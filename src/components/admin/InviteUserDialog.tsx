@@ -60,15 +60,28 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
     setLoading(true);
     try {
       // Invocar la Edge Function para enviar la invitación
-      const { data, error } = await supabase.functions.invoke('invite-user', {
+      const { data, error: invokeError } = await supabase.functions.invoke('invite-user', {
         body: JSON.stringify(values),
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      if (error) {
-        throw error;
+      if (invokeError) {
+        console.error('Supabase Edge Function invocation error:', invokeError);
+        // Intentar parsear el mensaje de error si es un JSON stringificado
+        let errorMessage = invokeError.message || 'Error desconocido al invocar la función.';
+        try {
+          const parsedError = JSON.parse(invokeError.message);
+          if (parsedError.error) {
+            errorMessage = parsedError.error;
+          }
+        } catch (e) {
+          // No es un JSON string, usar el mensaje tal cual
+        }
+        showError(errorMessage);
+        setLoading(false); // Asegurarse de que el loading se desactive en caso de error
+        return; // Detener la ejecución aquí
       }
 
       showSuccess('¡Invitación enviada con éxito!');
@@ -76,7 +89,7 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
       queryClient.invalidateQueries({ queryKey: ['users'] }); // Refrescar la tabla de usuarios
       onOpenChange(false); // Cerrar el diálogo
     } catch (error: any) {
-      console.error('Error al invitar usuario:', error);
+      console.error('Error al invitar usuario (client-side catch):', error);
       showError(error.message || 'Error al enviar la invitación.');
     } finally {
       setLoading(false);
