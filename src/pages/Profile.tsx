@@ -16,6 +16,23 @@ const Profile = () => {
 
   useEffect(() => {
     let ignore = false;
+
+    async function createProfile() {
+      if (!session?.user) return;
+      try {
+        setLoading(true);
+        showSuccess('Creando tu perfil de administrador...');
+        const { error } = await supabase.from('profiles').insert({
+          id: session.user.id,
+          role: 'admin', // Asignar rol de admin al crear
+        });
+        if (error) throw error;
+        showSuccess('¡Perfil de administrador creado! Por favor, completa tus datos.');
+      } catch (error: any) {
+        showError('Error al crear el perfil: ' + error.message);
+      }
+    }
+
     async function getProfile() {
       if (!session?.user) return;
       setLoading(true);
@@ -26,7 +43,14 @@ const Profile = () => {
         .single();
 
       if (!ignore) {
-        if (error) {
+        if (error && error.code === 'PGRST116') {
+          // Profile not found, so create it.
+          console.log('Profile not found, creating one.');
+          await createProfile();
+          // After creating, we can assume first/last name are empty
+          setFirstName('');
+          setLastName('');
+        } else if (error) {
           console.warn(error);
           showError('Error al cargar el perfil.');
         } else if (data) {
