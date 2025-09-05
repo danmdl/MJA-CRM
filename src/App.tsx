@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Profile from "./pages/Profile";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
 import { MadeWithDyad } from "./components/made-with-dyad";
@@ -29,6 +30,10 @@ const AppRoutes = () => {
       <Route 
         path="/" 
         element={session ? <Index /> : <Navigate to="/login" replace />} 
+      />
+      <Route 
+        path="/profile" 
+        element={session ? <Profile /> : <Navigate to="/login" replace />} 
       />
       <Route path="*" element={<NotFound />} />
     </Routes>

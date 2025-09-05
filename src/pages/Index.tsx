@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const Index = () => {
   const { session } = useSession();
@@ -24,7 +24,12 @@ const Index = () => {
             Logged in as: {session.user.email}
           </p>
         )}
-        <Button onClick={handleLogout}>Logout</Button>
+        <div className="flex gap-4 justify-center">
+            <Button asChild>
+                <Link to="/profile">Go to Profile</Link>
+            </Button>
+            <Button onClick={handleLogout} variant="outline">Logout</Button>
+        </div>
       </div>
     </div>
   );
