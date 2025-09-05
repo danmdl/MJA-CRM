@@ -13,6 +13,7 @@ serve(async (req) => {
 
   try {
     const { email, role } = await req.json();
+    console.log('Received invitation request for email:', email, 'with role:', role);
 
     if (!email || !role) {
       console.error('Missing email or role in request body.');
@@ -27,13 +28,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Log the keys being used (for debugging)
+    console.log('Attempting to invite user with Supabase Admin client.');
     console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? 'Set' : 'Not Set');
     console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Set' : 'Not Set');
-    console.log('SITE_URL:', Deno.env.get('SITE_URL') ? 'Set' : 'Not Set');
-
-
-    const redirectToUrl = Deno.env.get('SITE_URL') ? `${Deno.env.get('SITE_URL')}/login` : 'http://localhost:8080/login';
+    
+    const siteUrl = Deno.env.get('SITE_URL');
+    const redirectToUrl = siteUrl ? `${siteUrl}/login` : 'http://localhost:8080/login';
+    console.log('Redirecting new user to:', redirectToUrl);
 
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { role: role },
@@ -42,12 +43,13 @@ serve(async (req) => {
 
     if (error) {
       console.error('Error inviting user via Supabase Admin:', error.message);
-      return new Response(JSON.stringify({ error: error.message }), {
+      return new Response(JSON.stringify({ error: `Error al invitar usuario: ${error.message}` }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    console.log('User invited successfully. User ID:', data.user?.id);
     return new Response(JSON.stringify({ message: 'Invitación enviada con éxito.', user: data.user }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -55,7 +57,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in Edge Function catch block:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: `Error interno del servidor: ${error.message}` }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
