@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm } from '@hookform/react-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -31,9 +31,12 @@ import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 
+// Definir los nuevos roles como un enum de Zod
+const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user']);
+
 const inviteSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
-  role: z.enum(['user', 'admin'], { required_error: 'Debes seleccionar un rol.' }),
+  role: UserRoles, // Usar el nuevo enum de roles
 });
 
 interface InviteUserDialogProps {
@@ -49,16 +52,17 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
     resolver: zodResolver(inviteSchema),
     defaultValues: {
       email: '',
-      role: 'user',
+      role: 'user', // Rol por defecto
     },
   });
 
   const onSubmit = async (values: z.infer<typeof inviteSchema>) => {
     setLoading(true);
+    // Esta lógica se implementará en un paso posterior, probablemente con una Edge Function
     showError("La función de invitación aún no está implementada.");
     console.log("Valores del formulario de invitación:", values);
-    // Lógica para llamar a la Edge Function que se creará en el siguiente paso.
     setLoading(false);
+    onOpenChange(false); // Cerrar el diálogo después de intentar enviar
   };
 
   return (
@@ -98,8 +102,12 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      {/* Opciones de roles actualizadas */}
+                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="pastor">Pastor</SelectItem>
+                      <SelectItem value="piloto">Piloto</SelectItem>
+                      <SelectItem value="encargado_de_celula">Encargado de Célula</SelectItem>
                       <SelectItem value="user">Usuario</SelectItem>
-                      <SelectItem value="admin">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

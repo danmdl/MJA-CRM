@@ -13,12 +13,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Definir el tipo de rol de usuario para TypeScript
+type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
+
 interface User {
   id: string;
   email: string;
   first_name: string | null;
   last_name: string | null;
-  role: string;
+  role: UserRole; // Usar el nuevo tipo de rol
   updated_at: string;
 }
 
@@ -53,6 +56,25 @@ const UserTable = () => {
     return <div className="text-red-500">Error: {error.message}</div>;
   }
 
+  // Función para obtener la variante del badge según el rol
+  const getBadgeVariant = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return 'destructive';
+      case 'general':
+        return 'default';
+      case 'pastor':
+        return 'secondary';
+      case 'piloto':
+        return 'outline';
+      case 'encargado_de_celula':
+        return 'default';
+      case 'user':
+      default:
+        return 'secondary';
+    }
+  };
+
   return (
     <Table>
       <TableHeader>
@@ -70,7 +92,7 @@ const UserTable = () => {
               <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>
-                <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                <Badge variant={getBadgeVariant(user.role)}>
                   {user.role}
                 </Badge>
               </TableCell>
