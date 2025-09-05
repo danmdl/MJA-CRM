@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { PlusCircle } from 'lucide-react';
+import UserTable from '@/components/admin/UserTable';
 
 const ManageTeam = () => {
   return (
@@ -17,7 +18,7 @@ const ManageTeam = () => {
           <CardDescription>Ver, gestionar e invitar a miembros del equipo.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">La tabla de usuarios se mostrará aquí. La funcionalidad para invitar y gestionar usuarios se añadirá en el siguiente paso.</p>
+          <UserTable />
         </CardContent>
       </Card>
     </div>
