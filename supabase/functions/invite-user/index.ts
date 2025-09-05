@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Manejar solicitudes OPTIONS para CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -16,29 +15,33 @@ serve(async (req) => {
     const { email, role } = await req.json();
 
     if (!email || !role) {
+      console.error('Missing email or role in request body.');
       return new Response(JSON.stringify({ error: 'Email y rol son requeridos.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Crear un cliente Supabase con la clave de rol de servicio para operaciones de administrador
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Definir una URL de redirección, con un fallback si SITE_URL no está configurado
+    // Log the keys being used (for debugging)
+    console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? 'Set' : 'Not Set');
+    console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Set' : 'Not Set');
+    console.log('SITE_URL:', Deno.env.get('SITE_URL') ? 'Set' : 'Not Set');
+
+
     const redirectToUrl = Deno.env.get('SITE_URL') ? `${Deno.env.get('SITE_URL')}/login` : 'http://localhost:8080/login';
 
-    // Invitar al usuario por correo electrónico y establecer el rol en los metadatos
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { role: role }, // El trigger handle_new_user usará esto
-      redirectTo: redirectToUrl, // Usar la URL de redirección definida
+      data: { role: role },
+      redirectTo: redirectToUrl,
     });
 
     if (error) {
-      console.error('Error al invitar usuario:', error);
+      console.error('Error inviting user via Supabase Admin:', error.message);
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -50,8 +53,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error en la Edge Function:', error);
+  } catch (error: any) {
+    console.error('Error in Edge Function catch block:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

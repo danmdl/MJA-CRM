@@ -1,23 +1,13 @@
-import { NavLink, useNavigate } from 'react-router-dom'; // Importar useNavigate
-import { User, Database, Users, LogOut } from 'lucide-react'; // Importar LogOut icon
+import { NavLink } from 'react-router-dom';
+import { User, Database, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ModeToggle } from '@/components/ModeToggle';
-import { Button } from '@/components/ui/button'; // Importar Button
-import { supabase } from '@/integrations/supabase/client'; // Importar supabase
+import SidebarFooter from './SidebarFooter'; // Importar el nuevo componente
 
 const Sidebar = () => {
-  const navigate = useNavigate(); // Inicializar useNavigate
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
   return (
     <aside className="w-64 bg-background border-r hidden md:block">
       <div className="p-4 border-b flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Panel de Admin</h2>
-        <ModeToggle />
       </div>
       <nav className="flex flex-col p-2">
         <NavLink
@@ -57,16 +47,7 @@ const Sidebar = () => {
           Manejar Equipo
         </NavLink>
       </nav>
-      <div className="p-4 border-t mt-auto"> {/* Añadir un div para el botón de cerrar sesión */}
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start text-muted-foreground hover:text-primary" 
-          onClick={handleLogout}
-        >
-          <LogOut className="mr-3 h-4 w-4" />
-          Cerrar Sesión
-        </Button>
-      </div>
+      <SidebarFooter /> {/* Renderizar el nuevo componente de pie de página */}
     </aside>
   );
 };
