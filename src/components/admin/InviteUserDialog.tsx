@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form'; // Corregido: importación desde 'react-hook-form'
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -58,11 +58,29 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
 
   const onSubmit = async (values: z.infer<typeof inviteSchema>) => {
     setLoading(true);
-    // Esta lógica se implementará en un paso posterior, probablemente con una Edge Function
-    showError("La función de invitación aún no está implementada.");
-    console.log("Valores del formulario de invitación:", values);
-    setLoading(false);
-    onOpenChange(false); // Cerrar el diálogo después de intentar enviar
+    try {
+      // Invocar la Edge Function para enviar la invitación
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: JSON.stringify(values),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      showSuccess('¡Invitación enviada con éxito!');
+      form.reset(); // Limpiar el formulario
+      queryClient.invalidateQueries({ queryKey: ['users'] }); // Refrescar la tabla de usuarios
+      onOpenChange(false); // Cerrar el diálogo
+    } catch (error: any) {
+      console.error('Error al invitar usuario:', error);
+      showError(error.message || 'Error al enviar la invitación.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
