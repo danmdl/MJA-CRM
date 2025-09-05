@@ -5,11 +5,11 @@ import SidebarFooter from './SidebarFooter';
 
 const Sidebar = () => {
   return (
-    <aside className="w-64 bg-background border-r hidden md:flex flex-col h-full"> {/* Añadido flex flex-col h-full */}
+    <aside className="w-64 bg-background border-r hidden md:flex flex-col h-full">
       <div className="p-4 border-b flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight">Panel de Admin</h2>
       </div>
-      <nav className="flex flex-col p-2 flex-grow"> {/* Añadido flex-grow para ocupar el espacio */}
+      <nav className="flex flex-col p-2 flex-grow">
         <NavLink
           to="/admin/profile"
           className={({ isActive }) =>
@@ -47,7 +47,7 @@ const Sidebar = () => {
           Manejar Equipo
         </NavLink>
       </nav>
-      <SidebarFooter /> {/* Este componente ahora se empujará al final */}
+      <SidebarFooter />
     </aside>
   );
 };

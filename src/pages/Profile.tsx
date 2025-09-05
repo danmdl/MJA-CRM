@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
+import PasswordChangeForm from '@/components/auth/PasswordChangeForm'; // Importar el nuevo componente
 
 const Profile = () => {
   const { session } = useSession();
@@ -56,13 +57,10 @@ const Profile = () => {
     setLoading(false);
   };
   
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
+  // handleLogout se ha movido al SidebarFooter
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4"> {/* Usar bg-background */}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 space-y-6">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Tu Perfil</CardTitle>
@@ -95,16 +93,14 @@ const Profile = () => {
               />
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button type="button" variant="secondary" onClick={handleLogout}>
-              Cerrar Sesión
-            </Button>
+          <CardFooter className="flex justify-end"> {/* Ajustado para alinear a la derecha */}
             <Button type="submit" disabled={loading}>
               {loading ? 'Guardando...' : 'Guardar cambios'}
             </Button>
           </CardFooter>
         </form>
       </Card>
+      <PasswordChangeForm /> {/* Añadir el formulario de cambio de contraseña */}
     </div>
   );
 };

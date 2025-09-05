@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
+import PasswordChangeForm from '@/components/auth/PasswordChangeForm'; // Importar el nuevo componente
 
 const AdminProfile = () => {
   const { session } = useSession();
@@ -55,11 +56,11 @@ const AdminProfile = () => {
   };
 
   return (
-    <div>
+    <div className="space-y-6"> {/* Añadido espacio entre las tarjetas */}
       <h1 className="text-3xl font-bold mb-6">Perfil</h1>
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>Tu Perfil</CardTitle>
+          <CardTitle>Tu Información Personal</CardTitle>
           <CardDescription>Actualiza tu información personal aquí.</CardDescription>
         </CardHeader>
         <form onSubmit={handleUpdateProfile}>
@@ -94,6 +95,7 @@ const AdminProfile = () => {
           </CardFooter>
         </form>
       </Card>
+      <PasswordChangeForm /> {/* Añadir el formulario de cambio de contraseña */}
     </div>
   );
 };

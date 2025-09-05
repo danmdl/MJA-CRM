@@ -7,20 +7,17 @@ const Index = () => {
   const { session } = useSession();
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
+  // handleLogout se ha movido al SidebarFooter
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background"> {/* Usar bg-background */}
-      <div className="text-center p-8 bg-card shadow-md rounded-lg"> {/* Usar bg-card */}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+      <div className="text-center p-8 bg-card shadow-md rounded-lg">
         <h1 className="text-4xl font-bold mb-4">¡Bienvenido!</h1>
-        <p className="text-xl text-muted-foreground mb-6"> {/* Usar text-muted-foreground */}
+        <p className="text-xl text-muted-foreground mb-6">
           Has iniciado sesión correctamente.
         </p>
         {session && (
-          <p className="text-md text-muted-foreground mb-2"> {/* Usar text-muted-foreground */}
+          <p className="text-md text-muted-foreground mb-2">
             Sesión iniciada como: {session.user.email}
           </p>
         )}
@@ -28,7 +25,7 @@ const Index = () => {
             <Button asChild>
                 <Link to="/profile">Ir al Perfil</Link>
             </Button>
-            <Button onClick={handleLogout} variant="outline">Cerrar sesión</Button>
+            {/* El botón de cerrar sesión se ha movido al SidebarFooter */}
         </div>
       </div>
     </div>
