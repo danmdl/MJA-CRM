@@ -28,3 +28,6 @@ const ManageTeam = () => {
       <InviteUserDialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen} />
     </div>
   );
+};
+
+export default ManageTeam;
