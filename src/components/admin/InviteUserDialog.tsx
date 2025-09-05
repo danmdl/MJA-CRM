@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm } from '@hookform/resolvers/zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -59,6 +59,8 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
   const onSubmit = async (values: z.infer<typeof inviteSchema>) => {
     setLoading(true);
     try {
+      console.log('Sending payload to invite-user Edge Function:', values); // Nuevo log aquí
+
       // Invocar la Edge Function para enviar la invitación
       const { data, error: invokeError } = await supabase.functions.invoke('invite-user', {
         body: JSON.stringify(values),
@@ -69,7 +71,6 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
 
       if (invokeError) {
         console.error('Supabase Edge Function invocation error:', invokeError);
-        // Intentar parsear el mensaje de error si es un JSON stringificado
         let errorMessage = invokeError.message || 'Error desconocido al invocar la función.';
         try {
           const parsedError = JSON.parse(invokeError.message);
@@ -80,14 +81,14 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
           // No es un JSON string, usar el mensaje tal cual
         }
         showError(errorMessage);
-        setLoading(false); // Asegurarse de que el loading se desactive en caso de error
-        return; // Detener la ejecución aquí
+        setLoading(false);
+        return;
       }
 
       showSuccess('¡Invitación enviada con éxito!');
-      form.reset(); // Limpiar el formulario
-      queryClient.invalidateQueries({ queryKey: ['users'] }); // Refrescar la tabla de usuarios
-      onOpenChange(false); // Cerrar el diálogo
+      form.reset();
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      onOpenChange(false);
     } catch (error: any) {
       console.error('Error al invitar usuario (client-side catch):', error);
       showError(error.message || 'Error al enviar la invitación.');
@@ -133,7 +134,6 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {/* Opciones de roles actualizadas */}
                       <SelectItem value="general">General</SelectItem>
                       <SelectItem value="pastor">Pastor</SelectItem>
                       <SelectItem value="piloto">Piloto</SelectItem>

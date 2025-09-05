@@ -11,8 +11,15 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log('Incoming request method:', req.method);
+  console.log('Incoming request Content-Type:', req.headers.get('Content-Type')); // Nuevo log
+  console.log('SITE_URL env var:', Deno.env.get('SITE_URL')); // Nuevo log
+  console.log('SUPABASE_URL env var:', Deno.env.get('SUPABASE_URL') ? 'Set' : 'Not Set');
+  console.log('SUPABASE_SERVICE_ROLE_KEY env var:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Set' : 'Not Set');
+
   try {
     const { email, role } = await req.json();
+    console.log('Successfully parsed request body.');
     console.log('Received invitation request for email:', email, 'with role:', role);
 
     if (!email || !role) {
@@ -28,10 +35,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('Attempting to invite user with Supabase Admin client.');
-    console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? 'Set' : 'Not Set');
-    console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Set' : 'Not Set');
-    
     const siteUrl = Deno.env.get('SITE_URL');
     const redirectToUrl = siteUrl ? `${siteUrl}/login` : 'http://localhost:8080/login';
     console.log('Redirecting new user to:', redirectToUrl);
