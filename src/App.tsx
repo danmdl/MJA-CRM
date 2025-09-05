@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Index from "./pages/Index";
+import RootPage from "./pages/Root";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
@@ -33,7 +33,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
       <Route 
         path="/" 
-        element={session ? <Index /> : <Navigate to="/login" replace />} 
+        element={session ? <RootPage /> : <Navigate to="/login" replace />} 
       />
       <Route 
         path="/profile" 
