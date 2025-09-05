@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import Index from './Index';
+import Index from '@/pages/Index';
 
-const RootPage = () => {
+const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ const RootPage = () => {
 
       if (error) {
         console.error('Error fetching user role:', error);
-        setUserRole('user');
+        setUserRole('user'); 
       } else if (data) {
         setUserRole(data.role);
       }
@@ -53,4 +53,4 @@ const RootPage = () => {
   return <Index />;
 };
 
-export default RootPage;
+export default PrivateRoute;

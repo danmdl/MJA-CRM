@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import RootPage from "./pages/Root";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
@@ -14,6 +13,9 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import ManageTeam from "./pages/admin/ManageTeam";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
+import PrivateRoute from "./components/auth/PrivateRoute";
+import AdminProfile from "./pages/admin/Profile";
+import DatabasePage from "./pages/admin/Database";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +35,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
       <Route 
         path="/" 
-        element={session ? <RootPage /> : <Navigate to="/login" replace />} 
+        element={<PrivateRoute />} 
       />
       <Route 
         path="/profile" 
@@ -49,6 +51,8 @@ const AppRoutes = () => {
               <Routes>
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="manage-team" element={<ManageTeam />} />
+                <Route path="profile" element={<AdminProfile />} />
+                <Route path="database" element={<DatabasePage />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Routes>
             </AdminLayout>
