@@ -1,13 +1,14 @@
+import React from 'react'; // Añadido: Importación de React
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
-import { useTheme } from 'next-themes'; // Importar useTheme
+import { useTheme } from 'next-themes';
 
 const Login = () => {
   const { session } = useSession();
-  const { theme } = useTheme(); // Obtener el tema actual
+  const { theme } = useTheme();
 
   if (session) {
     return <Navigate to="/" replace />;
@@ -24,7 +25,7 @@ const Login = () => {
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
           providers={[]}
-          theme={theme === 'dark' ? 'dark' : 'light'} {/* Usar el tema de la aplicación */}
+          theme={theme === 'dark' ? 'dark' : 'light'}
         />
       </div>
     </div>
