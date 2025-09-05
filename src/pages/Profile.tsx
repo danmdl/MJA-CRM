@@ -16,66 +16,26 @@ const Profile = () => {
   const [lastName, setLastName] = useState('');
 
   useEffect(() => {
-    let ignore = false;
-
-    async function getAndFixProfile() {
+    async function getProfile() {
       if (!session?.user) return;
       setLoading(true);
-
       const { data, error } = await supabase
         .from('profiles')
-        .select(`first_name, last_name, role`)
+        .select(`first_name, last_name`)
         .eq('id', session.user.id)
         .single();
 
-      if (!ignore) {
-        if (error && error.code === 'PGRST116') {
-          // Caso 1: El perfil no existe. Lo creamos como administrador.
-          console.log('Perfil no encontrado, creando perfil de administrador.');
-          const { error: insertError } = await supabase.from('profiles').insert({
-            id: session.user.id,
-            role: 'admin',
-          });
-
-          if (insertError) {
-            showError('Error al crear el perfil de administrador.');
-            console.error(insertError);
-          } else {
-            showSuccess('Perfil de admin creado. Cierra sesión y vuelve a entrar.');
-          }
-        } else if (error) {
-          // Otro tipo de error
-          showError('Error al cargar el perfil.');
-          console.warn(error);
-        } else if (data) {
-          // Caso 2: El perfil existe. Verificamos el rol.
-          setFirstName(data.first_name || '');
-          setLastName(data.last_name || '');
-
-          if (data.role !== 'admin') {
-            console.log('El rol no es de admin, actualizando...');
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ role: 'admin' })
-              .eq('id', session.user.id);
-            
-            if (updateError) {
-              showError('No se pudo actualizar tu rol a administrador.');
-              console.error(updateError);
-            } else {
-              showSuccess('Rol actualizado a admin. Cierra sesión y vuelve a entrar.');
-            }
-          }
-        }
+      if (error) {
+        console.warn(error);
+        showError('Error al cargar el perfil.');
+      } else if (data) {
+        setFirstName(data.first_name || '');
+        setLastName(data.last_name || '');
       }
       setLoading(false);
     }
 
-    getAndFixProfile();
-
-    return () => {
-      ignore = true;
-    };
+    getProfile();
   }, [session]);
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -107,7 +67,7 @@ const Profile = () => {
         <CardHeader>
           <CardTitle>Tu Perfil</CardTitle>
           <CardDescription>
-            Aquí puedes actualizar tu información. Si tu rol fue actualizado, por favor cierra sesión y vuelve a iniciarla para acceder al panel de admin.
+            Aquí puedes actualizar tu información personal.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleUpdateProfile}>
