@@ -10,6 +10,10 @@ import Profile from "./pages/Profile";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
 import { MadeWithDyad } from "./components/made-with-dyad";
+import AdminDashboard from "./pages/admin/Dashboard";
+import ManageTeam from "./pages/admin/ManageTeam";
+import AdminLayout from "./components/layout/AdminLayout";
+import AdminRoute from "./components/auth/AdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +23,7 @@ const AppRoutes = () => {
   if (loading) {
     return (
         <div className="min-h-screen flex items-center justify-center">
-            <div>Loading...</div>
+            <div>Cargando...</div>
         </div>
     );
   }
@@ -35,6 +39,23 @@ const AppRoutes = () => {
         path="/profile" 
         element={session ? <Profile /> : <Navigate to="/login" replace />} 
       />
+      
+      {/* Admin Routes */}
+      <Route 
+        path="/admin/*"
+        element={
+          <AdminRoute>
+            <AdminLayout>
+              <Routes>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="manage-team" element={<ManageTeam />} />
+                <Route index element={<Navigate to="dashboard" replace />} />
+              </Routes>
+            </AdminLayout>
+          </AdminRoute>
+        }
+      />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

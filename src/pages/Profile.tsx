@@ -28,7 +28,7 @@ const Profile = () => {
       if (!ignore) {
         if (error) {
           console.warn(error);
-          showError('Failed to fetch profile.');
+          showError('Error al cargar el perfil.');
         } else if (data) {
           setFirstName(data.first_name || '');
           setLastName(data.last_name || '');
@@ -57,7 +57,7 @@ const Profile = () => {
     if (error) {
       showError(error.message);
     } else {
-      showSuccess('Profile updated successfully!');
+      showSuccess('¡Perfil actualizado con éxito!');
     }
     setLoading(false);
   };
@@ -66,17 +66,17 @@ const Profile = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Your Profile</CardTitle>
-          <CardDescription>Update your personal information here.</CardDescription>
+          <CardTitle>Tu Perfil</CardTitle>
+          <CardDescription>Actualiza tu información personal aquí.</CardDescription>
         </CardHeader>
         <form onSubmit={handleUpdateProfile}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>Correo electrónico</Label>
               <Input type="email" value={session?.user?.email || ''} disabled />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
+              <Label htmlFor="firstName">Nombre</Label>
               <Input
                 id="firstName"
                 value={firstName}
@@ -85,7 +85,7 @@ const Profile = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
+              <Label htmlFor="lastName">Apellido</Label>
               <Input
                 id="lastName"
                 value={lastName}
@@ -96,10 +96,10 @@ const Profile = () => {
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="link" asChild>
-              <Link to="/">Back to Home</Link>
+              <Link to="/">Volver al inicio</Link>
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
+              {loading ? 'Guardando...' : 'Guardar cambios'}
             </Button>
           </CardFooter>
         </form>

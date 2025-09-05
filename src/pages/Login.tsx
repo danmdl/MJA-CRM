@@ -15,8 +15,8 @@ const Login = () => {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
         <div className="text-center">
-            <h2 className="text-2xl font-bold">Welcome</h2>
-            <p className="text-gray-500">Sign in to continue</p>
+            <h2 className="text-2xl font-bold">Bienvenido</h2>
+            <p className="text-gray-500">Inicia sesión para continuar</p>
         </div>
         <Auth
           supabaseClient={supabase}
