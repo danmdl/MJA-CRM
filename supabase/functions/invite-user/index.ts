@@ -28,10 +28,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Definir una URL de redirección, con un fallback si SITE_URL no está configurado
+    const redirectToUrl = Deno.env.get('SITE_URL') ? `${Deno.env.get('SITE_URL')}/login` : 'http://localhost:8080/login';
+
     // Invitar al usuario por correo electrónico y establecer el rol en los metadatos
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { role: role }, // El trigger handle_new_user usará esto
-      redirectTo: `${Deno.env.get('SITE_URL')}/login`, // Redirigir al usuario a la página de login después de aceptar la invitación
+      redirectTo: redirectToUrl, // Usar la URL de redirección definida
     });
 
     if (error) {
