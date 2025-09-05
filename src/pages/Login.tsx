@@ -12,17 +12,17 @@ const Login = () => {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
+    <div className="flex items-center justify-center min-h-screen bg-background"> {/* Usar bg-background */}
+      <div className="w-full max-w-md p-8 space-y-8 bg-card rounded-lg shadow-md"> {/* Usar bg-card */}
         <div className="text-center">
             <h2 className="text-2xl font-bold">Bienvenido</h2>
-            <p className="text-gray-500">Inicia sesión para continuar</p>
+            <p className="text-muted-foreground">Inicia sesión para continuar</p> {/* Usar text-muted-foreground */}
         </div>
         <Auth
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
           providers={[]}
-          theme="light"
+          theme="light" // Supabase Auth UI tiene su propio tema, lo mantenemos en light para que se vea bien con el fondo oscuro de la app.
         />
       </div>
     </div>

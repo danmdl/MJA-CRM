@@ -16,6 +16,7 @@ import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
+import { ThemeProvider } from "next-themes"; // Importar ThemeProvider
 
 const queryClient = new QueryClient();
 
@@ -72,12 +73,14 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionProvider>
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-grow">
-              <AppRoutes />
-            </main>
-            <MadeWithDyad />
-          </div>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem> {/* Envolver con ThemeProvider */}
+            <div className="min-h-screen flex flex-col">
+              <main className="flex-grow">
+                <AppRoutes />
+              </main>
+              <MadeWithDyad />
+            </div>
+          </ThemeProvider>
         </SessionProvider>
       </BrowserRouter>
     </TooltipProvider>

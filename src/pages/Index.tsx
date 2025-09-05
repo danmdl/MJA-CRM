@@ -13,14 +13,14 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-      <div className="text-center p-8 bg-white shadow-md rounded-lg">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background"> {/* Usar bg-background */}
+      <div className="text-center p-8 bg-card shadow-md rounded-lg"> {/* Usar bg-card */}
         <h1 className="text-4xl font-bold mb-4">¡Bienvenido!</h1>
-        <p className="text-xl text-gray-600 mb-6">
+        <p className="text-xl text-muted-foreground mb-6"> {/* Usar text-muted-foreground */}
           Has iniciado sesión correctamente.
         </p>
         {session && (
-          <p className="text-md text-gray-500 mb-2">
+          <p className="text-md text-muted-foreground mb-2"> {/* Usar text-muted-foreground */}
             Sesión iniciada como: {session.user.email}
           </p>
         )}

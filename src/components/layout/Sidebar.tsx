@@ -1,12 +1,14 @@
 import { NavLink } from 'react-router-dom';
 import { User, Database, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ModeToggle } from '@/components/ModeToggle'; // Importar ModeToggle
 
 const Sidebar = () => {
   return (
     <aside className="w-64 bg-background border-r hidden md:block">
-      <div className="p-4 border-b">
+      <div className="p-4 border-b flex items-center justify-between"> {/* Añadido flex y justify-between */}
         <h2 className="text-xl font-bold tracking-tight">Panel de Admin</h2>
+        <ModeToggle /> {/* Añadido ModeToggle aquí */}
       </div>
       <nav className="flex flex-col p-2">
         <NavLink
