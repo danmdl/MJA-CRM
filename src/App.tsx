@@ -16,7 +16,8 @@ import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
-import { ThemeProvider } from "next-themes"; // Importar ThemeProvider
+import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage"; // Importar la nueva página
+import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const AppRoutes = () => {
                 <Route path="manage-team" element={<ManageTeam />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="database" element={<DatabasePage />} />
+                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Nueva ruta */}
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Routes>
             </AdminLayout>
@@ -73,7 +75,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem> {/* Envolver con ThemeProvider */}
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <div className="min-h-screen flex flex-col">
               <main className="flex-grow">
                 <AppRoutes />
