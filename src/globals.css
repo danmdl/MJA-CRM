@@ -96,8 +96,6 @@
   }
 
   body {
-    /* Añadido para diagnóstico: si el fondo cambia a rojo, el CSS se está cargando. */
-    background-color: red !important;
     @apply bg-background text-foreground;
   }
 }

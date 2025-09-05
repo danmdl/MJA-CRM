@@ -1,28 +1,31 @@
+import React from 'react'; // Añadido: Importación de React
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
+import { Navigate } from 'react-router-dom';
+import { useSession } from '@/hooks/use-session';
+import { useTheme } from 'next-themes';
 
 const Login = () => {
+  const { session } = useSession();
+  const { theme } = useTheme();
+
+  if (session) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white">Iniciar Sesión</h2>
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="w-full max-w-md p-8 space-y-8 bg-card rounded-lg shadow-md">
+        <div className="text-center">
+            <h2 className="text-2xl font-bold">Bienvenido</h2>
+            <p className="text-muted-foreground">Inicia sesión para continuar</p>
+        </div>
         <Auth
           supabaseClient={supabase}
-          providers={[]} // Puedes añadir 'google', 'github', etc. aquí si los configuras en Supabase
-          appearance={{
-            theme: ThemeSupa,
-            variables: {
-              default: {
-                colors: {
-                  brand: 'hsl(var(--primary))',
-                  brandAccent: 'hsl(var(--primary-foreground))',
-                },
-              },
-            },
-          }}
-          theme="light" // O "dark" si prefieres
-          redirectTo={window.location.origin + '/admin/dashboard'} // Redirige al dashboard después del login
+          appearance={{ theme: ThemeSupa }}
+          providers={[]}
+          theme={theme === 'dark' ? 'dark' : 'light'}
         />
       </div>
     </div>

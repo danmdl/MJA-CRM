@@ -1,16 +1,20 @@
-import Layout from '@/components/layout/Layout';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
-const Dashboard = () => {
+const AdminDashboard = () => {
   return (
-    <Layout>
-      <div className="flex flex-col items-center justify-center p-4">
-        <h1 className="text-3xl font-bold mb-4">Bienvenido al Panel de Administración</h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">
-          Aquí podrás gestionar tu aplicación.
-        </p>
-      </div>
-    </Layout>
+    <div>
+      <h1 className="text-3xl font-bold mb-6">Dashboard de Admin</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle>¡Bienvenido, Admin!</CardTitle>
+          <CardDescription>Este es tu centro de control para gestionar la aplicación.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p>Desde aquí, puedes gestionar usuarios, ver analíticas y configurar ajustes. Usa la barra lateral para navegar por las diferentes secciones.</p>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
-export default Dashboard;
+export default AdminDashboard;

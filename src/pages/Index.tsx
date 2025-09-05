@@ -1,30 +1,35 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useSession } from '@/components/auth/SessionProvider'; // Importar useSession
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/hooks/use-session";
+import { useNavigate, Link } from "react-router-dom";
 
 const Index = () => {
-  const { session, loading } = useSession();
+  const { session } = useSession();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!loading) {
-      if (session) {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/login');
-      }
-    }
-  }, [session, loading, navigate]);
+  // handleLogout se ha movido al SidebarFooter
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <p className="text-xl text-gray-600 dark:text-gray-400">Cargando...</p>
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+      <div className="text-center p-8 bg-card shadow-md rounded-lg">
+        <h1 className="text-4xl font-bold mb-4">¡Bienvenido!</h1>
+        <p className="text-xl text-muted-foreground mb-6">
+          Has iniciado sesión correctamente.
+        </p>
+        {session && (
+          <p className="text-md text-muted-foreground mb-2">
+            Sesión iniciada como: {session.user.email}
+          </p>
+        )}
+        <div className="flex gap-4 justify-center">
+            <Button asChild>
+                <Link to="/profile">Ir al Perfil</Link>
+            </Button>
+            {/* El botón de cerrar sesión se ha movido al SidebarFooter */}
+        </div>
       </div>
-    );
-  }
-
-  return null; // No renderiza nada mientras redirige
+    </div>
+  );
 };
 
 export default Index;

@@ -32,9 +32,8 @@ serve(async (req) => {
     console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Set' : 'Not Set');
     console.log('SITE_URL:', Deno.env.get('SITE_URL') ? 'Set' : 'Not Set');
 
-    // Ensure redirectToUrl is always valid, defaulting to localhost for local development
+
     const redirectToUrl = Deno.env.get('SITE_URL') ? `${Deno.env.get('SITE_URL')}/login` : 'http://localhost:8080/login';
-    console.log('Redirecting to:', redirectToUrl);
 
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { role: role },
@@ -42,7 +41,7 @@ serve(async (req) => {
     });
 
     if (error) {
-      console.error('Error inviting user via Supabase Admin:', error); // Log the full error object
+      console.error('Error inviting user via Supabase Admin:', error.message);
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -55,7 +54,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Error in Edge Function catch block:', error); // Log the full error object
+    console.error('Error in Edge Function catch block:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

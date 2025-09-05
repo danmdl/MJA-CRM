@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
+import { useNavigate } from 'react-router-dom';
 import PasswordChangeForm from '@/components/auth/PasswordChangeForm'; // Importar el nuevo componente
 
-const AdminProfile = () => {
+const Profile = () => {
   const { session } = useSession();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -54,14 +56,17 @@ const AdminProfile = () => {
     }
     setLoading(false);
   };
+  
+  // handleLogout se ha movido al SidebarFooter
 
   return (
-    <div className="space-y-6"> {/* Añadido espacio entre las tarjetas */}
-      <h1 className="text-3xl font-bold mb-6">Perfil</h1>
-      <Card className="max-w-2xl">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 space-y-6">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Tu Información Personal</CardTitle>
-          <CardDescription>Actualiza tu información personal aquí.</CardDescription>
+          <CardTitle>Tu Perfil</CardTitle>
+          <CardDescription>
+            Aquí puedes actualizar tu información personal.
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleUpdateProfile}>
           <CardContent className="space-y-4">
@@ -88,7 +93,7 @@ const AdminProfile = () => {
               />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex justify-end"> {/* Ajustado para alinear a la derecha */}
             <Button type="submit" disabled={loading}>
               {loading ? 'Guardando...' : 'Guardar cambios'}
             </Button>
@@ -100,4 +105,4 @@ const AdminProfile = () => {
   );
 };
 
-export default AdminProfile;
+export default Profile;

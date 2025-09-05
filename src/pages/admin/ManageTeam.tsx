@@ -1,25 +1,32 @@
-import Layout from '@/components/layout/Layout';
-import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
-import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { PlusCircle } from 'lucide-react';
+import UserTable from '@/components/admin/UserTable';
+import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
 
 const ManageTeam = () => {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
   return (
-    <Layout>
-      <div className="flex flex-col items-center justify-center p-4">
-        <h1 className="text-3xl font-bold mb-4">Gestionar Equipo</h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-          Aquí puedes invitar nuevos miembros y gestionar los roles existentes.
-        </p>
-        <Button onClick={() => setIsInviteDialogOpen(true)}>Invitar Nuevo Miembro</Button>
-        <InviteUserDialog
-          open={isInviteDialogOpen}
-          onOpenChange={setIsInviteDialogOpen}
-        />
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Equipo</h1>
+        <Button onClick={() => setIsInviteDialogOpen(true)}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Invitar Usuario
+        </Button>
       </div>
-    </Layout>
+      <Card>
+        <CardHeader>
+          <CardTitle>Miembros del Equipo</CardTitle>
+          <CardDescription>Ver, gestionar e invitar a miembros del equipo.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <UserTable />
+        </CardContent>
+      </Card>
+      <InviteUserDialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen} />
+    </div>
   );
 };
 

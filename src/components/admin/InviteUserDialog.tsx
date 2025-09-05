@@ -68,7 +68,7 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
       });
 
       if (invokeError) {
-        console.error('Supabase Edge Function invocation error:', invokeError); // Log the full error object
+        console.error('Supabase Edge Function invocation error:', invokeError);
         // Intentar parsear el mensaje de error si es un JSON stringificado
         let errorMessage = invokeError.message || 'Error desconocido al invocar la función.';
         try {
