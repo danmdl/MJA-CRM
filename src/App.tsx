@@ -22,13 +22,47 @@ import PasswordSetup from "./pages/PasswordSetup";
 import UserLayout from "./components/layout/UserLayout";
 import AdminLayout from "./components/layout/AdminLayout";
 import Index from "./pages/Index";
+import { useEffect, useState } from "react";
+import { supabase } from "./integrations/supabase/client";
 
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { session, loading } = useSession();
+  const { session, loading: sessionLoading } = useSession();
+  const [profileComplete, setProfileComplete] = useState(false);
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [loadingOnboarding, setLoadingOnboarding] = useState(true);
 
-  if (loading) {
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      if (sessionLoading) return;
+
+      if (!session) {
+        setLoadingOnboarding(false);
+        return;
+      }
+
+      // Check profile completion
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', session.user.id)
+        .single();
+
+      const isProfileComplete = profileData && profileData.first_name && profileData.last_name;
+      setProfileComplete(!!isProfileComplete);
+
+      // Check if password needs to be set (only if last_sign_in_at is null, implying first login after invite)
+      const isPasswordSet = !!session.user.last_sign_in_at;
+      setPasswordSet(isPasswordSet);
+      
+      setLoadingOnboarding(false);
+    };
+
+    checkOnboardingStatus();
+  }, [session, sessionLoading]);
+
+  if (sessionLoading || loadingOnboarding) {
     return (
         <div className="min-h-screen flex items-center justify-center">
             <div>Cargando...</div>
@@ -36,26 +70,33 @@ const AppRoutes = () => {
     );
   }
 
+  // --- Onboarding Redirects (handled at the top-level AppRoutes) ---
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!profileComplete) {
+    return <Navigate to="/initial-profile-setup" replace />;
+  }
+
+  if (!passwordSet) {
+    return <Navigate to="/password-setup" replace />;
+  }
+  // --- End Onboarding Redirects ---
+
   return (
     <Routes>
+      {/* Public routes and onboarding steps */}
       <Route path="/login" element={<Login />} />
-
-      {/* Routes for initial profile and password setup (no layout) */}
-      <Route
-        path="/initial-profile-setup"
-        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />}
-      />
-      <Route
-        path="/password-setup"
-        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />}
-      />
+      <Route path="/initial-profile-setup" element={<InitialProfileSetup />} />
+      <Route path="/password-setup" element={<PasswordSetup />} />
 
       {/* Protected routes for regular users */}
-      {/* First, PrivateRoute acts as a guard. If passed, it renders an Outlet. */}
+      {/* PrivateRoute acts as a role guard (non-admin) */}
       <Route element={<PrivateRoute />}>
-        {/* Then, UserLayout provides the common layout for these routes, rendering its own Outlet. */}
+        {/* UserLayout provides the common layout */}
         <Route element={<UserLayout />}>
-          <Route index element={<Index />} /> {/* Renders at / */}
+          <Route index element={<Index />} />
           <Route path="profile" element={<Profile />} />
           <Route path="database" element={<DatabasePage />} />
           <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
@@ -63,16 +104,16 @@ const AppRoutes = () => {
       </Route>
 
       {/* Protected routes for admin users */}
-      {/* First, AdminRoute acts as a guard. If passed, it renders an Outlet. */}
+      {/* AdminRoute acts as a role guard (admin) */}
       <Route path="/admin" element={<AdminRoute />}>
-        {/* Then, AdminLayout provides the common layout for these routes, rendering its own Outlet. */}
+        {/* AdminLayout provides the common layout */}
         <Route element={<AdminLayout />}>
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="manage-team" element={<ManageTeam />} />
           <Route path="profile" element={<AdminProfile />} />
           <Route path="database" element={<DatabasePage />} />
           <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-          <Route index element={<Navigate to="dashboard" replace />} /> {/* Default admin route */}
+          <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
       </Route>
 

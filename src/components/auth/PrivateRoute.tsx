@@ -1,56 +1,43 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom'; // Import Outlet
+import { Navigate, Outlet } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast'; // Added for consistency
+import { showError } from '@/utils/toast';
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
-  const [profileComplete, setProfileComplete] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [loadingRole, setLoadingRole] = useState(true);
 
   useEffect(() => {
-    if (sessionLoading) {
+    if (sessionLoading || !session) {
+      setLoadingRole(false);
       return;
     }
 
-    if (!session) {
-      setLoadingProfile(false);
-      return;
-    }
-
-    const fetchUserProfile = async () => {
-      setLoadingProfile(true);
+    const fetchUserRole = async () => {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name, role')
+        .select('role')
         .eq('id', session.user.id)
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
-        showError('No se pudo verificar tu rol de usuario.'); // Show error to user
-        setProfileComplete(false);
-        setUserRole('user');
-      } else if (profile) {
-        setUserRole(profile.role);
-        if (profile.first_name && profile.last_name) {
-          setProfileComplete(true);
-        } else {
-          setProfileComplete(false);
-        }
+        console.error('Error fetching user role in PrivateRoute:', error);
+        showError('No se pudo verificar tu rol de usuario.');
+        setUserRole('user'); // Default to user on error
+      } else if (data) {
+        setUserRole(data.role);
       } else {
-        setProfileComplete(false);
-        setUserRole('user');
+        setUserRole('user'); // Default if no profile found
       }
-      setLoadingProfile(false);
+      setLoadingRole(false);
     };
 
-    fetchUserProfile();
+    fetchUserRole();
   }, [session, sessionLoading]);
 
-  if (loadingProfile || sessionLoading) {
+  if (sessionLoading || loadingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Cargando...</div>
@@ -58,23 +45,13 @@ const PrivateRoute = () => {
     );
   }
 
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!profileComplete) {
-    return <Navigate to="/initial-profile-setup" replace />;
-  }
-
-  if (session && profileComplete && !session.user.last_sign_in_at) {
-     return <Navigate to="/password-setup" replace />;
-  }
-
+  // If the user is an admin, redirect them to the admin dashboard.
+  // AppRoutes handles unauthenticated users and onboarding.
   if (userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // If authenticated, profile complete, and not admin, render the Outlet for nested routes
+  // If not an admin, allow access to the nested user routes.
   return <Outlet />;
 };
 

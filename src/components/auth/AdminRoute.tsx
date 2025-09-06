@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom'; // Import Outlet
+import { Navigate, Outlet } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
@@ -7,15 +7,11 @@ import { showError } from '@/utils/toast';
 const AdminRoute = () => {
   const { session, loading: sessionLoading } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loadingRole, setLoadingRole] = useState(true);
 
   useEffect(() => {
-    if (sessionLoading) {
-      return;
-    }
-
-    if (!session) {
-      setLoading(false);
+    if (sessionLoading || !session) {
+      setLoadingRole(false);
       return;
     }
 
@@ -27,21 +23,21 @@ const AdminRoute = () => {
         .single();
 
       if (error) {
-        console.error('Error fetching user role:', error);
-        showError('No se pudo verificar tu rol de usuario.');
+        console.error('Error fetching user role in AdminRoute:', error);
+        showError('No se pudo verificar tu rol de administrador.');
         setIsAdmin(false);
       } else if (data && data.role === 'admin') {
         setIsAdmin(true);
       } else {
         setIsAdmin(false);
       }
-      setLoading(false);
+      setLoadingRole(false);
     };
 
     checkAdminRole();
   }, [session, sessionLoading]);
 
-  if (loading || sessionLoading) {
+  if (sessionLoading || loadingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Verificando acceso...</div>
@@ -49,16 +45,14 @@ const AdminRoute = () => {
     );
   }
 
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
-
+  // If the user is not an admin, redirect them to the regular user dashboard.
+  // AppRoutes handles unauthenticated users and onboarding.
   if (!isAdmin) {
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
   }
 
-  // If admin, render the Outlet for nested admin routes
+  // If admin, allow access to the nested admin routes.
   return <Outlet />;
 };
 
