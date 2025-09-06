@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import Index from '@/pages/Index';
+import Profile from '@/pages/Profile'; // Import Profile page
+import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
@@ -10,8 +12,12 @@ const PrivateRoute = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (sessionLoading || !session) {
-      if (!sessionLoading) setLoading(false);
+    if (sessionLoading) {
+      return;
+    }
+
+    if (!session) {
+      setLoading(false);
       return;
     }
 
@@ -50,7 +56,17 @@ const PrivateRoute = () => {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  return <Index />;
+  // For non-admin authenticated users, render UserLayout with nested routes
+  return (
+    <UserLayout>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/profile" element={<Profile />} />
+        {/* Add other user-specific routes here if needed */}
+        <Route index element={<Navigate to="/" replace />} />
+      </Routes>
+    </UserLayout>
+  );
 };
 
 export default PrivateRoute;

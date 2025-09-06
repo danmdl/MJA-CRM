@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import Profile from "./pages/Profile";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
 import { MadeWithDyad } from "./components/made-with-dyad";
@@ -16,13 +15,13 @@ import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
-import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage"; // Importar la nueva página
+import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { session, loading } = useSession();
+  const { loading } = useSession();
 
   if (loading) {
     return (
@@ -35,14 +34,9 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route 
-        path="/" 
-        element={<PrivateRoute />} 
-      />
-      <Route 
-        path="/profile" 
-        element={session ? <Profile /> : <Navigate to="/login" replace />} 
-      />
+      
+      {/* PrivateRoute now handles user-specific layout and routes */}
+      <Route path="/*" element={<PrivateRoute />} /> 
       
       {/* Admin Routes */}
       <Route 
@@ -55,7 +49,7 @@ const AppRoutes = () => {
                 <Route path="manage-team" element={<ManageTeam />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="database" element={<DatabasePage />} />
-                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Nueva ruta */}
+                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Routes>
             </AdminLayout>
