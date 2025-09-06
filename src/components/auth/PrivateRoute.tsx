@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom'; // No longer needs Outlet here
+import { Navigate, Outlet } from 'react-router-dom'; // Import Outlet
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
+import { showError } from '@/utils/toast'; // Added for consistency
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [profileComplete, setProfileComplete] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessionLoading) {
@@ -30,6 +30,7 @@ const PrivateRoute = () => {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        showError('No se pudo verificar tu rol de usuario.'); // Show error to user
         setProfileComplete(false);
         setUserRole('user');
       } else if (profile) {
@@ -73,8 +74,8 @@ const PrivateRoute = () => {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // If non-admin and all checks pass, render the UserLayout
-  return <UserLayout />;
+  // If authenticated, profile complete, and not admin, render the Outlet for nested routes
+  return <Outlet />;
 };
 
 export default PrivateRoute;
