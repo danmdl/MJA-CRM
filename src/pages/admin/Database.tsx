@@ -1,4 +1,6 @@
 import CsvImporter from '@/components/admin/CsvImporter';
+import ContactTable from '@/components/admin/ContactTable'; // Importar el nuevo componente
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const DatabasePage = () => {
   const contactFields = [
@@ -12,20 +14,28 @@ const DatabasePage = () => {
     { key: 'leader_assigned', label: 'Líder Asignado', type: 'text' },
   ];
 
-  // Para este ejemplo, todos los campos serán requeridos para simplificar.
-  // Puedes separar en requiredFields y optionalFields según necesites.
   const requiredContactFields = contactFields.filter(f => f.key !== 'apartment_number' && f.key !== 'leader_assigned');
   const optionalContactFields = contactFields.filter(f => f.key === 'apartment_number' || f.key === 'leader_assigned');
-
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold mb-6">Gestión de Base de Datos</h1>
-      <CsvImporter
-        tableName="contacts"
-        requiredFields={requiredContactFields}
-        optionalFields={optionalContactFields}
-      />
+      <Tabs defaultValue="contacts" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="contacts">Contactos</TabsTrigger>
+          <TabsTrigger value="import-csv">Importar CSV</TabsTrigger>
+        </TabsList>
+        <TabsContent value="contacts">
+          <ContactTable />
+        </TabsContent>
+        <TabsContent value="import-csv">
+          <CsvImporter
+            tableName="contacts"
+            requiredFields={requiredContactFields}
+            optionalFields={optionalContactFields}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
