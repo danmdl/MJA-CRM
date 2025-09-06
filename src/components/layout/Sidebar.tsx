@@ -1,3 +1,5 @@
+"use client";
+
 import { NavLink } from 'react-router-dom';
 import { User, Database, Users, FileSpreadsheet, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
