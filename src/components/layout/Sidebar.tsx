@@ -15,11 +15,11 @@ const Sidebar = ({ isCollapsed, userSession }: SidebarProps) => {
   const userRole = userSession?.user?.user_metadata?.role || 'user'; // Default to 'user'
 
   const allNavItems = [
-    { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'] },
+    { to: "/", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'] }, // Changed to "/" for non-admin home
     { to: "/profile", icon: User, label: "Perfil", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'] },
-    { to: "/database", icon: Database, label: "Base de Datos", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] },
+    { to: "/database", icon: Database, label: "Base de Datos", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'] }, // Added 'user' role
     { to: "/manage-team", icon: Users, label: "Manejar Equipo", roles: ['admin'] }, // Only for admin
-    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general'] },
+    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'] }, // Added all non-admin roles
   ];
 
   // Filter nav items based on user's role
@@ -34,7 +34,7 @@ const Sidebar = ({ isCollapsed, userSession }: SidebarProps) => {
         "p-4 border-b flex items-center",
         isCollapsed ? "justify-center" : "justify-between"
       )}>
-        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">Panel de Admin</h2>}
+        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">MJA Central</h2>} {/* Changed title */}
         {isCollapsed && <LayoutDashboard className="h-6 w-6 text-primary" />}
       </div>
       <nav className="flex flex-col p-2 flex-grow space-y-1">
@@ -42,7 +42,7 @@ const Sidebar = ({ isCollapsed, userSession }: SidebarProps) => {
           <NavLink
             key={item.to}
             // Prepend /admin to routes if the user is an admin, otherwise use root path
-            to={userRole === 'admin' ? `/admin${item.to}` : item.to}
+            to={userRole === 'admin' ? `/admin${item.to === '/' ? '/dashboard' : item.to}` : item.to}
             className={({ isActive }) =>
               cn(
                 'flex items-center rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',

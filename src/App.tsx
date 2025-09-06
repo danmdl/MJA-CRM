@@ -20,8 +20,8 @@ import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import { ThemeProvider } from "next-themes";
 import InitialProfileSetup from "./pages/InitialProfileSetup";
 import PasswordSetup from "./pages/PasswordSetup";
-import UserLayout from "./components/layout/UserLayout"; // Import the new UserLayout
-import Index from "./pages/Index"; // Import Index to be rendered within UserLayout
+import UserLayout from "./components/layout/UserLayout";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -39,13 +39,13 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route 
-        path="/" 
-        element={<PrivateRoute />} 
+      <Route
+        path="/"
+        element={<PrivateRoute />}
       >
         {/* Nested routes for authenticated users (non-admin) */}
-        <Route 
-          index 
+        <Route
+          index
           element={
             session ? (
               <UserLayout>
@@ -54,10 +54,10 @@ const AppRoutes = () => {
             ) : (
               <Navigate to="/login" replace />
             )
-          } 
+          }
         />
-        <Route 
-          path="profile" 
+        <Route
+          path="profile"
           element={
             session ? (
               <UserLayout>
@@ -66,22 +66,45 @@ const AppRoutes = () => {
             ) : (
               <Navigate to="/login" replace />
             )
-          } 
+          }
         />
-        {/* Other non-admin routes can be added here, wrapped in UserLayout */}
+        <Route
+          path="database"
+          element={
+            session ? (
+              <UserLayout>
+                <DatabasePage />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="csv-deduplicator"
+          element={
+            session ? (
+              <UserLayout>
+                <CsvDeduplicatorPage />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
       </Route>
-      
-      <Route 
-        path="/initial-profile-setup" 
-        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />} 
+
+      <Route
+        path="/initial-profile-setup"
+        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />}
       />
-      <Route 
-        path="/password-setup" 
-        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />} 
+      <Route
+        path="/password-setup"
+        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />}
       />
-      
+
       {/* Admin Routes */}
-      <Route 
+      <Route
         path="/admin/*"
         element={
           <AdminRoute>
