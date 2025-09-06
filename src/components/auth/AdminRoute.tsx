@@ -24,11 +24,15 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     }
 
     const checkAdminRole = async () => {
+      setLoading(true); // Asegurarse de que el estado de carga se active
       const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
         .single();
+
+      // Añadido: Log para depuración
+      console.log('AdminRoute - Resultado de la consulta de rol:', { data, error });
 
       if (error) {
         console.error('Error fetching user role:', error);
