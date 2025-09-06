@@ -1,41 +1,74 @@
+import React, { useState } from 'react';
+import DynamicContactTable from '@/components/admin/DynamicContactTable';
 import CsvImporter from '@/components/admin/CsvImporter';
-import ContactTable from '@/components/admin/ContactTable'; // Importar el nuevo componente
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Search, PlusCircle, Upload, Filter } from 'lucide-react';
+import { CONTACT_FIELDS } from '@/lib/contact-fields';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 const DatabasePage = () => {
-  const contactFields = [
-    { key: 'first_name', label: 'Primer Nombre', type: 'text' },
-    { key: 'last_name', label: 'Apellido', type: 'text' },
-    { key: 'email', label: 'Correo Electrónico', type: 'email' },
-    { key: 'phone', label: 'Teléfono', type: 'phone' },
-    { key: 'address', label: 'Dirección', type: 'text' },
-    { key: 'apartment_number', label: 'Número de Apartamento', type: 'text' },
-    { key: 'barrio', label: 'Barrio', type: 'text' },
-    { key: 'leader_assigned', label: 'Líder Asignado', type: 'text' },
-  ];
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const requiredContactFields = contactFields.filter(f => f.key !== 'apartment_number' && f.key !== 'leader_assigned');
-  const optionalContactFields = contactFields.filter(f => f.key === 'apartment_number' || f.key === 'leader_assigned');
+  const requiredContactFields = CONTACT_FIELDS.filter(f => f.key !== 'apartment_number' && f.key !== 'leader_assigned' && f.key !== 'created_at');
+  const optionalContactFields = CONTACT_FIELDS.filter(f => f.key === 'apartment_number' || f.key === 'leader_assigned' || f.key === 'created_at');
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold mb-6">Gestión de Base de Datos</h1>
-      <Tabs defaultValue="contacts" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="contacts">Contactos</TabsTrigger>
-          <TabsTrigger value="import-csv">Importar CSV</TabsTrigger>
-        </TabsList>
-        <TabsContent value="contacts">
-          <ContactTable />
-        </TabsContent>
-        <TabsContent value="import-csv">
-          <CsvImporter
-            tableName="contacts"
-            requiredFields={requiredContactFields}
-            optionalFields={optionalContactFields}
+    <div className="flex flex-col h-full w-full">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Contactos</h1>
+        <div className="flex space-x-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="mr-2 h-4 w-4" /> Importar CSV
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[800px]">
+              <DialogHeader>
+                <DialogTitle>Importar Contactos desde CSV</DialogTitle>
+                <DialogDescription>
+                  Sube un archivo CSV para añadir nuevos contactos a tu base de datos.
+                </DialogDescription>
+              </DialogHeader>
+              <CsvImporter
+                tableName="contacts"
+                requiredFields={requiredContactFields}
+                optionalFields={optionalContactFields}
+              />
+            </DialogContent>
+          </Dialog>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear Contacto
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-4 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar contactos por nombre, correo, teléfono..."
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-        </TabsContent>
-      </Tabs>
+        </div>
+        <Button variant="outline">
+          <Filter className="mr-2 h-4 w-4" /> Filtrar
+        </Button>
+      </div>
+
+      <div className="flex-grow">
+        <DynamicContactTable />
+      </div>
     </div>
   );
 };
