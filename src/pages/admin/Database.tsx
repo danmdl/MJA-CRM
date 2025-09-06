@@ -1,22 +1,31 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Database as DatabaseIcon } from 'lucide-react';
+import CsvImporter from '@/components/admin/CsvImporter';
 
 const DatabasePage = () => {
+  const contactFields = [
+    { key: 'first_name', label: 'Primer Nombre', type: 'text' },
+    { key: 'last_name', label: 'Apellido', type: 'text' },
+    { key: 'email', label: 'Correo Electrónico', type: 'email' },
+    { key: 'phone', label: 'Teléfono', type: 'phone' },
+    { key: 'address', label: 'Dirección', type: 'text' },
+    { key: 'apartment_number', label: 'Número de Apartamento', type: 'text' },
+    { key: 'barrio', label: 'Barrio', type: 'text' },
+    { key: 'leader_assigned', label: 'Líder Asignado', type: 'text' },
+  ];
+
+  // Para este ejemplo, todos los campos serán requeridos para simplificar.
+  // Puedes separar en requiredFields y optionalFields según necesites.
+  const requiredContactFields = contactFields.filter(f => f.key !== 'apartment_number' && f.key !== 'leader_assigned');
+  const optionalContactFields = contactFields.filter(f => f.key === 'apartment_number' || f.key === 'leader_assigned');
+
+
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Base de Datos</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DatabaseIcon className="h-6 w-6" />
-            Gestión de Base de Datos
-          </CardTitle>
-          <CardDescription>Esta sección está en construcción.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p>Aquí podrás ver y gestionar las tablas de tu base de datos en el futuro.</p>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold mb-6">Gestión de Base de Datos</h1>
+      <CsvImporter
+        tableName="contacts"
+        requiredFields={requiredContactFields}
+        optionalFields={optionalContactFields}
+      />
     </div>
   );
 };

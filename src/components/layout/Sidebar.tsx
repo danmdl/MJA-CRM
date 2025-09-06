@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { User, Database, Users, FileText } from 'lucide-react'; // Importar FileText
+import { User, Database, Users, FileText, FileSpreadsheet } from 'lucide-react'; // Importar FileSpreadsheet
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 
@@ -47,7 +47,7 @@ const Sidebar = () => {
           Manejar Equipo
         </NavLink>
         <NavLink
-          to="/admin/csv-deduplicator" // Nuevo enlace
+          to="/admin/csv-deduplicator"
           className={({ isActive }) =>
             cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
@@ -55,7 +55,7 @@ const Sidebar = () => {
             )
           }
         >
-          <FileText className="h-4 w-4" /> {/* Icono para el deduplicador */}
+          <FileSpreadsheet className="h-4 w-4" /> {/* Usar FileSpreadsheet para el deduplicador */}
           Deduplicar CSV
         </NavLink>
       </nav>
