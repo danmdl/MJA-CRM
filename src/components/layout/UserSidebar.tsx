@@ -11,8 +11,8 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/profile", icon: User, label: "Perfil" },
-    { to: "/database", icon: Database, label: "Base de Datos" }, // Added Database link
-    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Deduplicar CSV" }, // Added CSV Deduplicator link
+    { to: "/database", icon: Database, label: "Base de Datos" },
+    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar Duplicados" }, // Updated label here
   ];
 
   return (
