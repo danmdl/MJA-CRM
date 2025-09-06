@@ -17,10 +17,10 @@ import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
 import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import ChurchesPage from "./pages/admin/ChurchesPage";
-import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout"; // Import new layout
-import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage"; // Import new overview page
-import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage"; // Import new database page
-import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage"; // Import new team page
+import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
+import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
+import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
+import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
 import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
@@ -85,7 +85,7 @@ const App = () => (
       <BrowserRouter>
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <div className="min-h-screen flex flex-col">
+            <div className="h-screen flex flex-col"> {/* Changed min-h-screen to h-screen */}
               <main className="flex-grow">
                 <AppRoutes />
               </main>

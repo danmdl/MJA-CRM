@@ -54,14 +54,8 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
       "bg-background border-r flex flex-col h-full transition-all duration-300",
       isCollapsed ? "w-16" : "w-64"
     )}>
-      <div className={cn(
-        "p-4 border-b flex items-center",
-        isCollapsed ? "justify-center" : "justify-between"
-      )}>
-        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">Detalles Iglesia</h2>}
-        {isCollapsed && <LayoutDashboard className="h-6 w-6 text-primary" />}
-      </div>
-      <nav className="flex flex-col p-2 flex-grow space-y-1">
+      {/* Removed the top title div, as the dynamic title will now be in the footer */}
+      <nav className="flex flex-col p-2 flex-grow space-y-1 pt-4"> {/* Added pt-4 for top padding */}
         {navItems.map((item) => (
           <NavLink
             key={item.to}
