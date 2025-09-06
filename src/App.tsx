@@ -18,8 +18,10 @@ import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
 import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import { ThemeProvider } from "next-themes";
-import InitialProfileSetup from "./pages/InitialProfileSetup"; // Nueva importación
-import PasswordSetup from "./pages/PasswordSetup"; // Nueva importación
+import InitialProfileSetup from "./pages/InitialProfileSetup";
+import PasswordSetup from "./pages/PasswordSetup";
+import UserLayout from "./components/layout/UserLayout"; // Import the new UserLayout
+import Index from "./pages/Index"; // Import Index to be rendered within UserLayout
 
 const queryClient = new QueryClient();
 
@@ -40,11 +42,35 @@ const AppRoutes = () => {
       <Route 
         path="/" 
         element={<PrivateRoute />} 
-      />
-      <Route 
-        path="/profile" 
-        element={session ? <Profile /> : <Navigate to="/login" replace />} 
-      />
+      >
+        {/* Nested routes for authenticated users (non-admin) */}
+        <Route 
+          index 
+          element={
+            session ? (
+              <UserLayout>
+                <Index />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="profile" 
+          element={
+            session ? (
+              <UserLayout>
+                <Profile />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        {/* Other non-admin routes can be added here, wrapped in UserLayout */}
+      </Route>
+      
       <Route 
         path="/initial-profile-setup" 
         element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />} 
@@ -85,7 +111,6 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionProvider>
-          {/* Forced dark mode */}
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
             <div className="min-h-screen flex flex-col">
               <main className="flex-grow">

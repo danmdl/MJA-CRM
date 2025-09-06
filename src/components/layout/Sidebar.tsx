@@ -2,19 +2,28 @@ import { NavLink } from 'react-router-dom';
 import { User, Database, Users, FileSpreadsheet, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
+import { Session } from '@supabase/supabase-js'; // Import Session type
 
 interface SidebarProps {
   isCollapsed: boolean;
+  userSession: Session | null; // Pass the entire session object
 }
 
-const Sidebar = ({ isCollapsed }: SidebarProps) => {
-  const navItems = [
-    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/admin/profile", icon: User, label: "Perfil" },
-    { to: "/admin/database", icon: Database, label: "Base de Datos" },
-    { to: "/admin/manage-team", icon: Users, label: "Manejar Equipo" },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" }, // Renombrado
+const Sidebar = ({ isCollapsed, userSession }: SidebarProps) => {
+  // Determine user role from session metadata or profile (assuming profile is loaded)
+  // For now, we'll use a simple check. In a more complex app, you might fetch the profile here.
+  const userRole = userSession?.user?.user_metadata?.role || 'user'; // Default to 'user'
+
+  const allNavItems = [
+    { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'] },
+    { to: "/profile", icon: User, label: "Perfil", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'] },
+    { to: "/database", icon: Database, label: "Base de Datos", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] },
+    { to: "/manage-team", icon: Users, label: "Manejar Equipo", roles: ['admin'] }, // Only for admin
+    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general'] },
   ];
+
+  // Filter nav items based on user's role
+  const navItems = allNavItems.filter(item => item.roles.includes(userRole));
 
   return (
     <aside className={cn(
@@ -32,7 +41,8 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
         {navItems.map((item) => (
           <NavLink
             key={item.to}
-            to={item.to}
+            // Prepend /admin to routes if the user is an admin, otherwise use root path
+            to={userRole === 'admin' ? `/admin${item.to}` : item.to}
             className={({ isActive }) =>
               cn(
                 'flex items-center rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',

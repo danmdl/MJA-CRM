@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom'; // Import Outlet
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import Index from '@/pages/Index';
+import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
@@ -30,9 +31,8 @@ const PrivateRoute = () => {
 
       if (error) {
         console.error('Error fetching user profile:', error);
-        // If profile doesn't exist, treat as incomplete
         setProfileComplete(false);
-        setUserRole('user'); // Default role if profile fetch fails
+        setUserRole('user');
       } else if (profile) {
         setUserRole(profile.role);
         if (profile.first_name && profile.last_name) {
@@ -41,7 +41,6 @@ const PrivateRoute = () => {
           setProfileComplete(false);
         }
       } else {
-        // No profile found, treat as incomplete
         setProfileComplete(false);
         setUserRole('user');
       }
@@ -63,30 +62,23 @@ const PrivateRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
-  // If profile is not complete (missing first_name or last_name), redirect to initial setup
   if (!profileComplete) {
     return <Navigate to="/initial-profile-setup" replace />;
   }
 
-  // Check if password needs to be set (this is a heuristic, Supabase usually handles it via redirectTo)
-  // For invited users, after setting name, they should set password.
-  // If the user has a session and profile is complete, but they are coming from an invite flow,
-  // they might still need to set a password. We'll redirect them to PasswordSetup.
-  // A more robust check would involve checking `session.user.email_confirmed_at` vs `session.user.last_sign_in_at`
-  // or a custom flag in the profile, but for now, we assume if they just completed profile, password is next.
-  // This logic might need refinement based on actual Supabase invite behavior.
-  // For simplicity, if they are not an admin and just completed profile, we assume they need to set password.
-  // If they are an admin, they might have set it during invite.
-  if (session && profileComplete && !session.user.last_sign_in_at) { // Heuristic: if no last_sign_in_at, might be first login after invite
+  // Heuristic: if no last_sign_in_at, might be first login after invite and password needs to be set.
+  // This is a common scenario for invited users who haven't explicitly set a password yet.
+  if (session && profileComplete && !session.user.last_sign_in_at) {
      return <Navigate to="/password-setup" replace />;
   }
 
-
+  // If all onboarding steps are complete, determine where to send them
   if (userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  return <Index />;
+  // For non-admin users, render the nested routes within UserLayout
+  return <Outlet />;
 };
 
 export default PrivateRoute;
