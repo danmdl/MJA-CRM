@@ -10,7 +10,7 @@ interface AdminRouteProps {
 
 const AdminRoute = ({ children }: AdminRouteProps) => {
   const { session, loading: sessionLoading } = useSession();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,11 +33,11 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
       if (error) {
         console.error('Error fetching user role:', error);
         showError('No se pudo verificar tu rol de usuario.');
-        setIsAdmin(false);
-      } else if (data && data.role === 'admin') {
-        setIsAdmin(true);
+        setHasAdminAccess(false);
+      } else if (data && (data.role === 'admin' || data.role === 'general')) { // Allow 'admin' or 'general'
+        setHasAdminAccess(true);
       } else {
-        setIsAdmin(false);
+        setHasAdminAccess(false);
       }
       setLoading(false);
     };
@@ -57,7 +57,7 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isAdmin) {
+  if (!hasAdminAccess) {
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
   }

@@ -23,7 +23,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Verify the user's role to ensure only admins can call this function
+    // Verify the user's role to ensure only admins or generals can call this function
     const { data: userAuth, error: userAuthError } = await supabaseAdmin.auth.getUser(token);
     if (userAuthError || !userAuth.user) {
       console.error('Auth error:', userAuthError);
@@ -36,9 +36,9 @@ serve(async (req) => {
       .eq('id', userAuth.user.id)
       .single();
 
-    if (profileError || profile?.role !== 'admin') {
-      console.error('Profile error or not admin:', profileError, profile?.role);
-      return new Response('Forbidden: Only administrators can perform this action', { status: 403, headers: corsHeaders });
+    if (profileError || (profile?.role !== 'admin' && profile?.role !== 'general')) { // Allow 'admin' or 'general'
+      console.error('Profile error or not admin/general:', profileError, profile?.role);
+      return new Response('Forbidden: Only administrators or generals can perform this action', { status: 403, headers: corsHeaders });
     }
 
     const { email, role } = await req.json();
