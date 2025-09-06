@@ -1,5 +1,7 @@
+"use client";
+
 import { useState } from 'react';
-import { useForm } from 'react-hook-form'; // Corregido: useForm se importa de react-hook-form
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,7 @@ import {
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSession } from '@/hooks/use-session'; // Importar useSession
 
 // Definir los nuevos roles como un enum de Zod
 const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user']);
@@ -47,6 +50,7 @@ interface InviteUserDialogProps {
 export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { session } = useSession(); // Obtener la sesión del usuario
 
   const form = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
@@ -59,28 +63,31 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
   const onSubmit = async (values: z.infer<typeof inviteSchema>) => {
     setLoading(true);
     try {
-      console.log('Sending payload to invite-user Edge Function:', values); // Nuevo log aquí
+      if (!session?.access_token) {
+        showError('No hay sesión activa. Por favor, inicia sesión de nuevo.');
+        setLoading(false);
+        return;
+      }
 
-      // Invocar la Edge Function para enviar la invitación
-      const { data, error: invokeError } = await supabase.functions.invoke('invite-user', {
-        body: JSON.stringify(values),
+      console.log('Sending payload to invite-user Edge Function:', values);
+
+      // Construir la URL completa de la Edge Function
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/invite-user`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`, // Pasar el token de autenticación
         },
+        body: JSON.stringify(values),
       });
 
-      if (invokeError) {
-        console.error('Supabase Edge Function invocation error:', invokeError);
-        let errorMessage = invokeError.message || 'Error desconocido al invocar la función.';
-        try {
-          const parsedError = JSON.parse(invokeError.message);
-          if (parsedError.error) {
-            errorMessage = parsedError.error;
-          }
-        } catch (e) {
-          // No es un JSON string, usar el mensaje tal cual
-        }
-        showError(errorMessage);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Edge Function response error:', data);
+        showError(data.error || 'Error desconocido al invocar la función.');
         setLoading(false);
         return;
       }
