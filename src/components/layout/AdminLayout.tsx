@@ -12,7 +12,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   return (
     <ResizablePanelGroup
       direction="horizontal"
-      className="min-h-screen w-full"
+      className="h-full w-full" // Changed min-h-screen to h-full
       onLayout={(sizes: number[]) => {
         // Check if the sidebar panel is at its minimum size (collapsed)
         setIsSidebarCollapsed(sizes[0] < 10); // Assuming minSize for collapsed is < 10%
