@@ -7,7 +7,6 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
-import { MadeWithDyad } from "./components/made-with-dyad";
 import AdminDashboard from "./pages/admin/Dashboard";
 import ManageTeam from "./pages/admin/ManageTeam";
 import AdminLayout from "./components/layout/AdminLayout";
@@ -85,11 +84,10 @@ const App = () => (
       <BrowserRouter>
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <div className="h-screen flex flex-col"> {/* Changed min-h-screen to h-screen */}
+            <div className="h-screen flex flex-col">
               <main className="flex-grow">
                 <AppRoutes />
               </main>
-              <MadeWithDyad />
             </div>
           </ThemeProvider>
         </SessionProvider>
