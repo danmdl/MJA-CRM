@@ -31,7 +31,7 @@ const SidebarFooter = ({ isCollapsed }: SidebarFooterProps) => {
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="mja-central" className="border-b-0">
           <AccordionTrigger className={cn(
-            "flex items-start justify-between w-full px-3 py-0 text-muted-foreground hover:text-primary hover:no-underline h-auto min-h-0",
+            "flex items-start justify-between w-full px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline h-auto min-h-0", // Changed py-0 to py-2
             isCollapsed ? "justify-center" : "justify-between"
           )}>
             {isCollapsed ? (
