@@ -43,6 +43,7 @@ serve(async (req) => {
 
     const { email, role } = await req.json();
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080'; // Fallback for SITE_URL
+    console.log('Edge Function invite-user using SITE_URL:', siteUrl); // <-- Added logging
 
     if (!email) {
       return new Response(JSON.stringify({ error: 'Email is required' }), {

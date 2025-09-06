@@ -43,6 +43,7 @@ serve(async (req) => {
 
     const { action, email, userId, role, newRole } = await req.json();
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080'; // Fallback for SITE_URL
+    console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl); // <-- Added logging
 
     switch (action) {
       case 'listUsers': {
