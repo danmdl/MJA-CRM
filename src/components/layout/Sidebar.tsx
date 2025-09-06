@@ -34,7 +34,7 @@ const Sidebar = ({ isCollapsed, userSession }: SidebarProps) => {
         "p-4 border-b flex items-center",
         isCollapsed ? "justify-center" : "justify-between"
       )}>
-        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">MJA Central</h2>} {/* Changed title back */}
+        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">Panel de Admin</h2>}
         {isCollapsed && <LayoutDashboard className="h-6 w-6 text-primary" />}
       </div>
       <nav className="flex flex-col p-2 flex-grow space-y-1">

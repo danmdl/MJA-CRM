@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { Outlet } from 'react-router-dom'; // Import Outlet
-import { useSession } from '@/hooks/use-session'; // Import useSession to pass to Sidebar
 
 interface AdminLayoutProps {
-  // children: React.ReactNode; // No longer needed as Outlet will render children
+  children: React.ReactNode;
 }
 
-const AdminLayout = () => { // No longer takes children prop
+const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { session } = useSession(); // Get session to pass to Sidebar
 
   return (
     <ResizablePanelGroup
@@ -30,12 +27,12 @@ const AdminLayout = () => { // No longer takes children prop
         onExpand={() => setIsSidebarCollapsed(false)}
         className="min-w-[60px]" // Ensure a minimum pixel width even when collapsed
       >
-        <Sidebar isCollapsed={isSidebarCollapsed} userSession={session} /> {/* Pass session */}
+        <Sidebar isCollapsed={isSidebarCollapsed} />
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
         <main className="flex-1 p-6 overflow-auto">
-          <Outlet /> {/* This is where the matched child route will be rendered */}
+          {children}
         </main>
       </ResizablePanel>
     </ResizablePanelGroup>

@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
-import { supabase } from '@/integrations/supabase/client'; // ¡Error de sintaxis corregido aquí!
+import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 
-const AdminRoute = () => {
+interface AdminRouteProps {
+  children: React.ReactNode;
+}
+
+const AdminRoute = ({ children }: AdminRouteProps) => {
   const { session, loading: sessionLoading } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loadingRole, setLoadingRole] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (sessionLoading || !session) {
-      setLoadingRole(false);
+    if (sessionLoading) {
+      return;
+    }
+
+    if (!session) {
+      setLoading(false);
       return;
     }
 
@@ -23,21 +31,21 @@ const AdminRoute = () => {
         .single();
 
       if (error) {
-        console.error('Error fetching user role in AdminRoute:', error);
-        showError('No se pudo verificar tu rol de administrador.');
+        console.error('Error fetching user role:', error);
+        showError('No se pudo verificar tu rol de usuario.');
         setIsAdmin(false);
       } else if (data && data.role === 'admin') {
         setIsAdmin(true);
       } else {
         setIsAdmin(false);
       }
-      setLoadingRole(false);
+      setLoading(false);
     };
 
     checkAdminRole();
   }, [session, sessionLoading]);
 
-  if (sessionLoading || loadingRole) {
+  if (loading || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Verificando acceso...</div>
@@ -45,15 +53,16 @@ const AdminRoute = () => {
     );
   }
 
-  // Si el usuario no es un administrador, redirigirlo al dashboard de usuario normal.
-  // OnboardingGuard ya maneja usuarios no autenticados y el proceso de onboarding.
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
   if (!isAdmin) {
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
   }
 
-  // Si es administrador, permitir el acceso a las rutas anidadas de administrador.
-  return <Outlet />;
+  return <>{children}</>;
 };
 
 export default AdminRoute;

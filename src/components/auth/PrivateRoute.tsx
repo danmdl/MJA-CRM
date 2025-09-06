@@ -1,45 +1,56 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom'; // Import Outlet
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import Index from '@/pages/Index';
+import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [loadingRole, setLoadingRole] = useState(true);
+  const [profileComplete, setProfileComplete] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
-    if (sessionLoading || !session) {
-      // Si no hay sesión o aún está cargando, OnboardingGuard ya debería haber manejado esto.
-      // Este caso idealmente no debería ocurrir si OnboardingGuard funciona correctamente.
-      setLoadingRole(false);
+    if (sessionLoading) {
       return;
     }
 
-    const fetchUserRole = async () => {
+    if (!session) {
+      setLoadingProfile(false);
+      return;
+    }
+
+    const fetchUserProfile = async () => {
+      setLoadingProfile(true);
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role')
+        .select('first_name, last_name, role')
         .eq('id', session.user.id)
         .single();
 
       if (error) {
-        console.error('Error fetching user role in PrivateRoute:', error);
-        showError('No se pudo verificar tu rol de usuario.');
-        setUserRole('user'); // Por defecto a 'user' en caso de error
-      } else if (data) {
-        setUserRole(data.role);
+        console.error('Error fetching user profile:', error);
+        setProfileComplete(false);
+        setUserRole('user');
+      } else if (profile) {
+        setUserRole(profile.role);
+        if (profile.first_name && profile.last_name) {
+          setProfileComplete(true);
+        } else {
+          setProfileComplete(false);
+        }
       } else {
-        setUserRole('user'); // Por defecto si no se encuentra perfil
+        setProfileComplete(false);
+        setUserRole('user');
       }
-      setLoadingRole(false);
+      setLoadingProfile(false);
     };
 
-    fetchUserRole();
+    fetchUserProfile();
   }, [session, sessionLoading]);
 
-  if (sessionLoading || loadingRole) {
+  if (loadingProfile || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Cargando...</div>
@@ -47,13 +58,26 @@ const PrivateRoute = () => {
     );
   }
 
-  // Si el usuario es un administrador, redirigirlo al dashboard de administrador.
-  // OnboardingGuard ya asegura que la sesión esté activa y el onboarding completo.
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!profileComplete) {
+    return <Navigate to="/initial-profile-setup" replace />;
+  }
+
+  // Heuristic: if no last_sign_in_at, might be first login after invite and password needs to be set.
+  // This is a common scenario for invited users who haven't explicitly set a password yet.
+  if (session && profileComplete && !session.user.last_sign_in_at) {
+     return <Navigate to="/password-setup" replace />;
+  }
+
+  // If all onboarding steps are complete, determine where to send them
   if (userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // Si no es administrador, permitir el acceso a las rutas anidadas de usuario.
+  // For non-admin users, render the nested routes within UserLayout
   return <Outlet />;
 };
 
