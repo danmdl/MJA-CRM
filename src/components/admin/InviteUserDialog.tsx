@@ -35,7 +35,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session'; // Importar useSession
 
 // Definir los nuevos roles como un enum de Zod
-const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user']);
+const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']); // Añadir 'admin' aquí
 
 const inviteSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
@@ -141,11 +141,11 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
-                      <SelectItem value="pastor">Pastor</SelectItem>
-                      <SelectItem value="piloto">Piloto</SelectItem>
-                      <SelectItem value="encargado_de_celula">Encargado de Célula</SelectItem>
-                      <SelectItem value="user">Usuario</SelectItem>
+                      {UserRoles.options.map((roleOption) => (
+                        <SelectItem key={roleOption} value={roleOption}>
+                          {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

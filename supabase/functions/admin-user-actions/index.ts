@@ -41,7 +41,7 @@ serve(async (req) => {
       return new Response('Forbidden: Only administrators can perform this action', { status: 403, headers: corsHeaders });
     }
 
-    const { action, email, userId, role } = await req.json();
+    const { action, email, userId, role, newRole } = await req.json();
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080'; // Fallback for SITE_URL
 
     switch (action) {
@@ -169,6 +169,41 @@ serve(async (req) => {
           });
         }
         return new Response(JSON.stringify({ inviteLink }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'updateUserRole': {
+        if (!userId || !newRole) {
+          return new Response(JSON.stringify({ error: 'User ID and new role are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Ensure the new role is a valid enum value
+        const validRoles = ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'];
+        if (!validRoles.includes(newRole)) {
+          return new Response(JSON.stringify({ error: 'Invalid role provided' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({ role: newRole, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('Error updating user role:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ message: 'User role updated successfully' }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

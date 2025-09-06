@@ -21,6 +21,13 @@ import {
 import { MoreHorizontal, Copy, Send, Trash2 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Definir el tipo de rol de usuario para TypeScript
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
@@ -151,6 +158,33 @@ const UserTable = () => {
     },
   });
 
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: UserRole }) => {
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action: 'updateUserRole', userId, newRole }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al actualizar el rol del usuario.');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      showSuccess('Rol de usuario actualizado con éxito.');
+      queryClient.invalidateQueries({ queryKey: ['users'] }); // Invalida la caché para refrescar la tabla
+    },
+    onError: (err) => {
+      showError(err.message);
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -195,6 +229,8 @@ const UserTable = () => {
     }
   };
 
+  const userRoles: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
+
   return (
     <Table>
       <TableHeader>
@@ -214,9 +250,23 @@ const UserTable = () => {
               <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>
-                <Badge variant={getBadgeVariant(user.role)}>
-                  {user.role}
-                </Badge>
+                {/* Selector de rol */}
+                <Select
+                  value={user.role}
+                  onValueChange={(newRole: UserRole) => updateUserRoleMutation.mutate({ userId: user.id, newRole })}
+                  disabled={updateUserRoleMutation.isPending || user.id === session?.user.id} // Deshabilitar si está cargando o si es el propio admin
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Seleccionar rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {userRoles.map((roleOption) => (
+                      <SelectItem key={roleOption} value={roleOption}>
+                        {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </TableCell>
               <TableCell>{getStatusBadge(user.status)}</TableCell>
               <TableCell>
