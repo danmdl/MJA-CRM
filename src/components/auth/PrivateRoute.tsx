@@ -46,7 +46,7 @@ const PrivateRoute = () => {
   }
 
   // If the user is an admin, redirect them to the admin dashboard.
-  // AppRoutes handles unauthenticated users and onboarding.
+  // AppContent handles unauthenticated users and onboarding.
   if (userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
   }

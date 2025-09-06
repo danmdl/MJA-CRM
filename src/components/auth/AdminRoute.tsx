@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } => '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 
 const AdminRoute = () => {
@@ -46,7 +46,7 @@ const AdminRoute = () => {
   }
 
   // If the user is not an admin, redirect them to the regular user dashboard.
-  // AppRoutes handles unauthenticated users and onboarding.
+  // AppContent handles unauthenticated users and onboarding.
   if (!isAdmin) {
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
