@@ -32,13 +32,13 @@ const SidebarFooter = ({ isCollapsed, dynamicTitle }: SidebarFooterProps) => {
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="mja-central" className="border-b-0">
           <AccordionTrigger className={cn(
-            "flex items-center justify-between w-full px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline",
+            "flex items-center justify-between w-full px-3 py-3 text-muted-foreground hover:text-primary hover:no-underline", // Changed py-2 to py-3
             isCollapsed ? "justify-center" : "justify-between"
           )}>
             {isCollapsed ? (
               <Settings className="h-6 w-6 text-primary" />
             ) : (
-              <span className="font-bold text-lg whitespace-nowrap overflow-hidden text-ellipsis">
+              <span className="font-bold text-lg break-words"> {/* Removed whitespace-nowrap overflow-hidden text-ellipsis, added break-words */}
                 {titleToDisplay}
               </span>
             )}
