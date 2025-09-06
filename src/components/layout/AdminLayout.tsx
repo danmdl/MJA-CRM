@@ -1,40 +1,36 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { useSession } from '@/hooks/use-session'; // Import useSession
+import { useSession } from '@/hooks/use-session';
+import { Outlet } from 'react-router-dom'; // Importar Outlet
 
-interface AdminLayoutProps {
-  children: React.ReactNode;
-}
-
-const AdminLayout = ({ children }: AdminLayoutProps) => {
+const AdminLayout = () => { // Ya no necesita el prop 'children'
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { session } = useSession(); // Obtener la sesión aquí
+  const { session } = useSession();
 
   return (
     <ResizablePanelGroup
       direction="horizontal"
       className="min-h-screen w-full"
       onLayout={(sizes: number[]) => {
-        // Check if the sidebar panel is at its minimum size (collapsed)
-        setIsSidebarCollapsed(sizes[0] < 10); // Assuming minSize for collapsed is < 10%
+        setIsSidebarCollapsed(sizes[0] < 10);
       }}
     >
       <ResizablePanel
         defaultSize={15}
-        minSize={4} // Minimum size for collapsed state (e.g., 4% for icons only)
+        minSize={4}
         maxSize={25}
         collapsible={true}
         onCollapse={() => setIsSidebarCollapsed(true)}
         onExpand={() => setIsSidebarCollapsed(false)}
-        className="min-w-[60px]" // Ensure a minimum pixel width even when collapsed
+        className="min-w-[60px]"
       >
-        <Sidebar isCollapsed={isSidebarCollapsed} userSession={session} /> {/* Pasar la sesión al Sidebar */}
+        <Sidebar isCollapsed={isSidebarCollapsed} userSession={session} />
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
         <main className="flex-1 p-6 overflow-auto">
-          {children}
+          <Outlet /> {/* Renderizar Outlet para las rutas anidadas */}
         </main>
       </ResizablePanel>
     </ResizablePanelGroup>
