@@ -12,8 +12,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import AddChurchDialog from '@/components/admin/AddChurchDialog'; // Will create this next
-import ChurchCard from '@/components/admin/ChurchCard'; // Will create this next
+import AddChurchDialog from '@/components/admin/AddChurchDialog';
+import ChurchCard from '@/components/admin/ChurchCard';
+import EditChurchNameDialog from '@/components/admin/EditChurchNameDialog'; // Import new edit dialog
+import DeleteChurchConfirmationDialog from '@/components/admin/DeleteChurchConfirmationDialog'; // Import new delete dialog
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
@@ -41,11 +43,25 @@ const fetchChurches = async (): Promise<Church[]> => {
 
 const ChurchesPage = () => {
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
+  const [churchToDelete, setChurchToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const { data: churches, isLoading, isError, error } = useQuery<Church[]>({
     queryKey: ['churches'],
     queryFn: fetchChurches,
   });
+
+  const handleEditChurch = (church: Church) => {
+    setSelectedChurch(church);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteChurch = (churchId: string, churchName: string) => {
+    setChurchToDelete({ id: churchId, name: churchName });
+    setIsDeleteDialogOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -90,7 +106,12 @@ const ChurchesPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {churches && churches.length > 0 ? (
           churches.map((church) => (
-            <ChurchCard key={church.id} church={church} />
+            <ChurchCard
+              key={church.id}
+              church={church}
+              onEdit={handleEditChurch}
+              onDelete={handleDeleteChurch}
+            />
           ))
         ) : (
           <Card className="col-span-full text-center py-8">
@@ -106,6 +127,19 @@ const ChurchesPage = () => {
           </Card>
         )}
       </div>
+
+      <EditChurchNameDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        church={selectedChurch}
+      />
+
+      <DeleteChurchConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        churchId={churchToDelete?.id || null}
+        churchName={churchToDelete?.name || null}
+      />
     </div>
   );
 };

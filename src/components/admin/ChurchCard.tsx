@@ -3,8 +3,14 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Church, Users, Database, ArrowRight } from 'lucide-react';
+import { Church, Users, Database, ArrowRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ChurchProps {
   id: string;
@@ -15,15 +21,16 @@ interface ChurchProps {
 
 interface ChurchCardProps {
   church: ChurchProps;
+  onEdit: (church: ChurchProps) => void;
+  onDelete: (churchId: string, churchName: string) => void;
 }
 
-const ChurchCard = ({ church }: ChurchCardProps) => {
-  // In a real app, you might fetch pastor's name using pastor_id
+const ChurchCard = ({ church, onEdit, onDelete }: ChurchCardProps) => {
   const pastorName = church.pastor_id ? `Pastor ID: ${church.pastor_id.substring(0, 8)}...` : 'No asignado';
 
   return (
     <Card className="flex flex-col justify-between h-full">
-      <CardHeader>
+      <CardHeader className="relative">
         <div className="flex items-center space-x-3 mb-2">
           <Church className="h-6 w-6 text-primary" />
           <CardTitle className="text-xl">{church.name}</CardTitle>
@@ -31,6 +38,22 @@ const ChurchCard = ({ church }: ChurchCardProps) => {
         <CardDescription>
           {pastorName}
         </CardDescription>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0 absolute top-4 right-4">
+              <span className="sr-only">Abrir menú</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit(church)}>
+              <Pencil className="mr-2 h-4 w-4" /> Editar Nombre
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDelete(church.id, church.name)} className="text-red-600">
+              <Trash2 className="mr-2 h-4 w-4" /> Eliminar Iglesia
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardHeader>
       <CardContent className="flex flex-col space-y-2">
         <Button variant="outline" asChild>
