@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { useSession } from '@/hooks/use-session'; // Import useSession
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,7 @@ interface AdminLayoutProps {
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { session } = useSession(); // Obtener la sesión aquí
 
   return (
     <ResizablePanelGroup
@@ -27,7 +29,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         onExpand={() => setIsSidebarCollapsed(false)}
         className="min-w-[60px]" // Ensure a minimum pixel width even when collapsed
       >
-        <Sidebar isCollapsed={isSidebarCollapsed} />
+        <Sidebar isCollapsed={isSidebarCollapsed} userSession={session} /> {/* Pasar la sesión al Sidebar */}
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
