@@ -12,14 +12,29 @@ serve(async (req) => {
   }
 
   console.log('Incoming request method:', req.method);
-  console.log('Incoming request Content-Type:', req.headers.get('Content-Type')); // Nuevo log
-  console.log('SITE_URL env var:', Deno.env.get('SITE_URL')); // Nuevo log
+  console.log('Incoming request Content-Type:', req.headers.get('Content-Type'));
+  console.log('SITE_URL env var:', Deno.env.get('SITE_URL'));
   console.log('SUPABASE_URL env var:', Deno.env.get('SUPABASE_URL') ? 'Set' : 'Not Set');
   console.log('SUPABASE_SERVICE_ROLE_KEY env var:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Set' : 'Not Set');
 
+  let requestBody;
   try {
-    const { email, role } = await req.json();
-    console.log('Successfully parsed request body.');
+    // Leer el cuerpo de la solicitud como texto primero para depuración
+    const rawBody = await req.text();
+    console.log('Raw request body:', rawBody);
+
+    if (!rawBody) {
+      console.error('Request body is empty.');
+      return new Response(JSON.stringify({ error: 'El cuerpo de la solicitud está vacío.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    requestBody = JSON.parse(rawBody);
+    console.log('Successfully parsed request body:', requestBody);
+
+    const { email, role } = requestBody;
     console.log('Received invitation request for email:', email, 'with role:', role);
 
     if (!email || !role) {
