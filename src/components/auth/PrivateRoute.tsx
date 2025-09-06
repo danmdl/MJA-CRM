@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom'; // Import Outlet
+import { Navigate, Outlet } from 'react-router-dom'; // Ensure Outlet is imported
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import Index from '@/pages/Index';
-import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
+// Index is no longer directly rendered here, it's a child of the / route
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
@@ -66,18 +65,15 @@ const PrivateRoute = () => {
     return <Navigate to="/initial-profile-setup" replace />;
   }
 
-  // Heuristic: if no last_sign_in_at, might be first login after invite and password needs to be set.
-  // This is a common scenario for invited users who haven't explicitly set a password yet.
   if (session && profileComplete && !session.user.last_sign_in_at) {
      return <Navigate to="/password-setup" replace />;
   }
 
-  // If all onboarding steps are complete, determine where to send them
   if (userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // For non-admin users, render the nested routes within UserLayout
+  // For non-admin users, render the nested routes via Outlet
   return <Outlet />;
 };
 

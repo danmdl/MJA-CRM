@@ -39,88 +39,47 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route
-        path="/"
-        element={<PrivateRoute />}
+      
+      {/* Routes for initial profile and password setup (no layout) */}
+      <Route 
+        path="/initial-profile-setup" 
+        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />} 
+      />
+      <Route 
+        path="/password-setup" 
+        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />} 
+      />
+
+      {/* Private routes for authenticated users (non-admin) */}
+      <Route 
+        path="/" 
+        element={<PrivateRoute />} // PrivateRoute handles auth and redirects to onboarding if needed
       >
-        {/* Nested routes for authenticated users (non-admin) */}
-        <Route
-          index
-          element={
-            session ? (
-              <UserLayout>
-                <Index />
-              </UserLayout>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="profile"
-          element={
-            session ? (
-              <UserLayout>
-                <Profile />
-              </UserLayout>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="database"
-          element={
-            session ? (
-              <UserLayout>
-                <DatabasePage />
-              </UserLayout>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="csv-deduplicator"
-          element={
-            session ? (
-              <UserLayout>
-                <CsvDeduplicatorPage />
-              </UserLayout>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
+        <Route element={<UserLayout />}> {/* UserLayout provides the sidebar for non-admin users */}
+          <Route index element={<Index />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="database" element={<DatabasePage />} />
+          <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+        </Route>
       </Route>
-
-      <Route
-        path="/initial-profile-setup"
-        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />}
-      />
-      <Route
-        path="/password-setup"
-        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />}
-      />
-
+      
       {/* Admin Routes */}
-      <Route
-        path="/admin/*"
+      <Route 
+        path="/admin" // Parent route for admin section
         element={
           <AdminRoute>
-            <AdminLayout>
-              <Routes>
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="manage-team" element={<ManageTeam />} />
-                <Route path="profile" element={<AdminProfile />} />
-                <Route path="database" element={<DatabasePage />} />
-                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-                <Route index element={<Navigate to="dashboard" replace />} />
-              </Routes>
-            </AdminLayout>
+            <AdminLayout /> {/* AdminLayout provides the sidebar for admin users */}
           </AdminRoute>
         }
-      />
+      >
+        {/* Child routes for admin section, rendered within AdminLayout's <Outlet /> */}
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="manage-team" element={<ManageTeam />} />
+        <Route path="profile" element={<AdminProfile />} />
+        <Route path="database" element={<DatabasePage />} />
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+        <Route index element={<Navigate to="dashboard" replace />} /> {/* Default admin route */}
+      </Route>
 
       <Route path="*" element={<NotFound />} />
     </Routes>
