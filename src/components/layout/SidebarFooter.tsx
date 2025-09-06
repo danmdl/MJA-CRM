@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Settings } from 'lucide-react'; // Importar Settings
+import { LogOut, Settings } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -14,15 +14,18 @@ import { cn } from '@/lib/utils';
 
 interface SidebarFooterProps {
   isCollapsed: boolean;
+  dynamicTitle?: string; // New prop for dynamic title
 }
 
-const SidebarFooter = ({ isCollapsed }: SidebarFooterProps) => {
+const SidebarFooter = ({ isCollapsed, dynamicTitle }: SidebarFooterProps) => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
+
+  const titleToDisplay = dynamicTitle || "MJA CENTRAL";
 
   return (
     <div className="p-4 border-t mt-auto">
@@ -35,7 +38,9 @@ const SidebarFooter = ({ isCollapsed }: SidebarFooterProps) => {
             {isCollapsed ? (
               <Settings className="h-6 w-6 text-primary" />
             ) : (
-              <span className="font-bold text-lg">MJA CENTRAL</span>
+              <span className="font-bold text-lg whitespace-nowrap overflow-hidden text-ellipsis">
+                {titleToDisplay}
+              </span>
             )}
           </AccordionTrigger>
           <AccordionContent className="pb-0">

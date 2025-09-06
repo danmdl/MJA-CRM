@@ -3,14 +3,46 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Database, Users, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import SidebarFooter from './SidebarFooter'; // Reusing the existing footer
+import SidebarFooter from './SidebarFooter';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { showError } from '@/utils/toast';
 
 interface ChurchSidebarProps {
   isCollapsed: boolean;
   churchId: string;
 }
 
+interface Church {
+  id: string;
+  name: string;
+}
+
+const fetchChurchName = async (churchId: string): Promise<string> => {
+  const { data, error } = await supabase
+    .from('churches')
+    .select('name')
+    .eq('id', churchId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching church name:', error);
+    throw new Error('No se pudo cargar el nombre de la iglesia.');
+  }
+  return data.name;
+};
+
 const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
+  const { data: churchName, isLoading, isError, error } = useQuery<string>({
+    queryKey: ['churchName', churchId],
+    queryFn: () => fetchChurchName(churchId),
+    enabled: !!churchId,
+  });
+
+  if (isError) {
+    showError(error?.message || 'Error al cargar el nombre de la iglesia.');
+  }
+
   const navItems = [
     { to: `/admin/churches/${churchId}/overview`, icon: Info, label: "Resumen" },
     { to: `/admin/churches/${churchId}/database`, icon: Database, label: "Base de Datos" },
@@ -47,7 +79,7 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
           </NavLink>
         ))}
       </nav>
-      <SidebarFooter isCollapsed={isCollapsed} />
+      <SidebarFooter isCollapsed={isCollapsed} dynamicTitle={churchName || "Cargando..."} />
     </aside>
   );
 };
