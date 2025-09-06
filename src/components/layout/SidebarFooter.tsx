@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 interface SidebarFooterProps {
   isCollapsed: boolean;
-  dynamicTitle?: string; // New prop for dynamic title
+  dynamicTitle?: string;
 }
 
 const SidebarFooter = ({ isCollapsed, dynamicTitle }: SidebarFooterProps) => {
@@ -28,17 +28,17 @@ const SidebarFooter = ({ isCollapsed, dynamicTitle }: SidebarFooterProps) => {
   const titleToDisplay = dynamicTitle || "MJA CENTRAL";
 
   return (
-    <div className="p-4 border-t mt-auto">
+    <div className="px-4 pt-4 border-t mt-auto"> {/* Changed p-4 to px-4 pt-4 to remove bottom padding */}
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="mja-central" className="border-b-0">
           <AccordionTrigger className={cn(
-            "flex items-start justify-between w-full px-3 py-4 text-muted-foreground hover:text-primary hover:no-underline h-auto min-h-0",
+            "flex items-start justify-between w-full px-3 pt-4 pb-0 text-muted-foreground hover:text-primary hover:no-underline h-auto min-h-0", // Changed py-4 to pt-4 pb-0 to reduce bottom padding
             isCollapsed ? "justify-center" : "justify-between"
           )}>
             {isCollapsed ? (
               <Settings className="h-6 w-6 text-primary" />
             ) : (
-              <span className="font-bold text-lg break-words whitespace-normal"> {/* Added whitespace-normal */}
+              <span className="font-bold text-lg break-words whitespace-normal">
                 {titleToDisplay}
               </span>
             )}
