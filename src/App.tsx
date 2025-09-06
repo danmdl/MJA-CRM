@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
@@ -20,8 +20,8 @@ import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import { ThemeProvider } from "next-themes";
 import InitialProfileSetup from "./pages/InitialProfileSetup";
 import PasswordSetup from "./pages/PasswordSetup";
-import UserLayout from "./components/layout/UserLayout"; // Import the new UserLayout
-import Index from "./pages/Index"; // Import Index to be rendered within UserLayout
+import UserLayout from "./components/layout/UserLayout";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -39,38 +39,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route 
-        path="/" 
-        element={<PrivateRoute />} 
-      >
-        {/* Nested routes for authenticated users (non-admin) */}
-        <Route 
-          index 
-          element={
-            session ? (
-              <UserLayout>
-                <Index />
-              </UserLayout>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          } 
-        />
-        <Route 
-          path="profile" 
-          element={
-            session ? (
-              <UserLayout>
-                <Profile />
-              </UserLayout>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          } 
-        />
-        {/* Other non-admin routes can be added here, wrapped in UserLayout */}
-      </Route>
       
+      {/* Routes for initial setup (profile and password) */}
       <Route 
         path="/initial-profile-setup" 
         element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />} 
@@ -79,25 +49,35 @@ const AppRoutes = () => {
         path="/password-setup" 
         element={session ? <PasswordSetup /> : <Navigate to="/login" replace />} 
       />
+
+      {/* Private routes for all authenticated users */}
+      <Route element={<PrivateRoute />}>
+        {/* User-specific routes wrapped in UserLayout */}
+        <Route element={<UserLayout />}>
+          <Route index element={<Index />} /> {/* Default route for authenticated users */}
+          <Route path="profile" element={<Profile />} />
+          {/* Add other user-specific routes here */}
+        </Route>
+      </Route>
       
       {/* Admin Routes */}
       <Route 
-        path="/admin/*"
+        path="/admin"
         element={
           <AdminRoute>
             <AdminLayout>
-              <Routes>
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="manage-team" element={<ManageTeam />} />
-                <Route path="profile" element={<AdminProfile />} />
-                <Route path="database" element={<DatabasePage />} />
-                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-                <Route index element={<Navigate to="dashboard" replace />} />
-              </Routes>
+              <Outlet /> {/* AdminLayout will render its children here */}
             </AdminLayout>
           </AdminRoute>
         }
-      />
+      >
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="manage-team" element={<ManageTeam />} />
+        <Route path="profile" element={<AdminProfile />} />
+        <Route path="database" element={<DatabasePage />} />
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+        <Route index element={<Navigate to="dashboard" replace />} /> {/* Default admin route */}
+      </Route>
 
       <Route path="*" element={<NotFound />} />
     </Routes>

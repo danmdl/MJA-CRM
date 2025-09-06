@@ -14,20 +14,20 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       direction="horizontal"
       className="min-h-screen w-full"
       onLayout={(sizes: number[]) => {
-        // Check if the sidebar panel is at its minimum size (collapsed)
-        setIsSidebarCollapsed(sizes[0] < 10); // Assuming minSize for collapsed is < 10%
+        setIsSidebarCollapsed(sizes[0] < 10);
       }}
     >
       <ResizablePanel
         defaultSize={15}
-        minSize={4} // Minimum size for collapsed state (e.g., 4% for icons only)
+        minSize={4}
         maxSize={25}
         collapsible={true}
         onCollapse={() => setIsSidebarCollapsed(true)}
         onExpand={() => setIsSidebarCollapsed(false)}
-        className="min-w-[60px]" // Ensure a minimum pixel width even when collapsed
+        className="min-w-[60px]"
       >
-        <Sidebar isCollapsed={isSidebarCollapsed} />
+        {/* AdminLayout assumes an 'admin' role and a '/admin' base path */}
+        <Sidebar isCollapsed={isSidebarCollapsed} userRole="admin" basePath="/admin" />
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>

@@ -1,19 +1,49 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { useSession } from '@/hooks/use-session'; // Import useSession to get user role
+import { useSession } from '@/hooks/use-session';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { showError } from '@/utils/toast';
 
 interface UserLayoutProps {
   children: React.ReactNode;
 }
 
+const fetchUserRole = async (userId: string | undefined): Promise<string> => {
+  if (!userId) return 'user'; // Default role if no user ID
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching user role for UserLayout:', error);
+    showError('Error al cargar el rol del usuario.');
+    return 'user'; // Default to 'user' on error
+  }
+  return data?.role || 'user';
+};
+
 const UserLayout = ({ children }: UserLayoutProps) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { session } = useSession(); // Get session to pass user role to Sidebar
+  const { session, loading: sessionLoading } = useSession();
 
-  // Determine user role from session or profile (assuming profile is already loaded in PrivateRoute)
-  // For simplicity, we'll pass the session object and let Sidebar extract the role.
-  // In a real app, you might pass a specific 'userRole' prop.
+  const { data: userRole = 'user', isLoading: roleLoading } = useQuery<string>({
+    queryKey: ['userRole', session?.user?.id],
+    queryFn: () => fetchUserRole(session?.user?.id),
+    enabled: !!session?.user?.id && !sessionLoading,
+  });
+
+  if (sessionLoading || roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div>Cargando diseño de usuario...</div>
+      </div>
+    );
+  }
 
   return (
     <ResizablePanelGroup
@@ -32,7 +62,7 @@ const UserLayout = ({ children }: UserLayoutProps) => {
         onExpand={() => setIsSidebarCollapsed(false)}
         className="min-w-[60px]"
       >
-        <Sidebar isCollapsed={isSidebarCollapsed} userSession={session} />
+        <Sidebar isCollapsed={isSidebarCollapsed} userRole={userRole} basePath="/" />
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
