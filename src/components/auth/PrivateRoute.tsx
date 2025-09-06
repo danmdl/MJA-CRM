@@ -1,56 +1,40 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom'; // Import Outlet
+import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import Index from '@/pages/Index';
-import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [profileComplete, setProfileComplete] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (sessionLoading) {
+    if (sessionLoading || !session) {
+      if (!sessionLoading) setLoading(false);
       return;
     }
 
-    if (!session) {
-      setLoadingProfile(false);
-      return;
-    }
-
-    const fetchUserProfile = async () => {
-      setLoadingProfile(true);
-      const { data: profile, error } = await supabase
+    const fetchUserRole = async () => {
+      const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name, role')
+        .select('role')
         .eq('id', session.user.id)
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
-        setProfileComplete(false);
-        setUserRole('user');
-      } else if (profile) {
-        setUserRole(profile.role);
-        if (profile.first_name && profile.last_name) {
-          setProfileComplete(true);
-        } else {
-          setProfileComplete(false);
-        }
-      } else {
-        setProfileComplete(false);
-        setUserRole('user');
+        console.error('Error fetching user role:', error);
+        setUserRole('user'); 
+      } else if (data) {
+        setUserRole(data.role);
       }
-      setLoadingProfile(false);
+      setLoading(false);
     };
 
-    fetchUserProfile();
+    fetchUserRole();
   }, [session, sessionLoading]);
 
-  if (loadingProfile || sessionLoading) {
+  if (loading || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Cargando...</div>
@@ -62,23 +46,11 @@ const PrivateRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!profileComplete) {
-    return <Navigate to="/initial-profile-setup" replace />;
-  }
-
-  // Heuristic: if no last_sign_in_at, might be first login after invite and password needs to be set.
-  // This is a common scenario for invited users who haven't explicitly set a password yet.
-  if (session && profileComplete && !session.user.last_sign_in_at) {
-     return <Navigate to="/password-setup" replace />;
-  }
-
-  // If all onboarding steps are complete, determine where to send them
   if (userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // For non-admin users, render the nested routes within UserLayout
-  return <Outlet />;
+  return <Index />;
 };
 
 export default PrivateRoute;

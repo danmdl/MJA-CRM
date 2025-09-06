@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
@@ -16,12 +16,8 @@ import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
-import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
+import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage"; // Importar la nueva página
 import { ThemeProvider } from "next-themes";
-import InitialProfileSetup from "./pages/InitialProfileSetup";
-import PasswordSetup from "./pages/PasswordSetup";
-import UserLayout from "./components/layout/UserLayout";
-import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -39,45 +35,33 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      
-      {/* Routes for initial setup (profile and password) */}
       <Route 
-        path="/initial-profile-setup" 
-        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />} 
+        path="/" 
+        element={<PrivateRoute />} 
       />
       <Route 
-        path="/password-setup" 
-        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />} 
+        path="/profile" 
+        element={session ? <Profile /> : <Navigate to="/login" replace />} 
       />
-
-      {/* Private routes for all authenticated users */}
-      <Route element={<PrivateRoute />}>
-        {/* User-specific routes wrapped in UserLayout */}
-        <Route element={<UserLayout />}>
-          <Route index element={<Index />} /> {/* Default route for authenticated users */}
-          <Route path="profile" element={<Profile />} />
-          {/* Add other user-specific routes here */}
-        </Route>
-      </Route>
       
       {/* Admin Routes */}
       <Route 
-        path="/admin"
+        path="/admin/*"
         element={
           <AdminRoute>
             <AdminLayout>
-              <Outlet /> {/* AdminLayout will render its children here */}
+              <Routes>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="manage-team" element={<ManageTeam />} />
+                <Route path="profile" element={<AdminProfile />} />
+                <Route path="database" element={<DatabasePage />} />
+                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Nueva ruta */}
+                <Route index element={<Navigate to="dashboard" replace />} />
+              </Routes>
             </AdminLayout>
           </AdminRoute>
         }
-      >
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="manage-team" element={<ManageTeam />} />
-        <Route path="profile" element={<AdminProfile />} />
-        <Route path="database" element={<DatabasePage />} />
-        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-        <Route index element={<Navigate to="dashboard" replace />} /> {/* Default admin route */}
-      </Route>
+      />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
@@ -91,7 +75,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionProvider>
-          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <div className="min-h-screen flex flex-col">
               <main className="flex-grow">
                 <AppRoutes />
