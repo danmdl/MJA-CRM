@@ -3,6 +3,7 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Database, Users, Info, Church as ChurchIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+// import SidebarFooter from './SidebarFooter'; // Eliminado: Esta importación ya no es necesaria
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
@@ -10,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChurchSidebarProps {
   isCollapsed: boolean;
-  churchId: string;
 }
 
 interface Church {
@@ -67,7 +67,7 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
           </>
         )}
       </div>
-      <nav className="flex flex-col p-2 flex-grow space-y-1"> {/* Added flex-grow here */}
+      <nav className="flex flex-col p-2 flex-grow space-y-1">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -85,7 +85,7 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
           </NavLink>
         ))}
       </nav>
-      {/* Removed SidebarFooter from here */}
+      {/* El SidebarFooter fue eliminado de aquí en un paso anterior */}
     </aside>
   );
 };
