@@ -32,7 +32,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         collapsible={true}
         onCollapse={() => setIsSidebarCollapsed(true)}
         onExpand={() => setIsSidebarCollapsed(false)}
-        className="min-w-[60px]"
+        className="min-w-[60px] h-full" {/* Added h-full here */}
       >
         <ChurchSidebar isCollapsed={isSidebarCollapsed} churchId={churchId} />
       </ResizablePanel>

@@ -12,7 +12,7 @@ const UserLayout = ({ children }: UserLayoutProps) => {
   return (
     <ResizablePanelGroup
       direction="horizontal"
-      className="h-full w-full" // Changed min-h-screen to h-full
+      className="h-full w-full"
       onLayout={(sizes: number[]) => {
         setIsSidebarCollapsed(sizes[0] < 10);
       }}
@@ -24,7 +24,7 @@ const UserLayout = ({ children }: UserLayoutProps) => {
         collapsible={true}
         onCollapse={() => setIsSidebarCollapsed(true)}
         onExpand={() => setIsSidebarCollapsed(false)}
-        className="min-w-[60px]"
+        className="min-w-[60px] h-full" {/* Added h-full here */}
       >
         <UserSidebar isCollapsed={isSidebarCollapsed} />
       </ResizablePanel>
