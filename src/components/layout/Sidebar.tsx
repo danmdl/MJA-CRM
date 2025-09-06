@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church } from 'lucide-react'; // Importar LayoutDashboard y Church
+import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 
@@ -10,7 +10,7 @@ interface SidebarProps {
 const Sidebar = ({ isCollapsed }: SidebarProps) => {
   const navItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/admin/churches", icon: Church, label: "Iglesias" }, // New item for Churches
+    { to: "/admin/churches", icon: Church, label: "Iglesias" },
     { to: "/admin/database", icon: Database, label: "Base de Datos" },
     { to: "/admin/manage-team", icon: Users, label: "Manejar Equipo" },
     { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Deduplicar CSV" },

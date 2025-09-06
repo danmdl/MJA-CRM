@@ -1,12 +1,13 @@
 "use client";
 
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Database, Users, Info } from 'lucide-react';
+import { LayoutDashboard, Database, Users, Info, Church as ChurchIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChurchSidebarProps {
   isCollapsed: boolean;
@@ -54,8 +55,20 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
       "bg-background border-r flex flex-col h-full transition-all duration-300",
       isCollapsed ? "w-16" : "w-64"
     )}>
-      {/* Removed the top title div, as the dynamic title will now be in the footer */}
-      <nav className="flex flex-col p-2 flex-grow space-y-1 pt-4"> {/* Added pt-4 for top padding */}
+      <div className={cn(
+        "p-4 border-b flex items-center",
+        isCollapsed ? "justify-center" : "justify-between"
+      )}>
+        {isLoading ? (
+          <Skeleton className={cn("h-6", isCollapsed ? "w-6" : "w-3/4")} />
+        ) : (
+          <>
+            {!isCollapsed && <h2 className="text-xl font-bold tracking-tight break-words whitespace-normal">{churchName || "Cargando..."}</h2>}
+            {isCollapsed && <ChurchIcon className="h-6 w-6 text-primary" />}
+          </>
+        )}
+      </div>
+      <nav className="flex flex-col p-2 flex-grow space-y-1">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -73,7 +86,7 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
           </NavLink>
         ))}
       </nav>
-      <SidebarFooter isCollapsed={isCollapsed} dynamicTitle={churchName || "Cargando..."} />
+      <SidebarFooter isCollapsed={isCollapsed} />
     </aside>
   );
 };
