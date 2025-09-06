@@ -14,11 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import AddChurchDialog from '@/components/admin/AddChurchDialog';
 import ChurchCard from '@/components/admin/ChurchCard';
-import EditChurchNameDialog from '@/components/admin/EditChurchNameDialog'; // Import new edit dialog
-import DeleteChurchConfirmationDialog from '@/components/admin/DeleteChurchConfirmationDialog'; // Import new delete dialog
-import { useQuery } from '@tanstack/react-query';
+import EditChurchNameDialog from '@/components/admin/EditChurchNameDialog';
+import DeleteChurchConfirmationDialog from '@/components/admin/DeleteChurchConfirmationDialog';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Church {
@@ -26,13 +26,17 @@ interface Church {
   name: string;
   pastor_id: string | null;
   created_at: string;
+  is_pinned: boolean;
+  pin_order: number | null;
 }
 
 const fetchChurches = async (): Promise<Church[]> => {
   const { data, error } = await supabase
     .from('churches')
     .select('*')
-    .order('name', { ascending: true });
+    .order('is_pinned', { ascending: false }) // Pinned items first
+    .order('pin_order', { ascending: true, nullsFirst: false }) // Then by pin_order
+    .order('name', { ascending: true }); // Then by name
 
   if (error) {
     console.error('Error fetching churches:', error);
@@ -48,6 +52,7 @@ const ChurchesPage = () => {
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const [churchToDelete, setChurchToDelete] = useState<{ id: string; name: string } | null>(null);
 
+  const queryClient = useQueryClient();
   const { data: churches, isLoading, isError, error } = useQuery<Church[]>({
     queryKey: ['churches'],
     queryFn: fetchChurches,
@@ -63,11 +68,40 @@ const ChurchesPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  const pinChurchMutation = useMutation({
+    mutationFn: async ({ churchId, isPinned }: { churchId: string; isPinned: boolean }) => {
+      let newPinOrder: number | null = null;
+      if (isPinned) {
+        // Find the maximum existing pin_order and add 1, or start at 1
+        const maxPinOrder = churches?.reduce((max, c) => (c.is_pinned && c.pin_order !== null ? Math.max(max, c.pin_order) : max), 0) || 0;
+        newPinOrder = maxPinOrder + 1;
+      }
+
+      const { error } = await supabase
+        .from('churches')
+        .update({ is_pinned: isPinned, pin_order: newPinOrder })
+        .eq('id', churchId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      showSuccess('Estado de anclaje de la iglesia actualizado con éxito.');
+      queryClient.invalidateQueries({ queryKey: ['churches'] });
+    },
+    onError: (err) => {
+      showError(err.message || 'Error al actualizar el estado de anclaje de la iglesia.');
+    },
+  });
+
   if (isLoading) {
     return (
       <div>
         <h1 className="text-3xl font-bold mb-6">Iglesias</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"> {/* Adjusted grid */}
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
@@ -103,7 +137,7 @@ const ChurchesPage = () => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"> {/* Adjusted grid */}
         {churches && churches.length > 0 ? (
           churches.map((church) => (
             <ChurchCard
@@ -111,6 +145,7 @@ const ChurchesPage = () => {
               church={church}
               onEdit={handleEditChurch}
               onDelete={handleDeleteChurch}
+              onPinToggle={pinChurchMutation.mutate} // Pass the new pin toggle function
             />
           ))
         ) : (

@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Church, Users, Database, ArrowRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Church, Users, Database, ArrowRight, MoreHorizontal, Pencil, Trash2, Pin, PinOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -17,15 +17,18 @@ interface ChurchProps {
   name: string;
   pastor_id: string | null;
   created_at: string;
+  is_pinned: boolean; // Add is_pinned property
+  pin_order: number | null; // Add pin_order property
 }
 
 interface ChurchCardProps {
   church: ChurchProps;
   onEdit: (church: ChurchProps) => void;
   onDelete: (churchId: string, churchName: string) => void;
+  onPinToggle: ({ churchId, isPinned }: { churchId: string; isPinned: boolean }) => void; // Add onPinToggle
 }
 
-const ChurchCard = ({ church, onEdit, onDelete }: ChurchCardProps) => {
+const ChurchCard = ({ church, onEdit, onDelete, onPinToggle }: ChurchCardProps) => {
   const pastorName = church.pastor_id ? `Pastor ID: ${church.pastor_id.substring(0, 8)}...` : 'No asignado';
 
   return (
@@ -34,6 +37,9 @@ const ChurchCard = ({ church, onEdit, onDelete }: ChurchCardProps) => {
         <div className="flex items-center space-x-3 mb-2">
           <Church className="h-6 w-6 text-primary" />
           <CardTitle className="text-xl">{church.name}</CardTitle>
+          {church.is_pinned && (
+            <Pin className="h-4 w-4 text-muted-foreground rotate-45" aria-label="Anclado" />
+          )}
         </div>
         <CardDescription>
           {pastorName}
@@ -48,6 +54,17 @@ const ChurchCard = ({ church, onEdit, onDelete }: ChurchCardProps) => {
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit(church)}>
               <Pencil className="mr-2 h-4 w-4" /> Editar Nombre
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onPinToggle({ churchId: church.id, isPinned: !church.is_pinned })}>
+              {church.is_pinned ? (
+                <>
+                  <PinOff className="mr-2 h-4 w-4" /> Desanclar
+                </>
+              ) : (
+                <>
+                  <Pin className="mr-2 h-4 w-4" /> Anclar
+                </>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDelete(church.id, church.name)} className="text-red-600">
               <Trash2 className="mr-2 h-4 w-4" /> Eliminar Iglesia
