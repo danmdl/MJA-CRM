@@ -16,6 +16,7 @@ import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
 import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
+import ChurchesPage from "./pages/admin/ChurchesPage"; // Import the new ChurchesPage
 import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const AppRoutes = () => {
             <AdminLayout>
               <Routes>
                 <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="churches" element={<ChurchesPage />} /> {/* New route for Churches */}
                 <Route path="manage-team" element={<ManageTeam />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="database" element={<DatabasePage />} />
