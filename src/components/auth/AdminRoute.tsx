@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
-import { supabase } => '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client'; // ¡Error de sintaxis corregido aquí!
 import { showError } from '@/utils/toast';
 
 const AdminRoute = () => {
@@ -45,14 +45,14 @@ const AdminRoute = () => {
     );
   }
 
-  // If the user is not an admin, redirect them to the regular user dashboard.
-  // AppContent handles unauthenticated users and onboarding.
+  // Si el usuario no es un administrador, redirigirlo al dashboard de usuario normal.
+  // OnboardingGuard ya maneja usuarios no autenticados y el proceso de onboarding.
   if (!isAdmin) {
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
   }
 
-  // If admin, allow access to the nested admin routes.
+  // Si es administrador, permitir el acceso a las rutas anidadas de administrador.
   return <Outlet />;
 };
 

@@ -11,6 +11,8 @@ const PrivateRoute = () => {
 
   useEffect(() => {
     if (sessionLoading || !session) {
+      // Si no hay sesión o aún está cargando, OnboardingGuard ya debería haber manejado esto.
+      // Este caso idealmente no debería ocurrir si OnboardingGuard funciona correctamente.
       setLoadingRole(false);
       return;
     }
@@ -25,11 +27,11 @@ const PrivateRoute = () => {
       if (error) {
         console.error('Error fetching user role in PrivateRoute:', error);
         showError('No se pudo verificar tu rol de usuario.');
-        setUserRole('user'); // Default to user on error
+        setUserRole('user'); // Por defecto a 'user' en caso de error
       } else if (data) {
         setUserRole(data.role);
       } else {
-        setUserRole('user'); // Default if no profile found
+        setUserRole('user'); // Por defecto si no se encuentra perfil
       }
       setLoadingRole(false);
     };
@@ -45,13 +47,13 @@ const PrivateRoute = () => {
     );
   }
 
-  // If the user is an admin, redirect them to the admin dashboard.
-  // AppContent handles unauthenticated users and onboarding.
+  // Si el usuario es un administrador, redirigirlo al dashboard de administrador.
+  // OnboardingGuard ya asegura que la sesión esté activa y el onboarding completo.
   if (userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // If not an admin, allow access to the nested user routes.
+  // Si no es administrador, permitir el acceso a las rutas anidadas de usuario.
   return <Outlet />;
 };
 
