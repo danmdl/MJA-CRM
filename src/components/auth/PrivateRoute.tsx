@@ -3,8 +3,10 @@ import { Navigate, Routes, Route } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import Index from '@/pages/Index';
-import Profile from '@/pages/Profile'; // Import Profile page
-import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
+import Profile from '@/pages/Profile';
+import UserLayout from '@/components/layout/UserLayout';
+import DatabasePage from '@/pages/admin/Database'; // Import DatabasePage
+import CsvDeduplicatorPage from '@/pages/admin/CsvDeduplicatorPage'; // Import CsvDeduplicatorPage
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
@@ -62,7 +64,8 @@ const PrivateRoute = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/profile" element={<Profile />} />
-        {/* Add other user-specific routes here if needed */}
+        <Route path="/database" element={<DatabasePage />} /> {/* Added Database route */}
+        <Route path="/csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Added CSV Deduplicator route */}
         <Route index element={<Navigate to="/" replace />} />
       </Routes>
     </UserLayout>

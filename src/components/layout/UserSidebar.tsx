@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { User, LayoutDashboard } from 'lucide-react';
+import { User, LayoutDashboard, Database, FileSpreadsheet } from 'lucide-react'; // Import Database and FileSpreadsheet icons
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 
@@ -11,6 +11,8 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/profile", icon: User, label: "Perfil" },
+    { to: "/database", icon: Database, label: "Base de Datos" }, // Added Database link
+    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Deduplicar CSV" }, // Added CSV Deduplicator link
   ];
 
   return (
