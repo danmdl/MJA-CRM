@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom'; // Importar Outlet
+import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 
-const AdminRoute = () => { // Ya no necesita el prop 'children'
+interface AdminRouteProps {
+  children: React.ReactNode;
+}
+
+const AdminRoute = ({ children }: AdminRouteProps) => {
   const { session, loading: sessionLoading } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -20,14 +24,11 @@ const AdminRoute = () => { // Ya no necesita el prop 'children'
     }
 
     const checkAdminRole = async () => {
-      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
         .single();
-
-      console.log('AdminRoute - Resultado de la consulta de rol:', { data, error });
 
       if (error) {
         console.error('Error fetching user role:', error);
@@ -61,7 +62,7 @@ const AdminRoute = () => { // Ya no necesita el prop 'children'
     return <Navigate to="/" replace />;
   }
 
-  return <Outlet />; // Renderizar Outlet para las rutas anidadas
+  return <>{children}</>;
 };
 
 export default AdminRoute;

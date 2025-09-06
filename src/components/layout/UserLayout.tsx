@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { useSession } from '@/hooks/use-session';
-import { Outlet } from 'react-router-dom'; // Importar Outlet
+import { useSession } from '@/hooks/use-session'; // Import useSession to get user role
 
-const UserLayout = () => { // Ya no necesita el prop 'children'
+interface UserLayoutProps {
+  children: React.ReactNode;
+}
+
+const UserLayout = ({ children }: UserLayoutProps) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { session } = useSession();
+  const { session } = useSession(); // Get session to pass user role to Sidebar
+
+  // Determine user role from session or profile (assuming profile is already loaded in PrivateRoute)
+  // For simplicity, we'll pass the session object and let Sidebar extract the role.
+  // In a real app, you might pass a specific 'userRole' prop.
 
   return (
     <ResizablePanelGroup
@@ -30,7 +37,7 @@ const UserLayout = () => { // Ya no necesita el prop 'children'
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
         <main className="flex-1 p-6 overflow-auto">
-          <Outlet /> {/* Renderizar Outlet para las rutas anidadas */}
+          {children}
         </main>
       </ResizablePanel>
     </ResizablePanelGroup>

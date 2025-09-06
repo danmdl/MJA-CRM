@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"; // Importar Outlet
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
@@ -40,6 +40,61 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
+        path="/"
+        element={<PrivateRoute />}
+      >
+        {/* Nested routes for authenticated users (non-admin) */}
+        <Route
+          index
+          element={
+            session ? (
+              <UserLayout>
+                <Index />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            session ? (
+              <UserLayout>
+                <Profile />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="database"
+          element={
+            session ? (
+              <UserLayout>
+                <DatabasePage />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="csv-deduplicator"
+          element={
+            session ? (
+              <UserLayout>
+                <CsvDeduplicatorPage />
+              </UserLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+      </Route>
+
+      <Route
         path="/initial-profile-setup"
         element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />}
       />
@@ -48,28 +103,24 @@ const AppRoutes = () => {
         element={session ? <PasswordSetup /> : <Navigate to="/login" replace />}
       />
 
-      {/* Rutas privadas para todos los usuarios autenticados */}
-      <Route element={<PrivateRoute />}> {/* PrivateRoute maneja la sesión y la finalización del perfil */}
-        {/* Rutas específicas de usuario (envueltas en UserLayout) */}
-        <Route element={<UserLayout />}> {/* UserLayout proporciona la barra lateral para usuarios no administradores */}
-          <Route index element={<Index />} /> {/* Ruta por defecto para no administradores */}
-          <Route path="profile" element={<Profile />} />
-          <Route path="database" element={<DatabasePage />} />
-          <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-        </Route>
-
-        {/* Rutas específicas de administrador (envueltas en AdminRoute y AdminLayout) */}
-        <Route path="/admin" element={<AdminRoute />}> {/* AdminRoute verifica el rol de administrador */}
-          <Route element={<AdminLayout />}> {/* AdminLayout proporciona la barra lateral para administradores */}
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="manage-team" element={<ManageTeam />} />
-            <Route path="profile" element={<AdminProfile />} />
-            <Route path="database" element={<DatabasePage />} />
-            <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-            <Route index element={<Navigate to="dashboard" replace />} /> {/* Ruta por defecto del administrador */}
-          </Route>
-        </Route>
-      </Route>
+      {/* Admin Routes */}
+      <Route
+        path="/admin/*"
+        element={
+          <AdminRoute>
+            <AdminLayout>
+              <Routes>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="manage-team" element={<ManageTeam />} />
+                <Route path="profile" element={<AdminProfile />} />
+                <Route path="database" element={<DatabasePage />} />
+                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+                <Route index element={<Navigate to="dashboard" replace />} />
+              </Routes>
+            </AdminLayout>
+          </AdminRoute>
+        }
+      />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
