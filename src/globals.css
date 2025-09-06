@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    /* Light mode variables (will not be used due to forced dark mode) */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -35,40 +36,34 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
+  /* Dark mode variables - ensuring white text on dark backgrounds */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 222.2 84% 4.9%; /* Dark background */
+    --foreground: 210 40% 98%;    /* White/light text */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;       /* Dark card background */
+    --card-foreground: 210 40% 98%; /* White/light text on card */
 
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 210 40% 98%;       /* Primary color (e.g., button text) - white */
+    --primary-foreground: 222.2 47.4% 11.2%; /* Primary foreground (e.g., button background) - dark */
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%; /* Darker secondary background */
+    --secondary-foreground: 210 40% 98%; /* White/light text on secondary */
 
     --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted-foreground: 215 20.2% 65.1%; /* Lighter muted text */
 
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
@@ -79,6 +74,7 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;

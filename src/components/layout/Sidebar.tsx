@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard } from 'lucide-react'; // Importar LayoutDashboard
+import { User, Database, Users, FileSpreadsheet, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 
@@ -13,7 +13,7 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
     { to: "/admin/profile", icon: User, label: "Perfil" },
     { to: "/admin/database", icon: Database, label: "Base de Datos" },
     { to: "/admin/manage-team", icon: Users, label: "Manejar Equipo" },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Deduplicar CSV" },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" }, // Renombrado
   ];
 
   return (

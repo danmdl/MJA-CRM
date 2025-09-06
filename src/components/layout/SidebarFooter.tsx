@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Settings } from 'lucide-react'; // Importar Settings
+import { LogOut, Settings } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -8,7 +8,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
-import { ModeToggle } from '@/components/ModeToggle';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -43,13 +42,7 @@ const SidebarFooter = ({ isCollapsed }: SidebarFooterProps) => {
               "flex flex-col space-y-2",
               isCollapsed ? "items-center" : "pl-4"
             )}>
-              <div className={cn(
-                "flex items-center",
-                isCollapsed ? "justify-center" : "justify-between py-2"
-              )}>
-                {!isCollapsed && <span className="text-sm text-muted-foreground">Tema</span>}
-                <ModeToggle />
-              </div>
+              {/* ModeToggle removed */}
               <Button
                 variant="ghost"
                 className={cn(

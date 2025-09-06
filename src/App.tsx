@@ -16,8 +16,10 @@ import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
-import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage"; // Importar la nueva página
+import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import { ThemeProvider } from "next-themes";
+import InitialProfileSetup from "./pages/InitialProfileSetup"; // Nueva importación
+import PasswordSetup from "./pages/PasswordSetup"; // Nueva importación
 
 const queryClient = new QueryClient();
 
@@ -43,6 +45,14 @@ const AppRoutes = () => {
         path="/profile" 
         element={session ? <Profile /> : <Navigate to="/login" replace />} 
       />
+      <Route 
+        path="/initial-profile-setup" 
+        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />} 
+      />
+      <Route 
+        path="/password-setup" 
+        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />} 
+      />
       
       {/* Admin Routes */}
       <Route 
@@ -55,7 +65,7 @@ const AppRoutes = () => {
                 <Route path="manage-team" element={<ManageTeam />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="database" element={<DatabasePage />} />
-                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Nueva ruta */}
+                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Routes>
             </AdminLayout>
@@ -75,7 +85,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {/* Forced dark mode */}
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
             <div className="min-h-screen flex flex-col">
               <main className="flex-grow">
                 <AppRoutes />
