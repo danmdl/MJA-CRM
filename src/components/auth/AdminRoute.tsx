@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom'; // No longer needs Outlet here
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
+import AdminLayout from '@/components/layout/AdminLayout'; // Import AdminLayout
 
-interface AdminRouteProps {
-  children: React.ReactNode;
-}
-
-const AdminRoute = ({ children }: AdminRouteProps) => {
+const AdminRoute = () => { // No longer takes children prop
   const { session, loading: sessionLoading } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,7 +59,8 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>;
+  // If admin, render the AdminLayout which will then render its children via Outlet
+  return <AdminLayout />;
 };
 
 export default AdminRoute;

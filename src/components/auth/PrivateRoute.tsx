@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom'; // Ensure Outlet is imported
+import { Navigate } from 'react-router-dom'; // No longer needs Outlet here
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-// Index is no longer directly rendered here, it's a child of the / route
+import UserLayout from '@/components/layout/UserLayout'; // Import UserLayout
 
 const PrivateRoute = () => {
   const { session, loading: sessionLoading } = useSession();
@@ -73,8 +73,8 @@ const PrivateRoute = () => {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // For non-admin users, render the nested routes via Outlet
-  return <Outlet />;
+  // If non-admin and all checks pass, render the UserLayout
+  return <UserLayout />;
 };
 
 export default PrivateRoute;

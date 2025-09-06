@@ -11,16 +11,14 @@ import { useSession } from "./hooks/use-session";
 import { MadeWithDyad } from "./components/made-with-dyad";
 import AdminDashboard from "./pages/admin/Dashboard";
 import ManageTeam from "./pages/admin/ManageTeam";
-import AdminLayout from "./components/layout/AdminLayout";
-import AdminRoute from "./components/auth/AdminRoute";
-import PrivateRoute from "./components/auth/PrivateRoute";
+import AdminRoute from "./components/auth/AdminRoute"; // AdminRoute now returns AdminLayout
+import PrivateRoute from "./components/auth/PrivateRoute"; // PrivateRoute now returns UserLayout
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
 import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import { ThemeProvider } from "next-themes";
 import InitialProfileSetup from "./pages/InitialProfileSetup";
 import PasswordSetup from "./pages/PasswordSetup";
-import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
@@ -39,46 +37,35 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      
+
       {/* Routes for initial profile and password setup (no layout) */}
-      <Route 
-        path="/initial-profile-setup" 
-        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />} 
+      <Route
+        path="/initial-profile-setup"
+        element={session ? <InitialProfileSetup /> : <Navigate to="/login" replace />}
       />
-      <Route 
-        path="/password-setup" 
-        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />} 
+      <Route
+        path="/password-setup"
+        element={session ? <PasswordSetup /> : <Navigate to="/login" replace />}
       />
 
       {/* Private routes for authenticated users (non-admin) */}
-      <Route 
-        path="/" 
-        element={<PrivateRoute />} // PrivateRoute handles auth and redirects to onboarding if needed
-      >
-        <Route element={<UserLayout />}> {/* UserLayout provides the sidebar for non-admin users */}
-          <Route index element={<Index />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="database" element={<DatabasePage />} />
-          <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-        </Route>
+      {/* PrivateRoute now directly renders UserLayout if non-admin, or redirects if admin/unauth */}
+      <Route element={<PrivateRoute />}> {/* This route's element is PrivateRoute */}
+        <Route index element={<Index />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="database" element={<DatabasePage />} />
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
       </Route>
-      
+
       {/* Admin Routes */}
-      <Route 
-        path="/admin" // Parent route for admin section
-        element={
-          <AdminRoute>
-            <AdminLayout /> {/* AdminLayout provides the sidebar for admin users */}
-          </AdminRoute>
-        }
-      >
-        {/* Child routes for admin section, rendered within AdminLayout's <Outlet /> */}
+      {/* AdminRoute now directly renders AdminLayout if admin, or redirects if non-admin/unauth */}
+      <Route path="/admin" element={<AdminRoute />}> {/* This route's element is AdminRoute */}
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="manage-team" element={<ManageTeam />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="database" element={<DatabasePage />} />
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-        <Route index element={<Navigate to="dashboard" replace />} /> {/* Default admin route */}
+        <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
