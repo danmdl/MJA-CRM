@@ -32,31 +32,31 @@ import {
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSession } from '@/hooks/use-session'; // Importar useSession
+import { useSession } from '@/hooks/use-session';
 
-// Definir los nuevos roles como un enum de Zod
-const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']); // Añadir 'admin' aquí
+const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']);
 
 const inviteSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
-  role: UserRoles, // Usar el nuevo enum de roles
+  role: UserRoles,
 });
 
 interface InviteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  churchId?: string; // Add optional churchId prop
 }
 
-export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) => {
+export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
-  const { session } = useSession(); // Obtener la sesión del usuario
+  const { session } = useSession();
 
   const form = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
     defaultValues: {
       email: '',
-      role: 'user', // Rol por defecto
+      role: 'user',
     },
   });
 
@@ -69,18 +69,17 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
         return;
       }
 
-      console.log('Sending payload to invite-user Edge Function:', values);
+      console.log('Sending payload to invite-user Edge Function:', { ...values, churchId });
 
-      // Construir la URL completa de la Edge Function
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/invite-user`;
 
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`, // Pasar el token de autenticación
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, churchId }), // Pass churchId to the Edge Function
       });
 
       const data = await response.json();
@@ -95,6 +94,9 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
       showSuccess('¡Invitación enviada con éxito!');
       form.reset();
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      if (churchId) {
+        queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] }); // Invalidate church-specific users
+      }
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error al invitar usuario (client-side catch):', error);
@@ -111,6 +113,7 @@ export const InviteUserDialog = ({ open, onOpenChange }: InviteUserDialogProps) 
           <DialogTitle>Invitar a un nuevo miembro</DialogTitle>
           <DialogDescription>
             Introduce el correo electrónico y asigna un rol. El usuario recibirá una invitación para unirse.
+            {churchId && <p className="text-sm text-muted-foreground mt-1">Se asignará a la iglesia actual.</p>}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

@@ -84,7 +84,7 @@ const ChurchCard = ({ church, onEdit, onDelete, onPinToggle }: ChurchCardProps) 
           </Link>
         </Button>
         <Button asChild>
-          <Link to={`/admin/churches/${church.id}/details`} className="flex items-center justify-center">
+          <Link to={`/admin/churches/${church.id}/overview`} className="flex items-center justify-center">
             Ver Detalles <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>

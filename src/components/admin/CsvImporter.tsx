@@ -22,9 +22,10 @@ interface CsvImporterProps {
   tableName: string;
   requiredFields: { key: string; label: string; type: 'text' | 'email' | 'phone' }[];
   optionalFields: { key: string; label: string; type: 'text' | 'email' | 'phone' }[];
+  churchId?: string; // Add optional churchId prop
 }
 
-const CsvImporter = ({ tableName, requiredFields, optionalFields }: CsvImporterProps) => {
+const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: CsvImporterProps) => {
   const { session } = useSession();
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -103,6 +104,9 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields }: CsvImporterP
             newRecord[targetField.key] = row[csvHeader];
           }
         });
+        if (churchId) {
+          newRecord.church_id = churchId; // Add churchId to each record if provided
+        }
         return newRecord;
       });
 

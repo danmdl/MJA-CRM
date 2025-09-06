@@ -41,7 +41,7 @@ serve(async (req) => {
       return new Response('Forbidden: Only administrators or generals can perform this action', { status: 403, headers: corsHeaders });
     }
 
-    const { action, email, userId, role, newRole } = await req.json();
+    const { action, email, userId, role, newRole, churchId } = await req.json();
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080'; // Fallback for SITE_URL
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl); // <-- Added logging
 
@@ -63,7 +63,7 @@ serve(async (req) => {
         const userIds = users.users.map(u => u.id);
         const { data: profiles, error: profilesError } = await supabaseAdmin
           .from('profiles')
-          .select('id, first_name, last_name, role, updated_at')
+          .select('id, first_name, last_name, role, updated_at, church_id') // Include church_id
           .in('id', userIds);
 
         if (profilesError) {
@@ -87,10 +87,70 @@ serve(async (req) => {
             status: status,
             invited_at: user.invited_at,
             confirmed_at: user.confirmed_at,
+            church_id: userProfile?.church_id || null, // Include church_id
           };
         });
 
         return new Response(JSON.stringify(usersWithProfiles), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'listChurchUsers': {
+        if (!churchId) {
+          return new Response(JSON.stringify({ error: 'Church ID is required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Fetch profiles associated with the given churchId
+        const { data: profiles, error: profilesError } = await supabaseAdmin
+          .from('profiles')
+          .select('id, first_name, last_name, role, updated_at, church_id')
+          .eq('church_id', churchId);
+
+        if (profilesError) {
+          console.error('Error fetching church profiles:', profilesError);
+          return new Response(JSON.stringify({ error: profilesError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const userIds = profiles?.map(p => p.id) || [];
+        const { data: users, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
+          filter: `id in (${userIds.map(id => `'${id}'`).join(',')})`,
+          perPage: 100,
+        });
+
+        if (authUsersError) {
+          console.error('Error listing auth users for church:', authUsersError);
+          return new Response(JSON.stringify({ error: authUsersError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const churchUsers = users.users.map(user => {
+          const userProfile = profiles?.find(p => p.id === user.id);
+          const status = user.confirmed_at ? 'confirmed' : (user.invited_at ? 'invited' : 'unknown');
+          return {
+            id: user.id,
+            email: user.email,
+            first_name: userProfile?.first_name || null,
+            last_name: userProfile?.last_name || null,
+            role: userProfile?.role || 'user',
+            updated_at: userProfile?.updated_at || user.updated_at,
+            status: status,
+            invited_at: user.invited_at,
+            confirmed_at: user.confirmed_at,
+            church_id: userProfile?.church_id || null,
+          };
+        });
+
+        return new Response(JSON.stringify(churchUsers), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -126,7 +186,7 @@ serve(async (req) => {
         }
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'user' } // Pass role if provided
+          data: { role: role || 'user', church_id: churchId || null } // Pass role and church_id if provided
         });
         if (error) {
           console.error('Error resending invite:', error);
@@ -148,11 +208,9 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        // Supabase's inviteUserByEmail returns the user object which contains the confirmation_url
-        // We can use this to extract the invite link.
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'user' } // Pass role if provided
+          data: { role: role || 'user', church_id: churchId || null } // Pass role and church_id if provided
         });
         if (error) {
           console.error('Error generating invite link:', error);
@@ -161,7 +219,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        // The confirmation_url is the invite link
         const inviteLink = data.user?.confirmation_url;
         if (!inviteLink) {
           return new Response(JSON.stringify({ error: 'Could not generate invite link' }), {
@@ -183,7 +240,6 @@ serve(async (req) => {
           });
         }
 
-        // Ensure the new role is a valid enum value
         const validRoles = ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'];
         if (!validRoles.includes(newRole)) {
           return new Response(JSON.stringify({ error: 'Invalid role provided' }), {

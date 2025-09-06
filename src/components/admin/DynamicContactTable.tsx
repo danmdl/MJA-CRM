@@ -36,13 +36,20 @@ interface Contact {
   barrio: string | null;
   leader_assigned: string | null;
   created_at: string;
+  church_id: string; // Add church_id to Contact interface
 }
 
-const fetchContacts = async (): Promise<Contact[]> => {
-  const { data, error } = await supabase
+const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
+  let query = supabase
     .from('contacts')
     .select('*')
     .order('created_at', { ascending: false });
+
+  if (churchId) {
+    query = query.eq('church_id', churchId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching contacts:', error);
@@ -51,7 +58,11 @@ const fetchContacts = async (): Promise<Contact[]> => {
   return data || [];
 };
 
-const DynamicContactTable = () => {
+interface DynamicContactTableProps {
+  churchId?: string; // Make churchId optional
+}
+
+const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   const defaultVisibleColumns: ContactField[] = useMemo(() => [
     CONTACT_FIELDS.find(f => f.key === 'first_name')!,
     CONTACT_FIELDS.find(f => f.key === 'last_name')!,
@@ -67,8 +78,8 @@ const DynamicContactTable = () => {
   const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(defaultVisibleColumns);
 
   const { data: contacts, isLoading, isError, error } = useQuery<Contact[]>({
-    queryKey: ['contacts'],
-    queryFn: fetchContacts,
+    queryKey: ['contacts', churchId], // Include churchId in query key
+    queryFn: () => fetchContacts(churchId),
   });
 
   const handleColumnChange = (columnIndex: number, newFieldKey: string) => {

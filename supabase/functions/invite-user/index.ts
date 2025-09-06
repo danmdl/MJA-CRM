@@ -41,9 +41,9 @@ serve(async (req) => {
       return new Response('Forbidden: Only administrators or generals can perform this action', { status: 403, headers: corsHeaders });
     }
 
-    const { email, role } = await req.json();
-    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080'; // Fallback for SITE_URL
-    console.log('Edge Function invite-user using SITE_URL:', siteUrl); // <-- Added logging
+    const { email, role, churchId } = await req.json(); // Destructure churchId
+    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
+    console.log('Edge Function invite-user using SITE_URL:', siteUrl);
 
     if (!email) {
       return new Response(JSON.stringify({ error: 'Email is required' }), {
@@ -54,7 +54,7 @@ serve(async (req) => {
 
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${siteUrl}/login`,
-      data: { role: role || 'user' } // Pass role if provided
+      data: { role: role || 'user', church_id: churchId || null } // Pass role and church_id
     });
 
     if (error) {

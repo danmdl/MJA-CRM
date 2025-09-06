@@ -16,7 +16,11 @@ import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
 import DatabasePage from "./pages/admin/Database";
 import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
-import ChurchesPage from "./pages/admin/ChurchesPage"; // Import the new ChurchesPage
+import ChurchesPage from "./pages/admin/ChurchesPage";
+import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout"; // Import new layout
+import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage"; // Import new overview page
+import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage"; // Import new database page
+import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage"; // Import new team page
 import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
@@ -47,11 +51,20 @@ const AppRoutes = () => {
             <AdminLayout>
               <Routes>
                 <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="churches" element={<ChurchesPage />} /> {/* New route for Churches */}
+                <Route path="churches" element={<ChurchesPage />} />
                 <Route path="manage-team" element={<ManageTeam />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="database" element={<DatabasePage />} />
                 <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+                
+                {/* Nested routes for specific church details */}
+                <Route path="churches/:churchId/*" element={<ChurchDetailsLayout />}>
+                  <Route path="overview" element={<ChurchOverviewPage />} />
+                  <Route path="database" element={<ChurchDatabasePage />} />
+                  <Route path="team" element={<ChurchTeamPage />} />
+                  <Route index element={<Navigate to="overview" replace />} />
+                </Route>
+
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Routes>
             </AdminLayout>
