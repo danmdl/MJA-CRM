@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { User, LayoutDashboard, FileSpreadsheet } from 'lucide-react'; // Added FileSpreadsheet
+import { User, LayoutDashboard, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 
@@ -11,7 +11,7 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/profile", icon: User, label: "Perfil" },
-    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Deduplicar CSV" }, // Added global deduplicator link
+    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" }, // Changed label here
   ];
 
   return (

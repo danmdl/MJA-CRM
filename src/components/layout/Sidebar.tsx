@@ -11,9 +11,7 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
   const navItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/admin/churches", icon: Church, label: "Iglesias" },
-    // { to: "/admin/database", icon: Database, label: "Base de Datos" }, // Removed global database link
-    // { to: "/admin/manage-team", icon: Users, label: "Manejar Equipo" }, // Removed global team link
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Deduplicar CSV" },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" }, // Changed label here
     { to: "/admin/profile", icon: User, label: "Perfil" },
   ];
 
