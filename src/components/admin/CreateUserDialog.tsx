@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+// Importaciones de react-hook-form y zod eliminadas temporalmente
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,15 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+// Importaciones de Form, FormField, etc. eliminadas temporalmente
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label'; // Añadido Label
+// Importaciones de Select eliminadas temporalmente
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,11 +23,6 @@ import { useSession } from '@/hooks/use-session';
 // Definir el tipo de rol de usuario (aunque no se usa en este paso, lo mantengo para futuras referencias)
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
 
-const createUserSchema = z.object({
-  email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
-  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
-});
-
 interface CreateUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,24 +30,20 @@ interface CreateUserDialogProps {
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const queryClient = useQueryClient();
-  const { session } = useSession(); // Solo necesitamos la sesión para el token
-
-  const form = useForm<z.infer<typeof createUserSchema>>({
-    resolver: zodResolver(createUserSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
+  const { session } = useSession();
 
   useEffect(() => {
     if (!open) {
-      form.reset(); // Reset form when dialog closes
+      setEmail('');
+      setPassword('');
     }
-  }, [open, form]);
+  }, [open]);
 
-  const onSubmit = async (values: z.infer<typeof createUserSchema>) => {
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevenir el comportamiento por defecto del formulario
     setLoading(true);
     try {
       if (!session?.access_token) {
@@ -78,11 +62,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
         },
         body: JSON.stringify({
           action: 'createUser',
-          email: values.email,
-          password: values.password,
-          // Rol e iglesia no se envían en este paso simplificado
-          role: 'user', // Valor por defecto para la función, se hará configurable después
-          churchId: null, // Valor por defecto para la función, se hará configurable después
+          email: email,
+          password: password,
+          role: 'user', // Valor por defecto temporal
+          churchId: null, // Valor por defecto temporal
         }),
       });
 
@@ -96,9 +79,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       }
 
       showSuccess('¡Usuario creado con éxito!');
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: ['users'] }); // Refresh the user table
-      queryClient.invalidateQueries({ queryKey: ['churchUsers'] }); // Also refresh church-specific user tables
+      setEmail('');
+      setPassword('');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['churchUsers'] });
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error al crear usuario (client-side catch):', error);
@@ -117,44 +101,36 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             Introduce los detalles para crear una nueva cuenta de usuario.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Correo Electrónico</FormLabel>
-                  <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Correo Electrónico</Label>
+            <Input
+              id="email"
+              placeholder="nombre@ejemplo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
             />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="text" {...field} disabled={loading} /> {/* Visible y obligatorio */}
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Contraseña</Label>
+            <Input
+              id="password"
+              type="text" // Visible
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
             />
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creando...' : 'Crear Usuario'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Creando...' : 'Crear Usuario'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
