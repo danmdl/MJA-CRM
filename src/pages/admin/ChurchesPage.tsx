@@ -20,6 +20,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useSession } from '@/hooks/use-session'; // Import useSession
 
 interface Church {
   id: string;
@@ -46,6 +47,7 @@ const fetchChurches = async (): Promise<Church[]> => {
 };
 
 const ChurchesPage = () => {
+  const { profile } = useSession(); // Get user profile
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -95,6 +97,8 @@ const ChurchesPage = () => {
     },
   });
 
+  const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
+
   if (isLoading) {
     return (
       <div>
@@ -119,22 +123,24 @@ const ChurchesPage = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Iglesias</h1>
-        <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Nueva Iglesia
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Añadir Nueva Iglesia</DialogTitle>
-              <DialogDescription>
-                Introduce los detalles de la nueva iglesia aquí.
-              </DialogDescription>
-            </DialogHeader>
-            <AddChurchDialog onOpenChange={setIsAddChurchDialogOpen} />
-          </DialogContent>
-        </Dialog>
+        {isAdminOrGeneral && ( // Only show Add Church button for admin/general
+          <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Nueva Iglesia
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Añadir Nueva Iglesia</DialogTitle>
+                <DialogDescription>
+                  Introduce los detalles de la nueva iglesia aquí.
+                </DialogDescription>
+              </DialogHeader>
+              <AddChurchDialog onOpenChange={setIsAddChurchDialogOpen} />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"> {/* Adjusted grid */}
@@ -145,7 +151,9 @@ const ChurchesPage = () => {
               church={church}
               onEdit={handleEditChurch}
               onDelete={handleDeleteChurch}
-              onPinToggle={pinChurchMutation.mutate} // Pass the new pin toggle function
+              onPinToggle={pinChurchMutation.mutate}
+              currentUserChurchId={profile?.church_id} // Pass current user's church ID
+              currentUserRole={profile?.role} // Pass current user's role
             />
           ))
         ) : (
@@ -153,7 +161,7 @@ const ChurchesPage = () => {
             <CardHeader>
               <CardTitle>No hay iglesias registradas</CardTitle>
               <CardDescription>
-                Haz clic en "Añadir Nueva Iglesia" para empezar.
+                {isAdminOrGeneral ? 'Haz clic en "Añadir Nueva Iglesia" para empezar.' : 'Ponte en contacto con un administrador para ser asignado a una iglesia.'}
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -23,7 +23,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Verify the user's role to ensure only admins or generals can call this function
     const { data: userAuth, error: userAuthError } = await supabaseAdmin.auth.getUser(token);
     if (userAuthError || !userAuth.user) {
       console.error('Auth error:', userAuthError);
@@ -32,23 +31,30 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, church_id')
       .eq('id', userAuth.user.id)
       .single();
 
-    if (profileError || (profile?.role !== 'admin' && profile?.role !== 'general')) { // Allow 'admin' or 'general'
-      console.error('Profile error or not admin/general:', profileError, profile?.role);
-      return new Response('Forbidden: Only administrators or generals can perform this action', { status: 403, headers: corsHeaders });
+    if (profileError || !profile) {
+      console.error('Profile error:', profileError);
+      return new Response('Forbidden: User profile not found or accessible', { status: 403, headers: corsHeaders });
     }
 
+    const callerRole = profile.role;
+    const callerChurchId = profile.church_id;
+    const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
+
     const { action, email, userId, role, newRole, churchId } = await req.json();
-    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080'; // Fallback for SITE_URL
-    console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl); // <-- Added logging
+    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
+    console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
     switch (action) {
       case 'listUsers': {
+        if (!isAdminOrGeneral) {
+          return new Response('Forbidden: Only administrators or generals can list all users.', { status: 403, headers: corsHeaders });
+        }
         const { data: users, error } = await supabaseAdmin.auth.admin.listUsers({
-          perPage: 100, // Adjust as needed
+          perPage: 100,
         });
 
         if (error) {
@@ -59,11 +65,10 @@ serve(async (req) => {
           });
         }
 
-        // Fetch profiles to get roles and names
         const userIds = users.users.map(u => u.id);
-        const { data: profiles, error: profilesError } = await supabaseAdmin
+        const { data: profilesData, error: profilesError } = await supabaseAdmin
           .from('profiles')
-          .select('id, first_name, last_name, role, updated_at, church_id') // Include church_id
+          .select('id, first_name, last_name, role, updated_at, church_id')
           .in('id', userIds);
 
         if (profilesError) {
@@ -75,7 +80,7 @@ serve(async (req) => {
         }
 
         const usersWithProfiles = users.users.map(user => {
-          const userProfile = profiles?.find(p => p.id === user.id);
+          const userProfile = profilesData?.find(p => p.id === user.id);
           const status = user.confirmed_at ? 'confirmed' : (user.invited_at ? 'invited' : 'unknown');
           return {
             id: user.id,
@@ -87,7 +92,7 @@ serve(async (req) => {
             status: status,
             invited_at: user.invited_at,
             confirmed_at: user.confirmed_at,
-            church_id: userProfile?.church_id || null, // Include church_id
+            church_id: userProfile?.church_id || null,
           };
         });
 
@@ -104,9 +109,12 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+        // Authorization check for listChurchUsers
+        if (!isAdminOrGeneral && callerChurchId !== churchId) {
+          return new Response('Forbidden: You can only list users from your assigned church.', { status: 403, headers: corsHeaders });
+        }
 
-        // Fetch profiles associated with the given churchId
-        const { data: profiles, error: profilesError } = await supabaseAdmin
+        const { data: profilesData, error: profilesError } = await supabaseAdmin
           .from('profiles')
           .select('id, first_name, last_name, role, updated_at, church_id')
           .eq('church_id', churchId);
@@ -119,7 +127,7 @@ serve(async (req) => {
           });
         }
 
-        const userIds = profiles?.map(p => p.id) || [];
+        const userIds = profilesData?.map(p => p.id) || [];
         const { data: users, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
           filter: `id in (${userIds.map(id => `'${id}'`).join(',')})`,
           perPage: 100,
@@ -134,7 +142,7 @@ serve(async (req) => {
         }
 
         const churchUsers = users.users.map(user => {
-          const userProfile = profiles?.find(p => p.id === user.id);
+          const userProfile = profilesData?.find(p => p.id === user.id);
           const status = user.confirmed_at ? 'confirmed' : (user.invited_at ? 'invited' : 'unknown');
           return {
             id: user.id,
@@ -163,6 +171,24 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        // Fetch the target user's profile to check their church_id
+        const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+          .from('profiles')
+          .select('church_id')
+          .eq('id', userId)
+          .single();
+
+        if (targetProfileError || !targetProfile) {
+          console.error('Error fetching target user profile:', targetProfileError);
+          return new Response('Error: Target user profile not found.', { status: 404, headers: corsHeaders });
+        }
+
+        // Authorization check for deleteUser
+        if (!isAdminOrGeneral && targetProfile.church_id !== callerChurchId) {
+          return new Response('Forbidden: You can only delete users from your assigned church.', { status: 403, headers: corsHeaders });
+        }
+
         const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
         if (error) {
           console.error('Error deleting user:', error);
@@ -177,30 +203,7 @@ serve(async (req) => {
         });
       }
 
-      case 'resendInvite': {
-        if (!email) {
-          return new Response(JSON.stringify({ error: 'Email is required' }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-          redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'user', church_id: churchId || null } // Pass role and church_id if provided
-        });
-        if (error) {
-          console.error('Error resending invite:', error);
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        return new Response(JSON.stringify({ message: 'Invitation resent successfully', user: data.user }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
+      case 'resendInvite':
       case 'generateInviteLink': {
         if (!email) {
           return new Response(JSON.stringify({ error: 'Email is required' }), {
@@ -208,25 +211,29 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+        // Authorization check for invite/resend/generate link
+        // If churchId is provided in the request, ensure caller is admin/general OR assigned to that church
+        if (churchId && !isAdminOrGeneral && callerChurchId !== churchId) {
+          return new Response('Forbidden: You can only invite users to your assigned church.', { status: 403, headers: corsHeaders });
+        }
+        // If no churchId is provided, only admin/general can invite globally
+        if (!churchId && !isAdminOrGeneral) {
+          return new Response('Forbidden: Only administrators or generals can invite users globally.', { status: 403, headers: corsHeaders });
+        }
+
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'user', church_id: churchId || null } // Pass role and church_id if provided
+          data: { role: role || 'user', church_id: churchId || null }
         });
         if (error) {
-          console.error('Error generating invite link:', error);
+          console.error(`Error ${action} user:`, error);
           return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        const inviteLink = data.user?.confirmation_url;
-        if (!inviteLink) {
-          return new Response(JSON.stringify({ error: 'Could not generate invite link' }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        return new Response(JSON.stringify({ inviteLink }), {
+        const responseBody = action === 'generateInviteLink' ? { inviteLink: data.user?.confirmation_url } : { message: 'Invitation sent successfully', user: data.user };
+        return new Response(JSON.stringify(responseBody), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -246,6 +253,27 @@ serve(async (req) => {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
+        }
+
+        // Fetch the target user's profile to check their church_id
+        const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+          .from('profiles')
+          .select('church_id')
+          .eq('id', userId)
+          .single();
+
+        if (targetProfileError || !targetProfile) {
+          console.error('Error fetching target user profile:', targetProfileError);
+          return new Response('Error: Target user profile not found.', { status: 404, headers: corsHeaders });
+        }
+
+        // Authorization check for updateUserRole
+        if (!isAdminOrGeneral && targetProfile.church_id !== callerChurchId) {
+          return new Response('Forbidden: You can only update roles for users from your assigned church.', { status: 403, headers: corsHeaders });
+        }
+        // Prevent non-admins from setting admin/general roles
+        if (!isAdminOrGeneral && (newRole === 'admin' || newRole === 'general')) {
+          return new Response('Forbidden: Only administrators can assign admin or general roles.', { status: 403, headers: corsHeaders });
         }
 
         const { error } = await supabaseAdmin

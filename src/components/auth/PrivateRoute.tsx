@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
@@ -9,41 +9,21 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute = ({ children }: PrivateRouteProps) => {
-  const { session, loading: sessionLoading } = useSession();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { session, loading: sessionLoading, profile } = useSession();
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
-    if (sessionLoading) {
-      return;
+    if (!sessionLoading && session && !profile) {
+      // If session exists but profile is not loaded yet, wait for it
+      // This might happen if profile fetching is slightly delayed
+      setLoadingProfile(true);
+    } else {
+      setLoadingProfile(false);
     }
+  }, [session, sessionLoading, profile]);
 
-    if (!session) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchUserRole = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user role:', error);
-        showError('No se pudo verificar tu rol de usuario.');
-        setUserRole('user'); 
-      } else if (data) {
-        setUserRole(data.role);
-      }
-      setLoading(false);
-    };
-
-    fetchUserRole();
-  }, [session, sessionLoading]);
-
-  if (loading || sessionLoading) {
+  if (sessionLoading || loadingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Cargando...</div>
@@ -55,11 +35,26 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  // If an admin or general user tries to access a non-admin route, redirect them to admin dashboard
-  if (userRole === 'admin' || userRole === 'general') {
+  // Redirect admin/general to admin dashboard
+  if (profile?.role === 'admin' || profile?.role === 'general') {
+    // If they are already on an admin path, let them continue
+    if (location.pathname.startsWith('/admin')) {
+      return <>{children}</>;
+    }
     return <Navigate to="/admin/dashboard" replace />;
   }
 
+  // Redirect pastor/piloto/encargado_de_celula to admin churches page
+  if (['pastor', 'piloto', 'encargado_de_celula'].includes(profile?.role || '')) {
+    // If they are already on an admin path (churches or csv-deduplicator), let them continue
+    if (location.pathname.startsWith('/admin/churches') || location.pathname === '/admin/csv-deduplicator') {
+      return <>{children}</>;
+    }
+    // If they are on the root or a user-specific page, redirect to admin churches
+    return <Navigate to="/admin/churches" replace />;
+  }
+
+  // For 'user' role, or if no specific redirection, render children
   return <>{children}</>;
 };
 

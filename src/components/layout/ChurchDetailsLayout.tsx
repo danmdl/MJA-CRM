@@ -1,21 +1,50 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import ChurchSidebar from './ChurchSidebar';
-import { Outlet } from 'react-router-dom'; // Import Outlet
+import { Outlet } from 'react-router-dom';
+import { useSession } from '@/hooks/use-session'; // Import useSession
+import { showError } from '@/utils/toast';
 
 interface ChurchDetailsLayoutProps {
-  children?: React.ReactNode; // Children are now optional as Outlet will render them
+  children?: React.ReactNode;
 }
 
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
+  const { profile, loading: sessionLoading } = useSession(); // Get user profile and session loading state
+  const navigate = useNavigate();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(false);
 
-  if (!churchId) {
-    return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
+  useEffect(() => {
+    if (sessionLoading) return; // Wait for session and profile to load
+
+    if (!churchId) {
+      showError('Error: No se encontró el ID de la iglesia.');
+      navigate('/admin/churches', { replace: true });
+      return;
+    }
+
+    const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
+    const isAssignedToChurch = profile?.church_id === churchId;
+
+    if (!isAdminOrGeneral && !isAssignedToChurch) {
+      showError('No tienes permiso para acceder a los detalles de esta iglesia.');
+      navigate('/admin/churches', { replace: true });
+    } else {
+      setAccessChecked(true);
+    }
+  }, [churchId, profile, sessionLoading, navigate]);
+
+  if (!accessChecked || sessionLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div>Verificando acceso a la iglesia...</div>
+      </div>
+    );
   }
 
   return (
@@ -40,7 +69,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
         <main className="flex-1 p-6 overflow-auto">
-          {children || <Outlet />} {/* Render children if provided, otherwise Outlet */}
+          {children || <Outlet />}
         </main>
       </ResizablePanel>
     </ResizablePanelGroup>

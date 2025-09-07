@@ -12,7 +12,7 @@ import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
-import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage"; // Keep for admin-specific deduplicator if needed, but remove from global admin nav
+import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
@@ -44,10 +44,11 @@ const AppRoutes = () => {
       <Route path="/" element={<PrivateRoute><UserLayout><Outlet /></UserLayout></PrivateRoute>}>
         <Route index element={<Index />} />
         <Route path="profile" element={<Profile />} />
-        {/* Removed global database and csv-deduplicator for regular users */}
+        {/* CSV Deduplicator is now accessible to all authenticated users */}
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
       </Route>
       
-      {/* Admin Routes */}
+      {/* Admin Routes (accessible by admin, general, and specific church roles for certain paths) */}
       <Route 
         path="/admin"
         element={
@@ -61,8 +62,8 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="churches" element={<ChurchesPage />} />
-        {/* Removed global manage-team and database routes */}
-        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Kept for admin global access if desired */}
+        {/* CSV Deduplicator is also accessible via admin path */}
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
         <Route path="profile" element={<AdminProfile />} />
         
         {/* Nested routes for specific church details */}

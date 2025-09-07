@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
-import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 
 interface AdminRouteProps {
@@ -9,43 +8,19 @@ interface AdminRouteProps {
 }
 
 const AdminRoute = ({ children }: AdminRouteProps) => {
-  const { session, loading: sessionLoading } = useSession();
-  const [hasAdminAccess, setHasAdminAccess] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { session, loading: sessionLoading, profile } = useSession();
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
-    if (sessionLoading) {
-      return;
+    if (!sessionLoading && session && !profile) {
+      setLoadingProfile(true);
+    } else {
+      setLoadingProfile(false);
     }
+  }, [session, sessionLoading, profile]);
 
-    if (!session) {
-      setLoading(false);
-      return;
-    }
-
-    const checkAdminRole = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user role:', error);
-        showError('No se pudo verificar tu rol de usuario.');
-        setHasAdminAccess(false);
-      } else if (data && (data.role === 'admin' || data.role === 'general')) {
-        setHasAdminAccess(true);
-      } else {
-        setHasAdminAccess(false);
-      }
-      setLoading(false);
-    };
-
-    checkAdminRole();
-  }, [session, sessionLoading]);
-
-  if (loading || sessionLoading) {
+  if (sessionLoading || loadingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Verificando acceso...</div>
@@ -57,12 +32,32 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!hasAdminAccess) {
+  const userRole = profile?.role;
+  const isAdminOrGeneral = userRole === 'admin' || userRole === 'general';
+  const isChurchRole = ['pastor', 'piloto', 'encargado_de_celula'].includes(userRole || '');
+
+  // Paths that church roles can access under /admin
+  const allowedChurchRolePaths = [
+    '/admin/churches',
+    '/admin/csv-deduplicator',
+  ];
+
+  // Check if the current path starts with any of the allowed church role paths
+  const isCurrentPathAllowedForChurchRole = allowedChurchRolePaths.some(path => 
+    location.pathname.startsWith(path)
+  );
+
+  if (isAdminOrGeneral) {
+    // Admins and Generals have full access to all /admin routes
+    return <>{children}</>;
+  } else if (isChurchRole && isCurrentPathAllowedForChurchRole) {
+    // Church roles can access specific /admin paths
+    return <>{children}</>;
+  } else {
+    // For any other /admin path, or if not admin/general/church-role, deny access
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
   }
-
-  return <>{children}</>;
 };
 
 export default AdminRoute;

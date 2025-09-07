@@ -50,7 +50,7 @@ interface InviteUserDialogProps {
 export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
-  const { session } = useSession();
+  const { session, profile } = useSession(); // Get user profile
 
   const form = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
@@ -106,6 +106,8 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
     }
   };
 
+  const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -145,7 +147,12 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
                     </FormControl>
                     <SelectContent>
                       {UserRoles.options.map((roleOption) => (
-                        <SelectItem key={roleOption} value={roleOption}>
+                        // Disable admin/general roles if current user is not admin/general
+                        <SelectItem 
+                          key={roleOption} 
+                          value={roleOption}
+                          disabled={!isAdminOrGeneral && (roleOption === 'admin' || roleOption === 'general')}
+                        >
                           {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
                         </SelectItem>
                       ))}

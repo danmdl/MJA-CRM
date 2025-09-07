@@ -23,7 +23,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Verify the user's role to ensure only admins or generals can call this function
     const { data: userAuth, error: userAuthError } = await supabaseAdmin.auth.getUser(token);
     if (userAuthError || !userAuth.user) {
       console.error('Auth error:', userAuthError);
@@ -32,16 +31,20 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, church_id')
       .eq('id', userAuth.user.id)
       .single();
 
-    if (profileError || (profile?.role !== 'admin' && profile?.role !== 'general')) { // Allow 'admin' or 'general'
-      console.error('Profile error or not admin/general:', profileError, profile?.role);
-      return new Response('Forbidden: Only administrators or generals can perform this action', { status: 403, headers: corsHeaders });
+    if (profileError || !profile) {
+      console.error('Profile error:', profileError);
+      return new Response('Forbidden: User profile not found or accessible', { status: 403, headers: corsHeaders });
     }
 
-    const { email, role, churchId } = await req.json(); // Destructure churchId
+    const callerRole = profile.role;
+    const callerChurchId = profile.church_id;
+    const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
+
+    const { email, role, churchId } = await req.json();
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function invite-user using SITE_URL:', siteUrl);
 
@@ -52,9 +55,23 @@ serve(async (req) => {
       });
     }
 
+    // Authorization check for invite
+    // If churchId is provided in the request, ensure caller is admin/general OR assigned to that church
+    if (churchId && !isAdminOrGeneral && callerChurchId !== churchId) {
+      return new Response('Forbidden: You can only invite users to your assigned church.', { status: 403, headers: corsHeaders });
+    }
+    // If no churchId is provided, only admin/general can invite globally
+    if (!churchId && !isAdminOrGeneral) {
+      return new Response('Forbidden: Only administrators or generals can invite users globally.', { status: 403, headers: corsHeaders });
+    }
+    // Prevent non-admins from setting admin/general roles
+    if (!isAdminOrGeneral && (role === 'admin' || role === 'general')) {
+      return new Response('Forbidden: Only administrators can assign admin or general roles.', { status: 403, headers: corsHeaders });
+    }
+
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${siteUrl}/login`,
-      data: { role: role || 'user', church_id: churchId || null } // Pass role and church_id
+      data: { role: role || 'user', church_id: churchId || null }
     });
 
     if (error) {
