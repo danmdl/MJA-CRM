@@ -45,7 +45,7 @@ serve(async (req) => {
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
     const isAdmin = callerRole === 'admin'; // Explicitly check for admin role
 
-    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name } = await req.json(); // Added first_name, last_name, churchId for createUser
+    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name } = await req.json(); // Removed churchId from destructuring for createUser action
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
@@ -189,7 +189,7 @@ serve(async (req) => {
             first_name: first_name || null,
             last_name: last_name || null,
             role: role, 
-            church_id: churchId || null 
+            // church_id: churchId || null // Revertido: No se envía church_id por ahora
           },
         });
 
