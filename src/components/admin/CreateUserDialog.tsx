@@ -31,24 +31,45 @@ import {
 } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 
 // Definir el tipo de rol de usuario
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
 
+// Definir la interfaz para la iglesia
+interface Church {
+  id: string;
+  name: string;
+}
+
 const createUserSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().optional(),
-    last_name: z.string().optional(),
-  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']), // Role is now required
+  last_name: z.string().optional(),
+  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']),
+  church_id: z.string().uuid().nullable().optional(), // church_id es opcional y puede ser nulo
 });
 
 interface CreateUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Función para obtener las iglesias
+const fetchChurches = async (): Promise<Church[]> => {
+  const { data, error } = await supabase
+    .from('churches')
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching churches:', error);
+    throw new Error('No se pudieron cargar las iglesias.');
+  }
+  return data || [];
+};
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
@@ -62,8 +83,16 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       password: '',
       first_name: '',
       last_name: '',
-      role: 'user', // Default role
+      role: 'user',
+      church_id: null,
     },
+  });
+
+  // Cargar iglesias para el selector
+  const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches, error: errorChurches } = useQuery<Church[]>({
+    queryKey: ['churches'],
+    queryFn: fetchChurches,
+    enabled: open, // Solo cargar cuando el diálogo está abierto
   });
 
   useEffect(() => {
@@ -71,6 +100,12 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       form.reset(); // Reset form when dialog closes
     }
   }, [open, form]);
+
+  useEffect(() => {
+    if (isErrorChurches) {
+      showError(errorChurches?.message || 'Error al cargar la lista de iglesias.');
+    }
+  }, [isErrorChurches, errorChurches]);
 
   const onSubmit = async (values: z.infer<typeof createUserSchema>) => {
     setLoading(true);
@@ -96,7 +131,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           first_name: values.first_name || null,
           last_name: values.last_name || null,
           role: values.role,
-          churchId: null, // Valor por defecto temporal, se añadirá en el siguiente paso
+          churchId: values.church_id || null, // Enviar church_id
         }),
       });
 
@@ -123,6 +158,14 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
   };
 
   const isAdmin = profile?.role === 'admin';
+
+  // Filtrar roles disponibles
+  const availableRoles = createUserSchema.shape.role.options.filter(roleOption => {
+    if (!isAdmin && (roleOption === 'admin' || roleOption === 'general')) {
+      return false; // No mostrar 'admin' o 'general' si el usuario actual no es admin
+    }
+    return true;
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -200,13 +243,41 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                     </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {createUserSchema.shape.role.options.map((roleOption) => (
+                      {availableRoles.map((roleOption) => (
                         <SelectItem
                           key={roleOption}
                           value={roleOption}
-                          disabled={!isAdmin && (roleOption === 'admin' || roleOption === 'general')}
                         >
                           {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="church_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Iglesia Asignada</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === "" ? null : value)} // Convert empty string to null
+                    value={field.value || ""} // Ensure controlled component
+                    disabled={loading || isLoadingChurches}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingChurches ? "Cargando iglesias..." : "Selecciona una iglesia (Opcional)"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">(Ninguna)</SelectItem> {/* Opción para no asignar iglesia */}
+                      {churches?.map((church) => (
+                        <SelectItem key={church.id} value={church.id}>
+                          {church.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -219,7 +290,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading || isLoadingChurches}>
                 {loading ? 'Creando...' : 'Crear Usuario'}
               </Button>
             </DialogFooter>
