@@ -46,10 +46,9 @@ const createUserSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   confirmPassword: z.string(),
-  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin'], {
-    errorMap: () => ({ message: 'Por favor, selecciona un rol.' })
-  }),
-  church_id: z.string().uuid({ message: 'Por favor, selecciona una iglesia válida.' }), // Ahora es obligatorio
+  // Rol e iglesia comentados temporalmente para depuración
+  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']).optional(),
+  church_id: z.string().uuid().nullable().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden.',
   path: ['confirmPassword'],
@@ -60,18 +59,19 @@ interface CreateUserDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const fetchChurchesForSelect = async (): Promise<Church[]> => {
-  const { data, error } = await supabase
-    .from('churches')
-    .select('id, name')
-    .order('name', { ascending: true });
+// Comentado temporalmente para depuración
+// const fetchChurchesForSelect = async (): Promise<Church[]> => {
+//   const { data, error } = await supabase
+//     .from('churches')
+//     .select('id, name')
+//     .order('name', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching churches for select:', error);
-    throw new Error('No se pudieron cargar las iglesias.');
-  }
-  return data || [];
-};
+//   if (error) {
+//     console.error('Error fetching churches for select:', error);
+//     throw new Error('No se pudieron cargar las iglesias.');
+//   }
+//   return data || [];
+// };
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
@@ -84,15 +84,16 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       email: '',
       password: '',
       confirmPassword: '',
-      role: 'user', // Valor por defecto, pero será obligatorio seleccionar
-      church_id: '', // Valor por defecto vacío para el select obligatorio
+      role: 'user',
+      church_id: null,
     },
   });
 
-  const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
-    queryKey: ['churchesForSelect'],
-    queryFn: fetchChurchesForSelect,
-  });
+  // Comentado temporalmente para depuración
+  // const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
+  //   queryKey: ['churchesForSelect'],
+  //   queryFn: fetchChurchesForSelect,
+  // });
 
   useEffect(() => {
     if (!open) {
@@ -200,6 +201,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 </FormItem>
               )}
             />
+            {/* Campos de rol e iglesia comentados temporalmente */}
+            {/*
             <FormField
               control={form.control}
               name="role"
@@ -210,7 +213,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
-                      </SelectTrigger>
+                    </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {createUserSchema.shape.role.options.map((roleOption) => (
@@ -233,9 +236,9 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               name="church_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Iglesia Asignada</FormLabel> {/* Ya no es opcional */}
+                  <FormLabel>Iglesia Asignada</FormLabel>
                   <Select
-                    onValueChange={(value) => field.onChange(value)} // Ya no permite null
+                    onValueChange={(value) => field.onChange(value)}
                     value={field.value}
                     disabled={loading || isLoadingChurches}
                   >
@@ -258,6 +261,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 </FormItem>
               )}
             />
+            */}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
