@@ -34,10 +34,8 @@ type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula
 const createUserSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Las contraseñas no coinciden.',
-  path: ['confirmPassword'],
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
 });
 
 interface CreateUserDialogProps {
@@ -55,7 +53,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
     defaultValues: {
       email: '',
       password: '',
-      confirmPassword: '',
+      first_name: '',
+      last_name: '',
     },
   });
 
@@ -86,6 +85,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           action: 'createUser',
           email: values.email,
           password: values.password,
+          first_name: values.first_name || null,
+          last_name: values.last_name || null,
           role: 'user', // Valor por defecto temporal
           churchId: null, // Valor por defecto temporal
         }),
@@ -152,12 +153,25 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             />
             <FormField
               control={form.control}
-              name="confirmPassword"
+              name="first_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirmar Contraseña</FormLabel>
+                  <FormLabel>Nombre</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} disabled={loading} />
+                    <Input placeholder="Primer Nombre" {...field} disabled={loading} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="last_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Apellido</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Apellido" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
