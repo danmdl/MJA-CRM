@@ -46,8 +46,10 @@ const createUserSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   confirmPassword: z.string(),
-  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']),
-  church_id: z.string().uuid().nullable().optional(),
+  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin'], {
+    errorMap: () => ({ message: 'Por favor, selecciona un rol.' })
+  }),
+  church_id: z.string().uuid({ message: 'Por favor, selecciona una iglesia válida.' }), // Ahora es obligatorio
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden.',
   path: ['confirmPassword'],
@@ -58,19 +60,18 @@ interface CreateUserDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Comentado temporalmente para depuración
-// const fetchChurchesForSelect = async (): Promise<Church[]> => {
-//   const { data, error } = await supabase
-//     .from('churches')
-//     .select('id, name')
-//     .order('name', { ascending: true });
+const fetchChurchesForSelect = async (): Promise<Church[]> => {
+  const { data, error } = await supabase
+    .from('churches')
+    .select('id, name')
+    .order('name', { ascending: true });
 
-//   if (error) {
-//     console.error('Error fetching churches for select:', error);
-//     throw new Error('No se pudieron cargar las iglesias.');
-//   }
-//   return data || [];
-// };
+  if (error) {
+    console.error('Error fetching churches for select:', error);
+    throw new Error('No se pudieron cargar las iglesias.');
+  }
+  return data || [];
+};
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
@@ -83,16 +84,15 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       email: '',
       password: '',
       confirmPassword: '',
-      role: 'user',
-      church_id: null,
+      role: 'user', // Valor por defecto, pero será obligatorio seleccionar
+      church_id: '', // Valor por defecto vacío para el select obligatorio
     },
   });
 
-  // Comentado temporalmente para depuración
-  // const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
-  //   queryKey: ['churchesForSelect'],
-  //   queryFn: fetchChurchesForSelect,
-  // });
+  const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
+    queryKey: ['churchesForSelect'],
+    queryFn: fetchChurchesForSelect,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -174,8 +174,6 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 </FormItem>
               )}
             />
-            {/* Campos de contraseña, rol e iglesia comentados temporalmente */}
-            {/*
             <FormField
               control={form.control}
               name="password"
@@ -183,7 +181,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} disabled={loading} />
+                    <Input type="text" {...field} disabled={loading} /> {/* Cambiado a type="text" */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -196,7 +194,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 <FormItem>
                   <FormLabel>Confirmar Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} disabled={loading} />
+                    <Input type="text" {...field} disabled={loading} /> {/* Cambiado a type="text" */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -235,10 +233,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               name="church_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Iglesia Asignada (Opcional)</FormLabel>
+                  <FormLabel>Iglesia Asignada</FormLabel> {/* Ya no es opcional */}
                   <Select
-                    onValueChange={(value) => field.onChange(value === "" ? null : value)}
-                    value={field.value || ""}
+                    onValueChange={(value) => field.onChange(value)} // Ya no permite null
+                    value={field.value}
                     disabled={loading || isLoadingChurches}
                   >
                     <FormControl>
@@ -247,7 +245,6 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">(Ninguna)</SelectItem>
                       {isLoadingChurches && <SelectItem value="loading" disabled>Cargando iglesias...</SelectItem>}
                       {isErrorChurches && <SelectItem value="error" disabled>Error al cargar iglesias</SelectItem>}
                       {churches?.map((church) => (
@@ -261,7 +258,6 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 </FormItem>
               )}
             />
-            */}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
