@@ -22,20 +22,27 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-// Importaciones de Select eliminadas temporalmente
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 
-// Definir el tipo de rol de usuario (no se usa directamente en este paso, pero se mantiene para el futuro)
+// Definir el tipo de rol de usuario
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
 
 const createUserSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().optional(),
-  last_name: z.string().optional(),
+    last_name: z.string().optional(),
+  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']), // Role is now required
 });
 
 interface CreateUserDialogProps {
@@ -46,7 +53,7 @@ interface CreateUserDialogProps {
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
-  const { session } = useSession();
+  const { session, profile } = useSession();
 
   const form = useForm<z.infer<typeof createUserSchema>>({
     resolver: zodResolver(createUserSchema),
@@ -55,6 +62,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       password: '',
       first_name: '',
       last_name: '',
+      role: 'user', // Default role
     },
   });
 
@@ -87,8 +95,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           password: values.password,
           first_name: values.first_name || null,
           last_name: values.last_name || null,
-          role: 'user', // Valor por defecto temporal
-          churchId: null, // Valor por defecto temporal
+          role: values.role,
+          churchId: null, // Valor por defecto temporal, se añadirá en el siguiente paso
         }),
       });
 
@@ -113,6 +121,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       setLoading(false);
     }
   };
+
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,6 +183,34 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                   <FormControl>
                     <Input placeholder="Apellido" {...field} disabled={loading} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rol</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un rol" />
+                    </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {createUserSchema.shape.role.options.map((roleOption) => (
+                        <SelectItem
+                          key={roleOption}
+                          value={roleOption}
+                          disabled={!isAdmin && (roleOption === 'admin' || roleOption === 'general')}
+                        >
+                          {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
