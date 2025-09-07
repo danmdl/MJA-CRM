@@ -108,6 +108,11 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
 
   const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
 
+  // Filter roles based on churchId presence
+  const availableRoles = churchId
+    ? UserRoles.options.filter(role => ['pastor', 'piloto', 'encargado_de_celula'].includes(role))
+    : UserRoles.options; // If no churchId, show all roles (for global invite, if ever implemented)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -146,7 +151,7 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {UserRoles.options.map((roleOption) => (
+                      {availableRoles.map((roleOption) => (
                         // Disable admin/general roles if current user is not admin/general
                         <SelectItem 
                           key={roleOption} 

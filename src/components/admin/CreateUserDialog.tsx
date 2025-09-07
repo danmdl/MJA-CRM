@@ -47,7 +47,7 @@ const createUserSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   confirmPassword: z.string(),
   role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']),
-  // church_id: z.string().uuid().nullable().optional(), // Temporarily comment out
+  church_id: z.string().uuid().nullable().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden.',
   path: ['confirmPassword'],
@@ -58,22 +58,20 @@ interface CreateUserDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Temporarily comment out fetchChurchesForSelect
-// const fetchChurchesForSelect = async (): Promise<Church[]> => {
-//   const { data, error } = await supabase
-//     .from('churches')
-//     .select('id, name')
-//     .order('name', { ascending: true });
+const fetchChurchesForSelect = async (): Promise<Church[]> => {
+  const { data, error } = await supabase
+    .from('churches')
+    .select('id, name')
+    .order('name', { ascending: true });
 
-//   if (error) {
-//     console.error('Error fetching churches for select:', error);
-//     throw new Error('No se pudieron cargar las iglesias.');
-//   }
-//   return data || [];
-// };
+  if (error) {
+    console.error('Error fetching churches for select:', error);
+    throw new Error('No se pudieron cargar las iglesias.');
+  }
+  return data || [];
+};
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
-  console.log("CreateUserDialog rendered, open:", open); // Debug log
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
@@ -85,15 +83,14 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       password: '',
       confirmPassword: '',
       role: 'user',
-      // church_id: null, // Temporarily comment out
+      church_id: null,
     },
   });
 
-  // Temporarily comment out useQuery for churches
-  // const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
-  //   queryKey: ['churchesForSelect'],
-  //   queryFn: fetchChurchesForSelect,
-  // });
+  const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
+    queryKey: ['churchesForSelect'],
+    queryFn: fetchChurchesForSelect,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -123,7 +120,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           email: values.email,
           password: values.password,
           role: values.role,
-          // churchId: values.church_id, // Temporarily comment out
+          churchId: values.church_id,
         }),
       });
 
@@ -160,119 +157,18 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             Introduce los detalles para crear una nueva cuenta de usuario.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Correo Electrónico</FormLabel>
-                  <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirmar Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un rol" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {createUserSchema.shape.role.options.map((roleOption) => (
-                        <SelectItem
-                          key={roleOption}
-                          value={roleOption}
-                          disabled={!isAdmin && (roleOption === 'admin' || roleOption === 'general')}
-                        >
-                          {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {/* Temporarily commented out church_id field */}
-            {/*
-            <FormField
-              control={form.control}
-              name="church_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Iglesia Asignada (Opcional)</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === "" ? null : value)}
-                    value={field.value || ""}
-                    disabled={loading || isLoadingChurches}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una iglesia" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="">(Ninguna)</SelectItem>
-                      {isLoadingChurches && <SelectItem value="loading" disabled>Cargando iglesias...</SelectItem>}
-                      {isErrorChurches && <SelectItem value="error" disabled>Error al cargar iglesias</SelectItem>}
-                      {churches?.map((church) => (
-                        <SelectItem key={church.id} value={church.id}>
-                          {church.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            */}
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creando...' : 'Crear Usuario'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        {/* Simplified content for debugging */}
+        <div className="p-4 text-center">
+          <p>Contenido de prueba para el diálogo.</p>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Creando...' : 'Crear Usuario'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
