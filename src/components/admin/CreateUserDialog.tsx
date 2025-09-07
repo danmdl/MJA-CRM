@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+// Importaciones de react-hook-form y zod eliminadas temporalmente
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,96 +11,39 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+// Importaciones de Form, FormField, etc. eliminadas temporalmente
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Label } from '@/components/ui/label'; // Añadido Label
+// Importaciones de Select eliminadas temporalmente
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 
-// Definir el tipo de rol de usuario
+// Definir el tipo de rol de usuario (aunque no se usa en este paso, lo mantengo para futuras referencias)
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
-
-interface Church {
-  id: string;
-  name: string;
-}
-
-const createUserSchema = z.object({
-  email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
-  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
-  confirmPassword: z.string(),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
-  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']).optional(),
-  church_id: z.string().uuid().nullable().optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Las contraseñas no coinciden.',
-  path: ['confirmPassword'],
-});
 
 interface CreateUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const fetchChurchesForSelect = async (): Promise<Church[]> => {
-  const { data, error } = await supabase
-    .from('churches')
-    .select('id, name')
-    .order('name', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching churches for select:', error);
-    throw new Error('No se pudieron cargar las iglesias.');
-  }
-  return data || [];
-};
-
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const queryClient = useQueryClient();
-  const { session, profile } = useSession();
-
-  const form = useForm<z.infer<typeof createUserSchema>>({
-    resolver: zodResolver(createUserSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      confirmPassword: '',
-      first_name: '',
-      last_name: '',
-      role: 'user', // Default role
-      church_id: null,
-    },
-  });
-
-  const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
-    queryKey: ['churchesForSelect'],
-    queryFn: fetchChurchesForSelect,
-  });
+  const { session } = useSession();
 
   useEffect(() => {
     if (!open) {
-      form.reset(); // Reset form when dialog closes
+      setEmail('');
+      setPassword('');
     }
-  }, [open, form]);
+  }, [open]);
 
-  const onSubmit = async (values: z.infer<typeof createUserSchema>) => {
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevenir el comportamiento por defecto del formulario
     setLoading(true);
     try {
       if (!session?.access_token) {
@@ -121,12 +62,11 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
         },
         body: JSON.stringify({
           action: 'createUser',
-          email: values.email,
-          password: values.password,
-          first_name: values.first_name || null,
-          last_name: values.last_name || null,
-          role: values.role,
-          churchId: values.church_id,
+          email: email,
+          password: password,
+          // Rol e iglesia no se envían en este paso simplificado
+          role: 'user', // Valor por defecto para la función, se hará configurable después
+          churchId: null, // Valor por defecto para la función, se hará configurable después
         }),
       });
 
@@ -140,9 +80,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       }
 
       showSuccess('¡Usuario creado con éxito!');
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: ['users'] }); // Refresh the user table
-      queryClient.invalidateQueries({ queryKey: ['churchUsers'] }); // Also refresh church-specific user tables
+      setEmail('');
+      setPassword('');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['churchUsers'] });
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error al crear usuario (client-side catch):', error);
@@ -151,8 +92,6 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       setLoading(false);
     }
   };
-
-  const isAdmin = profile?.role === 'admin';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -163,142 +102,36 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             Introduce los detalles para crear una nueva cuenta de usuario.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Correo Electrónico</FormLabel>
-                  <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Correo Electrónico</Label>
+            <Input
+              id="email"
+              placeholder="nombre@ejemplo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
             />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="text" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Contraseña</Label>
+            <Input
+              id="password"
+              type="text" // Visible
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
             />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirmar Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="text" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="first_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Primer Nombre" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="last_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Apellido</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Apellido" {...field} disabled={loading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un rol" />
-                    </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {createUserSchema.shape.role.options.map((roleOption) => (
-                        <SelectItem
-                          key={roleOption}
-                          value={roleOption}
-                          disabled={!isAdmin && (roleOption === 'admin' || roleOption === 'general')}
-                        >
-                          {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="church_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Iglesia Asignada</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === "" ? null : value)} // Handle empty string for null
-                    value={field.value || ""} // Ensure controlled component
-                    disabled={loading || isLoadingChurches}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una iglesia (Opcional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="">(Ninguna)</SelectItem> {/* Option for no church */}
-                      {isLoadingChurches && <SelectItem value="loading" disabled>Cargando iglesias...</SelectItem>}
-                      {isErrorChurches && <SelectItem value="error" disabled>Error al cargar iglesias</SelectItem>}
-                      {churches?.map((church) => (
-                        <SelectItem key={church.id} value={church.id}>
-                          {church.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creando...' : 'Crear Usuario'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Creando...' : 'Crear Usuario'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
