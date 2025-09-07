@@ -34,7 +34,7 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
         console.error('Error fetching user role:', error);
         showError('No se pudo verificar tu rol de usuario.');
         setHasAdminAccess(false);
-      } else if (data && (data.role === 'admin' || data.role === 'general')) { // Allow 'admin' or 'general'
+      } else if (data && (data.role === 'admin' || data.role === 'general')) {
         setHasAdminAccess(true);
       } else {
         setHasAdminAccess(false);

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"; // Import Outlet
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { SessionProvider } from "./components/SessionProvider";
@@ -21,6 +21,9 @@ import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
 import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
 import { ThemeProvider } from "next-themes";
+import UserLayout from "./components/layout/UserLayout"; // Import UserLayout
+import Index from "./pages/Index"; // Import Index
+import Profile from "./pages/Profile"; // Import Profile
 
 const queryClient = new QueryClient();
 
@@ -39,37 +42,41 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       
-      {/* PrivateRoute now handles user-specific layout and routes */}
-      <Route path="/*" element={<PrivateRoute />} /> 
+      {/* User-specific routes, wrapped by PrivateRoute and UserLayout */}
+      <Route path="/" element={<PrivateRoute><UserLayout><Outlet /></UserLayout></PrivateRoute>}>
+        <Route index element={<Index />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="database" element={<DatabasePage />} />
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+      </Route>
       
       {/* Admin Routes */}
       <Route 
-        path="/admin/*"
+        path="/admin" // Base path for admin routes
         element={
           <AdminRoute>
             <AdminLayout>
-              <Routes>
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="churches" element={<ChurchesPage />} />
-                <Route path="manage-team" element={<ManageTeam />} />
-                <Route path="profile" element={<AdminProfile />} />
-                <Route path="database" element={<DatabasePage />} />
-                <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-                
-                {/* Nested routes for specific church details */}
-                <Route path="churches/:churchId/*" element={<ChurchDetailsLayout />}>
-                  <Route path="overview" element={<ChurchOverviewPage />} />
-                  <Route path="database" element={<ChurchDatabasePage />} />
-                  <Route path="team" element={<ChurchTeamPage />} />
-                  <Route index element={<Navigate to="overview" replace />} />
-                </Route>
-
-                <Route index element={<Navigate to="dashboard" replace />} />
-              </Routes>
+              <Outlet /> {/* Outlet for nested admin routes */}
             </AdminLayout>
           </AdminRoute>
         }
-      />
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="churches" element={<ChurchesPage />} />
+        <Route path="manage-team" element={<ManageTeam />} />
+        <Route path="profile" element={<AdminProfile />} />
+        <Route path="database" element={<DatabasePage />} />
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+        
+        {/* Nested routes for specific church details */}
+        <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>
+          <Route path="overview" element={<ChurchOverviewPage />} />
+          <Route path="database" element={<ChurchDatabasePage />} />
+          <Route path="team" element={<ChurchTeamPage />} />
+          <Route index element={<Navigate to="overview" replace />} />
+        </Route>
+      </Route>
 
       <Route path="*" element={<NotFound />} />
     </Routes>

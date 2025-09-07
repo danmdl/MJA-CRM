@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import ChurchSidebar from './ChurchSidebar';
+import { Outlet } from 'react-router-dom'; // Import Outlet
 
 interface ChurchDetailsLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode; // Children are now optional as Outlet will render them
 }
 
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
@@ -20,7 +21,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   return (
     <ResizablePanelGroup
       direction="horizontal"
-      className="h-full w-full" {/* Changed from min-h-screen to h-full */}
+      className="h-full w-full"
       onLayout={(sizes: number[]) => {
         setIsSidebarCollapsed(sizes[0] < 10);
       }}
@@ -39,7 +40,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
         <main className="flex-1 p-6 overflow-auto">
-          {children}
+          {children || <Outlet />} {/* Render children if provided, otherwise Outlet */}
         </main>
       </ResizablePanel>
     </ResizablePanelGroup>

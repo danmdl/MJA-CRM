@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { Outlet } from 'react-router-dom'; // Import Outlet
 
 interface AdminLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode; // Children are now optional as Outlet will render them
 }
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
@@ -24,14 +25,14 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         collapsible={true}
         onCollapse={() => setIsSidebarCollapsed(true)}
         onExpand={() => setIsSidebarCollapsed(false)}
-        className="min-w-[60px] h-full" {/* Added h-full here */}
+        className="min-w-[60px] h-full"
       >
         <Sidebar isCollapsed={isSidebarCollapsed} />
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
         <main className="flex-1 p-6 overflow-auto">
-          {children}
+          {children || <Outlet />} {/* Render children if provided, otherwise Outlet */}
         </main>
       </ResizablePanel>
     </ResizablePanelGroup>

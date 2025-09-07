@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Routes, Route } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import Index from '@/pages/Index';
-import Profile from '@/pages/Profile';
-import UserLayout from '@/components/layout/UserLayout';
-import DatabasePage from '@/pages/admin/Database'; // Import DatabasePage
-import CsvDeduplicatorPage from '@/pages/admin/CsvDeduplicatorPage'; // Import CsvDeduplicatorPage
+import { showError } from '@/utils/toast';
 
-const PrivateRoute = () => {
+interface PrivateRouteProps {
+  children: React.ReactNode;
+}
+
+const PrivateRoute = ({ children }: PrivateRouteProps) => {
   const { session, loading: sessionLoading } = useSession();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +32,7 @@ const PrivateRoute = () => {
 
       if (error) {
         console.error('Error fetching user role:', error);
+        showError('No se pudo verificar tu rol de usuario.');
         setUserRole('user'); 
       } else if (data) {
         setUserRole(data.role);
@@ -54,22 +55,12 @@ const PrivateRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (userRole === 'admin') {
+  // If an admin or general user tries to access a non-admin route, redirect them to admin dashboard
+  if (userRole === 'admin' || userRole === 'general') {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // For non-admin authenticated users, render UserLayout with nested routes
-  return (
-    <UserLayout>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/database" element={<DatabasePage />} /> {/* Added Database route */}
-        <Route path="/csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Added CSV Deduplicator route */}
-        <Route index element={<Navigate to="/" replace />} />
-      </Routes>
-    </UserLayout>
-  );
+  return <>{children}</>;
 };
 
 export default PrivateRoute;
