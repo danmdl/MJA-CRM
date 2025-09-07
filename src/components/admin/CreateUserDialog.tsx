@@ -22,36 +22,17 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 
-// Definir el tipo de rol de usuario
+// Definir el tipo de rol de usuario (aunque no se usa en este paso, lo mantengo para futuras referencias)
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
-
-interface Church {
-  id: string;
-  name: string;
-}
 
 const createUserSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
-  confirmPassword: z.string(),
-  // Rol e iglesia comentados temporalmente para depuración
-  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']).optional(),
-  church_id: z.string().uuid().nullable().optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Las contraseñas no coinciden.',
-  path: ['confirmPassword'],
 });
 
 interface CreateUserDialogProps {
@@ -59,41 +40,18 @@ interface CreateUserDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Comentado temporalmente para depuración
-// const fetchChurchesForSelect = async (): Promise<Church[]> => {
-//   const { data, error } = await supabase
-//     .from('churches')
-//     .select('id, name')
-//     .order('name', { ascending: true });
-
-//   if (error) {
-//     console.error('Error fetching churches for select:', error);
-//     throw new Error('No se pudieron cargar las iglesias.');
-//   }
-//   return data || [];
-// };
-
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
-  const { session, profile } = useSession();
+  const { session } = useSession(); // Solo necesitamos la sesión para el token
 
   const form = useForm<z.infer<typeof createUserSchema>>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
       email: '',
       password: '',
-      confirmPassword: '',
-      role: 'user',
-      church_id: null,
     },
   });
-
-  // Comentado temporalmente para depuración
-  // const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
-  //   queryKey: ['churchesForSelect'],
-  //   queryFn: fetchChurchesForSelect,
-  // });
 
   useEffect(() => {
     if (!open) {
@@ -122,8 +80,9 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           action: 'createUser',
           email: values.email,
           password: values.password,
-          role: values.role,
-          churchId: values.church_id,
+          // Rol e iglesia no se envían en este paso simplificado
+          role: 'user', // Valor por defecto para la función, se hará configurable después
+          churchId: null, // Valor por defecto para la función, se hará configurable después
         }),
       });
 
@@ -148,8 +107,6 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       setLoading(false);
     }
   };
-
-  const isAdmin = profile?.role === 'admin';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,86 +139,12 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} disabled={loading} /> {/* Cambiado a type="text" */}
+                    <Input type="text" {...field} disabled={loading} /> {/* Visible y obligatorio */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirmar Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="text" {...field} disabled={loading} /> {/* Cambiado a type="text" */}
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {/* Campos de rol e iglesia comentados temporalmente */}
-            {/*
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un rol" />
-                    </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {createUserSchema.shape.role.options.map((roleOption) => (
-                        <SelectItem
-                          key={roleOption}
-                          value={roleOption}
-                          disabled={!isAdmin && (roleOption === 'admin' || roleOption === 'general')}
-                        >
-                          {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="church_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Iglesia Asignada</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value)}
-                    value={field.value}
-                    disabled={loading || isLoadingChurches}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una iglesia" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {isLoadingChurches && <SelectItem value="loading" disabled>Cargando iglesias...</SelectItem>}
-                      {isErrorChurches && <SelectItem value="error" disabled>Error al cargar iglesias</SelectItem>}
-                      {churches?.map((church) => (
-                        <SelectItem key={church.id} value={church.id}>
-                          {church.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            */}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
