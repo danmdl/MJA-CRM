@@ -58,18 +58,19 @@ interface CreateUserDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const fetchChurchesForSelect = async (): Promise<Church[]> => {
-  const { data, error } = await supabase
-    .from('churches')
-    .select('id, name')
-    .order('name', { ascending: true });
+// Comentado temporalmente para depuración
+// const fetchChurchesForSelect = async (): Promise<Church[]> => {
+//   const { data, error } = await supabase
+//     .from('churches')
+//     .select('id, name')
+//     .order('name', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching churches for select:', error);
-    throw new Error('No se pudieron cargar las iglesias.');
-  }
-  return data || [];
-};
+//   if (error) {
+//     console.error('Error fetching churches for select:', error);
+//     throw new Error('No se pudieron cargar las iglesias.');
+//   }
+//   return data || [];
+// };
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
@@ -87,10 +88,11 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
     },
   });
 
-  const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
-    queryKey: ['churchesForSelect'],
-    queryFn: fetchChurchesForSelect,
-  });
+  // Comentado temporalmente para depuración
+  // const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches } = useQuery<Church[]>({
+  //   queryKey: ['churchesForSelect'],
+  //   queryFn: fetchChurchesForSelect,
+  // });
 
   useEffect(() => {
     if (!open) {
@@ -172,6 +174,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 </FormItem>
               )}
             />
+            {/* Campos de contraseña, rol e iglesia comentados temporalmente */}
+            {/*
             <FormField
               control={form.control}
               name="password"
@@ -257,6 +261,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 </FormItem>
               )}
             />
+            */}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
