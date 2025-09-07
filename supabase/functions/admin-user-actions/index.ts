@@ -43,8 +43,9 @@ serve(async (req) => {
     const callerRole = profile.role;
     const callerChurchId = profile.church_id;
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
+    const isAdmin = callerRole === 'admin'; // Explicitly check for admin role
 
-    const { action, email, userId, role, newRole, churchId, newPassword } = await req.json(); // Added newPassword
+    const { action, email, userId, role, newRole, churchId, newPassword, password } = await req.json(); // Added password for createUser
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
@@ -164,6 +165,43 @@ serve(async (req) => {
         });
       }
 
+      case 'createUser': {
+        if (!isAdmin) { // Only admin can create users directly
+          return new Response('Forbidden: Only administrators can create users directly.', { status: 403, headers: corsHeaders });
+        }
+        if (!email || !password || !role) {
+          return new Response(JSON.stringify({ error: 'Email, password, and role are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Prevent non-admins from setting admin/general roles (redundant check, but good for safety)
+        if (!isAdmin && (role === 'admin' || role === 'general')) {
+          return new Response('Forbidden: Only administrators can assign admin or general roles.', { status: 403, headers: corsHeaders });
+        }
+
+        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+          email: email,
+          password: password,
+          email_confirm: true, // Automatically confirm email for created users
+          user_metadata: { role: role, church_id: churchId || null },
+        });
+
+        if (error) {
+          console.error('Error creating user:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: 'User created successfully', user: data.user }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       case 'deleteUser': {
         if (!userId) {
           return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -272,7 +310,7 @@ serve(async (req) => {
           return new Response('Forbidden: You can only update roles for users from your assigned church.', { status: 403, headers: corsHeaders });
         }
         // Prevent non-admins from setting admin/general roles
-        if (!isAdminOrGeneral && (newRole === 'admin' || newRole === 'general')) {
+        if (!isAdmin && (newRole === 'admin' || newRole === 'general')) { // Changed to isAdmin
           return new Response('Forbidden: Only administrators can assign admin or general roles.', { status: 403, headers: corsHeaders });
         }
 
@@ -295,7 +333,7 @@ serve(async (req) => {
       }
 
       case 'resetUserPassword': {
-        if (callerRole !== 'admin') { // Only admin can reset passwords
+        if (!isAdmin) { // Only admin can reset passwords
           return new Response('Forbidden: Only administrators can reset user passwords.', { status: 403, headers: corsHeaders });
         }
         if (!userId || !newPassword) {
