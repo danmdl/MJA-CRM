@@ -44,7 +44,7 @@ serve(async (req) => {
     const callerChurchId = profile.church_id;
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
 
-    const { action, email, userId, role, newRole, churchId } = await req.json();
+    const { action, email, userId, role, newRole, churchId, newPassword } = await req.json(); // Added newPassword
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
@@ -289,6 +289,34 @@ serve(async (req) => {
           });
         }
         return new Response(JSON.stringify({ message: 'User role updated successfully' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'resetUserPassword': {
+        if (callerRole !== 'admin') { // Only admin can reset passwords
+          return new Response('Forbidden: Only administrators can reset user passwords.', { status: 403, headers: corsHeaders });
+        }
+        if (!userId || !newPassword) {
+          return new Response(JSON.stringify({ error: 'User ID and new password are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          password: newPassword,
+        });
+
+        if (error) {
+          console.error('Error resetting user password:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ message: 'User password reset successfully', user: data.user }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

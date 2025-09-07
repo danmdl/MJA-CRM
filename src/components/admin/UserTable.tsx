@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Copy, Send, Trash2, Key } from 'lucide-react'; // Added Key icon
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import {
@@ -28,6 +28,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 // Definir el tipo de rol de usuario para TypeScript
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
@@ -42,7 +57,16 @@ interface User {
   status: 'confirmed' | 'invited' | 'unknown';
   invited_at: string | null;
   confirmed_at: string | null;
+  church_id: string | null;
 }
+
+const passwordResetSchema = z.object({
+  newPassword: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
+  confirmPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Las contraseñas no coinciden.',
+  path: ['confirmPassword'],
+});
 
 const fetchUsers = async (accessToken: string): Promise<User[]> => {
   const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
@@ -66,13 +90,23 @@ const fetchUsers = async (accessToken: string): Promise<User[]> => {
 };
 
 const UserTable = () => {
-  const { session } = useSession();
+  const { session, profile } = useSession();
   const queryClient = useQueryClient();
+  const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false);
+  const [userToResetPassword, setUserToResetPassword] = useState<User | null>(null);
+
+  const form = useForm<z.infer<typeof passwordResetSchema>>({
+    resolver: zodResolver(passwordResetSchema),
+    defaultValues: {
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
 
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => fetchUsers(session?.access_token || ''),
-    enabled: !!session?.access_token,
+    enabled: !!session?.access_token && (profile?.role === 'admin' || profile?.role === 'general'), // Only fetch for admin/general
   });
 
   const deleteUserMutation = useMutation({
@@ -103,7 +137,7 @@ const UserTable = () => {
   });
 
   const resendInviteMutation = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: UserRole }) => {
+    mutationFn: async ({ email, role, churchId }: { email: string; role: UserRole; churchId: string | null }) => {
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
@@ -111,7 +145,7 @@ const UserTable = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ action: 'resendInvite', email, role }),
+        body: JSON.stringify({ action: 'resendInvite', email, role, churchId }),
       });
 
       if (!response.ok) {
@@ -130,7 +164,7 @@ const UserTable = () => {
   });
 
   const generateInviteLinkMutation = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: UserRole }) => {
+    mutationFn: async ({ email, role, churchId }: { email: string; role: UserRole; churchId: string | null }) => {
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
@@ -138,7 +172,7 @@ const UserTable = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ action: 'generateInviteLink', email, role }),
+        body: JSON.stringify({ action: 'generateInviteLink', email, role, churchId }),
       });
 
       if (!response.ok) {
@@ -185,6 +219,46 @@ const UserTable = () => {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action: 'resetUserPassword', userId, newPassword }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cambiar la contraseña.');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      showSuccess('Contraseña actualizada con éxito.');
+      setIsPasswordResetDialogOpen(false);
+      setUserToResetPassword(null);
+      form.reset();
+    },
+    onError: (err) => {
+      showError(err.message);
+    },
+  });
+
+  const handleOpenPasswordResetDialog = (user: User) => {
+    setUserToResetPassword(user);
+    setIsPasswordResetDialogOpen(true);
+    form.reset(); // Reset form fields when opening
+  };
+
+  const onSubmitPasswordReset = async (values: z.infer<typeof passwordResetSchema>) => {
+    if (!userToResetPassword) return;
+    resetPasswordMutation.mutate({ userId: userToResetPassword.id, newPassword: values.newPassword });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -198,24 +272,6 @@ const UserTable = () => {
   if (isError) {
     return <div className="text-red-500">Error: {error?.message || 'No se pudieron cargar los usuarios.'}</div>;
   }
-
-  const getBadgeVariant = (role: UserRole) => {
-    switch (role) {
-      case 'admin':
-        return 'destructive';
-      case 'general':
-        return 'default';
-      case 'pastor':
-        return 'secondary';
-      case 'piloto':
-        return 'outline';
-      case 'encargado_de_celula':
-        return 'default';
-      case 'user':
-      default:
-        return 'secondary';
-    }
-  };
 
   const getStatusBadge = (status: User['status']) => {
     switch (status) {
@@ -232,82 +288,141 @@ const UserTable = () => {
   const userRoles: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Nombre</TableHead>
-          <TableHead>Correo Electrónico</TableHead>
-          <TableHead>Rol</TableHead>
-          <TableHead>Estado</TableHead>
-          <TableHead>Última Actualización</TableHead>
-          <TableHead className="text-right">Acciones</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {users && users.length > 0 ? (
-          users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>
-                {/* Selector de rol */}
-                <Select
-                  value={user.role}
-                  onValueChange={(newRole: UserRole) => updateUserRoleMutation.mutate({ userId: user.id, newRole })}
-                  disabled={updateUserRoleMutation.isPending || user.id === session?.user.id} // Deshabilitar si está cargando o si es el propio admin
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Seleccionar rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {userRoles.map((roleOption) => (
-                      <SelectItem key={roleOption} value={roleOption}>
-                        {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>{getStatusBadge(user.status)}</TableCell>
-              <TableCell>
-                {user.updated_at ? format(new Date(user.updated_at), "d 'de' MMMM, yyyy", { locale: es }) : '-'}
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Abrir menú</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {user.status === 'invited' && (
-                      <DropdownMenuItem onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}>
-                        <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Correo Electrónico</TableHead>
+            <TableHead>Rol</TableHead>
+            <TableHead>Iglesia Asignada</TableHead> {/* New column */}
+            <TableHead>Estado</TableHead>
+            <TableHead>Última Actualización</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users && users.length > 0 ? (
+            users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  {/* Selector de rol */}
+                  <Select
+                    value={user.role}
+                    onValueChange={(newRole: UserRole) => updateUserRoleMutation.mutate({ userId: user.id, newRole })}
+                    disabled={updateUserRoleMutation.isPending || user.id === session?.user.id || profile?.role !== 'admin'} // Only admin can change roles
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Seleccionar rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {userRoles.map((roleOption) => (
+                        <SelectItem key={roleOption} value={roleOption} disabled={profile?.role !== 'admin' && (roleOption === 'admin' || roleOption === 'general')}>
+                          {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>{user.church_id ? user.church_id.substring(0, 8) + '...' : '-'}</TableCell> {/* Display church_id */}
+                <TableCell>{getStatusBadge(user.status)}</TableCell>
+                <TableCell>
+                  {user.updated_at ? format(new Date(user.updated_at), "d 'de' MMMM, yyyy", { locale: es }) : '-'}
+                </TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Abrir menú</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {user.status === 'invited' && (
+                        <DropdownMenuItem onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role, churchId: user.church_id })}>
+                          <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
+                        </DropdownMenuItem>
+                      )}
+                      {user.status === 'invited' && (
+                        <DropdownMenuItem onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role, churchId: user.church_id })}>
+                          <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
+                        </DropdownMenuItem>
+                      )}
+                      {profile?.role === 'admin' && ( // Only admin can reset password
+                        <DropdownMenuItem onClick={() => handleOpenPasswordResetDialog(user)}>
+                          <Key className="mr-2 h-4 w-4" /> Cambiar Contraseña
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => deleteUserMutation.mutate(user.id)} className="text-red-600" disabled={user.id === session?.user.id}>
+                        <Trash2 className="mr-2 h-4 w-4" /> {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
                       </DropdownMenuItem>
-                    )}
-                    {user.status === 'invited' && (
-                      <DropdownMenuItem onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}>
-                        <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => deleteUserMutation.mutate(user.id)} className="text-red-600">
-                      <Trash2 className="mr-2 h-4 w-4" /> {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center">
+                No se encontraron usuarios.
               </TableCell>
             </TableRow>
-          ))
-        ) : (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center">
-              No se encontraron usuarios.
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+          )}
+        </TableBody>
+      </Table>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={isPasswordResetDialogOpen} onOpenChange={setIsPasswordResetDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cambiar Contraseña para {userToResetPassword?.email}</DialogTitle>
+            <DialogDescription>
+              Introduce una nueva contraseña para este usuario.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitPasswordReset)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="newPassword">Nueva Contraseña</FormLabel>
+                    <FormControl>
+                      <Input id="newPassword" type="password" {...field} disabled={resetPasswordMutation.isPending} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="confirmPassword">Confirmar Nueva Contraseña</FormLabel>
+                    <FormControl>
+                      <Input id="confirmPassword" type="password" {...field} disabled={resetPasswordMutation.isPending} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setIsPasswordResetDialogOpen(false)} disabled={resetPasswordMutation.isPending}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={resetPasswordMutation.isPending}>
+                  {resetPasswordMutation.isPending ? 'Cambiando...' : 'Cambiar Contraseña'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

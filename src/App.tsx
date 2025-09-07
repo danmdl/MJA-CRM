@@ -18,6 +18,7 @@ import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
 import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
+import LoginManagementPage from "./pages/admin/LoginManagementPage"; // New import
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
@@ -64,6 +65,7 @@ const AppRoutes = () => {
         <Route path="churches" element={<ChurchesPage />} />
         {/* CSV Deduplicator is also accessible via admin path */}
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+        <Route path="login-management" element={<LoginManagementPage />} /> {/* New route */}
         <Route path="profile" element={<AdminProfile />} />
         
         {/* Nested routes for specific church details */}
