@@ -24,14 +24,14 @@ const SidebarFooter = ({ isCollapsed }: SidebarFooterProps) => {
     navigate('/login');
   };
 
-  const titleToDisplay = "MJA CENTRAL"; // Fixed title
+  const titleToDisplay = "MJA"; // Changed from "MJA CENTRAL" to "MJA"
 
   return (
     <div className={cn("px-4 pt-4 pb-4 border-t mt-auto", isCollapsed && "pb-2")}>
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="mja-central" className="border-b-0">
           <AccordionTrigger className={cn(
-            "flex items-start justify-between w-full px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline h-auto min-h-0", // Changed py-0 to py-2
+            "flex items-start justify-between w-full px-3 py-2 text-muted-foreground hover:text-primary hover:no-underline h-auto min-h-0",
             isCollapsed ? "justify-center" : "justify-between"
           )}>
             {isCollapsed ? (

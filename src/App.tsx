@@ -2,28 +2,26 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"; // Import Outlet
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
 import AdminDashboard from "./pages/admin/Dashboard";
-import ManageTeam from "./pages/admin/ManageTeam";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
-import DatabasePage from "./pages/admin/Database";
-import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
+import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage"; // Keep for admin-specific deduplicator if needed, but remove from global admin nav
 import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
 import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
 import { ThemeProvider } from "next-themes";
-import UserLayout from "./components/layout/UserLayout"; // Import UserLayout
-import Index from "./pages/Index"; // Import Index
-import Profile from "./pages/Profile"; // Import Profile
+import UserLayout from "./components/layout/UserLayout";
+import Index from "./pages/Index";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -46,17 +44,16 @@ const AppRoutes = () => {
       <Route path="/" element={<PrivateRoute><UserLayout><Outlet /></UserLayout></PrivateRoute>}>
         <Route index element={<Index />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="database" element={<DatabasePage />} />
-        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
+        {/* Removed global database and csv-deduplicator for regular users */}
       </Route>
       
       {/* Admin Routes */}
       <Route 
-        path="/admin" // Base path for admin routes
+        path="/admin"
         element={
           <AdminRoute>
             <AdminLayout>
-              <Outlet /> {/* Outlet for nested admin routes */}
+              <Outlet />
             </AdminLayout>
           </AdminRoute>
         }
@@ -64,10 +61,9 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="churches" element={<ChurchesPage />} />
-        <Route path="manage-team" element={<ManageTeam />} />
+        {/* Removed global manage-team and database routes */}
+        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} /> {/* Kept for admin global access if desired */}
         <Route path="profile" element={<AdminProfile />} />
-        <Route path="database" element={<DatabasePage />} />
-        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
         
         {/* Nested routes for specific church details */}
         <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>
