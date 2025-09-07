@@ -20,7 +20,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   return (
     <ResizablePanelGroup
       direction="horizontal"
-      className="min-h-screen w-full"
+      className="h-full w-full" {/* Changed from min-h-screen to h-full */}
       onLayout={(sizes: number[]) => {
         setIsSidebarCollapsed(sizes[0] < 10);
       }}
@@ -32,7 +32,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         collapsible={true}
         onCollapse={() => setIsSidebarCollapsed(true)}
         onExpand={() => setIsSidebarCollapsed(false)}
-        className="min-w-[60px] h-full" {/* Added h-full here */}
+        className="min-w-[60px] h-full"
       >
         <ChurchSidebar isCollapsed={isSidebarCollapsed} churchId={churchId} />
       </ResizablePanel>
