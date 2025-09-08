@@ -243,14 +243,18 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""} disabled={loading}>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || "placeholder-role-select"} // Usar valor no vacío para el placeholder
+                    disabled={loading}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
                     </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="" disabled>Selecciona un rol</SelectItem> {/* Placeholder */}
+                      <SelectItem value="placeholder-role-select" disabled>Selecciona un rol</SelectItem> {/* Placeholder con valor no vacío */}
                       {availableRoles.map((roleOption) => (
                         <SelectItem
                           key={roleOption}
@@ -273,7 +277,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                   <FormLabel>Iglesia Asignada</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    value={field.value || ""} // Usar cadena vacía para el placeholder
+                    value={field.value || "placeholder-church-select"} // Usar valor no vacío para el placeholder
                     disabled={loading || isLoadingChurches}
                   >
                     <FormControl>
@@ -282,7 +286,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="" disabled>Selecciona una iglesia</SelectItem> {/* Placeholder */}
+                      <SelectItem value="placeholder-church-select" disabled>Selecciona una iglesia</SelectItem> {/* Placeholder con valor no vacío */}
                       {churches?.map((church) => (
                         <SelectItem key={church.id} value={church.id}>
                           {church.name}
