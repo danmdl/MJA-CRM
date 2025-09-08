@@ -117,13 +117,11 @@ serve(async (req) => {
           return new Response('Forbidden: You can only list users from your assigned church.', { status: 403, headers: corsHeaders });
         }
 
-        let profileIdsToFetch: string[] = [];
-
         // Fetch profiles explicitly assigned to this church
         const { data: assignedProfiles, error: assignedProfilesError } = await supabaseAdmin
           .from('profiles')
           .select('id, first_name, last_name, role, updated_at, church_id')
-          .eq('church_id', churchId);
+          .eq('church_id', churchId); // This is the core filter
 
         if (assignedProfilesError) {
           console.error('Error fetching assigned church profiles:', assignedProfilesError);
@@ -133,14 +131,7 @@ serve(async (req) => {
           });
         }
         
-        profileIdsToFetch = assignedProfiles?.map(p => p.id) || [];
-
-        // If the caller is an admin/general and not assigned to any church,
-        // and they are not already in the list (which they shouldn't be if church_id is NULL),
-        // add their ID to the list to ensure they see themselves.
-        if (isAdminOrGeneral && callerChurchId === null && !profileIdsToFetch.includes(userAuth.user.id)) {
-          profileIdsToFetch.push(userAuth.user.id);
-        }
+        const profileIdsToFetch = assignedProfiles?.map(p => p.id) || [];
 
         if (profileIdsToFetch.length === 0) {
           return new Response(JSON.stringify([]), {
@@ -163,16 +154,8 @@ serve(async (req) => {
         }
 
         const churchUsers = users.users.map(user => {
-          // Find the profile from assignedProfiles or construct one for the global admin caller
-          const userProfile = (assignedProfiles || []).find(p => p.id === user.id) || 
-                             (user.id === userAuth.user.id && isAdminOrGeneral && callerChurchId === null ? { 
-                               id: user.id,
-                               first_name: userAuth.user.user_metadata.first_name || null,
-                               last_name: userAuth.user.user_metadata.last_name || null,
-                               role: callerRole, 
-                               updated_at: user.updated_at,
-                               church_id: null, 
-                             } : null);
+          // Find the profile from assignedProfiles
+          const userProfile = (assignedProfiles || []).find(p => p.id === user.id);
 
           const status = user.confirmed_at ? 'confirmed' : (user.invited_at ? 'invited' : 'unknown');
           return {
