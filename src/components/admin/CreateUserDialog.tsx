@@ -48,10 +48,10 @@ const createUserSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
   last_name: z.string().min(1, { message: 'El apellido es obligatorio.' }),
-  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula'], {
+  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula'], { // Solo roles permitidos
     errorMap: () => ({ message: 'El rol es obligatorio.' })
   }),
-  church_id: z.string().uuid({ message: 'La iglesia es obligatoria.' }),
+  church_id: z.string().uuid({ message: 'La iglesia es obligatoria.' }), // Obligatorio
 });
 
 interface CreateUserDialogProps {
@@ -74,7 +74,6 @@ const fetchChurches = async (): Promise<Church[]> => {
 };
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
-  console.log('CreateUserDialog rendering, open:', open); // Debugging log
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
@@ -86,8 +85,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       password: '',
       first_name: '',
       last_name: '',
-      role: undefined, // No preseleccionado
-      church_id: undefined, // No preseleccionado
+      role: undefined, // No preseleccionado, para que el placeholder sea visible
+      church_id: undefined, // No preseleccionado, para que el placeholder sea visible
     },
   });
 
@@ -131,10 +130,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           action: 'createUser',
           email: values.email,
           password: values.password,
-          first_name: values.first_name || null,
-          last_name: values.last_name || null,
+          first_name: values.first_name,
+          last_name: values.last_name,
           role: values.role,
-          churchId: values.church_id, // Enviar church_id (ya es obligatorio por el schema)
+          churchId: values.church_id,
         }),
       });
 
@@ -163,10 +162,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
   const isAdmin = profile?.role === 'admin';
 
   // Roles permitidos para la creación de usuarios en este diálogo (definidos en el schema)
-  const allowedRolesInSchema: UserRole[] = ['general', 'pastor', 'piloto', 'encargado_de_celula'];
+  const allowedRolesForCreation: z.infer<typeof createUserSchema>['role'][] = createUserSchema.shape.role.options;
 
   // Filtrar roles disponibles para el selector en la UI
-  const availableRoles = allowedRolesInSchema.filter(roleOption => {
+  const availableRoles = allowedRolesForCreation.filter(roleOption => {
     // Si el usuario actual no es admin, no puede asignar el rol 'general'
     if (!isAdmin && roleOption === 'general') {
       return false;

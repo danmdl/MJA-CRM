@@ -11,7 +11,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestBody; 
   try {
+    // Store the result of req.json() in a variable first to prevent 'Body already consumed' errors
+    requestBody = await req.json(); 
+    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name } = requestBody;
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response('Unauthorized: Missing Authorization header', { status: 401, headers: corsHeaders });
@@ -45,7 +50,6 @@ serve(async (req) => {
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
     const isAdmin = callerRole === 'admin'; // Explicitly check for admin role
 
-    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name } = await req.json(); // Added first_name, last_name, churchId for createUser
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
