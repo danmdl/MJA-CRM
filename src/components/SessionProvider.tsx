@@ -27,33 +27,26 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   useEffect(() => {
     const getSessionAndProfile = async () => {
       setLoading(true);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
 
-        if (session) {
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, role, church_id')
-            .eq('id', session.user.id)
-            .single();
+      if (session) {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, role, church_id')
+          .eq('id', session.user.id)
+          .single();
 
-          if (error) {
-            console.error('Error fetching profile:', error);
-            setProfile(null);
-          } else {
-            setProfile(profileData as UserProfile);
-          }
-        } else {
+        if (error) {
+          console.error('Error fetching profile:', error);
           setProfile(null);
+        } else {
+          setProfile(profileData as UserProfile);
         }
-      } catch (error) {
-        console.error('Unhandled error in getSessionAndProfile:', error);
-        setSession(null);
+      } else {
         setProfile(null);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
 
     getSessionAndProfile();
