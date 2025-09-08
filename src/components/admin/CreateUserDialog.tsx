@@ -265,8 +265,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 <FormItem>
                   <FormLabel>Iglesia Asignada</FormLabel>
                   <Select
-                    onValueChange={(value) => field.onChange(value === "" ? null : value)} // Convert empty string to null
-                    value={field.value || ""} // Ensure controlled component
+                    onValueChange={(value) => field.onChange(value === "unassigned" ? null : value)} // Convert "unassigned" to null
+                    value={field.value || "unassigned"} // Set default to "unassigned" if null
                     disabled={loading || isLoadingChurches}
                   >
                     <FormControl>
@@ -275,7 +275,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">(Ninguna)</SelectItem> {/* Opción para no asignar iglesia */}
+                      <SelectItem value="unassigned">(Ninguna)</SelectItem> {/* Valor no vacío */}
                       {churches?.map((church) => (
                         <SelectItem key={church.id} value={church.id}>
                           {church.name}
