@@ -28,7 +28,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'; // ¡Importaciones corregidas!
+} from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -72,6 +72,7 @@ const fetchChurches = async (): Promise<Church[]> => {
 };
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
+  console.log('CreateUserDialog rendering, open:', open); // Debugging log
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
