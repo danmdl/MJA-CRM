@@ -121,6 +121,7 @@ serve(async (req) => {
           return new Response('Forbidden: You can only list users from your assigned church.', { status: 403, headers: corsHeaders });
         }
 
+        // MODIFICACIÓN: Eliminado .single() para permitir múltiples perfiles
         const { data: profilesData, error: profilesError } = await supabaseAdmin
           .from('profiles')
           .select('id, first_name, last_name, role, updated_at, church_id')
