@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Copy, Send, Trash2, Key } from 'lucide-react'; // Added Key icon
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import {
@@ -28,7 +28,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useState, useEffect } from 'react'; // Import useEffect
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import *as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
+// Definir el tipo de rol de usuario para TypeScript
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
 
 interface User {
@@ -44,9 +60,13 @@ interface User {
   church_id: string | null;
 }
 
-interface ChurchUserTableProps {
-  churchId: string;
-}
+const passwordResetSchema = z.object({
+  newPassword: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
+  confirmPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Las contraseñas no coinciden.',
+  path: ['confirmPassword'],
+});
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
   const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
@@ -69,7 +89,7 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
   return data || [];
 };
 
-const ChurchUserTable = ({ churchId }: ChurchUserTableProps) => {
+const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session } = useSession();
   const queryClient = useQueryClient();
 
@@ -78,6 +98,12 @@ const ChurchUserTable = ({ churchId }: ChurchUserTableProps) => {
     queryFn: () => fetchChurchUsers(session?.access_token || '', churchId),
     enabled: !!session?.access_token && !!churchId,
   });
+
+  useEffect(() => {
+    if (users) {
+      console.log(`[DEBUG] Users received for ChurchUserTable (Church ID: ${churchId}):`, users);
+    }
+  }, [users, churchId]);
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
