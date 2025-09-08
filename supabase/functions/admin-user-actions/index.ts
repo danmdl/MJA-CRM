@@ -107,7 +107,10 @@ serve(async (req) => {
       }
 
       case 'listChurchUsers': {
-        console.log(`[DEBUG EDGE] listChurchUsers action received. churchId: ${churchId}, callerRole: ${callerRole}, callerChurchId: ${callerChurchId}`);
+        console.log(`[DEBUG EDGE] listChurchUsers action received.`);
+        console.log(`[DEBUG EDGE] Request churchId: ${churchId}`);
+        console.log(`[DEBUG EDGE] Caller Role: ${callerRole}, Caller Church ID: ${callerChurchId}`);
+
         if (!churchId) {
           return new Response(JSON.stringify({ error: 'Church ID is required' }), {
             status: 400,
@@ -132,11 +135,14 @@ serve(async (req) => {
           });
         }
         
-        console.log(`[DEBUG EDGE] Profiles fetched for churchId ${churchId}:`, assignedProfiles);
+        console.log(`[DEBUG EDGE] Profiles fetched from DB for churchId ${churchId}:`, assignedProfiles);
 
         const profileIdsToFetch = assignedProfiles?.map(p => p.id) || [];
+        console.log(`[DEBUG EDGE] Profile IDs to fetch from Auth for churchId ${churchId}:`, profileIdsToFetch);
+
 
         if (profileIdsToFetch.length === 0) {
+          console.log(`[DEBUG EDGE] No profiles found for churchId ${churchId}. Returning empty array.`);
           return new Response(JSON.stringify([]), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -155,6 +161,8 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+        console.log(`[DEBUG EDGE] Auth users fetched for churchId ${churchId}:`, users.users);
+
 
         const churchUsers = users.users.map(user => {
           // Find the profile from assignedProfiles
@@ -174,6 +182,8 @@ serve(async (req) => {
             church_id: userProfile?.church_id || null,
           };
         });
+        console.log(`[DEBUG EDGE] Final churchUsers array for churchId ${churchId}:`, churchUsers);
+
 
         return new Response(JSON.stringify(churchUsers), {
           status: 200,
