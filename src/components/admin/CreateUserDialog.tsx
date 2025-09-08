@@ -84,7 +84,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       password: '',
       first_name: '',
       last_name: '',
-      role: 'user',
+      role: 'encargado_de_celula', // Nuevo valor por defecto
       church_id: null,
     },
   });
@@ -160,10 +160,18 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
 
   const isAdmin = profile?.role === 'admin';
 
+  // Roles permitidos para la creación de usuarios en este diálogo
+  const allowedRolesForCreation: UserRole[] = ['general', 'pastor', 'piloto', 'encargado_de_celula'];
+
   // Filtrar roles disponibles
   const availableRoles = createUserSchema.shape.role.options.filter(roleOption => {
-    if (!isAdmin && (roleOption === 'admin' || roleOption === 'general')) {
-      return false; // No mostrar 'admin' o 'general' si el usuario actual no es admin
+    // Solo incluir roles que están en la lista de permitidos para este diálogo
+    if (!allowedRolesForCreation.includes(roleOption)) {
+      return false;
+    }
+    // Si el usuario actual no es admin, no puede asignar el rol 'general'
+    if (!isAdmin && roleOption === 'general') {
+      return false;
     }
     return true;
   });
