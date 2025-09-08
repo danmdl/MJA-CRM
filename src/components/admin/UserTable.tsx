@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Import useEffect
 import {
   Dialog,
   DialogContent,
@@ -108,6 +108,14 @@ const UserTable = () => {
     queryFn: () => fetchUsers(session?.access_token || ''),
     enabled: !!session?.access_token && (profile?.role === 'admin' || profile?.role === 'general'), // Only fetch for admin/general
   });
+
+  useEffect(() => {
+    if (users) {
+      users.forEach(user => {
+        console.log(`[DEBUG] User in UserTable: Email: ${user.email}, ID: ${user.id}, Role: ${user.role}, Church ID: ${user.church_id}`);
+      });
+    }
+  }, [users]);
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,6 +59,17 @@ const ChurchesPage = () => {
     queryKey: ['churches'],
     queryFn: fetchChurches,
   });
+
+  useEffect(() => {
+    if (profile) {
+      console.log('[DEBUG] Current User Profile on ChurchesPage:', {
+        id: profile.id,
+        email: profile.email, // Assuming email is available in profile or session
+        role: profile.role,
+        church_id: profile.church_id,
+      });
+    }
+  }, [profile]);
 
   const handleEditChurch = (church: Church) => {
     setSelectedChurch(church);
@@ -152,7 +163,7 @@ const ChurchesPage = () => {
               onEdit={handleEditChurch}
               onDelete={handleDeleteChurch}
               onPinToggle={pinChurchMutation.mutate}
-              currentUserChurchId={profile?.church_id} // Pass current user's church ID
+              currentUserChurchId={profile?.church_id} // Pass current user's assigned church ID
               currentUserRole={profile?.role} // Pass current user's role
             />
           ))
