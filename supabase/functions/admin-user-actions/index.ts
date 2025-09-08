@@ -107,11 +107,6 @@ serve(async (req) => {
       }
 
       case 'listChurchUsers': {
-        console.log('Action: listChurchUsers');
-        console.log('Received churchId:', churchId);
-        console.log('Caller Role:', callerRole, 'Caller Church ID:', callerChurchId);
-        console.log('Request Body:', requestBody); // Added log
-
         if (!churchId) {
           return new Response(JSON.stringify({ error: 'Church ID is required' }), {
             status: 400,
@@ -122,24 +117,32 @@ serve(async (req) => {
           return new Response('Forbidden: You can only list users from your assigned church.', { status: 403, headers: corsHeaders });
         }
 
-        const { data: profilesData, error: profilesError } = await supabaseAdmin
+        let profileIdsToFetch: string[] = [];
+
+        // Fetch profiles explicitly assigned to this church
+        const { data: assignedProfiles, error: assignedProfilesError } = await supabaseAdmin
           .from('profiles')
           .select('id, first_name, last_name, role, updated_at, church_id')
           .eq('church_id', churchId);
 
-        if (profilesError) {
-          console.error('Error fetching church profiles:', profilesError);
-          return new Response(JSON.stringify({ error: profilesError.message }), {
+        if (assignedProfilesError) {
+          console.error('Error fetching assigned church profiles:', assignedProfilesError);
+          return new Response(JSON.stringify({ error: assignedProfilesError.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        console.log('Profiles data for church:', profilesData); // Added log
+        
+        profileIdsToFetch = assignedProfiles?.map(p => p.id) || [];
 
-        const userIds = profilesData?.map(p => p.id) || [];
-        console.log('User IDs from profiles:', userIds); // Added log
+        // If the caller is an admin/general and not assigned to any church,
+        // and they are not already in the list (which they shouldn't be if church_id is NULL),
+        // add their ID to the list to ensure they see themselves.
+        if (isAdminOrGeneral && callerChurchId === null && !profileIdsToFetch.includes(userAuth.user.id)) {
+          profileIdsToFetch.push(userAuth.user.id);
+        }
 
-        if (userIds.length === 0) {
+        if (profileIdsToFetch.length === 0) {
           return new Response(JSON.stringify([]), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -147,7 +150,7 @@ serve(async (req) => {
         }
 
         const { data: users, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
-          filter: `id in (${userIds.map(id => `'${id}'`).join(',')})`,
+          filter: `id in (${profileIdsToFetch.map(id => `'${id}'`).join(',')})`,
           perPage: 100,
         });
 
@@ -158,10 +161,19 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        console.log('Auth users data for church IDs:', users.users); // Added log
 
         const churchUsers = users.users.map(user => {
-          const userProfile = profilesData?.find(p => p.id === user.id);
+          // Find the profile from assignedProfiles or construct one for the global admin caller
+          const userProfile = (assignedProfiles || []).find(p => p.id === user.id) || 
+                             (user.id === userAuth.user.id && isAdminOrGeneral && callerChurchId === null ? { 
+                               id: user.id,
+                               first_name: userAuth.user.user_metadata.first_name || null,
+                               last_name: userAuth.user.user_metadata.last_name || null,
+                               role: callerRole, 
+                               updated_at: user.updated_at,
+                               church_id: null, 
+                             } : null);
+
           const status = user.confirmed_at ? 'confirmed' : (user.invited_at ? 'invited' : 'unknown');
           return {
             id: user.id,
@@ -176,7 +188,6 @@ serve(async (req) => {
             church_id: userProfile?.church_id || null,
           };
         });
-        console.log('Final church users list:', churchUsers); // Added log
 
         return new Response(JSON.stringify(churchUsers), {
           status: 200,
