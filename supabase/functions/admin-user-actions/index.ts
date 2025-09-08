@@ -107,6 +107,7 @@ serve(async (req) => {
       }
 
       case 'listChurchUsers': {
+        console.log(`[DEBUG EDGE] listChurchUsers action received. churchId: ${churchId}, callerRole: ${callerRole}, callerChurchId: ${callerChurchId}`);
         if (!churchId) {
           return new Response(JSON.stringify({ error: 'Church ID is required' }), {
             status: 400,
@@ -131,6 +132,8 @@ serve(async (req) => {
           });
         }
         
+        console.log(`[DEBUG EDGE] Profiles fetched for churchId ${churchId}:`, assignedProfiles);
+
         const profileIdsToFetch = assignedProfiles?.map(p => p.id) || [];
 
         if (profileIdsToFetch.length === 0) {

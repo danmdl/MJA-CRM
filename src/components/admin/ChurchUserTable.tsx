@@ -69,6 +69,7 @@ const passwordResetSchema = z.object({
 });
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
+  console.log(`[DEBUG CLIENT] fetchChurchUsers called with churchId: ${churchId} and accessToken present: ${!!accessToken}`);
   const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
   const response = await fetch(edgeFunctionUrl, {
     method: 'POST',
@@ -86,6 +87,7 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
   }
 
   const data = await response.json();
+  console.log(`[DEBUG CLIENT] Users received from Edge Function for Church ID ${churchId}:`, data);
   return data || [];
 };
 
@@ -99,11 +101,8 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     enabled: !!session?.access_token && !!churchId,
   });
 
-  useEffect(() => {
-    if (users) {
-      console.log(`[DEBUG] Users received for ChurchUserTable (Church ID: ${churchId}):`, users);
-    }
-  }, [users, churchId]);
+  // Removed the previous useEffect log as it was not firing when data was empty.
+  // The new logs in fetchChurchUsers will provide more immediate feedback.
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
