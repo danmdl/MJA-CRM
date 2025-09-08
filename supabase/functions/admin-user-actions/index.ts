@@ -119,6 +119,7 @@ serve(async (req) => {
           return new Response('Forbidden: You can only list users from your assigned church.', { status: 403, headers: corsHeaders });
         }
 
+        // Step 1: Get profiles associated with the specific churchId
         const { data: profilesData, error: profilesError } = await supabaseAdmin
           .from('profiles')
           .select('id, first_name, last_name, role, updated_at, church_id')
@@ -133,9 +134,19 @@ serve(async (req) => {
         }
 
         const userIds = profilesData?.map(p => p.id) || [];
+
+        // Step 2: If no profiles found for this church, return an empty array immediately
+        if (userIds.length === 0) {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Step 3: Get auth.users data for the found profile IDs
         const { data: users, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
           filter: `id in (${userIds.map(id => `'${id}'`).join(',')})`,
-          perPage: 100,
+          perPage: 100, // Adjust as needed
         });
 
         if (authUsersError) {
@@ -146,6 +157,7 @@ serve(async (req) => {
           });
         }
 
+        // Step 4: Combine auth.users data with profile data
         const churchUsers = users.users.map(user => {
           const userProfile = profilesData?.find(p => p.id === user.id);
           const status = user.confirmed_at ? 'confirmed' : (user.invited_at ? 'invited' : 'unknown');
