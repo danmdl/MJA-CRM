@@ -149,22 +149,26 @@ serve(async (req) => {
           });
         }
 
-        const { data: users, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
-          filter: `id in (${profileIdsToFetch.map(id => `'${id}'`).join(',')})`,
-          perPage: 100,
+        // --- MODIFICACIÓN: Obtener todos los usuarios y luego filtrar en la función Edge ---
+        const { data: allUsersData, error: allUsersError } = await supabaseAdmin.auth.admin.listUsers({
+          perPage: 100, // Ajusta esto si esperas más de 100 usuarios en total
         });
 
-        if (authUsersError) {
-          console.error('Error listing auth users for church:', authUsersError);
-          return new Response(JSON.stringify({ error: authUsersError.message }), {
+        if (allUsersError) {
+          console.error('Error listing all auth users:', allUsersError);
+          return new Response(JSON.stringify({ error: allUsersError.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        console.log(`[DEBUG EDGE] Auth users fetched for churchId ${churchId}:`, users.users);
+        
+        console.log(`[DEBUG EDGE] All Auth users fetched (IDs):`, allUsersData.users.map(u => u.id));
 
+        const filteredAuthUsers = allUsersData.users.filter(user => profileIdsToFetch.includes(user.id));
+        console.log(`[DEBUG EDGE] Filtered Auth users by profile IDs:`, filteredAuthUsers.map(u => u.id));
+        // --- FIN MODIFICACIÓN ---
 
-        const churchUsers = users.users.map(user => {
+        const churchUsers = filteredAuthUsers.map(user => { // Usar filteredAuthUsers aquí
           // Find the profile from assignedProfiles
           const userProfile = (assignedProfiles || []).find(p => p.id === user.id);
 
