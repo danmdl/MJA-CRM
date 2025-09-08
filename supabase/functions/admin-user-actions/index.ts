@@ -110,6 +110,7 @@ serve(async (req) => {
         console.log('Action: listChurchUsers');
         console.log('Received churchId:', churchId);
         console.log('Caller Role:', callerRole, 'Caller Church ID:', callerChurchId);
+        console.log('Request Body:', requestBody); // Added log
 
         if (!churchId) {
           return new Response(JSON.stringify({ error: 'Church ID is required' }), {
@@ -121,7 +122,6 @@ serve(async (req) => {
           return new Response('Forbidden: You can only list users from your assigned church.', { status: 403, headers: corsHeaders });
         }
 
-        // MODIFICACIÓN: Eliminado .single() para permitir múltiples perfiles
         const { data: profilesData, error: profilesError } = await supabaseAdmin
           .from('profiles')
           .select('id, first_name, last_name, role, updated_at, church_id')
@@ -134,10 +134,10 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        console.log('Profiles data for church:', profilesData);
+        console.log('Profiles data for church:', profilesData); // Added log
 
         const userIds = profilesData?.map(p => p.id) || [];
-        console.log('User IDs from profiles:', userIds);
+        console.log('User IDs from profiles:', userIds); // Added log
 
         if (userIds.length === 0) {
           return new Response(JSON.stringify([]), {
@@ -158,7 +158,7 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        console.log('Auth users data for church IDs:', users.users);
+        console.log('Auth users data for church IDs:', users.users); // Added log
 
         const churchUsers = users.users.map(user => {
           const userProfile = profilesData?.find(p => p.id === user.id);
@@ -176,7 +176,7 @@ serve(async (req) => {
             church_id: userProfile?.church_id || null,
           };
         });
-        console.log('Final church users list:', churchUsers);
+        console.log('Final church users list:', churchUsers); // Added log
 
         return new Response(JSON.stringify(churchUsers), {
           status: 200,
