@@ -46,10 +46,12 @@ interface Church {
 const createUserSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
-  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']),
-  church_id: z.string().uuid().nullable().optional(), // church_id es opcional y puede ser nulo
+  first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
+  last_name: z.string().min(1, { message: 'El apellido es obligatorio.' }),
+  role: z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula'], {
+    errorMap: () => ({ message: 'El rol es obligatorio.' })
+  }),
+  church_id: z.string().uuid({ message: 'La iglesia es obligatoria.' }),
 });
 
 interface CreateUserDialogProps {
@@ -84,8 +86,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       password: '',
       first_name: '',
       last_name: '',
-      role: 'encargado_de_celula', // Nuevo valor por defecto
-      church_id: null,
+      role: undefined, // No preseleccionado
+      church_id: undefined, // No preseleccionado
     },
   });
 
@@ -132,7 +134,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           first_name: values.first_name || null,
           last_name: values.last_name || null,
           role: values.role,
-          churchId: values.church_id || null, // Enviar church_id
+          churchId: values.church_id, // Enviar church_id (ya es obligatorio por el schema)
         }),
       });
 
@@ -160,15 +162,11 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
 
   const isAdmin = profile?.role === 'admin';
 
-  // Roles permitidos para la creación de usuarios en este diálogo
-  const allowedRolesForCreation: UserRole[] = ['general', 'pastor', 'piloto', 'encargado_de_celula'];
+  // Roles permitidos para la creación de usuarios en este diálogo (definidos en el schema)
+  const allowedRolesInSchema: UserRole[] = ['general', 'pastor', 'piloto', 'encargado_de_celula'];
 
-  // Filtrar roles disponibles
-  const availableRoles = createUserSchema.shape.role.options.filter(roleOption => {
-    // Solo incluir roles que están en la lista de permitidos para este diálogo
-    if (!allowedRolesForCreation.includes(roleOption)) {
-      return false;
-    }
+  // Filtrar roles disponibles para el selector en la UI
+  const availableRoles = allowedRolesInSchema.filter(roleOption => {
     // Si el usuario actual no es admin, no puede asignar el rol 'general'
     if (!isAdmin && roleOption === 'general') {
       return false;
@@ -182,7 +180,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
         <DialogHeader>
           <DialogTitle>Crear Nuevo Usuario</DialogTitle>
           <DialogDescription>
-            Introduce los detalles para crear una nueva cuenta de usuario.
+            Introduce los detalles para crear una nueva cuenta de usuario. Todos los campos son obligatorios.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -245,13 +243,14 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                  <Select onValueChange={field.onChange} value={field.value || ""} disabled={loading}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
                     </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="" disabled>Selecciona un rol</SelectItem> {/* Placeholder */}
                       {availableRoles.map((roleOption) => (
                         <SelectItem
                           key={roleOption}
@@ -273,17 +272,17 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 <FormItem>
                   <FormLabel>Iglesia Asignada</FormLabel>
                   <Select
-                    onValueChange={(value) => field.onChange(value === "unassigned" ? null : value)} // Convert "unassigned" to null
-                    value={field.value || "unassigned"} // Set default to "unassigned" if null
+                    onValueChange={field.onChange}
+                    value={field.value || ""} // Usar cadena vacía para el placeholder
                     disabled={loading || isLoadingChurches}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={isLoadingChurches ? "Cargando iglesias..." : "Selecciona una iglesia (Opcional)"} />
+                        <SelectValue placeholder={isLoadingChurches ? "Cargando iglesias..." : "Selecciona una iglesia"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="unassigned">(Ninguna)</SelectItem> {/* Valor no vacío */}
+                      <SelectItem value="" disabled>Selecciona una iglesia</SelectItem> {/* Placeholder */}
                       {churches?.map((church) => (
                         <SelectItem key={church.id} value={church.id}>
                           {church.name}
