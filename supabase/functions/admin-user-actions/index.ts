@@ -45,8 +45,7 @@ serve(async (req) => {
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
     const isAdmin = callerRole === 'admin'; // Explicitly check for admin role
 
-    // Destructure common fields. Specific actions will destructure their unique fields.
-    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name } = await req.json(); 
+    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name } = await req.json(); // Added first_name, last_name, churchId for createUser
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
@@ -170,9 +169,6 @@ serve(async (req) => {
         if (!isAdmin) { // Only admin can create users directly
           return new Response('Forbidden: Only administrators can create users directly.', { status: 403, headers: corsHeaders });
         }
-        // Destructure only the fields expected for createUser
-        const { email, password, first_name, last_name, role } = await req.json(); 
-
         if (!email || !password || !role) {
           return new Response(JSON.stringify({ error: 'Email, password, and role are required' }), {
             status: 400,
@@ -193,8 +189,7 @@ serve(async (req) => {
             first_name: first_name || null,
             last_name: last_name || null,
             role: role, 
-            // church_id is not sent from CreateUserDialog, so we don't include it here.
-            // The handle_new_user trigger will set it to NULL by default if not present.
+            church_id: churchId || null 
           },
         });
 
