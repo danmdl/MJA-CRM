@@ -71,7 +71,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         logger.error('Error fetching cells', error);
         throw new Error('No se pudieron cargar las células.');
       }
-      
+
       logger.log('Cells fetched successfully', data);
       return data || [];
     },
@@ -94,7 +94,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         logger.error('Error fetching leaders', error);
         throw new Error('No se pudieron cargar los líderes.');
       }
-      
+
       logger.log('Leaders fetched successfully', data);
       return data || [];
     },
