@@ -218,35 +218,61 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
   const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
     logger.log('[DynamicContactTable] fetchContacts called with churchId', churchId);
 
-    let query = supabase
+    // First, fetch contacts
+    let contactQuery = supabase
       .from('contacts')
       .select(`
         *,
-        latest_log:contact_logs(contact_date),
-        cell:cells(name),
-        leader:profiles!inner(id, first_name, last_name)
+        latest_log:contact_logs(contact_date)
       `)
       .order('created_at', { ascending: false });
 
     if (churchId) {
-      query = query.eq('church_id', churchId);
+      contactQuery = contactQuery.eq('church_id', churchId);
       logger.log(`[DynamicContactTable] Filtering contacts by church_id: ${churchId}`);
     } else {
       logger.warn("[DynamicContactTable] No churchId provided to fetchContacts. Fetching all contacts (if RLS allows).");
     }
 
-    const { data, error } = await query;
+    const { data: contactsData, error: contactsError } = await contactQuery;
 
-    if (error) {
-      logger.error('[DynamicContactTable] Error fetching contacts', error);
+    if (contactsError) {
+      logger.error('[DynamicContactTable] Error fetching contacts', contactsError);
       throw new Error('No se pudieron cargar los contactos.');
     }
 
-    // Process data to extract last contact date
-    const processedData = data?.map(contact => ({
-      ...contact,
-      last_contact_date: contact.latest_log?.[0]?.contact_date || null
-    })) || [];
+    // Fetch cells
+    const { data: cellsData, error: cellsError } = await supabase
+      .from('cells')
+      .select('id, name');
+
+    if (cellsError) {
+      logger.error('[DynamicContactTable] Error fetching cells', cellsError);
+      throw new Error('No se pudieron cargar las células.');
+    }
+
+    // Fetch leaders (profiles)
+    const { data: leadersData, error: leadersError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name');
+
+    if (leadersError) {
+      logger.error('[DynamicContactTable] Error fetching leaders', leadersError);
+      throw new Error('No se pudieron cargar los líderes.');
+    }
+
+    // Process data to combine contacts with cells and leaders
+    const processedData = contactsData?.map(contact => {
+      const cell = cellsData?.find(c => c.id === contact.cell_id) || null;
+      const leader = leadersData?.find(l => l.id === contact.leader_assigned) || null;
+      
+      return {
+        ...contact,
+        cell,
+        leader,
+        last_contact_date: contact.latest_log?.[0]?.contact_date || null
+      };
+    }) || [];
 
     logger.log(`[DynamicContactTable] Successfully fetched ${processedData.length} contacts.`);
     return processedData;
