@@ -197,6 +197,23 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
     setProfileContactId(contactId);
   };
 
+  // Format date as DD/MM/YY
+  const formatCompactDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, "d/MM/yy", { locale: es });
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  // Truncate text to fit in cell
+  const truncateText = (text: string | null, maxLength: number = 30) => {
+    if (!text) return '-';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
   if (isLoading) {
     logger.log('[DynamicContactTable] Loading contacts');
     return (
@@ -288,7 +305,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                   key={contact.id} 
                   className={selectedContacts.includes(contact.id) ? "bg-muted" : ""}
                 >
-                  <TableCell>
+                  <TableCell className="align-top">
                     <Checkbox
                       checked={selectedContacts.includes(contact.id)}
                       onCheckedChange={() => handleSelectContact(contact.id)}
@@ -297,16 +314,17 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                   {visibleColumns.map((column) => (
                     <TableCell 
                       key={column.key}
-                      className={column.key === 'first_name' || column.key === 'last_name' ? "cursor-pointer hover:underline" : ""}
+                      className={`align-top max-w-xs truncate ${column.key === 'first_name' || column.key === 'last_name' ? "cursor-pointer hover:underline" : ""}`}
                       onClick={() => {
                         if (column.key === 'first_name' || column.key === 'last_name') {
                           handleViewProfile(contact.id);
                         }
                       }}
+                      title={contact[column.key] || undefined} // Show full text on hover
                     >
-                      {column.type === 'date' && contact[column.key]
-                        ? format(new Date(contact[column.key] as string), "d 'de' MMMM, yyyy", { locale: es })
-                        : (contact[column.key] || '-')}
+                      {column.key === 'created_at' && contact[column.key]
+                        ? formatCompactDate(contact[column.key] as string)
+                        : truncateText(contact[column.key] as string)}
                     </TableCell>
                   ))}
                 </TableRow>
