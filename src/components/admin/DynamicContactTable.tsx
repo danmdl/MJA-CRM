@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Trash2, Edit } from 'lucide-react';
+import { ChevronDown, Trash2, Edit, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CONTACT_FIELDS, ContactField } from '@/lib/contact-fields';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -214,6 +214,27 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
     return text.substring(0, maxLength) + '...';
   };
 
+  // Handle drag and drop for column reordering
+  const handleDragStart = (e: React.DragEvent<HTMLTableHeaderCellElement>, index: number) => {
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLTableHeaderCellElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLTableHeaderCellElement>, dropIndex: number) => {
+    e.preventDefault();
+    const dragIndex = parseInt(e.dataTransfer.getData("text/plain"));
+    
+    if (dragIndex !== dropIndex) {
+      const newColumns = [...visibleColumns];
+      const [draggedColumn] = newColumns.splice(dragIndex, 1);
+      newColumns.splice(dropIndex, 0, draggedColumn);
+      setVisibleColumns(newColumns);
+    }
+  };
+
   if (isLoading) {
     logger.log('[DynamicContactTable] Loading contacts');
     return (
@@ -275,25 +296,35 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                 />
               </TableHead>
               {visibleColumns.map((column, index) => (
-                <TableHead key={column.key + index}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="flex items-center gap-1 h-auto p-0 font-semibold text-foreground hover:text-primary">
-                        {column.label} <ChevronDown className="ml-1 h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {CONTACT_FIELDS.map(field => (
-                        <DropdownMenuItem
-                          key={field.key}
-                          onClick={() => handleColumnChange(index, field.key)}
-                          disabled={visibleColumns.some(vc => vc.key === field.key)}
-                        >
-                          {field.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                <TableHead 
+                  key={column.key + index}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, index)}
+                  className={`cursor-move ${column.key === 'apartment_number' ? 'w-24' : ''}`}
+                >
+                  <div className="flex items-center gap-1">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="flex items-center gap-1 h-auto p-0 font-semibold text-foreground hover:text-primary">
+                          {column.label} <ChevronDown className="ml-1 h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        {CONTACT_FIELDS.map(field => (
+                          <DropdownMenuItem
+                            key={field.key}
+                            onClick={() => handleColumnChange(index, field.key)}
+                            disabled={visibleColumns.some(vc => vc.key === field.key)}
+                          >
+                            {field.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </TableHead>
               ))}
             </TableRow>
@@ -320,7 +351,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                           handleViewProfile(contact.id);
                         }
                       }}
-                      title={contact[column.key] || undefined} // Show full text on hover
+                      title={contact[column.key] || undefined}
                     >
                       {column.key === 'created_at' && contact[column.key]
                         ? formatCompactDate(contact[column.key] as string)
