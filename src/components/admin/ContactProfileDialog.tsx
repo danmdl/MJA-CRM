@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +13,11 @@ import { User, Mail, Phone, MapPin, Home, Users, Calendar, MessageSquare } from 
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+// Interfaces
 interface Contact {
   id: string;
   first_name: string;
@@ -62,6 +63,177 @@ interface ContactProfileDialogProps {
   churchId: string;
 }
 
+// Componentes modulares
+const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
+  <div className="flex flex-col items-center space-y-4">
+    <div className="relative">
+      <div className="bg-gray-200 border-2 border-dashed rounded-xl w-24 h-24 flex items-center justify-center">
+        <User className="h-12 w-12 text-gray-400" />
+      </div>
+      <Button size="sm" className="absolute -bottom-2 left-1/2 transform -translate-x-1/2" variant="outline">
+        Cambiar Foto
+      </Button>
+    </div>
+    <h2 className="text-xl font-bold">
+      {contact.first_name} {contact.last_name || ''}
+    </h2>
+  </div>
+);
+
+const ContactInfoField = ({
+  label,
+  value,
+  onChange,
+  icon: Icon,
+  type = "text",
+  placeholder = ""
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  icon?: React.ComponentType<{ className: string }>;
+  type?: string;
+  placeholder?: string;
+}) => (
+  <div className="space-y-2">
+    <Label htmlFor={label.toLowerCase().replace(/\s/g, '-')}>{label}</Label>
+    {Icon && (
+      <div className="relative">
+        <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          id={label.toLowerCase().replace(/\s/g, '-')}
+          type={type}
+          className="pl-10"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+        />
+      </div>
+    )}
+    {!Icon && (
+      <Input
+        id={label.toLowerCase().replace(/\s/g, '-')}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    )}
+  </div>
+);
+
+const SelectField = ({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false
+}: {
+  label: string;
+  value: string | null;
+  onChange: (value: string | null) => void;
+  options: Array<{ id: string; name: string }>;
+  placeholder: string;
+  disabled?: boolean;
+}) => (
+  <div className="space-y-2">
+    <Label htmlFor={label.toLowerCase().replace(/\s/g, '-')}>{label}</Label>
+    <Select
+      value={value || undefined}
+      onValueChange={(value) => onChange(value === "none" ? null : value)}
+      disabled={disabled}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">Sin asignación</SelectItem>
+        {options.map((option) => (
+          <SelectItem key={option.id} value={option.id}>
+            {option.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);
+
+const ContactLogForm = ({
+  newLog,
+  setNewLog,
+  onAddLog
+}: {
+  newLog: { date: string; method: string; notes: string };
+  setNewLog: React.Dispatch<React.SetStateAction<{ date: string; method: string; notes: string }>>;
+  onAddLog: () => void;
+}) => (
+  <div className="space-y-3 p-3 bg-muted rounded-md">
+    <h4 className="font-medium">Agregar Nuevo Registro</h4>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      <div>
+        <Label htmlFor="logDate" className="text-xs">Fecha</Label>
+        <Input
+          id="logDate"
+          type="date"
+          value={newLog.date}
+          onChange={(e) => setNewLog({ ...newLog, date: e.target.value })}
+        />
+      </div>
+      <div>
+        <Label htmlFor="logMethod" className="text-xs">Método</Label>
+        <Input
+          id="logMethod"
+          placeholder="Llamada, WhatsApp, etc."
+          value={newLog.method}
+          onChange={(e) => setNewLog({ ...newLog, method: e.target.value })}
+        />
+      </div>
+      <div>
+        <Label htmlFor="logNotes" className="text-xs">Notas</Label>
+        <Input
+          id="logNotes"
+          placeholder="Detalles del contacto"
+          value={newLog.notes}
+          onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })}
+        />
+      </div>
+    </div>
+    <Button size="sm" onClick={onAddLog} disabled={!newLog.date}>
+      <MessageSquare className="mr-2 h-4 w-4" />
+      Agregar Registro
+    </Button>
+  </div>
+);
+
+const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead className="w-32">Fecha</TableHead>
+        <TableHead className="w-32">Método</TableHead>
+        <TableHead>Notas</TableHead>
+        <TableHead className="w-32">Registrado por</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {logs.map((log) => (
+        <TableRow key={log.id}>
+          <TableCell>
+            {format(new Date(log.contact_date), "d 'de' MMM yyyy", { locale: es })}
+          </TableCell>
+          <TableCell>{log.contact_method || '-'}</TableCell>
+          <TableCell>{log.notes || '-'}</TableCell>
+          <TableCell className="text-sm text-muted-foreground">
+            {log.contacted_by_name}
+          </TableCell>
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+);
+
+// Componente principal
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
   const [contact, setContact] = useState<Contact | null>(null);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
@@ -90,7 +262,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         .eq('id', contactId)
         .eq('church_id', churchId)
         .single();
-      
+
       if (error) {
         logger.error('Error fetching contact details', error);
         showError('Error al cargar los detalles del contacto.');
@@ -107,17 +279,17 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const fetchContactLogs = async () => {
     if (!contactId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('contact_logs')
-        .select(` 
-          *, 
-          contacted_by_profile:profiles(first_name, last_name) 
+        .select(`
+          *,
+          contacted_by_profile:profiles(first_name, last_name)
         `)
         .eq('contact_id', contactId)
         .order('contact_date', { ascending: false });
-      
+
       if (error) {
         logger.error('Error fetching contact logs', error);
         showError('Error al cargar el historial de contactos.');
@@ -125,8 +297,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         // Map the data to include contacted_by_name
         const logs = data.map(log => ({
           ...log,
-          contacted_by_name: log.contacted_by_profile ? 
-            `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}` : 
+          contacted_by_name: log.contacted_by_profile ?
+            `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}` :
             'Desconocido'
         }));
         setContactLogs(logs);
@@ -146,20 +318,20 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         .eq('church_id', churchId)
         .in('role', ['pastor', 'piloto', 'encargado_de_celula'])
         .order('first_name', { ascending: true });
-      
+
       if (leadersError) {
         logger.error('Error fetching leaders', leadersError);
       } else {
         setLeaders(leadersData || []);
       }
-      
+
       // Fetch cells
       const { data: cellsData, error: cellsError } = await supabase
         .from('cells')
         .select('id, name')
         .eq('church_id', churchId)
         .order('name', { ascending: true });
-      
+
       if (cellsError) {
         logger.error('Error fetching cells', cellsError);
       } else {
@@ -172,7 +344,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const handleSave = async () => {
     if (!contact) return;
-    
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -192,7 +364,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         })
         .eq('id', contact.id)
         .eq('church_id', churchId);
-      
+
       if (error) {
         logger.error('Error updating contact', error);
         showError('Error al actualizar el contacto.');
@@ -211,7 +383,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const handleAddLog = async () => {
     if (!contactId || !newLog.date) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('contact_logs')
@@ -222,12 +394,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
           contact_method: newLog.method,
           notes: newLog.notes,
         })
-        .select(` 
-          *, 
-          contacted_by_profile:profiles(first_name, last_name) 
+        .select(`
+          *,
+          contacted_by_profile:profiles(first_name, last_name)
         `)
         .single();
-      
+
       if (error) {
         logger.error('Error adding contact log', error);
         showError('Error al agregar el registro de contacto.');
@@ -235,8 +407,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         // Add the new log to the list
         const logWithContactedByName = {
           ...data,
-          contacted_by_name: data.contacted_by_profile ? 
-            `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}` : 
+          contacted_by_name: data.contacted_by_profile ?
+            `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}` :
             'Desconocido'
         };
         setContactLogs([logWithContactedByName, ...contactLogs]);
@@ -276,154 +448,80 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         {contact && (
           <div className="space-y-6">
             {/* Profile Picture Section */}
-            <div className="flex flex-col items-center space-y-4">
-              <div className="relative">
-                <div className="bg-gray-200 border-2 border-dashed rounded-xl w-24 h-24 flex items-center justify-center">
-                  <User className="h-12 w-12 text-gray-400" />
-                </div>
-                <Button 
-                  size="sm" 
-                  className="absolute -bottom-2 left-1/2 transform -translate-x-1/2" 
-                  variant="outline"
-                >
-                  Cambiar Foto
-                </Button>
-              </div>
-              <h2 className="text-xl font-bold">
-                {contact.first_name} {contact.last_name || ''}
-              </h2>
-            </div>
-            
+            <ProfilePictureSection contact={contact} />
+
             {/* Contact Information */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Nombre</Label>
-                  <Input
-                    id="firstName"
-                    value={contact.first_name}
-                    onChange={(e) => handleChange('first_name', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Apellido</Label>
-                  <Input
-                    id="lastName"
-                    value={contact.last_name || ''}
-                    onChange={(e) => handleChange('last_name', e.target.value || null)}
-                  />
-                </div>
+                <ContactInfoField
+                  label="Nombre"
+                  value={contact.first_name}
+                  onChange={(value) => handleChange('first_name', value)}
+                />
+                <ContactInfoField
+                  label="Apellido"
+                  value={contact.last_name || ''}
+                  onChange={(value) => handleChange('last_name', value || null)}
+                />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    className="pl-10"
-                    value={contact.email || ''}
-                    onChange={(e) => handleChange('email', e.target.value || null)}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="phone"
-                    className="pl-10"
-                    value={contact.phone || ''}
-                    onChange={(e) => handleChange('phone', e.target.value || null)}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="address">Dirección</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="address"
-                    className="pl-10"
-                    value={contact.address || ''}
-                    onChange={(e) => handleChange('address', e.target.value || null)}
-                  />
-                </div>
-              </div>
-              
+
+              <ContactInfoField
+                label="Correo Electrónico"
+                value={contact.email || ''}
+                onChange={(value) => handleChange('email', value || null)}
+                icon={Mail}
+                type="email"
+              />
+
+              <ContactInfoField
+                label="Teléfono"
+                value={contact.phone || ''}
+                onChange={(value) => handleChange('phone', value || null)}
+                icon={Phone}
+              />
+
+              <ContactInfoField
+                label="Dirección"
+                value={contact.address || ''}
+                onChange={(value) => handleChange('address', value || null)}
+                icon={MapPin}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="apartment">Número de Apartamento</Label>
-                  <div className="relative">
-                    <Home className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="apartment"
-                      className="pl-10"
-                      value={contact.apartment_number || ''}
-                      onChange={(e) => handleChange('apartment_number', e.target.value || null)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="barrio">Barrio</Label>
-                  <Input
-                    id="barrio"
-                    value={contact.barrio || ''}
-                    onChange={(e) => handleChange('barrio', e.target.value || null)}
-                  />
-                </div>
+                <ContactInfoField
+                  label="Número de Apartamento"
+                  value={contact.apartment_number || ''}
+                  onChange={(value) => handleChange('apartment_number', value || null)}
+                  icon={Home}
+                />
+                <ContactInfoField
+                  label="Barrio"
+                  value={contact.barrio || ''}
+                  onChange={(value) => handleChange('barrio', value || null)}
+                />
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cell">Célula</Label>
-                  <Select
-                    value={contact.cell_id || undefined}
-                    onValueChange={(value) => handleChange('cell_id', value === "none" ? null : value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue 
-                        placeholder="Sin célula asignada" 
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin célula asignada</SelectItem>
-                      {cells.map((cell) => (
-                        <SelectItem key={cell.id} value={cell.id}>
-                          {cell.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="leader">Líder Asignado</Label>
-                  <Select
-                    value={contact.leader_assigned || undefined}
-                    onValueChange={(value) => handleChange('leader_assigned', value === "none" ? null : value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue 
-                        placeholder="Sin líder asignado" 
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin líder asignado</SelectItem>
-                      {leaders.map((leader) => (
-                        <SelectItem key={leader.id} value={leader.id}>
-                          {leader.first_name} {leader.last_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <SelectField
+                  label="Célula"
+                  value={contact.cell_id}
+                  onChange={(value) => handleChange('cell_id', value)}
+                  options={cells}
+                  placeholder="Sin célula asignada"
+                />
+
+                <SelectField
+                  label="Líder Asignado"
+                  value={contact.leader_assigned}
+                  onChange={(value) => handleChange('leader_assigned', value)}
+                  options={leaders.map(leader => ({
+                    id: leader.id,
+                    name: `${leader.first_name} ${leader.last_name}`
+                  }))}
+                  placeholder="Sin líder asignado"
+                />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="notes">Notas</Label>
                 <Textarea
@@ -435,7 +533,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 />
               </div>
             </div>
-            
+
             {/* Contact Log Section */}
             <Card>
               <CardHeader>
@@ -446,73 +544,15 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Add New Log */}
-                <div className="space-y-3 p-3 bg-muted rounded-md">
-                  <h4 className="font-medium">Agregar Nuevo Registro</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <div>
-                      <Label htmlFor="logDate" className="text-xs">Fecha</Label>
-                      <Input
-                        id="logDate"
-                        type="date"
-                        value={newLog.date}
-                        onChange={(e) => setNewLog({ ...newLog, date: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="logMethod" className="text-xs">Método</Label>
-                      <Input
-                        id="logMethod"
-                        placeholder="Llamada, WhatsApp, etc."
-                        value={newLog.method}
-                        onChange={(e) => setNewLog({ ...newLog, method: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="logNotes" className="text-xs">Notas</Label>
-                      <Input
-                        id="logNotes"
-                        placeholder="Detalles del contacto"
-                        value={newLog.notes}
-                        onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    onClick={handleAddLog} 
-                    disabled={!newLog.date}
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Agregar Registro
-                  </Button>
-                </div>
-                
+                <ContactLogForm
+                  newLog={newLog}
+                  setNewLog={setNewLog}
+                  onAddLog={handleAddLog}
+                />
+
                 {/* Contact Logs Table */}
                 {contactLogs.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-32">Fecha</TableHead>
-                        <TableHead className="w-32">Método</TableHead>
-                        <TableHead>Notas</TableHead>
-                        <TableHead className="w-32">Registrado por</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {contactLogs.map((log) => (
-                        <TableRow key={log.id}>
-                          <TableCell>
-                            {format(new Date(log.contact_date), "d 'de' MMM yyyy", { locale: es })}
-                          </TableCell>
-                          <TableCell>{log.contact_method || '-'}</TableCell>
-                          <TableCell>{log.notes || '-'}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {log.contacted_by_name}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <ContactLogsTable logs={contactLogs} />
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
                     No hay registros de contacto aún.
@@ -520,11 +560,11 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 )}
               </CardContent>
             </Card>
-            
+
             <div className="flex justify-end space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => onOpenChange(false)} 
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
                 disabled={saving}
               >
                 Cancelar
