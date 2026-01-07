@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,15 +13,9 @@ import { User, Mail, Phone, MapPin, Home, Users, Calendar, MessageSquare } from 
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Contact {
   id: string;
@@ -101,7 +90,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         .eq('id', contactId)
         .eq('church_id', churchId)
         .single();
-
+      
       if (error) {
         logger.error('Error fetching contact details', error);
         showError('Error al cargar los detalles del contacto.');
@@ -122,13 +111,13 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     try {
       const { data, error } = await supabase
         .from('contact_logs')
-        .select(`
-          *,
-          contacted_by_profile:profiles(first_name, last_name)
+        .select(` 
+          *, 
+          contacted_by_profile:profiles(first_name, last_name) 
         `)
         .eq('contact_id', contactId)
         .order('contact_date', { ascending: false });
-
+      
       if (error) {
         logger.error('Error fetching contact logs', error);
         showError('Error al cargar el historial de contactos.');
@@ -136,9 +125,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         // Map the data to include contacted_by_name
         const logs = data.map(log => ({
           ...log,
-          contacted_by_name: log.contacted_by_profile 
-            ? `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}`
-            : 'Desconocido'
+          contacted_by_name: log.contacted_by_profile ? 
+            `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}` : 
+            'Desconocido'
         }));
         setContactLogs(logs);
       }
@@ -150,27 +139,27 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const fetchLeadersAndCells = async () => {
     try {
-      // Fetch leaders
+      // Fetch leaders (pastor, piloto, encargado_de_celula)
       const { data: leadersData, error: leadersError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
         .eq('church_id', churchId)
         .in('role', ['pastor', 'piloto', 'encargado_de_celula'])
         .order('first_name', { ascending: true });
-
+      
       if (leadersError) {
         logger.error('Error fetching leaders', leadersError);
       } else {
         setLeaders(leadersData || []);
       }
-
+      
       // Fetch cells
       const { data: cellsData, error: cellsError } = await supabase
         .from('cells')
         .select('id, name')
         .eq('church_id', churchId)
         .order('name', { ascending: true });
-
+      
       if (cellsError) {
         logger.error('Error fetching cells', cellsError);
       } else {
@@ -183,6 +172,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const handleSave = async () => {
     if (!contact) return;
+    
     setSaving(true);
     try {
       const { error } = await supabase
@@ -202,7 +192,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         })
         .eq('id', contact.id)
         .eq('church_id', churchId);
-
+      
       if (error) {
         logger.error('Error updating contact', error);
         showError('Error al actualizar el contacto.');
@@ -232,12 +222,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
           contact_method: newLog.method,
           notes: newLog.notes,
         })
-        .select(`
-          *,
-          contacted_by_profile:profiles(first_name, last_name)
+        .select(` 
+          *, 
+          contacted_by_profile:profiles(first_name, last_name) 
         `)
         .single();
-
+      
       if (error) {
         logger.error('Error adding contact log', error);
         showError('Error al agregar el registro de contacto.');
@@ -245,9 +235,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         // Add the new log to the list
         const logWithContactedByName = {
           ...data,
-          contacted_by_name: data.contacted_by_profile 
-            ? `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}`
-            : 'Desconocido'
+          contacted_by_name: data.contacted_by_profile ? 
+            `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}` : 
+            'Desconocido'
         };
         setContactLogs([logWithContactedByName, ...contactLogs]);
         setNewLog({ date: '', method: '', notes: '' });
@@ -291,7 +281,11 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <div className="bg-gray-200 border-2 border-dashed rounded-xl w-24 h-24 flex items-center justify-center">
                   <User className="h-12 w-12 text-gray-400" />
                 </div>
-                <Button size="sm" className="absolute -bottom-2 left-1/2 transform -translate-x-1/2" variant="outline">
+                <Button 
+                  size="sm" 
+                  className="absolute -bottom-2 left-1/2 transform -translate-x-1/2" 
+                  variant="outline"
+                >
                   Cambiar Foto
                 </Button>
               </div>
@@ -299,7 +293,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 {contact.first_name} {contact.last_name || ''}
               </h2>
             </div>
-
+            
             {/* Contact Information */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -320,7 +314,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   />
                 </div>
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>
                 <div className="relative">
@@ -334,7 +328,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   />
                 </div>
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="phone">Teléfono</Label>
                 <div className="relative">
@@ -347,7 +341,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   />
                 </div>
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="address">Dirección</Label>
                 <div className="relative">
@@ -360,7 +354,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   />
                 </div>
               </div>
-
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="apartment">Número de Apartamento</Label>
@@ -383,42 +377,53 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   />
                 </div>
               </div>
-
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="cell">Célula</Label>
-                  <select
-                    id="cell"
-                    className="w-full p-2 border rounded-md"
-                    value={contact.cell_id || ''}
-                    onChange={(e) => handleChange('cell_id', e.target.value || null)}
+                  <Select
+                    value={contact.cell_id || undefined}
+                    onValueChange={(value) => handleChange('cell_id', value === "none" ? null : value)}
                   >
-                    <option value="">Sin célula asignada</option>
-                    {cells.map((cell) => (
-                      <option key={cell.id} value={cell.id}>
-                        {cell.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue 
+                        placeholder="Sin célula asignada" 
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin célula asignada</SelectItem>
+                      {cells.map((cell) => (
+                        <SelectItem key={cell.id} value={cell.id}>
+                          {cell.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="leader">Líder Asignado</Label>
-                  <select
-                    id="leader"
-                    className="w-full p-2 border rounded-md"
-                    value={contact.leader_assigned || ''}
-                    onChange={(e) => handleChange('leader_assigned', e.target.value || null)}
+                  <Select
+                    value={contact.leader_assigned || undefined}
+                    onValueChange={(value) => handleChange('leader_assigned', value === "none" ? null : value)}
                   >
-                    <option value="">Sin líder asignado</option>
-                    {leaders.map((leader) => (
-                      <option key={leader.id} value={leader.id}>
-                        {leader.first_name} {leader.last_name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue 
+                        placeholder="Sin líder asignado" 
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin líder asignado</SelectItem>
+                      {leaders.map((leader) => (
+                        <SelectItem key={leader.id} value={leader.id}>
+                          {leader.first_name} {leader.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="notes">Notas</Label>
                 <Textarea
@@ -430,7 +435,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 />
               </div>
             </div>
-
+            
             {/* Contact Log Section */}
             <Card>
               <CardHeader>
@@ -474,14 +479,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   </div>
                   <Button 
                     size="sm" 
-                    onClick={handleAddLog}
+                    onClick={handleAddLog} 
                     disabled={!newLog.date}
                   >
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Agregar Registro
                   </Button>
                 </div>
-
+                
                 {/* Contact Logs Table */}
                 {contactLogs.length > 0 ? (
                   <Table>
@@ -515,9 +520,13 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 )}
               </CardContent>
             </Card>
-
+            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              <Button 
+                variant="outline" 
+                onClick={() => onOpenChange(false)} 
+                disabled={saving}
+              >
                 Cancelar
               </Button>
               <Button onClick={handleSave} disabled={saving}>

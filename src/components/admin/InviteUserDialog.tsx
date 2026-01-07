@@ -5,34 +5,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
+
+// Definir el tipo de rol de usuario
+type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
 
 const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']);
 
@@ -44,14 +27,14 @@ const inviteSchema = z.object({
 interface InviteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  churchId?: string; // Add optional churchId prop
+  churchId?: string;
 }
 
 export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
-  const { session, profile } = useSession(); // Get user profile
-
+  const { session, profile } = useSession();
+  
   const form = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
     defaultValues: {
@@ -68,34 +51,39 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
         setLoading(false);
         return;
       }
-
-      console.log('Sending payload to invite-user Edge Function:', { ...values, churchId });
-
+      
+      console.log('Sending payload to invite-user Edge Function:', {
+        ...values,
+        churchId
+      });
+      
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/invite-user`;
-
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ ...values, churchId }), // Pass churchId to the Edge Function
+        body: JSON.stringify({
+          ...values,
+          churchId
+        }),
       });
-
+      
       const data = await response.json();
-
+      
       if (!response.ok) {
         console.error('Edge Function response error:', data);
         showError(data.error || 'Error desconocido al invocar la función.');
         setLoading(false);
         return;
       }
-
+      
       showSuccess('¡Invitación enviada con éxito!');
       form.reset();
       queryClient.invalidateQueries({ queryKey: ['users'] });
       if (churchId) {
-        queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] }); // Invalidate church-specific users
+        queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
       }
       onOpenChange(false);
     } catch (error: any) {
@@ -107,11 +95,11 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
   };
 
   const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
-
-  // Filter roles based on churchId presence
-  const availableRoles = churchId
-    ? UserRoles.options.filter(role => ['pastor', 'piloto', 'encargado_de_celula'].includes(role))
-    : UserRoles.options; // If no churchId, show all roles (for global invite, if ever implemented)
+  
+  // Roles disponibles para asignar
+  const availableRoles: UserRole[] = churchId 
+    ? ['pastor', 'piloto', 'encargado_de_celula', 'user'] 
+    : ['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin'];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -152,13 +140,12 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
                     </FormControl>
                     <SelectContent>
                       {availableRoles.map((roleOption) => (
-                        // Disable admin/general roles if current user is not admin/general
                         <SelectItem 
                           key={roleOption} 
                           value={roleOption}
                           disabled={!isAdminOrGeneral && (roleOption === 'admin' || roleOption === 'general')}
                         >
-                          {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                          {roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
                         </SelectItem>
                       ))}
                     </SelectContent>

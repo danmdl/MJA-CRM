@@ -1,47 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2, Key } from 'lucide-react'; // Added Key icon
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Copy, Send, Trash2, Key } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useState, useEffect } from 'react'; // Import useEffect
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import *as z from 'zod';
+import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 // Definir el tipo de rol de usuario para TypeScript
@@ -70,6 +45,7 @@ const passwordResetSchema = z.object({
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
   console.log(`[DEBUG CLIENT] fetchChurchUsers called with churchId: ${churchId} and accessToken present: ${!!accessToken}`);
+  
   const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
   const response = await fetch(edgeFunctionUrl, {
     method: 'POST',
@@ -79,13 +55,13 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
     },
     body: JSON.stringify({ action: 'listChurchUsers', churchId }),
   });
-
+  
   if (!response.ok) {
     const errorData = await response.json();
     console.error('Error fetching church users from Edge Function:', errorData);
     throw new Error(errorData.error || 'No se pudieron cargar los usuarios de la iglesia.');
   }
-
+  
   const data = await response.json();
   console.log(`[DEBUG CLIENT] Users received from Edge Function for Church ID ${churchId}:`, data);
   return data || [];
@@ -94,15 +70,12 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
 const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session } = useSession();
   const queryClient = useQueryClient();
-
+  
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['churchUsers', churchId],
     queryFn: () => fetchChurchUsers(session?.access_token || '', churchId),
     enabled: !!session?.access_token && !!churchId,
   });
-
-  // Removed the previous useEffect log as it was not firing when data was empty.
-  // The new logs in fetchChurchUsers will provide more immediate feedback.
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -115,11 +88,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         },
         body: JSON.stringify({ action: 'deleteUser', userId }),
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al eliminar el usuario.');
       }
+      
       return response.json();
     },
     onSuccess: () => {
@@ -140,13 +114,14 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ action: 'resendInvite', email, role, churchId }), // Pass churchId
+        body: JSON.stringify({ action: 'resendInvite', email, role, churchId }),
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al reenviar la invitación.');
       }
+      
       return response.json();
     },
     onSuccess: () => {
@@ -167,13 +142,14 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ action: 'generateInviteLink', email, role, churchId }), // Pass churchId
+        body: JSON.stringify({ action: 'generateInviteLink', email, role, churchId }),
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al generar el enlace de invitación.');
       }
+      
       return response.json();
     },
     onSuccess: (data) => {
@@ -198,11 +174,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         },
         body: JSON.stringify({ action: 'updateUserRole', userId, newRole }),
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al actualizar el rol del usuario.');
       }
+      
       return response.json();
     },
     onSuccess: () => {
@@ -240,7 +217,8 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     }
   };
 
-  const userRoles: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
+  // Roles que pueden ser asignados a usuarios de iglesia
+  const assignableRoles: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor'];
 
   return (
     <Table>
@@ -270,9 +248,9 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {userRoles.map((roleOption) => (
+                    {assignableRoles.map((roleOption) => (
                       <SelectItem key={roleOption} value={roleOption}>
-                        {roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                        {roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -292,17 +270,27 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     {user.status === 'invited' && (
-                      <DropdownMenuItem onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}>
-                        <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
+                      <DropdownMenuItem 
+                        onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}
+                      >
+                        <Send className="mr-2 h-4 w-4" />
+                        Reenviar Invitación
                       </DropdownMenuItem>
                     )}
                     {user.status === 'invited' && (
-                      <DropdownMenuItem onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}>
-                        <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
+                      <DropdownMenuItem 
+                        onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copiar Enlace de Invitación
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onClick={() => deleteUserMutation.mutate(user.id)} className="text-red-600">
-                      <Trash2 className="mr-2 h-4 w-4" /> {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
+                    <DropdownMenuItem 
+                      onClick={() => deleteUserMutation.mutate(user.id)} 
+                      className="text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
