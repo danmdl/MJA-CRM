@@ -176,7 +176,6 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
   const defaultVisibleColumns: ContactField[] = useMemo(() => [
     extendedContactFields.find(f => f.key === 'first_name')!,
     extendedContactFields.find(f => f.key === 'last_name')!,
-    extendedContactFields.find(f => f.key === 'email')!,
     extendedContactFields.find(f => f.key === 'phone')!,
     extendedContactFields.find(f => f.key === 'cell.name')!,
     extendedContactFields.find(f => f.key === 'leader.first_name')!,
@@ -327,6 +326,36 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedContacts.includes(id));
   const someVisibleSelected = visibleIds.some(id => selectedContacts.includes(id)) && !allVisibleSelected;
 
+  // Append an actions column rendering at the end (not in visibleColumns switching)
+  const renderActionsCell = (c: Contact) => {
+    const wa = (c.phone || '').replace(/[^\d]/g, '');
+    const mapQ = encodeURIComponent((c as any).address || '');
+    return (
+      <div className="flex gap-2">
+        <a
+          href={wa ? `https://wa.me/${wa}` : '#'}
+          target="_blank"
+          rel="noreferrer"
+          className={`text-xs px-2 py-1 rounded border ${wa ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
+          onClick={(e) => { if (!wa) e.preventDefault(); }}
+          title="Enviar Whatsapp"
+        >
+          Whatsapp
+        </a>
+        <a
+          href={(c as any).address ? `https://www.google.com/maps/search/?api=1&query=${mapQ}` : '#'}
+          target="_blank"
+          rel="noreferrer"
+          className={`text-xs px-2 py-1 rounded border ${ (c as any).address ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
+          onClick={(e) => { if (!(c as any).address) e.preventDefault(); }}
+          title="Ver Dirección en Mapa"
+        >
+          Ver mapa
+        </a>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -390,6 +419,7 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
                   handleColumnChange={handleColumnChange}
                 />
               ))}
+              <TableHead className="w-40">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -410,11 +440,12 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
                       handleViewProfile={handleViewProfile}
                     />
                   ))}
+                  <TableCell>{renderActionsCell(contact)}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={visibleColumns.length + 1} className="text-center">
+                <TableCell colSpan={visibleColumns.length + 2} className="text-center">
                   No se encontraron contactos.
                 </TableCell>
               </TableRow>

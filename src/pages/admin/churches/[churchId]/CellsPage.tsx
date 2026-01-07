@@ -6,7 +6,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Users, MapPin, Clock } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Users, MapPin, Clock, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -71,6 +72,7 @@ const CellsPage = () => {
   const [editing, setEditing] = useState<CellRow | null>(null);
   const [attendeesFor, setAttendeesFor] = useState<string | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: cells, isLoading, isError, error } = useQuery<CellRow[]>({
     queryKey: ['cells', churchId],
@@ -93,12 +95,18 @@ const CellsPage = () => {
   });
 
   const rows = useMemo(() => {
-    return (cells || []).map(c => ({
+    const all = (cells || []).map(c => ({
       ...c,
       leader_name: c.encargado_id ? (profilesMap?.[c.encargado_id] || 'Sin nombre') : null,
       attendee_count: attendeeCounts?.[c.id] || 0,
     }));
-  }, [cells, profilesMap, attendeeCounts]);
+    const q = search.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter(c => {
+      const s = `${c.name} ${c.leader_name || ''} ${c.address || ''}`.toLowerCase();
+      return s.includes(q);
+    });
+  }, [cells, profilesMap, attendeeCounts, search]);
 
   const deleteCell = async (id: string) => {
     if (!window.confirm('¿Eliminar esta célula?')) return;
@@ -128,7 +136,18 @@ const CellsPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Listado de Células</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Listado de Células</CardTitle>
+            <div className="relative w-[320px] max-w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar por nombre, referente o dirección"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
           <CardDescription>Gestiona referentes, asistentes y horarios de cada célula.</CardDescription>
         </CardHeader>
         <CardContent>

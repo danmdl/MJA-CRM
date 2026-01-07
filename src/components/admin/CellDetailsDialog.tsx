@@ -36,8 +36,8 @@ interface Contact {
   id: string;
   first_name: string;
   last_name: string | null;
-  email: string | null;
   phone: string | null;
+  address: string | null;
 }
 
 const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetailsDialogProps) => {
@@ -76,7 +76,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
       // Load attendees
       const { data: contactsData } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, email, phone')
+        .select('id, first_name, last_name, phone, address')
         .eq('church_id', churchId)
         .eq('cell_id', cellId)
         .order('first_name', { ascending: true });
@@ -91,7 +91,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
     const q = search.trim().toLowerCase();
     if (!q) return attendees;
     return attendees.filter(a => {
-      const s = `${a.first_name} ${a.last_name || ''} ${a.email || ''} ${a.phone || ''}`.toLowerCase();
+      const s = `${a.first_name} ${a.last_name || ''} ${a.phone || ''} ${a.address || ''}`.toLowerCase();
       return s.includes(q);
     });
   }, [attendees, search]);
@@ -165,18 +165,44 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
                     {filteredAttendees.length === 0 ? (
                       <div className="p-4 text-sm text-muted-foreground">No hay asistentes.</div>
                     ) : (
-                      filteredAttendees.map(a => (
-                        <button
-                          key={a.id}
-                          className="w-full text-left p-3 hover:bg-muted/50 transition-colors"
-                          onClick={() => setProfileContactId(a.id)}
-                        >
-                          <div className="font-medium">{a.first_name} {a.last_name || ''}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {a.email || 'Sin email'} · {a.phone || 'Sin teléfono'}
+                      filteredAttendees.map(a => {
+                        const waNumber = (a.phone || '').replace(/[^\d]/g, '');
+                        const mapQuery = encodeURIComponent(a.address || '');
+                        return (
+                          <div key={a.id} className="p-3 hover:bg-muted/50 transition-colors">
+                            <button
+                              className="font-medium hover:underline text-left"
+                              onClick={() => setProfileContactId(a.id)}
+                              title="Ver perfil del asistente"
+                            >
+                              {a.first_name} {a.last_name || ''}
+                            </button>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {a.phone || 'Sin teléfono'}
+                            </div>
+                            <div className="mt-2 flex gap-2">
+                              <a
+                                href={waNumber ? `https://wa.me/${waNumber}` : '#'}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`text-xs px-2 py-1 rounded border ${waNumber ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
+                                onClick={(e) => { if (!waNumber) e.preventDefault(); }}
+                              >
+                                Enviar Whatsapp
+                              </a>
+                              <a
+                                href={a.address ? `https://www.google.com/maps/search/?api=1&query=${mapQuery}` : '#'}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`text-xs px-2 py-1 rounded border ${a.address ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
+                                onClick={(e) => { if (!a.address) e.preventDefault(); }}
+                              >
+                                Ver Dirección en Mapa
+                              </a>
+                            </div>
                           </div>
-                        </button>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </CardContent>
