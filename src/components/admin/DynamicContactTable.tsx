@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table,
   TableBody,
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -21,9 +21,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Settings2 } from 'lucide-react';
+import { ChevronDown, Settings2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CONTACT_FIELDS, ContactField } from '@/lib/contact-fields';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Contact {
   id: string;
@@ -36,7 +37,8 @@ interface Contact {
   barrio: string | null;
   leader_assigned: string | null;
   created_at: string;
-  church_id: string; // Add church_id to Contact interface
+  church_id: string;
+  cell_id: string | null;
 }
 
 const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
@@ -64,7 +66,7 @@ const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
 };
 
 interface DynamicContactTableProps {
-  churchId?: string; // Make churchId optional
+  churchId?: string;
 }
 
 const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
@@ -78,14 +80,37 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
     CONTACT_FIELDS.find(f => f.key === 'barrio')!,
     CONTACT_FIELDS.find(f => f.key === 'leader_assigned')!,
     CONTACT_FIELDS.find(f => f.key === 'created_at')!,
-  ].filter(Boolean), []); // Filter out any undefined if a field is not found
+  ].filter(Boolean), []);
 
   const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(defaultVisibleColumns);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const queryClient = useQueryClient();
 
   const { data: contacts, isLoading, isError, error } = useQuery<Contact[]>({
-    queryKey: ['contacts', churchId], // Include churchId in query key
+    queryKey: ['contacts', churchId],
     queryFn: () => fetchContacts(churchId),
-    enabled: !!churchId, // Only enable query if churchId is available
+    enabled: !!churchId,
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', contactId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      showSuccess('Contacto(s) eliminado(s) con éxito.');
+      queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+      setSelectedContacts([]);
+    },
+    onError: (err) => {
+      showError(err.message || 'Error al eliminar el contacto.');
+    },
   });
 
   const handleColumnChange = (columnIndex: number, newFieldKey: string) => {
@@ -95,6 +120,31 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
         const updatedColumns = [...prevColumns];
         updatedColumns[columnIndex] = newField;
         return updatedColumns;
+      });
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedContacts.length === contacts?.length) {
+      setSelectedContacts([]);
+    } else {
+      setSelectedContacts(contacts?.map(c => c.id) || []);
+    }
+  };
+
+  const handleSelectContact = (contactId: string) => {
+    setSelectedContacts(prev =>
+      prev.includes(contactId)
+        ? prev.filter(id => id !== contactId)
+        : [...prev, contactId]
+    );
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedContacts.length === 0) return;
+    if (window.confirm(`¿Estás seguro de que deseas eliminar ${selectedContacts.length} contacto(s)?`)) {
+      selectedContacts.forEach(contactId => {
+        deleteContactMutation.mutate(contactId);
       });
     }
   };
@@ -110,19 +160,43 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   }
 
   if (isError) {
-    console.error("[DynamicContactTable] Query error object:", error); // Log the full error object
+    console.error("[DynamicContactTable] Query error object:", error);
     showError(error?.message || 'Error al cargar los contactos.');
     return <div className="text-red-500">Error: {error?.message || 'No se pudieron cargar los contactos.'}</div>;
   }
 
   return (
     <div className="overflow-x-auto border rounded-md">
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            checked={selectedContacts.length > 0 && selectedContacts.length === contacts?.length}
+            indeterminate={selectedContacts.length > 0 && selectedContacts.length < contacts?.length}
+            onCheckedChange={handleSelectAll}
+          />
+          <span className="text-sm text-muted-foreground">
+            {selectedContacts.length} seleccionado(s)
+          </span>
+        </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={handleDeleteSelected}
+          disabled={selectedContacts.length === 0 || deleteContactMutation.isPending}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Eliminar Seleccionados
+        </Button>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
-            {/* Checkbox for selection, if needed in the future */}
             <TableHead className="w-12">
-              <input type="checkbox" className="form-checkbox" />
+              <Checkbox
+                checked={selectedContacts.length > 0 && selectedContacts.length === contacts?.length}
+                indeterminate={selectedContacts.length > 0 && selectedContacts.length < contacts?.length}
+                onCheckedChange={handleSelectAll}
+              />
             </TableHead>
             {visibleColumns.map((column, index) => (
               <TableHead key={column.key + index}>
@@ -137,7 +211,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                       <DropdownMenuItem
                         key={field.key}
                         onClick={() => handleColumnChange(index, field.key)}
-                        disabled={visibleColumns.some(vc => vc.key === field.key)} // Disable if already visible
+                        disabled={visibleColumns.some(vc => vc.key === field.key)}
                       >
                         {field.label}
                       </DropdownMenuItem>
@@ -146,6 +220,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                 </DropdownMenu>
               </TableHead>
             ))}
+            <TableHead className="w-12">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -153,7 +228,10 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
             contacts.map((contact) => (
               <TableRow key={contact.id}>
                 <TableCell>
-                  <input type="checkbox" className="form-checkbox" />
+                  <Checkbox
+                    checked={selectedContacts.includes(contact.id)}
+                    onCheckedChange={() => handleSelectContact(contact.id)}
+                  />
                 </TableCell>
                 {visibleColumns.map((column) => (
                   <TableCell key={column.key}>
@@ -162,11 +240,29 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                       : (contact[column.key] || '-')}
                   </TableCell>
                 ))}
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Settings2 className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => deleteContactMutation.mutate(contact.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={visibleColumns.length + 1} className="text-center">
+              <TableCell colSpan={visibleColumns.length + 2} className="text-center">
                 No se encontraron contactos.
               </TableCell>
             </TableRow>

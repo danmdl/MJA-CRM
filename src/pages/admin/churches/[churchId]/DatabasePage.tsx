@@ -6,7 +6,7 @@ import DynamicContactTable from '@/components/admin/DynamicContactTable';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, PlusCircle, Upload, Filter } from 'lucide-react';
+import { Search, PlusCircle, Upload, Filter, X } from 'lucide-react';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import {
   Dialog,
@@ -17,11 +17,18 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const ChurchDatabasePage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
+  const [filterField, setFilterField] = useState<string | null>(null);
 
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
@@ -29,6 +36,11 @@ const ChurchDatabasePage = () => {
 
   const requiredContactFields = CONTACT_FIELDS.filter(f => f.key !== 'apartment_number' && f.key !== 'leader_assigned' && f.key !== 'created_at');
   const optionalContactFields = CONTACT_FIELDS.filter(f => f.key === 'apartment_number' || f.key === 'leader_assigned' || f.key === 'created_at');
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setFilterField(null);
+  };
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -72,9 +84,25 @@ const ChurchDatabasePage = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline">
-          <Filter className="mr-2 h-4 w-4" /> Filtrar
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Filter className="mr-2 h-4 w-4" /> {filterField ? CONTACT_FIELDS.find(f => f.key === filterField)?.label : 'Filtrar'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {CONTACT_FIELDS.map(field => (
+              <DropdownMenuItem key={field.key} onClick={() => setFilterField(field.key)}>
+                {field.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {(searchTerm || filterField) && (
+          <Button variant="ghost" onClick={handleClearFilters}>
+            <X className="mr-2 h-4 w-4" /> Limpiar Filtros
+          </Button>
+        )}
       </div>
 
       <div className="flex-grow">
