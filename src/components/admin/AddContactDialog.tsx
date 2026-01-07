@@ -44,7 +44,7 @@ const addContactSchema = z.object({
   apartment_number: z.string().optional(),
   barrio: z.string().optional(),
   leader_assigned: z.string().optional(),
-  cell_id: z.string().optional(), // Make cell_id optional
+  cell_id: z.string().optional(),
 });
 
 interface Cell {
@@ -73,7 +73,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
       apartment_number: '',
       barrio: '',
       leader_assigned: '',
-      cell_id: undefined, // Initialize as undefined
+      cell_id: '',
     },
   });
 
@@ -105,7 +105,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           ...values,
           church_id: churchId,
           email: values.email || null,
-          cell_id: values.cell_id || null, // Ensure cell_id is null if not provided
+          cell_id: values.cell_id || null,
         })
         .select();
 
@@ -147,7 +147,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                     <FormLabel>{field.label}</FormLabel>
                     <FormControl>
                       <Input
-                        type={field.type}
+                        type={field.type === 'email' ? 'email' : 'text'}
                         placeholder={field.label}
                         {...formField}
                         value={formField.value || ''}
