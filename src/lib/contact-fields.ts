@@ -6,7 +6,7 @@ export const CONTACT_FIELDS = [
   { key: 'address', label: 'Dirección', type: 'text' },
   { key: 'apartment_number', label: 'Departamento', type: 'text' },
   { key: 'barrio', label: 'Barrio', type: 'text' },
-  { key: 'leader_assigned', label: 'Líder Asignado', type: 'text' },
+  { key: 'leader_assigned', label: 'Referente asignado', type: 'text' },
   { key: 'created_at', label: 'Fecha de Creación', type: 'date' },
 ];
 

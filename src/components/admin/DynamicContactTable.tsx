@@ -16,7 +16,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { logger } from '@/utils/logger';
 import ContactProfileDialog from './ContactProfileDialog';
 
-// Interfaces
 interface Contact {
   id: string;
   first_name: string;
@@ -31,16 +30,10 @@ interface Contact {
   church_id: string;
   cell_id: string | null;
   last_contact_date?: string | null;
-  cell?: {
-    name: string;
-  } | null;
-  leader?: {
-    first_name: string;
-    last_name: string;
-  } | null;
+  cell?: { name: string } | null;
+  leader?: { first_name: string; last_name: string } | null;
 }
 
-// Componentes modulares
 const TableHeaderCell = ({
   column,
   index,
@@ -96,21 +89,17 @@ const TableHeaderCell = ({
 const TableCellContent = ({
   contact,
   column,
-  selectedContacts,
-  handleSelectContact,
   handleViewProfile
 }: {
   contact: Contact;
   column: ContactField;
-  selectedContacts: string[];
-  handleSelectContact: (contactId: string) => void;
   handleViewProfile: (contactId: string) => void;
 }) => {
   const formatCompactDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
       return format(date, "d/MM/yy", { locale: es });
-    } catch (e) {
+    } catch {
       return dateString;
     }
   };
@@ -129,56 +118,44 @@ const TableCellContent = ({
           handleViewProfile(contact.id);
         }
       }}
-      title={contact[column.key] || undefined}
+      title={(contact as any)[column.key] || undefined}
     >
       {column.key === 'created_at' || column.key === 'last_contact_date' ? (
-        contact[column.key] ?
-          formatCompactDate(contact[column.key] as string) :
-          '-'
+        (contact as any)[column.key] ? formatCompactDate((contact as any)[column.key] as string) : '-'
       ) : column.key === 'cell.name' ? (
         contact.cell?.name || '-'
       ) : column.key === 'leader.first_name' ? (
-        contact.leader ?
-          `${contact.leader.first_name} ${contact.leader.last_name}` :
-          '-'
+        contact.leader ? `${contact.leader.first_name} ${contact.leader.last_name}` : '-'
       ) : (
-        truncateText(contact[column.key] as string)
+        truncateText((contact as any)[column.key] as string)
       )}
     </TableCell>
   );
 };
 
 const SelectionToolbar = ({
-  selectedContacts,
-  handleEditContact,
-  handleDeleteSelected,
-  deleteContactMutation
+  selectedCount,
+  canEdit,
+  onEdit,
+  onDeleteSelected,
+  isDeleting
 }: {
-  selectedContacts: string[];
-  handleEditContact: (contactId: string) => void;
-  handleDeleteSelected: () => void;
-  deleteContactMutation: any;
+  selectedCount: number;
+  canEdit: boolean;
+  onEdit: () => void;
+  onDeleteSelected: () => void;
+  isDeleting: boolean;
 }) => (
   <div className="flex items-center justify-between p-3 bg-muted rounded-md">
     <div className="text-sm text-muted-foreground">
-      {selectedContacts.length} contacto(s) seleccionado(s)
+      {selectedCount} contacto(s) seleccionado(s)
     </div>
     <div className="flex space-x-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handleEditContact(selectedContacts[0])}
-        disabled={selectedContacts.length !== 1}
-      >
+      <Button variant="outline" size="sm" onClick={onEdit} disabled={!canEdit}>
         <Edit className="mr-2 h-4 w-4" />
         Editar
       </Button>
-      <Button
-        variant="destructive"
-        size="sm"
-        onClick={handleDeleteSelected}
-        disabled={deleteContactMutation.isPending}
-      >
+      <Button variant="destructive" size="sm" onClick={onDeleteSelected} disabled={isDeleting}>
         <Trash2 className="mr-2 h-4 w-4" />
         Eliminar Seleccionados
       </Button>
@@ -186,15 +163,13 @@ const SelectionToolbar = ({
   </div>
 );
 
-// Componente principal
-const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
-  logger.log('[DynamicContactTable] Component rendered', { churchId });
+const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as string | null }: { churchId?: string; searchTerm?: string; filterField?: string | null }) => {
+  logger.log('[DynamicContactTable] Component rendered', { churchId, searchTerm, filterField });
 
-  // Add cell and leader to the fields
   const extendedContactFields = useMemo(() => [
     ...CONTACT_FIELDS,
     { key: 'cell.name', label: 'Célula', type: 'text' },
-    { key: 'leader.first_name', label: 'Líder Asignado', type: 'text' },
+    { key: 'leader.first_name', label: 'Referente', type: 'text' },
     { key: 'last_contact_date', label: 'Último Contacto', type: 'date' }
   ], []);
 
@@ -211,14 +186,10 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
 
   const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(defaultVisibleColumns);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
-  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
-    logger.log('[DynamicContactTable] fetchContacts called with churchId', churchId);
-
-    // First, fetch contacts
     let contactQuery = supabase
       .from('contacts')
       .select(`
@@ -227,54 +198,28 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
       `)
       .order('created_at', { ascending: false });
 
-    if (churchId) {
-      contactQuery = contactQuery.eq('church_id', churchId);
-      logger.log(`[DynamicContactTable] Filtering contacts by church_id: ${churchId}`);
-    } else {
-      logger.warn("[DynamicContactTable] No churchId provided to fetchContacts. Fetching all contacts (if RLS allows).");
-    }
+    if (churchId) contactQuery = contactQuery.eq('church_id', churchId);
 
     const { data: contactsData, error: contactsError } = await contactQuery;
+    if (contactsError) throw new Error('No se pudieron cargar los contactos.');
 
-    if (contactsError) {
-      logger.error('[DynamicContactTable] Error fetching contacts', contactsError);
-      throw new Error('No se pudieron cargar los contactos.');
-    }
+    const { data: cellsData, error: cellsError } = await supabase.from('cells').select('id, name');
+    if (cellsError) throw new Error('No se pudieron cargar las células.');
 
-    // Fetch cells
-    const { data: cellsData, error: cellsError } = await supabase
-      .from('cells')
-      .select('id, name');
+    const { data: leadersData, error: leadersError } = await supabase.from('profiles').select('id, first_name, last_name');
+    if (leadersError) throw new Error('No se pudieron cargar los referentes.');
 
-    if (cellsError) {
-      logger.error('[DynamicContactTable] Error fetching cells', cellsError);
-      throw new Error('No se pudieron cargar las células.');
-    }
-
-    // Fetch leaders (profiles)
-    const { data: leadersData, error: leadersError } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name');
-
-    if (leadersError) {
-      logger.error('[DynamicContactTable] Error fetching leaders', leadersError);
-      throw new Error('No se pudieron cargar los líderes.');
-    }
-
-    // Process data to combine contacts with cells and leaders
-    const processedData = contactsData?.map(contact => {
-      const cell = cellsData?.find(c => c.id === contact.cell_id) || null;
-      const leader = leadersData?.find(l => l.id === contact.leader_assigned) || null;
-      
+    const processedData = (contactsData || []).map((c: any) => {
+      const cell = (cellsData || []).find((x: any) => x.id === c.cell_id) || null;
+      const leader = (leadersData || []).find((x: any) => x.id === c.leader_assigned) || null;
       return {
-        ...contact,
+        ...c,
         cell,
         leader,
-        last_contact_date: contact.latest_log?.[0]?.contact_date || null
-      };
-    }) || [];
+        last_contact_date: c.latest_log?.[0]?.contact_date || null
+      } as Contact;
+    });
 
-    logger.log(`[DynamicContactTable] Successfully fetched ${processedData.length} contacts.`);
     return processedData;
   };
 
@@ -284,123 +229,85 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
     enabled: !!churchId,
   });
 
-  // Log query results
-  useEffect(() => {
-    if (contacts) {
-      logger.log('[DynamicContactTable] Contacts data updated', { count: contacts.length });
-    }
-  }, [contacts]);
-
-  useEffect(() => {
-    if (isError) {
-      logger.error('[DynamicContactTable] Query error', error);
-    }
-  }, [isError, error]);
-
   const deleteContactMutation = useMutation({
     mutationFn: async (contactId: string) => {
-      logger.log('[DynamicContactTable] Deleting contact', { contactId });
-      const { error } = await supabase
-        .from('contacts')
-        .delete()
-        .eq('id', contactId);
-
-      if (error) {
-        logger.error('[DynamicContactTable] Error deleting contact', error);
-        throw new Error(error.message);
-      }
+      const { error } = await supabase.from('contacts').delete().eq('id', contactId);
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      logger.log('[DynamicContactTable] Contact deleted successfully');
       showSuccess('Contacto(s) eliminado(s) con éxito.');
       queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
       setSelectedContacts([]);
     },
     onError: (err: any) => {
-      logger.error('[DynamicContactTable] Error in delete mutation', err);
       showError(err.message || 'Error al eliminar el contacto.');
     },
   });
 
   const handleColumnChange = (columnIndex: number, newFieldKey: string) => {
-    logger.log('[DynamicContactTable] Changing column', { columnIndex, newFieldKey });
     const newField = extendedContactFields.find(f => f.key === newFieldKey);
     if (newField) {
-      setVisibleColumns(prevColumns => {
-        const updatedColumns = [...prevColumns];
-        updatedColumns[columnIndex] = newField;
-        return updatedColumns;
+      setVisibleColumns(prev => {
+        const updated = [...prev];
+        updated[columnIndex] = newField;
+        return updated;
       });
     }
   };
 
-  const handleSelectAll = () => {
-    logger.log('[DynamicContactTable] Select all triggered', {
-      selectedCount: selectedContacts.length,
-      totalCount: contacts?.length
-    });
-    if (selectedContacts.length === contacts?.length) {
-      setSelectedContacts([]);
+  const handleSelectAll = (visibleIds: string[]) => {
+    if (visibleIds.every(id => selectedContacts.includes(id))) {
+      setSelectedContacts(selectedContacts.filter(id => !visibleIds.includes(id)));
     } else {
-      setSelectedContacts(contacts?.map(c => c.id) || []);
+      const union = Array.from(new Set([...selectedContacts, ...visibleIds]));
+      setSelectedContacts(union);
     }
   };
 
   const handleSelectContact = (contactId: string) => {
-    logger.log('[DynamicContactTable] Select contact', { contactId });
-    setSelectedContacts(prev =>
-      prev.includes(contactId)
-        ? prev.filter(id => id !== contactId)
-        : [...prev, contactId]
-    );
+    setSelectedContacts(prev => prev.includes(contactId) ? prev.filter(id => id !== contactId) : [...prev, contactId]);
   };
 
-  const handleDeleteSelected = () => {
-    logger.log('[DynamicContactTable] Delete selected triggered', { count: selectedContacts.length });
-    if (selectedContacts.length === 0) {
-      logger.warn('[DynamicContactTable] No contacts selected for deletion');
-      return;
-    }
-    if (window.confirm(`¿Estás seguro de que deseas eliminar ${selectedContacts.length} contacto(s)?`)) {
-      selectedContacts.forEach(contactId => {
-        deleteContactMutation.mutate(contactId);
-      });
+  const handleDeleteSelected = (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (window.confirm(`¿Estás seguro de que deseas eliminar ${ids.length} contacto(s)?`)) {
+      ids.forEach(id => deleteContactMutation.mutate(id));
     }
   };
 
-  const handleEditContact = (contactId: string) => {
-    logger.log('[DynamicContactTable] Edit contact triggered', { contactId });
-    setEditingContactId(contactId);
-    setProfileContactId(contactId);
-  };
+  const handleViewProfile = (contactId: string) => setProfileContactId(contactId);
 
-  const handleViewProfile = (contactId: string) => {
-    logger.log('[DynamicContactTable] View profile triggered', { contactId });
-    setProfileContactId(contactId);
-  };
+  const filteredContacts = useMemo(() => {
+    const term = (searchTerm || '').trim().toLowerCase();
+    if (!contacts) return [];
+    if (!term) return contacts;
 
-  // Handle drag and drop for column reordering
-  const handleDragStart = (e: React.DragEvent<HTMLTableHeaderCellElement>, index: number) => {
-    e.dataTransfer.setData("text/plain", index.toString());
-  };
+    const match = (c: Contact, key?: string | null) => {
+      if (!key) {
+        const haystack = [
+          c.first_name, c.last_name, c.email, c.phone, c.address, c.barrio,
+          c.cell?.name || '',
+          c.leader ? `${c.leader.first_name} ${c.leader.last_name}` : ''
+        ].join(' ').toLowerCase();
+        return haystack.includes(term);
+      }
+      if (key === 'leader_assigned') {
+        const leaderName = c.leader ? `${c.leader.first_name} ${c.leader.last_name}`.toLowerCase() : '';
+        return leaderName.includes(term);
+      }
+      const value = (c as any)[key];
+      if (typeof value === 'string') return value.toLowerCase().includes(term);
+      return false;
+    };
 
-  const handleDragOver = (e: React.DragEvent<HTMLTableHeaderCellElement>) => {
-    e.preventDefault();
-  };
+    return contacts.filter(c => match(c, filterField));
+  }, [contacts, searchTerm, filterField]);
 
-  const handleDrop = (e: React.DragEvent<HTMLTableHeaderCellElement>, dropIndex: number) => {
-    e.preventDefault();
-    const dragIndex = parseInt(e.dataTransfer.getData("text/plain"));
-    if (dragIndex !== dropIndex) {
-      const newColumns = [...visibleColumns];
-      const [draggedColumn] = newColumns.splice(dragIndex, 1);
-      newColumns.splice(dropIndex, 0, draggedColumn);
-      setVisibleColumns(newColumns);
-    }
-  };
+  const visibleIds = filteredContacts.map(c => c.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedContacts.includes(id));
+  const someVisibleSelected = visibleIds.some(id => selectedContacts.includes(id)) && !allVisibleSelected;
 
   if (isLoading) {
-    logger.log('[DynamicContactTable] Loading contacts');
     return (
       <div className="space-y-2">
         <Skeleton className="h-10 w-full" />
@@ -411,45 +318,34 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
   }
 
   if (isError) {
-    logger.error("[DynamicContactTable] Error loading contacts", error);
-    showError(error?.message || 'Error al cargar los contactos.');
-    return <div className="text-red-500">Error: {error?.message || 'No se pudieron cargar los contactos.'}</div>;
+    showError((error as any)?.message || 'Error al cargar los contactos.');
+    return <div className="text-red-500">Error: {(error as any)?.message || 'No se pudieron cargar los contactos.'}</div>;
   }
 
   return (
     <div className="space-y-4">
-      {/* Selection Toolbar */}
-      {selectedContacts.length > 0 && (
+      {someVisibleSelected || allVisibleSelected ? (
         <SelectionToolbar
-          selectedContacts={selectedContacts}
-          handleEditContact={handleEditContact}
-          handleDeleteSelected={handleDeleteSelected}
-          deleteContactMutation={deleteContactMutation}
+          selectedCount={visibleIds.filter(id => selectedContacts.includes(id)).length}
+          canEdit={visibleIds.filter(id => selectedContacts.includes(id)).length === 1}
+          onEdit={() => {
+            const only = visibleIds.find(id => selectedContacts.includes(id));
+            if (only) setProfileContactId(only);
+          }}
+          onDeleteSelected={() => handleDeleteSelected(visibleIds.filter(id => selectedContacts.includes(id)))}
+          isDeleting={deleteContactMutation.isPending as any}
         />
-      )}
+      ) : null}
 
-      {/* Contacts Table */}
       <div className="overflow-x-auto border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedContacts.length === contacts?.length}
-                  onCheckedChange={() => handleSelectAll()}
-                  // The 'indeterminate' state is handled internally by shadcn/ui's Checkbox
-                  // when `checked` is explicitly set to 'indeterminate'.
-                  // We can achieve this by conditionally setting `checked` to 'indeterminate'
-                  // if some but not all items are selected.
-                  // However, the `Checkbox` component from shadcn/ui expects `checked` to be `boolean | 'indeterminate'`.
-                  // The `indeterminate` prop itself is not directly exposed.
-                  // So, we pass `checked` as 'indeterminate' when appropriate.
-                  // For simplicity and to avoid the TS error, we'll rely on `checked` being boolean
-                  // and let the UI library handle the visual indeterminate state if it supports it
-                  // based on the `data-state` attribute, which is usually set by Radix.
-                  // If a visual indeterminate state is strictly required, a custom Checkbox
-                  // or a direct Radix Checkbox.Root with `data-state` manipulation would be needed.
-                  // For now, we'll ensure `checked` is a boolean.
+                  checked={allVisibleSelected}
+                  onCheckedChange={() => handleSelectAll(visibleIds)}
+                  aria-checked={someVisibleSelected ? 'mixed' : allVisibleSelected}
                 />
               </TableHead>
               {visibleColumns.map((column, index) => (
@@ -459,21 +355,27 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
                   index={index}
                   visibleColumns={visibleColumns}
                   extendedContactFields={extendedContactFields}
-                  handleDragStart={handleDragStart}
-                  handleDragOver={handleDragOver}
-                  handleDrop={handleDrop}
+                  handleDragStart={(e, i) => e.dataTransfer.setData("text/plain", i.toString())}
+                  handleDragOver={(e) => e.preventDefault()}
+                  handleDrop={(e, dropIndex) => {
+                    e.preventDefault();
+                    const dragIndex = parseInt(e.dataTransfer.getData("text/plain"));
+                    if (dragIndex !== dropIndex) {
+                      const newColumns = [...visibleColumns];
+                      const [dragged] = newColumns.splice(dragIndex, 1);
+                      newColumns.splice(dropIndex, 0, dragged);
+                      setVisibleColumns(newColumns);
+                    }
+                  }}
                   handleColumnChange={handleColumnChange}
                 />
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {contacts && contacts.length > 0 ? (
-              contacts.map((contact) => (
-                <TableRow
-                  key={contact.id}
-                  className={selectedContacts.includes(contact.id) ? "bg-muted" : ""}
-                >
+            {filteredContacts.length > 0 ? (
+              filteredContacts.map((contact) => (
+                <TableRow key={contact.id} className={selectedContacts.includes(contact.id) ? "bg-muted" : ""}>
                   <TableCell className="align-top">
                     <Checkbox
                       checked={selectedContacts.includes(contact.id)}
@@ -485,8 +387,6 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
                       key={column.key}
                       contact={contact}
                       column={column}
-                      selectedContacts={selectedContacts}
-                      handleSelectContact={handleSelectContact}
                       handleViewProfile={handleViewProfile}
                     />
                   ))}
@@ -503,14 +403,10 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
         </Table>
       </div>
 
-      {/* Contact Profile Dialog */}
       <ContactProfileDialog
         open={!!profileContactId}
         onOpenChange={(open) => {
-          if (!open) {
-            setProfileContactId(null);
-            setEditingContactId(null);
-          }
+          if (!open) setProfileContactId(null);
         }}
         contactId={profileContactId}
         churchId={churchId || ''}

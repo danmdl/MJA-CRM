@@ -138,7 +138,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const { data: leaders, isLoading: isLoadingLeaders } = useQuery<Leader[]>({
     queryKey: ['leaders', churchId, !!session?.access_token],
     queryFn: async () => {
-      // Prefer Edge Function (matches Equipo, bypasses RLS)
       if (session?.access_token) {
         const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
         const resp = await fetch(edgeFunctionUrl, {
@@ -156,10 +155,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             .filter((u: any) => leaderRoles.includes(u.role))
             .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name })) as Leader[];
         }
-        // If edge call fails, fall back to empty list instead of throwing
         return [];
       }
-      // If no token available yet, return empty to avoid blocking UI
       return [];
     },
     enabled: !!churchId,
@@ -231,7 +228,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             placeholder="Selecciona una célula (opcional)"
           />
           <SelectField
-            label="Líder Asignado"
+            label="Referente asignado"
             value={leaderAssigned}
             onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
             options={(leaders || []).map(leader => ({
@@ -239,7 +236,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
             }))}
             loading={isLoadingLeaders}
-            placeholder="Selecciona un líder (opcional)"
+            placeholder="Selecciona un referente (opcional)"
           />
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>

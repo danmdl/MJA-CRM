@@ -16,7 +16,6 @@ import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// Removed DebugLeaders debug import
 import { useSession } from '@/hooks/use-session';
 
 interface Contact {
@@ -32,7 +31,6 @@ interface Contact {
   created_at: string;
   church_id: string;
   cell_id: string | null;
-  notes?: string | null;
 }
 
 interface ContactLog {
@@ -97,9 +95,9 @@ const ContactInfoField = ({
 }) => (
   <div className="space-y-2">
     <Label htmlFor={label.toLowerCase().replace(/\s/g, '-')}>{label}</Label>
-    {Icon && (
+    {Icon ? (
       <div className="relative">
-        <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         <Input
           id={label.toLowerCase().replace(/\s/g, '-')}
           type={type}
@@ -109,8 +107,7 @@ const ContactInfoField = ({
           placeholder={placeholder}
         />
       </div>
-    )}
-    {!Icon && (
+    ) : (
       <Input
         id={label.toLowerCase().replace(/\s/g, '-')}
         type={type}
@@ -239,7 +236,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   };
 
   const fetchLeadersAndCells = async () => {
-    // Leaders via Edge Function (safe), fall back gracefully
     try {
       if (session?.access_token) {
         const resp = await fetch(`https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`, {
@@ -258,16 +254,15 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name }));
           setLeaders(mapped);
         } else {
-          setLeaders([]); // do not throw
+          setLeaders([]);
         }
       } else {
         setLeaders([]);
       }
     } catch {
-      setLeaders([]); // swallow error, keep UI alive
+      setLeaders([]);
     }
 
-    // Cells
     const { data: cellsData } = await supabase
       .from('cells')
       .select('id, name')
@@ -291,7 +286,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         barrio: contact.barrio,
         leader_assigned: contact.leader_assigned,
         cell_id: contact.cell_id,
-        notes: contact.notes,
         updated_at: new Date().toISOString(),
       })
       .eq('id', contact.id)
@@ -374,16 +368,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SelectField label="Célula" value={contact.cell_id} onChange={(v) => setContact({ ...contact, cell_id: v })} options={cells} placeholder="Sin célula asignada" />
                 <SelectField
-                  label="Líder Asignado"
+                  label="Referente asignado"
                   value={contact.leader_assigned}
                   onChange={(v) => setContact({ ...contact, leader_assigned: v })}
                   options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))}
-                  placeholder="Sin líder asignado"
+                  placeholder="Sin referente asignado"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notas</Label>
-                <Textarea id="notes" value={contact.notes || ''} onChange={(e) => setContact({ ...contact, notes: e.target.value || null })} rows={4} placeholder="Agrega notas importantes sobre este contacto..." />
               </div>
             </div>
 

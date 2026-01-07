@@ -78,7 +78,7 @@ const ChurchDatabasePage = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar contactos por nombre, correo, teléfono..."
+            placeholder={filterField ? `Filtrar por ${CONTACT_FIELDS.find(f => f.key === filterField)?.label}...` : "Buscar por nombre, correo, teléfono, referencia, etc."}
             className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -106,7 +106,7 @@ const ChurchDatabasePage = () => {
       </div>
 
       <div className="flex-grow">
-        <DynamicContactTable churchId={churchId} />
+        <DynamicContactTable churchId={churchId} searchTerm={searchTerm} filterField={filterField} />
       </div>
 
       <AddContactDialog
