@@ -32,14 +32,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // Validar usuario
+    // Validate user
     const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
     if (userErr || !userData?.user) {
       console.error("[update-contact] Invalid token", userErr)
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // Cargar perfil del caller
+    // Load caller profile
     const { data: callerProfile, error: callerErr } = await supabaseAdmin
       .from("profiles")
       .select("role, church_id")
@@ -57,7 +57,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // Verificar que el contacto pertenezca a la iglesia
+    // Verify contact belongs to the church
     const { data: targetContact, error: contactErr } = await supabaseAdmin
       .from("contacts")
       .select("id, church_id")
@@ -70,7 +70,15 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Contact not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // Sólo permitir columnas válidas en contacts
+    // Fetch before state
+    const { data: before } = await supabaseAdmin
+      .from("contacts")
+      .select("*")
+      .eq("id", contactId)
+      .eq("church_id", churchId)
+      .single()
+
+    // Sanitize incoming fields to only allow valid columns
     const allowedKeys = new Set([
       "first_name",
       "last_name",
@@ -81,7 +89,6 @@ serve(async (req) => {
       "barrio",
       "leader_assigned",
       "cell_id",
-      // NOTA: no existe updated_at ni notes en la tabla contacts
     ])
     const sanitized: Record<string, unknown> = {}
     for (const k in data) {
@@ -89,14 +96,6 @@ serve(async (req) => {
     }
 
     console.log("[update-contact] Updating contact with", sanitized)
-
-    -- fetch before
-    const { data: before } = await supabaseAdmin
-      .from("contacts")
-      .select("*")
-      .eq("id", contactId)
-      .eq("church_id", churchId)
-      .single();
 
     const { error: updateErr } = await supabaseAdmin
       .from("contacts")
@@ -109,26 +108,27 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: updateErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // fetch after
+    // Fetch after state
     const { data: after } = await supabaseAdmin
       .from("contacts")
       .select("*")
       .eq("id", contactId)
       .eq("church_id", churchId)
-      .single();
+      .single()
 
-    // log activity
+    // Log activity
     const { error: logErr } = await supabaseAdmin
       .from("activity_logs")
       .insert({
         user_id: userData.user.id,
         church_id: churchId,
-        action: 'update',
-        entity_type: 'contact',
+        action: "update",
+        entity_type: "contact",
         entity_id: contactId,
         before_data: before ?? null,
-        after_data: after ?? null
-      });
+        after_data: after ?? null,
+      })
+
     if (logErr) {
       console.error("[update-contact] Failed to write activity log", logErr)
     }
