@@ -2,15 +2,16 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { logger } from '@/utils/logger';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 
+// Interfaces
 interface Cell {
   id: string;
   name: string;
@@ -28,6 +29,84 @@ interface AddContactDialogProps {
   churchId: string;
 }
 
+// Componentes modulares
+const FormField = ({
+  label,
+  id,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+  disabled = false,
+  placeholder = ""
+}: {
+  label: string;
+  id: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  required?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+}) => (
+  <div className="space-y-2">
+    <label htmlFor={id} className="text-sm font-medium">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    <Input
+      id={id}
+      type={type}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      required={required}
+      placeholder={placeholder}
+    />
+  </div>
+);
+
+const SelectField = ({
+  label,
+  value,
+  onChange,
+  options,
+  loading,
+  placeholder,
+  disabled = false
+}: {
+  label: string;
+  value: string | null;
+  onChange: (value: string) => void;
+  options: Array<{ id: string; name: string }>;
+  loading: boolean;
+  placeholder: string;
+  disabled?: boolean;
+}) => (
+  <div className="space-y-2">
+    <label htmlFor={label.toLowerCase().replace(/\s/g, '-')} className="text-sm font-medium">
+      {label}
+    </label>
+    <Select
+      value={value || undefined}
+      onValueChange={onChange}
+      disabled={disabled || loading}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder={loading ? "Cargando..." : placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">Sin asignación</SelectItem>
+        {options.map((option) => (
+          <SelectItem key={option.id} value={option.id}>
+            {option.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);
+
+// Componente principal
 const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -39,7 +118,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [barrio, setBarrio] = useState('');
   const [leaderAssigned, setLeaderAssigned] = useState<string | null>(null);
   const [cellId, setCellId] = useState<string | null>(null);
-  
+
   const queryClient = useQueryClient();
   logger.log('AddContactDialog rendered', { open, churchId });
 
@@ -53,12 +132,12 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .select('id, name')
         .eq('church_id', churchId)
         .order('name', { ascending: true });
-      
+
       if (error) {
         logger.error('Error fetching cells', error);
         throw new Error('No se pudieron cargar las células.');
       }
-      
+
       logger.log('Cells fetched successfully', data);
       return data || [];
     },
@@ -76,12 +155,12 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .eq('church_id', churchId)
         .in('role', ['pastor', 'piloto', 'encargado_de_celula'])
         .order('first_name', { ascending: true });
-      
+
       if (error) {
         logger.error('Error fetching leaders', error);
         throw new Error('No se pudieron cargar los líderes.');
       }
-      
+
       logger.log('Leaders fetched successfully', data);
       return data || [];
     },
@@ -90,10 +169,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    logger.log('Form submitted', { 
-      firstName, lastName, email, phone, address, apartmentNumber, barrio, leaderAssigned, cellId, churchId 
+    logger.log('Form submitted', {
+      firstName, lastName, email, phone, address, apartmentNumber, barrio, leaderAssigned, cellId, churchId
     });
-    
+
     setLoading(true);
     try {
       logger.log('Attempting to insert contact...');
@@ -112,14 +191,14 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           church_id: churchId,
         })
         .select();
-      
+
       if (error) {
         logger.error('Supabase error:', error);
         showError(`Error: ${error.message}`);
       } else {
         logger.log('Contact inserted successfully:', data);
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
-        
+
         // Reset form
         setFirstName('');
         setLastName('');
@@ -130,7 +209,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         setBarrio('');
         setLeaderAssigned(null);
         setCellId(null);
-        
+
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
         onOpenChange(false);
       }
@@ -152,149 +231,92 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="firstName" className="text-sm font-medium">
-              Nombre *
-            </label>
-            <Input
-              id="firstName"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              disabled={loading}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="lastName" className="text-sm font-medium">
-              Apellido
-            </label>
-            <Input
-              id="lastName"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-              Correo Electrónico
-            </label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="phone" className="text-sm font-medium">
-              Teléfono
-            </label>
-            <Input
-              id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="address" className="text-sm font-medium">
-              Dirección
-            </label>
-            <Input
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="apartmentNumber" className="text-sm font-medium">
-              Número de Apartamento
-            </label>
-            <Input
-              id="apartmentNumber"
-              value={apartmentNumber}
-              onChange={(e) => setApartmentNumber(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="barrio" className="text-sm font-medium">
-              Barrio
-            </label>
-            <Input
-              id="barrio"
-              value={barrio}
-              onChange={(e) => setBarrio(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          
+          <FormField
+            label="Nombre"
+            id="firstName"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            disabled={loading}
+          />
+
+          <FormField
+            label="Apellido"
+            id="lastName"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            disabled={loading}
+          />
+
+          <FormField
+            label="Correo Electrónico"
+            id="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            disabled={loading}
+          />
+
+          <FormField
+            label="Teléfono"
+            id="phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={loading}
+          />
+
+          <FormField
+            label="Dirección"
+            id="address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            disabled={loading}
+          />
+
+          <FormField
+            label="Número de Apartamento"
+            id="apartmentNumber"
+            value={apartmentNumber}
+            onChange={(e) => setApartmentNumber(e.target.value)}
+            disabled={loading}
+          />
+
+          <FormField
+            label="Barrio"
+            id="barrio"
+            value={barrio}
+            onChange={(e) => setBarrio(e.target.value)}
+            disabled={loading}
+          />
+
           {/* Cell selector */}
-          <div className="space-y-2">
-            <label htmlFor="cellId" className="text-sm font-medium">
-              Célula
-            </label>
-            <Select
-              value={cellId || undefined}
-              onValueChange={(value) => setCellId(value === "none" ? null : value)}
-              disabled={loading || isLoadingCells}
-            >
-              <SelectTrigger>
-                <SelectValue 
-                  placeholder={isLoadingCells ? "Cargando células..." : "Selecciona una célula (opcional)"} 
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin célula asignada</SelectItem>
-                {cells?.map((cell) => (
-                  <SelectItem key={cell.id} value={cell.id}>
-                    {cell.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
+          <SelectField
+            label="Célula"
+            value={cellId}
+            onChange={(value) => setCellId(value === "none" ? null : value)}
+            options={cells || []}
+            loading={isLoadingCells}
+            placeholder="Selecciona una célula (opcional)"
+          />
+
           {/* Leader selector */}
-          <div className="space-y-2">
-            <label htmlFor="leaderAssigned" className="text-sm font-medium">
-              Líder Asignado
-            </label>
-            <Select
-              value={leaderAssigned || undefined}
-              onValueChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
-              disabled={loading || isLoadingLeaders}
-            >
-              <SelectTrigger>
-                <SelectValue 
-                  placeholder={isLoadingLeaders ? "Cargando líderes..." : "Selecciona un líder (opcional)"} 
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin líder asignado</SelectItem>
-                {leaders?.map((leader) => (
-                  <SelectItem key={leader.id} value={leader.id}>
-                    {leader.first_name} {leader.last_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
+          <SelectField
+            label="Líder Asignado"
+            value={leaderAssigned}
+            onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
+            options={leaders?.map(leader => ({
+              id: leader.id,
+              name: `${leader.first_name} ${leader.last_name}`
+            })) || []}
+            loading={isLoadingLeaders}
+            placeholder="Selecciona un líder (opcional)"
+          />
+
           <DialogFooter>
-            <Button 
-              type="button" 
-              variant="ghost" 
-              onClick={() => onOpenChange(false)} 
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
               disabled={loading}
             >
               Cancelar
