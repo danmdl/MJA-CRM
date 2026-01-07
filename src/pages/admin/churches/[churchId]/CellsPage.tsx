@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Skeleton } from '@/components/ui/skeleton';
 import { showError, showSuccess } from '@/utils/toast';
 import AddCellDialog from '@/components/admin/AddCellDialog';
+import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
 import ManageCellAttendeesDialog from '@/components/admin/ManageCellAttendeesDialog';
 
 interface CellRow {
@@ -69,6 +70,7 @@ const CellsPage = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editing, setEditing] = useState<CellRow | null>(null);
   const [attendeesFor, setAttendeesFor] = useState<string | null>(null);
+  const [detailsFor, setDetailsFor] = useState<string | null>(null);
 
   const { data: cells, isLoading, isError, error } = useQuery<CellRow[]>({
     queryKey: ['cells', churchId],
@@ -158,7 +160,15 @@ const CellsPage = () => {
                     </TableRow>
                   ) : rows.map(c => (
                     <TableRow key={c.id}>
-                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          className="hover:underline text-left"
+                          onClick={() => setDetailsFor(c.id)}
+                          title="Ver detalles de la célula"
+                        >
+                          {c.name}
+                        </button>
+                      </TableCell>
                       <TableCell>{c.leader_name || 'Sin referente'}</TableCell>
                       <TableCell><div className="flex items-center gap-2"><Users className="h-4 w-4" /> {c.attendee_count}</div></TableCell>
                       <TableCell>{c.address || '-'}</TableCell>
@@ -217,6 +227,15 @@ const CellsPage = () => {
         }}
         churchId={churchId!}
         cellId={attendeesFor || ''}
+      />
+
+      <CellDetailsDialog
+        open={!!detailsFor}
+        onOpenChange={(o) => {
+          if (!o) setDetailsFor(null);
+        }}
+        churchId={churchId!}
+        cellId={detailsFor}
       />
     </div>
   );
