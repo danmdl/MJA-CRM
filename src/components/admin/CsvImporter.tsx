@@ -228,7 +228,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       </CardContent>
       <CardFooter className="flex justify-end">
         <Button
-          type="button" {/* Added type="button" here */}
+          type="button"
           onClick={handleImportData}
           disabled={loading || !file || unmappedRequiredFields.length > 0}
         >
