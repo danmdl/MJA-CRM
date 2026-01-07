@@ -9,10 +9,11 @@ import { showError, showSuccess } from '@/utils/toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Trash2, Edit, GripVertical } from 'lucide-react';
+import { ChevronDown, Trash2, Edit, GripVertical, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CONTACT_FIELDS, ContactField } from '@/lib/contact-fields';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { logger } from '@/utils/logger';
 import ContactProfileDialog from './ContactProfileDialog';
 
@@ -120,14 +121,31 @@ const TableCellContent = ({
       }}
       title={(contact as any)[column.key] || undefined}
     >
-      {column.key === 'created_at' || column.key === 'last_contact_date' ? (
+      {column.key === 'created_at' ? (
         (contact as any)[column.key] ? formatCompactDate((contact as any)[column.key] as string) : '-'
+      ) : column.key === 'last_contact_date' ? (
+        (() => {
+          const val = (contact as any).last_contact_date as string | null | undefined;
+          if (!val) return '-';
+          const days = Math.floor((Date.now() - new Date(val).getTime()) / (1000 * 60 * 60 * 24));
+          const red = days >= 7;
+          return (
+            <span className={`inline-flex items-center gap-2 ${red ? 'text-red-600' : ''}`}>
+              <span className={`inline-block w-2 h-2 rounded-full ${red ? 'bg-red-600' : 'bg-muted-foreground/40'}`} />
+              {formatCompactDate(val)}
+            </span>
+          );
+        })()
       ) : column.key === 'cell.name' ? (
         contact.cell?.name || '-'
       ) : column.key === 'leader.first_name' ? (
-        contact.leader ? `${contact.leader.first_name} ${contact.leader.last_name}` : '-'
+        contact.leader ?
+          `${contact.leader.first_name} ${contact.leader.last_name}` :
+          '-'
+      ) : column.key === 'age' ? (
+        (contact as any).age ?? '-'
       ) : (
-        truncateText((contact as any)[column.key] as string)
+        truncateText(contact[column.key] as string)
       )}
     </TableCell>
   );
@@ -208,6 +226,15 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
+  const computeAge = (dob?: string | null) => {
+    if (!dob) return null;
+    const d = new Date(dob);
+    if (Number.isNaN(d.getTime())) return null;
+    const diff = Date.now() - d.getTime();
+    const ageDate = new Date(diff);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+  };
+
   const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
     let contactQuery = supabase
       .from('contacts')
@@ -228,16 +255,18 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
     const { data: leadersData, error: leadersError } = await supabase.from('profiles').select('id, first_name, last_name');
     if (leadersError) throw new Error('No se pudieron cargar los referentes.');
 
-    const processedData = (contactsData || []).map((c: any) => {
-      const cell = (cellsData || []).find((x: any) => x.id === c.cell_id) || null;
-      const leader = (leadersData || []).find((x: any) => x.id === c.leader_assigned) || null;
+    const processedData = contactsData?.map(contact => {
+      const cell = cellsData?.find(c => c.id === contact.cell_id) || null;
+      const leader = leadersData?.find(l => l.id === contact.leader_assigned) || null;
+      const age = computeAge(contact.date_of_birth || null);
       return {
-        ...c,
+        ...contact,
         cell,
         leader,
-        last_contact_date: c.latest_log?.[0]?.contact_date || null
-      } as Contact;
-    });
+        last_contact_date: contact.latest_log?.[0]?.contact_date || null,
+        age
+      };
+    }) || [];
 
     return processedData;
   };
@@ -389,6 +418,41 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
           </div>
         )}
         <div className="pt-14">
+          {/* Columns Picker */}
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="mb-2">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Columnas
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {extendedContactFields.map(field => (
+                  <DropdownMenuCheckboxItem
+                    key={field.key}
+                    checked={visibleColumns.some(vc => vc.key === field.key)}
+                    onCheckedChange={(checked) => {
+                      setVisibleColumns(prev => {
+                        if (checked) {
+                          // add at end if not present
+                          if (prev.some(p => p.key === field.key)) return prev;
+                          return [...prev, field];
+                        } else {
+                          // ensure at least 1 column remains
+                          const filtered = prev.filter(p => p.key !== field.key);
+                          return filtered.length > 0 ? filtered : prev;
+                        }
+                      });
+                    }}
+                  >
+                    {field.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           {/* Contacts Table */}
           <div className="overflow-x-auto border rounded-md">
             <Table>

@@ -89,6 +89,7 @@ serve(async (req) => {
       "barrio",
       "leader_assigned",
       "cell_id",
+      "date_of_birth",
     ])
     const sanitized: Record<string, unknown> = {}
     for (const k in data) {

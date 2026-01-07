@@ -33,6 +33,7 @@ interface Contact {
   created_at: string;
   church_id: string;
   cell_id: string | null;
+  date_of_birth?: string | null;
 }
 
 interface ContactLog {
@@ -77,6 +78,16 @@ const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
     <h2 className="text-xl font-bold">
       {contact.first_name} {contact.last_name || ''}
     </h2>
+    {contact.date_of_birth ? (
+      <div className="text-sm text-muted-foreground">
+        {(() => {
+          const d = new Date(contact.date_of_birth!);
+          const diff = Date.now() - d.getTime();
+          const age = Math.abs(new Date(diff).getUTCFullYear() - 1970);
+          return `Edad: ${Number.isFinite(age) ? age : '-'}`;
+        })()}
+      </div>
+    ) : null}
   </div>
 );
 
@@ -298,6 +309,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             barrio: contact.barrio,
             leader_assigned: contact.leader_assigned,
             cell_id: contact.cell_id,
+            date_of_birth: contact.date_of_birth || null,
           }
         }),
       });
@@ -377,6 +389,17 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
                 <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fecha-nacimiento">Fecha de nacimiento</Label>
+                  <Input
+                    id="fecha-nacimiento"
+                    type="date"
+                    value={contact.date_of_birth || ''}
+                    onChange={(e) => setContact({ ...contact, date_of_birth: e.target.value || null })}
+                  />
+                </div>
               </div>
               {/* Email se mueve debajo de Departamento/Barrio */}
               <ContactInfoField label="Correo Electrónico" value={contact.email || ''} onChange={(v) => setContact({ ...contact, email: v || null })} icon={Mail} type="email" />

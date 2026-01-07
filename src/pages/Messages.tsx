@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +25,7 @@ const Messages = () => {
   const [body, setBody] = useState('');
   const [inbox, setInbox] = useState<any[]>([]);
   const [outbox, setOutbox] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -45,9 +47,41 @@ const Messages = () => {
         .eq('sender_id', session?.user.id);
       setOutbox(data || []);
     };
+    const loadAlerts = async () => {
+      if (!profile?.church_id) return;
+      // Load contacts and last contact logs, then compute stale ones (≥ 7 days or never contacted)
+      const { data: contactsData } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, phone, church_id')
+        .eq('church_id', profile.church_id);
+      const { data: logsData } = await supabase
+        .from('contact_logs')
+        .select('contact_id, contact_date')
+        .in('contact_id', (contactsData || []).map((c: any) => c.id));
+      const latestMap: Record<string, string> = {};
+      (logsData || []).forEach((l: any) => {
+        const prev = latestMap[l.contact_id];
+        if (!prev || new Date(l.contact_date) > new Date(prev)) {
+          latestMap[l.contact_id] = l.contact_date;
+        }
+      });
+      const stale = (contactsData || []).filter((c: any) => {
+        const last = latestMap[c.id];
+        if (!last) return true;
+        const days = Math.floor((Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24));
+        return days >= 7;
+      }).map((c: any) => ({
+        id: c.id,
+        name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Sin nombre',
+        phone: c.phone || '',
+        lastContact: latestMap[c.id] || null
+      }));
+      setAlerts(stale);
+    };
     loadTeam();
     loadInbox();
     loadOutbox();
+    loadAlerts();
   }, [session?.user.id, profile?.church_id]);
 
   const filteredTeam = useMemo(() => {
@@ -106,7 +140,40 @@ const Messages = () => {
         <TabsList>
           <TabsTrigger value="inbox">Bandeja de entrada</TabsTrigger>
           <TabsTrigger value="outbox">Enviados</TabsTrigger>
+          <TabsTrigger value="alerts">Alertas</TabsTrigger>
         </TabsList>
+        <TabsContent value="alerts">
+          <div className="space-y-2">
+            {alerts.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No hay alertas.</div>
+            ) : alerts.map(a => {
+              const wa = (a.phone || '').replace(/[^\d]/g, '');
+              const days = a.lastContact ? Math.floor((Date.now() - new Date(a.lastContact).getTime()) / (1000 * 60 * 60 * 24)) : null;
+              return (
+                <div key={a.id} className="border rounded p-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{a.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {a.lastContact ? `Último contacto: ${new Date(a.lastContact).toLocaleDateString()}` : 'Sin contactos previos'}
+                      {days !== null && days >= 7 ? <Badge className="ml-2 bg-red-600 hover:bg-red-600">+7 días</Badge> : null}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={wa ? `https://wa.me/${wa}` : '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`text-xs px-2 py-1 rounded border ${wa ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
+                      onClick={(e) => { if (!wa) e.preventDefault(); }}
+                    >
+                      Enviar Whatsapp
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
         <TabsContent value="inbox">
           <div className="space-y-2">
             {inbox.map(m => (

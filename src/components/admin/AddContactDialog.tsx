@@ -114,6 +114,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [address, setAddress] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [barrio, setBarrio] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<string>('');
   const [leaderAssigned, setLeaderAssigned] = useState<string | null>(null);
   const [cellId, setCellId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -181,6 +182,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           leader_assigned: leaderAssigned,
           cell_id: cellId,
           church_id: churchId,
+          date_of_birth: dateOfBirth || null,
         });
       if (error) {
         showError(`Error: ${error.message}`);
@@ -193,6 +195,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         setAddress('');
         setApartmentNumber('');
         setBarrio('');
+        setDateOfBirth('');
         setLeaderAssigned(null);
         setCellId(null);
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
@@ -220,6 +223,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           <FormField label="Dirección" id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={loading} />
           <FormField label="Número de Apartamento" id="apartmentNumber" value={apartmentNumber} onChange={(e) => setApartmentNumber(e.target.value)} disabled={loading} />
           <FormField label="Barrio" id="barrio" value={barrio} onChange={(e) => setBarrio(e.target.value)} disabled={loading} />
+          <div className="space-y-2">
+            <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
+            <Input id="dob" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} disabled={loading} />
+          </div>
           <SelectField
             label="Célula"
             value={cellId}
