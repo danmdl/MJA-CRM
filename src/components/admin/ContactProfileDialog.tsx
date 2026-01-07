@@ -16,6 +16,7 @@ import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import DebugLeaders from './DebugLeaders';
 
 // Interfaces
 interface Contact {
@@ -313,6 +314,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     try {
       console.log(`[ContactProfileDialog] Fetching leaders and cells for churchId: ${churchId}`);
 
+      // Fetch all profiles for debugging
+      const { data: allProfiles, error: allProfilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role')
+        .eq('church_id', churchId);
+
+      console.log(`[ContactProfileDialog] All profiles for church:`, allProfiles, allProfilesError);
+
       // Fetch leaders (all roles that could be leaders)
       const { data: leadersData, error: leadersError } = await supabase
         .from('profiles')
@@ -452,6 +461,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         </DialogHeader>
         {contact && (
           <div className="space-y-6">
+            {/* Debug info */}
+            <DebugLeaders churchId={churchId} />
+            
             {/* Profile Picture Section */}
             <ProfilePictureSection contact={contact} />
 
