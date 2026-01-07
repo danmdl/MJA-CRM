@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table,
@@ -25,6 +25,7 @@ import { ChevronDown, Settings2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CONTACT_FIELDS, ContactField } from '@/lib/contact-fields';
 import { Checkbox } from '@/components/ui/checkbox';
+import { logger } from '@/utils/logger';
 
 interface Contact {
   id: string;
@@ -42,7 +43,8 @@ interface Contact {
 }
 
 const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
-  console.log(`[DynamicContactTable] fetchContacts called with churchId: ${churchId}`);
+  logger.log('[DynamicContactTable] fetchContacts called with churchId', churchId);
+  
   let query = supabase
     .from('contacts')
     .select('*')
@@ -50,18 +52,19 @@ const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
 
   if (churchId) {
     query = query.eq('church_id', churchId);
-    console.log(`[DynamicContactTable] Filtering contacts by church_id: ${churchId}`);
+    logger.log(`[DynamicContactTable] Filtering contacts by church_id: ${churchId}`);
   } else {
-    console.warn("[DynamicContactTable] No churchId provided to fetchContacts. Fetching all contacts (if RLS allows).");
+    logger.warn("[DynamicContactTable] No churchId provided to fetchContacts. Fetching all contacts (if RLS allows).");
   }
 
   const { data, error } = await query;
 
   if (error) {
-    console.error('[DynamicContactTable] Error fetching contacts:', error);
+    logger.error('[DynamicContactTable] Error fetching contacts', error);
     throw new Error('No se pudieron cargar los contactos.');
   }
-  console.log(`[DynamicContactTable] Successfully fetched ${data?.length || 0} contacts.`);
+  
+  logger.log(`[DynamicContactTable] Successfully fetched ${data?.length || 0} contacts.`);
   return data || [];
 };
 
@@ -70,6 +73,8 @@ interface DynamicContactTableProps {
 }
 
 const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
+  logger.log('[DynamicContactTable] Component rendered', { churchId });
+  
   const defaultVisibleColumns: ContactField[] = useMemo(() => [
     CONTACT_FIELDS.find(f => f.key === 'first_name')!,
     CONTACT_FIELDS.find(f => f.key === 'last_name')!,
@@ -92,28 +97,46 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
     enabled: !!churchId,
   });
 
+  // Log query results
+  useEffect(() => {
+    if (contacts) {
+      logger.log('[DynamicContactTable] Contacts data updated', { count: contacts.length });
+    }
+  }, [contacts]);
+
+  useEffect(() => {
+    if (isError) {
+      logger.error('[DynamicContactTable] Query error', error);
+    }
+  }, [isError, error]);
+
   const deleteContactMutation = useMutation({
     mutationFn: async (contactId: string) => {
+      logger.log('[DynamicContactTable] Deleting contact', { contactId });
       const { error } = await supabase
         .from('contacts')
         .delete()
         .eq('id', contactId);
 
       if (error) {
+        logger.error('[DynamicContactTable] Error deleting contact', error);
         throw new Error(error.message);
       }
     },
     onSuccess: () => {
+      logger.log('[DynamicContactTable] Contact deleted successfully');
       showSuccess('Contacto(s) eliminado(s) con éxito.');
       queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
       setSelectedContacts([]);
     },
-    onError: (err) => {
+    onError: (err: any) => {
+      logger.error('[DynamicContactTable] Error in delete mutation', err);
       showError(err.message || 'Error al eliminar el contacto.');
     },
   });
 
   const handleColumnChange = (columnIndex: number, newFieldKey: string) => {
+    logger.log('[DynamicContactTable] Changing column', { columnIndex, newFieldKey });
     const newField = CONTACT_FIELDS.find(f => f.key === newFieldKey);
     if (newField) {
       setVisibleColumns(prevColumns => {
@@ -125,6 +148,11 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   };
 
   const handleSelectAll = () => {
+    logger.log('[DynamicContactTable] Select all triggered', { 
+      selectedCount: selectedContacts.length, 
+      totalCount: contacts?.length 
+    });
+    
     if (selectedContacts.length === contacts?.length) {
       setSelectedContacts([]);
     } else {
@@ -133,6 +161,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   };
 
   const handleSelectContact = (contactId: string) => {
+    logger.log('[DynamicContactTable] Select contact', { contactId });
     setSelectedContacts(prev =>
       prev.includes(contactId)
         ? prev.filter(id => id !== contactId)
@@ -141,7 +170,12 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   };
 
   const handleDeleteSelected = () => {
-    if (selectedContacts.length === 0) return;
+    logger.log('[DynamicContactTable] Delete selected triggered', { count: selectedContacts.length });
+    if (selectedContacts.length === 0) {
+      logger.warn('[DynamicContactTable] No contacts selected for deletion');
+      return;
+    }
+    
     if (window.confirm(`¿Estás seguro de que deseas eliminar ${selectedContacts.length} contacto(s)?`)) {
       selectedContacts.forEach(contactId => {
         deleteContactMutation.mutate(contactId);
@@ -150,6 +184,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   };
 
   if (isLoading) {
+    logger.log('[DynamicContactTable] Loading contacts');
     return (
       <div className="space-y-2">
         <Skeleton className="h-10 w-full" />
@@ -160,7 +195,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   }
 
   if (isError) {
-    console.error("[DynamicContactTable] Query error object:", error);
+    logger.error("[DynamicContactTable] Error loading contacts", error);
     showError(error?.message || 'Error al cargar los contactos.');
     return <div className="text-red-500">Error: {error?.message || 'No se pudieron cargar los contactos.'}</div>;
   }

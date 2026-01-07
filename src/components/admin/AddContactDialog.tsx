@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
+import { logger } from '@/utils/logger';
 
 const addContactSchema = z.object({
   first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
@@ -68,6 +69,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
 
+  logger.log('AddContactDialog rendered', { open, churchId });
+
   const form = useForm<z.infer<typeof addContactSchema>>({
     resolver: zodResolver(addContactSchema),
     defaultValues: {
@@ -84,9 +87,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   });
 
   // Fetch cells for the current church
-  const { data: cells, isLoading: isLoadingCells } = useQuery<Cell[]>({
+  const { data: cells, isLoading: isLoadingCells, isError: isCellsError, error: cellsError } = useQuery<Cell[]>({
     queryKey: ['cells', churchId],
     queryFn: async () => {
+      logger.log('Fetching cells for church', { churchId });
       const { data, error } = await supabase
         .from('cells')
         .select('id, name')
@@ -94,18 +98,28 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .order('name', { ascending: true });
 
       if (error) {
-        console.error('Error fetching cells:', error);
+        logger.error('Error fetching cells', error);
         throw new Error('No se pudieron cargar las células.');
       }
+      
+      logger.log('Cells fetched successfully', data);
       return data || [];
     },
     enabled: !!churchId,
   });
 
+  // Log any errors in fetching cells
+  useEffect(() => {
+    if (isCellsError) {
+      logger.error('Error in cells query', cellsError);
+    }
+  }, [isCellsError, cellsError]);
+
   // Fetch leaders for the current church
-  const { data: leaders, isLoading: isLoadingLeaders } = useQuery<Leader[]>({
+  const { data: leaders, isLoading: isLoadingLeaders, isError: isLeadersError, error: leadersError } = useQuery<Leader[]>({
     queryKey: ['leaders', churchId],
     queryFn: async () => {
+      logger.log('Fetching leaders for church', { churchId });
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
@@ -114,39 +128,55 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .order('first_name', { ascending: true });
 
       if (error) {
-        console.error('Error fetching leaders:', error);
+        logger.error('Error fetching leaders', error);
         throw new Error('No se pudieron cargar los líderes.');
       }
+      
+      logger.log('Leaders fetched successfully', data);
       return data || [];
     },
     enabled: !!churchId,
   });
 
+  // Log any errors in fetching leaders
+  useEffect(() => {
+    if (isLeadersError) {
+      logger.error('Error in leaders query', leadersError);
+    }
+  }, [isLeadersError, leadersError]);
+
   const onSubmit = async (values: z.infer<typeof addContactSchema>) => {
+    logger.log('Submitting contact form', values);
     setLoading(true);
+    
     try {
+      const contactData = {
+        ...values,
+        church_id: churchId,
+        email: values.email || null,
+        cell_id: values.cell_id || null,
+        leader_assigned: values.leader_assigned || null,
+      };
+      
+      logger.log('Inserting contact data', contactData);
+      
       const { data, error } = await supabase
         .from('contacts')
-        .insert({
-          ...values,
-          church_id: churchId,
-          email: values.email || null,
-          cell_id: values.cell_id || null,
-          leader_assigned: values.leader_assigned || null,
-        })
+        .insert(contactData)
         .select();
 
       if (error) {
-        console.error('Error adding contact:', error);
+        logger.error('Error adding contact', error);
         showError(error.message || 'Error al añadir el contacto.');
       } else {
+        logger.log('Contact added successfully', data);
         showSuccess(`¡Contacto "${values.first_name}" añadido con éxito!`);
         form.reset();
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
         onOpenChange(false);
       }
     } catch (error: any) {
-      console.error('Error during add contact:', error);
+      logger.error('Error during add contact', error);
       showError(error.message || 'Error desconocido al añadir el contacto.');
     } finally {
       setLoading(false);
