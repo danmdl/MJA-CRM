@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import AddContactDialog from '@/components/admin/AddContactDialog'; // Import the new dialog
+import AddContactDialog from '@/components/admin/AddContactDialog';
 
 const ChurchDatabasePage = () => {
   const { churchId } = useParams<{ churchId: string }>();
@@ -52,11 +52,11 @@ const ChurchDatabasePage = () => {
                 tableName="contacts"
                 requiredFields={requiredContactFields}
                 optionalFields={optionalContactFields}
-                churchId={churchId} // Pass churchId to CsvImporter
+                churchId={churchId}
               />
             </DialogContent>
           </Dialog>
-          <Button onClick={() => setIsAddContactDialogOpen(true)}> {/* Open AddContactDialog */}
+          <Button onClick={() => setIsAddContactDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Contacto
           </Button>
         </div>
@@ -78,7 +78,7 @@ const ChurchDatabasePage = () => {
       </div>
 
       <div className="flex-grow">
-        <DynamicContactTable churchId={churchId} /> {/* Pass churchId to DynamicContactTable */}
+        <DynamicContactTable churchId={churchId} />
       </div>
 
       <AddContactDialog
