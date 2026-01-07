@@ -41,6 +41,7 @@ interface Contact {
   created_at: string;
   church_id: string;
   cell_id: string | null;
+  last_contact_date?: string | null;
 }
 
 const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
@@ -48,7 +49,10 @@ const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
   
   let query = supabase
     .from('contacts')
-    .select('*')
+    .select(`
+      *,
+      latest_log:contact_logs(contact_date)
+    `)
     .order('created_at', { ascending: false });
 
   if (churchId) {
@@ -65,8 +69,14 @@ const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
     throw new Error('No se pudieron cargar los contactos.');
   }
   
-  logger.log(`[DynamicContactTable] Successfully fetched ${data?.length || 0} contacts.`);
-  return data || [];
+  // Process data to extract last contact date
+  const processedData = data?.map(contact => ({
+    ...contact,
+    last_contact_date: contact.latest_log?.[0]?.contact_date || null
+  })) || [];
+  
+  logger.log(`[DynamicContactTable] Successfully fetched ${processedData.length} contacts.`);
+  return processedData;
 };
 
 interface DynamicContactTableProps {
@@ -76,17 +86,24 @@ interface DynamicContactTableProps {
 const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   logger.log('[DynamicContactTable] Component rendered', { churchId });
   
+  // Add last_contact_date to the fields
+  const extendedContactFields = useMemo(() => [
+    ...CONTACT_FIELDS,
+    { key: 'last_contact_date', label: 'Último Contacto', type: 'date' }
+  ], []);
+  
   const defaultVisibleColumns: ContactField[] = useMemo(() => [
-    CONTACT_FIELDS.find(f => f.key === 'first_name')!,
-    CONTACT_FIELDS.find(f => f.key === 'last_name')!,
-    CONTACT_FIELDS.find(f => f.key === 'email')!,
-    CONTACT_FIELDS.find(f => f.key === 'phone')!,
-    CONTACT_FIELDS.find(f => f.key === 'address')!,
-    CONTACT_FIELDS.find(f => f.key === 'apartment_number')!,
-    CONTACT_FIELDS.find(f => f.key === 'barrio')!,
-    CONTACT_FIELDS.find(f => f.key === 'leader_assigned')!,
-    CONTACT_FIELDS.find(f => f.key === 'created_at')!,
-  ].filter(Boolean), []);
+    extendedContactFields.find(f => f.key === 'first_name')!,
+    extendedContactFields.find(f => f.key === 'last_name')!,
+    extendedContactFields.find(f => f.key === 'email')!,
+    extendedContactFields.find(f => f.key === 'phone')!,
+    extendedContactFields.find(f => f.key === 'address')!,
+    extendedContactFields.find(f => f.key === 'apartment_number')!,
+    extendedContactFields.find(f => f.key === 'barrio')!,
+    extendedContactFields.find(f => f.key === 'leader_assigned')!,
+    extendedContactFields.find(f => f.key === 'last_contact_date')!,
+    extendedContactFields.find(f => f.key === 'created_at')!,
+  ].filter(Boolean), [extendedContactFields]);
 
   const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(defaultVisibleColumns);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -140,7 +157,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
 
   const handleColumnChange = (columnIndex: number, newFieldKey: string) => {
     logger.log('[DynamicContactTable] Changing column', { columnIndex, newFieldKey });
-    const newField = CONTACT_FIELDS.find(f => f.key === newFieldKey);
+    const newField = extendedContactFields.find(f => f.key === newFieldKey);
     if (newField) {
       setVisibleColumns(prevColumns => {
         const updatedColumns = [...prevColumns];
@@ -302,7 +319,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
-                  className={`cursor-move ${column.key === 'apartment_number' ? 'w-24' : ''}`}
+                  className={`cursor-move ${column.key === 'apartment_number' ? 'w-24' : ''} ${column.key === 'last_contact_date' ? 'w-32' : ''}`}
                 >
                   <div className="flex items-center gap-1">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -313,7 +330,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
-                        {CONTACT_FIELDS.map(field => (
+                        {extendedContactFields.map(field => (
                           <DropdownMenuItem
                             key={field.key}
                             onClick={() => handleColumnChange(index, field.key)}
@@ -353,8 +370,10 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
                       }}
                       title={contact[column.key] || undefined}
                     >
-                      {column.key === 'created_at' && contact[column.key]
-                        ? formatCompactDate(contact[column.key] as string)
+                      {column.key === 'created_at' || column.key === 'last_contact_date'
+                        ? contact[column.key] 
+                          ? formatCompactDate(contact[column.key] as string)
+                          : '-'
                         : truncateText(contact[column.key] as string)}
                     </TableCell>
                   ))}
