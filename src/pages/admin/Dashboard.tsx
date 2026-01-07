@@ -100,16 +100,6 @@ const AdminDashboard = () => {
           />
         </div>
       )}
-
-      <Card className="mt-6 flex-grow">
-        <CardHeader>
-          <CardTitle>¡Bienvenido, Admin!</CardTitle>
-          <CardDescription>Este es tu centro de control para gestionar la aplicación.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p>Desde aquí, puedes gestionar usuarios, ver analíticas y configurar ajustes. Usa la barra lateral para navegar por las diferentes secciones.</p>
-        </CardContent>
-      </Card>
     </div>
   );
 };
