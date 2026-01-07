@@ -21,11 +21,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Settings2, Trash2 } from 'lucide-react';
+import { ChevronDown, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CONTACT_FIELDS, ContactField } from '@/lib/contact-fields';
 import { Checkbox } from '@/components/ui/checkbox';
 import { logger } from '@/utils/logger';
+import ContactProfileDialog from './ContactProfileDialog';
 
 interface Contact {
   id: string;
@@ -89,6 +90,8 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
 
   const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(defaultVisibleColumns);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [profileContactId, setProfileContactId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: contacts, isLoading, isError, error } = useQuery<Contact[]>({
@@ -183,6 +186,17 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
     }
   };
 
+  const handleEditContact = (contactId: string) => {
+    logger.log('[DynamicContactTable] Edit contact triggered', { contactId });
+    setEditingContactId(contactId);
+    setProfileContactId(contactId);
+  };
+
+  const handleViewProfile = (contactId: string) => {
+    logger.log('[DynamicContactTable] View profile triggered', { contactId });
+    setProfileContactId(contactId);
+  };
+
   if (isLoading) {
     logger.log('[DynamicContactTable] Loading contacts');
     return (
@@ -201,109 +215,125 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   }
 
   return (
-    <div className="overflow-x-auto border rounded-md">
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            checked={selectedContacts.length > 0 && selectedContacts.length === contacts?.length}
-            indeterminate={selectedContacts.length > 0 && selectedContacts.length < contacts?.length}
-            onCheckedChange={handleSelectAll}
-          />
-          <span className="text-sm text-muted-foreground">
-            {selectedContacts.length} seleccionado(s)
-          </span>
+    <div className="space-y-4">
+      {/* Selection Toolbar */}
+      {selectedContacts.length > 0 && (
+        <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+          <div className="text-sm text-muted-foreground">
+            {selectedContacts.length} contacto(s) seleccionado(s)
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEditContact(selectedContacts[0])}
+              disabled={selectedContacts.length !== 1}
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteSelected}
+              disabled={deleteContactMutation.isPending}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar Seleccionados
+            </Button>
+          </div>
         </div>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleDeleteSelected}
-          disabled={selectedContacts.length === 0 || deleteContactMutation.isPending}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          Eliminar Seleccionados
-        </Button>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12">
-              <Checkbox
-                checked={selectedContacts.length > 0 && selectedContacts.length === contacts?.length}
-                indeterminate={selectedContacts.length > 0 && selectedContacts.length < contacts?.length}
-                onCheckedChange={handleSelectAll}
-              />
-            </TableHead>
-            {visibleColumns.map((column, index) => (
-              <TableHead key={column.key + index}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center gap-1 h-auto p-0 font-semibold text-foreground hover:text-primary">
-                      {column.label} <ChevronDown className="ml-1 h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {CONTACT_FIELDS.map(field => (
-                      <DropdownMenuItem
-                        key={field.key}
-                        onClick={() => handleColumnChange(index, field.key)}
-                        disabled={visibleColumns.some(vc => vc.key === field.key)}
-                      >
-                        {field.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+      )}
+
+      {/* Contacts Table */}
+      <div className="overflow-x-auto border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={selectedContacts.length > 0 && selectedContacts.length === contacts?.length}
+                  indeterminate={selectedContacts.length > 0 && selectedContacts.length < contacts?.length}
+                  onCheckedChange={handleSelectAll}
+                />
               </TableHead>
-            ))}
-            <TableHead className="w-12">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {contacts && contacts.length > 0 ? (
-            contacts.map((contact) => (
-              <TableRow key={contact.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedContacts.includes(contact.id)}
-                    onCheckedChange={() => handleSelectContact(contact.id)}
-                  />
-                </TableCell>
-                {visibleColumns.map((column) => (
-                  <TableCell key={column.key}>
-                    {column.type === 'date' && contact[column.key]
-                      ? format(new Date(contact[column.key] as string), "d 'de' MMMM, yyyy", { locale: es })
-                      : (contact[column.key] || '-')}
-                  </TableCell>
-                ))}
-                <TableCell>
+              {visibleColumns.map((column, index) => (
+                <TableHead key={column.key + index}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <Settings2 className="h-4 w-4" />
+                      <Button variant="ghost" className="flex items-center gap-1 h-auto p-0 font-semibold text-foreground hover:text-primary">
+                        {column.label} <ChevronDown className="ml-1 h-3 w-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => deleteContactMutation.mutate(contact.id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Eliminar
-                      </DropdownMenuItem>
+                    <DropdownMenuContent align="start">
+                      {CONTACT_FIELDS.map(field => (
+                        <DropdownMenuItem
+                          key={field.key}
+                          onClick={() => handleColumnChange(index, field.key)}
+                          disabled={visibleColumns.some(vc => vc.key === field.key)}
+                        >
+                          {field.label}
+                        </DropdownMenuItem>
+                      ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {contacts && contacts.length > 0 ? (
+              contacts.map((contact) => (
+                <TableRow 
+                  key={contact.id} 
+                  className={selectedContacts.includes(contact.id) ? "bg-muted" : ""}
+                >
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedContacts.includes(contact.id)}
+                      onCheckedChange={() => handleSelectContact(contact.id)}
+                    />
+                  </TableCell>
+                  {visibleColumns.map((column) => (
+                    <TableCell 
+                      key={column.key}
+                      className={column.key === 'first_name' || column.key === 'last_name' ? "cursor-pointer hover:underline" : ""}
+                      onClick={() => {
+                        if (column.key === 'first_name' || column.key === 'last_name') {
+                          handleViewProfile(contact.id);
+                        }
+                      }}
+                    >
+                      {column.type === 'date' && contact[column.key]
+                        ? format(new Date(contact[column.key] as string), "d 'de' MMMM, yyyy", { locale: es })
+                        : (contact[column.key] || '-')}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={visibleColumns.length + 1} className="text-center">
+                  No se encontraron contactos.
                 </TableCell>
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={visibleColumns.length + 2} className="text-center">
-                No se encontraron contactos.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Contact Profile Dialog */}
+      <ContactProfileDialog
+        open={!!profileContactId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProfileContactId(null);
+            setEditingContactId(null);
+          }
+        }}
+        contactId={profileContactId}
+        churchId={churchId || ''}
+      />
     </div>
   );
 };
