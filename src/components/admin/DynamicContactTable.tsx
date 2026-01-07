@@ -224,7 +224,7 @@ const DynamicContactTable = ({ churchId }: { churchId?: string }) => {
         *,
         latest_log:contact_logs(contact_date),
         cell:cells(name),
-        leader:profiles!contacts_leader_assigned_fkey(first_name, last_name)
+        leader:profiles!inner(id, first_name, last_name)
       `)
       .order('created_at', { ascending: false });
 
