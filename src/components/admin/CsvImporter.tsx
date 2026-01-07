@@ -145,18 +145,6 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     }
   };
 
-  const handleDownload = () => {
-    if (processedData) {
-      const blob = new Blob([processedData], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute('download', originalFileName);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
-
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>

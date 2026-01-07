@@ -11,6 +11,7 @@ interface UserProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  email: string | null; // ADDED: keep in sync with use-session.tsx
   role: UserRole;
   church_id: string | null;
 }
@@ -41,7 +42,11 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
           console.error('Error fetching profile:', error);
           setProfile(null);
         } else {
-          setProfile(profileData as UserProfile);
+          // Merge email from the auth session
+          setProfile({
+            ...profileData,
+            email: session.user.email ?? null,
+          } as UserProfile);
         }
       } else {
         setProfile(null);
