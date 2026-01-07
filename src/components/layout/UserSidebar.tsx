@@ -43,6 +43,7 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
             {!isCollapsed && <span className="text-sm">{item.label}</span>}
           </NavLink>
         ))}
+        <Link to="/messages" className="block rounded px-3 py-2 hover:bg-muted">Mensajes</Link>
       </nav>
       <SidebarFooter isCollapsed={isCollapsed} />
     </aside>

@@ -373,85 +373,91 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
 
   return (
     <div className="space-y-4">
-      {someVisibleSelected || allVisibleSelected ? (
-        <SelectionToolbar
-          selectedCount={visibleIds.filter(id => selectedContacts.includes(id)).length}
-          canEdit={visibleIds.filter(id => selectedContacts.includes(id)).length === 1}
-          onEdit={() => {
-            const only = visibleIds.find(id => selectedContacts.includes(id));
-            if (only) setProfileContactId(only);
-          }}
-          onDeleteSelected={() => handleDeleteSelected(visibleIds.filter(id => selectedContacts.includes(id)))}
-          isDeleting={deleteContactMutation.isPending as any}
-        />
-      ) : null}
-
-      <div className="overflow-x-auto border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allVisibleSelected}
-                  onCheckedChange={() => handleSelectAll(visibleIds)}
-                  aria-checked={someVisibleSelected ? 'mixed' : allVisibleSelected}
-                />
-              </TableHead>
-              {visibleColumns.map((column, index) => (
-                <TableHeaderCell
-                  key={column.key + index}
-                  column={column}
-                  index={index}
-                  visibleColumns={visibleColumns}
-                  extendedContactFields={extendedContactFields}
-                  handleDragStart={(e, i) => e.dataTransfer.setData("text/plain", i.toString())}
-                  handleDragOver={(e) => e.preventDefault()}
-                  handleDrop={(e, dropIndex) => {
-                    e.preventDefault();
-                    const dragIndex = parseInt(e.dataTransfer.getData("text/plain"));
-                    if (dragIndex !== dropIndex) {
-                      const newColumns = [...visibleColumns];
-                      const [dragged] = newColumns.splice(dragIndex, 1);
-                      newColumns.splice(dropIndex, 0, dragged);
-                      setVisibleColumns(newColumns);
-                    }
-                  }}
-                  handleColumnChange={handleColumnChange}
-                />
-              ))}
-              <TableHead className="w-40">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredContacts.length > 0 ? (
-              filteredContacts.map((contact) => (
-                <TableRow key={contact.id} className={selectedContacts.includes(contact.id) ? "bg-muted" : ""}>
-                  <TableCell className="align-top">
+      <div className="relative">
+        {(someVisibleSelected || allVisibleSelected) && (
+          <div className="absolute top-0 left-0 right-0 z-10">
+            <SelectionToolbar
+              selectedCount={visibleIds.filter(id => selectedContacts.includes(id)).length}
+              canEdit={visibleIds.filter(id => selectedContacts.includes(id)).length === 1}
+              onEdit={() => {
+                const only = visibleIds.find(id => selectedContacts.includes(id));
+                if (only) setProfileContactId(only);
+              }}
+              onDeleteSelected={() => handleDeleteSelected(visibleIds.filter(id => selectedContacts.includes(id)))}
+              isDeleting={deleteContactMutation.isPending as any}
+            />
+          </div>
+        )}
+        <div className="pt-14">
+          {/* Contacts Table */}
+          <div className="overflow-x-auto border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
                     <Checkbox
-                      checked={selectedContacts.includes(contact.id)}
-                      onCheckedChange={() => handleSelectContact(contact.id)}
+                      checked={allVisibleSelected}
+                      onCheckedChange={() => handleSelectAll(visibleIds)}
+                      aria-checked={someVisibleSelected ? 'mixed' : allVisibleSelected}
                     />
-                  </TableCell>
-                  {visibleColumns.map((column) => (
-                    <TableCellContent
-                      key={column.key}
-                      contact={contact}
+                  </TableHead>
+                  {visibleColumns.map((column, index) => (
+                    <TableHeaderCell
+                      key={column.key + index}
                       column={column}
-                      handleViewProfile={handleViewProfile}
+                      index={index}
+                      visibleColumns={visibleColumns}
+                      extendedContactFields={extendedContactFields}
+                      handleDragStart={(e, i) => e.dataTransfer.setData("text/plain", i.toString())}
+                      handleDragOver={(e) => e.preventDefault()}
+                      handleDrop={(e, dropIndex) => {
+                        e.preventDefault();
+                        const dragIndex = parseInt(e.dataTransfer.getData("text/plain"));
+                        if (dragIndex !== dropIndex) {
+                          const newColumns = [...visibleColumns];
+                          const [dragged] = newColumns.splice(dragIndex, 1);
+                          newColumns.splice(dropIndex, 0, dragged);
+                          setVisibleColumns(newColumns);
+                        }
+                      }}
+                      handleColumnChange={handleColumnChange}
                     />
                   ))}
-                  <TableCell>{renderActionsCell(contact)}</TableCell>
+                  <TableHead className="w-40">Acciones</TableHead>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={visibleColumns.length + 2} className="text-center">
-                  No se encontraron contactos.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredContacts.length > 0 ? (
+                  filteredContacts.map((contact) => (
+                    <TableRow key={contact.id} className={selectedContacts.includes(contact.id) ? "bg-muted" : ""}>
+                      <TableCell className="align-top">
+                        <Checkbox
+                          checked={selectedContacts.includes(contact.id)}
+                          onCheckedChange={() => handleSelectContact(contact.id)}
+                        />
+                      </TableCell>
+                      {visibleColumns.map((column) => (
+                        <TableCellContent
+                          key={column.key}
+                          contact={contact}
+                          column={column}
+                          handleViewProfile={handleViewProfile}
+                        />
+                      ))}
+                      <TableCell>{renderActionsCell(contact)}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={visibleColumns.length + 2} className="text-center">
+                      No se encontraron contactos.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
 
       <ContactProfileDialog

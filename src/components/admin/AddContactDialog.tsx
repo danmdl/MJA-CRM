@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import CountryPhoneInput from '@/components/CountryPhoneInput';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -215,7 +216,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           <FormField label="Nombre" id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={loading} />
           <FormField label="Apellido" id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} />
           <FormField label="Correo Electrónico" id="email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" disabled={loading} />
-          <FormField label="Teléfono" id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={loading} />
+          <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} />
           <FormField label="Dirección" id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={loading} />
           <FormField label="Número de Apartamento" id="apartmentNumber" value={apartmentNumber} onChange={(e) => setApartmentNumber(e.target.value)} disabled={loading} />
           <FormField label="Barrio" id="barrio" value={barrio} onChange={(e) => setBarrio(e.target.value)} disabled={loading} />

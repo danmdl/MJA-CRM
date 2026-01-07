@@ -24,6 +24,7 @@ import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
 import Profile from "./pages/Profile";
+import Messages from "./pages/Messages";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const AppRoutes = () => {
       <Route path="/" element={<PrivateRoute><UserLayout><Outlet /></UserLayout></PrivateRoute>}>
         <Route index element={<Index />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="messages" element={<Messages />} />
         {/* CSV Deduplicator is now accessible to all authenticated users */}
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
       </Route>

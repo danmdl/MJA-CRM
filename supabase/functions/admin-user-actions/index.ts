@@ -14,7 +14,7 @@ serve(async (req) => {
   let requestBody; 
   try {
     requestBody = await req.json(); 
-    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name } = requestBody;
+    const { action, email, userId, role, newRole, churchId, newPassword, password, first_name, last_name, phone } = requestBody;
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -168,10 +168,15 @@ serve(async (req) => {
         console.log(`[DEBUG EDGE] Filtered Auth users by profile IDs:`, filteredAuthUsers.map(u => u.id));
         // --- FIN MODIFICACIÓN ---
 
-        const churchUsers = filteredAuthUsers.map(user => { // Usar filteredAuthUsers aquí
-          // Find the profile from assignedProfiles
-          const userProfile = (assignedProfiles || []).find(p => p.id === user.id);
+        // Fetch extra roles
+        const { data: extraRoles } = await supabaseAdmin
+          .from('profiles_roles')
+          .select('user_id, role')
+          .in('user_id', profileIdsToFetch);
 
+        const churchUsers = filteredAuthUsers.map(user => {
+          const userProfile = (assignedProfiles || []).find(p => p.id === user.id);
+          const rolesArr = [userProfile?.role || 'user'].concat((extraRoles || []).filter(r => r.user_id === user.id).map(r => r.role));
           const status = user.confirmed_at ? 'confirmed' : (user.invited_at ? 'invited' : 'unknown');
           return {
             id: user.id,
@@ -179,11 +184,13 @@ serve(async (req) => {
             first_name: userProfile?.first_name || null,
             last_name: userProfile?.last_name || null,
             role: userProfile?.role || 'user',
+            roles: rolesArr,
             updated_at: userProfile?.updated_at || user.updated_at,
             status: status,
             invited_at: user.invited_at,
             confirmed_at: user.confirmed_at,
             church_id: userProfile?.church_id || null,
+            phone: userProfile?.phone || null,
           };
         });
         console.log(`[DEBUG EDGE] Final churchUsers array for churchId ${churchId}:`, churchUsers);
@@ -218,7 +225,8 @@ serve(async (req) => {
             first_name: first_name || null,
             last_name: last_name || null,
             role: role, 
-            church_id: churchId || null 
+            church_id: churchId || null,
+            phone: (requestBody && requestBody.phone) || null
           },
         });
 
@@ -290,7 +298,7 @@ serve(async (req) => {
 
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'user', church_id: churchId || null }
+          data: { role: role || 'user', church_id: churchId || null, first_name, last_name, phone }
         });
         if (error) {
           console.error(`Error ${action} user:`, error);
@@ -353,6 +361,38 @@ serve(async (req) => {
           });
         }
         return new Response(JSON.stringify({ message: 'User role updated successfully' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'updateUserRoles': {
+        if (!isAdminOrGeneral) {
+          return new Response('Forbidden: Only administrators or generals can update user roles.', { status: 403, headers: corsHeaders });
+        }
+        if (!userId || !Array.isArray(requestBody.roles)) {
+          return new Response(JSON.stringify({ error: 'User ID and roles[] are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // clear existing extra roles
+        await supabaseAdmin.from('profiles_roles').delete().eq('user_id', userId);
+
+        // ensure primary role remains set in profiles (first item if provided)
+        if (requestBody.roles.length > 0) {
+          const primary = requestBody.roles[0];
+          await supabaseAdmin.from('profiles').update({ role: primary }).eq('id', userId);
+        }
+
+        // add the rest as extra roles (skip duplicate of primary)
+        const extras = requestBody.roles.slice(1).map((r: any) => ({ user_id: userId, role: r }));
+        if (extras.length > 0) {
+          await supabaseAdmin.from('profiles_roles').insert(extras);
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

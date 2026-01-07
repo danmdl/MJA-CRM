@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import CountryPhoneInput from '@/components/CountryPhoneInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -154,6 +155,11 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div><label className="text-sm">Nombre</label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
+              <div><label className="text-sm">Apellido</label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+            </div>
+            <CountryPhoneInput label="Teléfono" value={phone} onChange={setPhone} />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancelar

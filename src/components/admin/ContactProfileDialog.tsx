@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Mail, Phone, MapPin, Home, Calendar, MessageSquare } from 'lucide-react';
+import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,6 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/hooks/use-session';
+import CountryPhoneInput from '@/components/CountryPhoneInput';
+import ContactLogDialog from './ContactLogDialog';
 
 interface Contact {
   id: string;
@@ -191,6 +193,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [newLog, setNewLog] = useState({ date: '', method: '', notes: '' });
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
+  const [logOpen, setLogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { session } = useSession();
 
@@ -369,7 +372,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
                 <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
               </div>
-              <ContactInfoField label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} icon={Phone} />
+              <CountryPhoneInput label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} />
               <ContactInfoField label="Dirección" value={contact.address || ''} onChange={(v) => setContact({ ...contact, address: v || null })} icon={MapPin} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
@@ -389,43 +392,17 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Historial de Contactos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3 p-3 bg-muted rounded-md">
-                  <h4 className="font-medium">Agregar Nuevo Registro</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <div>
-                      <Label htmlFor="logDate" className="text-xs">Fecha</Label>
-                      <Input id="logDate" type="date" value={newLog.date} onChange={(e) => setNewLog({ ...newLog, date: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label htmlFor="logMethod" className="text-xs">Método</Label>
-                      <Input id="logMethod" placeholder="Llamada, WhatsApp, etc." value={newLog.method} onChange={(e) => setNewLog({ ...newLog, method: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label htmlFor="logNotes" className="text-xs">Notas</Label>
-                      <Input id="logNotes" placeholder="Detalles del contacto" value={newLog.notes} onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })} />
-                    </div>
-                  </div>
-                  <Button size="sm" onClick={handleAddLog} disabled={!newLog.date}>
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Agregar Registro
-                  </Button>
-                </div>
-
-                {contactLogs.length > 0 ? (
-                  <ContactLogsTable logs={contactLogs} />
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">No hay registros de contacto aún.</div>
-                )}
-              </CardContent>
-            </Card>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setLogOpen(true)}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Ver historial de contacto
+              </Button>
+              <Button size="sm" onClick={() => setLogOpen(true)}>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Agregar registro
+              </Button>
+            </div>
+            <ContactLogDialog open={logOpen} onOpenChange={setLogOpen} churchId={churchId} contactId={contact.id} />
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>

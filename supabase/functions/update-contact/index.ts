@@ -90,6 +90,14 @@ serve(async (req) => {
 
     console.log("[update-contact] Updating contact with", sanitized)
 
+    -- fetch before
+    const { data: before } = await supabaseAdmin
+      .from("contacts")
+      .select("*")
+      .eq("id", contactId)
+      .eq("church_id", churchId)
+      .single();
+
     const { error: updateErr } = await supabaseAdmin
       .from("contacts")
       .update(sanitized)
@@ -99,6 +107,30 @@ serve(async (req) => {
     if (updateErr) {
       console.error("[update-contact] Update failed", updateErr)
       return new Response(JSON.stringify({ error: updateErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } })
+    }
+
+    // fetch after
+    const { data: after } = await supabaseAdmin
+      .from("contacts")
+      .select("*")
+      .eq("id", contactId)
+      .eq("church_id", churchId)
+      .single();
+
+    // log activity
+    const { error: logErr } = await supabaseAdmin
+      .from("activity_logs")
+      .insert({
+        user_id: userData.user.id,
+        church_id: churchId,
+        action: 'update',
+        entity_type: 'contact',
+        entity_id: contactId,
+        before_data: before ?? null,
+        after_data: after ?? null
+      });
+    if (logErr) {
+      console.error("[update-contact] Failed to write activity log", logErr)
     }
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } })

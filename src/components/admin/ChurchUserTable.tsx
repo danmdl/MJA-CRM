@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Copy, Send, Trash2, Key } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -192,6 +192,32 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     },
   });
 
+  const updateUserRolesMutation = useMutation({
+    mutationFn: async ({ userId, roles }: { userId: string; roles: UserRole[] }) => {
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action: 'updateUserRoles', userId, roles }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al actualizar los roles del usuario.');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      showSuccess('Roles actualizados con éxito.');
+      queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
+    },
+    onError: (err) => {
+      showError((err as any).message);
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -240,22 +266,26 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
               <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>
-                <Select
-                  value={user.role}
-                  onValueChange={(newRole: UserRole) => updateUserRoleMutation.mutate({ userId: user.id, newRole })}
-                  disabled={updateUserRoleMutation.isPending || user.id === session?.user.id}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Seleccionar rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assignableRoles.map((roleOption) => (
-                      <SelectItem key={roleOption} value={roleOption}>
-                        {roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap gap-2">
+                  {assignableRoles.map(roleOption => {
+                    const rolesArr = (user as any).roles || [user.role];
+                    const checked = rolesArr.includes(roleOption);
+                    return (
+                      <label key={roleOption} className="flex items-center gap-1 text-sm">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(val) => {
+                            const next = new Set(rolesArr);
+                            if (val) next.add(roleOption); else next.delete(roleOption);
+                            updateUserRolesMutation.mutate({ userId: user.id, roles: Array.from(next) as UserRole[] });
+                          }}
+                          disabled={user.id === session?.user.id}
+                        />
+                        <span>{roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g,' ')}</span>
+                      </label>
+                    )
+                  })}
+                </div>
               </TableCell>
               <TableCell>{getStatusBadge(user.status)}</TableCell>
               <TableCell>
