@@ -167,7 +167,7 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
         <TableHead className="w-32">Método</TableHead>
         <TableHead>Notas</TableHead>
         <TableHead className="w-32">Registrado por</TableHead>
-      </Row>
+      </TableRow>
     </TableHeader>
     <TableBody>
       {logs.map((log) => (
