@@ -6,13 +6,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { logger } from '@/utils/logger';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 
-// Interfaces
 interface Cell {
   id: string;
   name: string;
@@ -30,66 +28,65 @@ interface AddContactDialogProps {
   churchId: string;
 }
 
-// Componentes modulares
-const FormField = ({ 
-  label, 
-  id, 
-  value, 
-  onChange, 
-  type = "text", 
-  required = false, 
-  disabled = false, 
-  placeholder = "" 
-}: { 
-  label: string; 
-  id: string; 
-  value: string; 
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; 
-  type?: string; 
-  required?: boolean; 
-  disabled?: boolean; 
-  placeholder?: string; 
+const FormField = ({
+  label,
+  id,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+  disabled = false,
+  placeholder = ""
+}: {
+  label: string;
+  id: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  required?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
 }) => (
   <div className="space-y-2">
     <label htmlFor={id} className="text-sm font-medium">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
-    <Input 
-      id={id} 
-      type={type} 
-      value={value} 
-      onChange={onChange} 
-      disabled={disabled} 
-      required={required} 
-      placeholder={placeholder} 
+    <Input
+      id={id}
+      type={type}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      required={required}
+      placeholder={placeholder}
     />
   </div>
 );
 
-const SelectField = ({ 
-  label, 
-  value, 
-  onChange, 
-  options, 
-  loading, 
-  placeholder, 
-  disabled = false 
-}: { 
-  label: string; 
-  value: string | null; 
-  onChange: (value: string) => void; 
-  options: Array<{ id: string; name: string }>; 
-  loading: boolean; 
-  placeholder: string; 
-  disabled?: boolean; 
+const SelectField = ({
+  label,
+  value,
+  onChange,
+  options,
+  loading,
+  placeholder,
+  disabled = false
+}: {
+  label: string;
+  value: string | null;
+  onChange: (value: string) => void;
+  options: Array<{ id: string; name: string }>;
+  loading: boolean;
+  placeholder: string;
+  disabled?: boolean;
 }) => (
   <div className="space-y-2">
     <label htmlFor={label.toLowerCase().replace(/\s/g, '-')} className="text-sm font-medium">
       {label}
     </label>
-    <Select 
-      value={value || undefined} 
-      onValueChange={onChange} 
+    <Select
+      value={value || undefined}
+      onValueChange={onChange}
       disabled={disabled || loading}
     >
       <SelectTrigger>
@@ -107,7 +104,6 @@ const SelectField = ({
   </div>
 );
 
-// Componente principal
 const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -124,66 +120,57 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   logger.log('AddContactDialog rendered', { open, churchId });
 
-  // Fetch cells for the current church
   const { data: cells, isLoading: isLoadingCells } = useQuery<Cell[]>({
     queryKey: ['cells', churchId],
     queryFn: async () => {
-      logger.log('Fetching cells for church', { churchId });
       const { data, error } = await supabase
         .from('cells')
         .select('id, name')
         .eq('church_id', churchId)
         .order('name', { ascending: true });
-
-      if (error) {
-        logger.error('Error fetching cells', error);
-        throw new Error('No se pudieron cargar las células.');
-      }
-
-      logger.log('Cells fetched successfully', data);
+      if (error) throw new Error('No se pudieron cargar las células.');
       return data || [];
     },
     enabled: !!churchId,
+    staleTime: 60_000,
   });
 
-  // Fetch leaders for the current church via Edge Function (matches Equipo)
   const { data: leaders, isLoading: isLoadingLeaders } = useQuery<Leader[]>({
-    queryKey: ['leaders', churchId],
+    queryKey: ['leaders', churchId, !!session?.access_token],
     queryFn: async () => {
-      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
-      const resp = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
-        },
-        body: JSON.stringify({ action: 'listChurchUsers', churchId }),
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || 'No se pudieron cargar los líderes.');
+      // Prefer Edge Function (matches Equipo, bypasses RLS)
+      if (session?.access_token) {
+        const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+        const resp = await fetch(edgeFunctionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: 'listChurchUsers', churchId }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
+          return (data || [])
+            .filter((u: any) => leaderRoles.includes(u.role))
+            .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name })) as Leader[];
+        }
+        // If edge call fails, fall back to empty list instead of throwing
+        return [];
       }
-      const data = await resp.json();
-      const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
-      const mapped: Leader[] = (data || [])
-        .filter((u: any) => leaderRoles.includes(u.role))
-        .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name }));
-      return mapped;
+      // If no token available yet, return empty to avoid blocking UI
+      return [];
     },
-    enabled: !!churchId && !!session?.access_token,
+    enabled: !!churchId,
+    staleTime: 30_000,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    logger.log('Form submitted', { 
-      firstName, lastName, email, phone, address, 
-      apartmentNumber, barrio, leaderAssigned, cellId, churchId 
-    });
-    
     setLoading(true);
     try {
-      logger.log('Attempting to insert contact...');
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('contacts')
         .insert({
           first_name: firstName,
@@ -196,16 +183,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           leader_assigned: leaderAssigned,
           cell_id: cellId,
           church_id: churchId,
-        })
-        .select();
-
+        });
       if (error) {
-        logger.error('Supabase error:', error);
         showError(`Error: ${error.message}`);
       } else {
-        logger.log('Contact inserted successfully:', data);
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
-        // Reset form
         setFirstName('');
         setLastName('');
         setEmail('');
@@ -218,9 +200,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
         onOpenChange(false);
       }
-    } catch (error: any) {
-      logger.error('Unexpected error:', error);
-      showError(`Error inesperado: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -236,88 +215,34 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField 
-            label="Nombre" 
-            id="firstName" 
-            value={firstName} 
-            onChange={(e) => setFirstName(e.target.value)} 
-            required 
-            disabled={loading} 
+          <FormField label="Nombre" id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={loading} />
+          <FormField label="Apellido" id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} />
+          <FormField label="Correo Electrónico" id="email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" disabled={loading} />
+          <FormField label="Teléfono" id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={loading} />
+          <FormField label="Dirección" id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={loading} />
+          <FormField label="Número de Apartamento" id="apartmentNumber" value={apartmentNumber} onChange={(e) => setApartmentNumber(e.target.value)} disabled={loading} />
+          <FormField label="Barrio" id="barrio" value={barrio} onChange={(e) => setBarrio(e.target.value)} disabled={loading} />
+          <SelectField
+            label="Célula"
+            value={cellId}
+            onChange={(value) => setCellId(value === "none" ? null : value)}
+            options={cells || []}
+            loading={isLoadingCells}
+            placeholder="Selecciona una célula (opcional)"
           />
-          <FormField 
-            label="Apellido" 
-            id="lastName" 
-            value={lastName} 
-            onChange={(e) => setLastName(e.target.value)} 
-            disabled={loading} 
-          />
-          <FormField 
-            label="Correo Electrónico" 
-            id="email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            type="email" 
-            disabled={loading} 
-          />
-          <FormField 
-            label="Teléfono" 
-            id="phone" 
-            value={phone} 
-            onChange={(e) => setPhone(e.target.value)} 
-            disabled={loading} 
-          />
-          <FormField 
-            label="Dirección" 
-            id="address" 
-            value={address} 
-            onChange={(e) => setAddress(e.target.value)} 
-            disabled={loading} 
-          />
-          <FormField 
-            label="Número de Apartamento" 
-            id="apartmentNumber" 
-            value={apartmentNumber} 
-            onChange={(e) => setApartmentNumber(e.target.value)} 
-            disabled={loading} 
-          />
-          <FormField 
-            label="Barrio" 
-            id="barrio" 
-            value={barrio} 
-            onChange={(e) => setBarrio(e.target.value)} 
-            disabled={loading} 
-          />
-          
-          {/* Cell selector */}
-          <SelectField 
-            label="Célula" 
-            value={cellId} 
-            onChange={(value) => setCellId(value === "none" ? null : value)} 
-            options={cells || []} 
-            loading={isLoadingCells} 
-            placeholder="Selecciona una célula (opcional)" 
-          />
-          
-          {/* Leader selector */}
-          <SelectField 
-            label="Líder Asignado" 
-            value={leaderAssigned} 
-            onChange={(value) => setLeaderAssigned(value === "none" ? null : value)} 
-            options={(leaders || []).map(leader => ({ 
-              id: leader.id, 
+          <SelectField
+            label="Líder Asignado"
+            value={leaderAssigned}
+            onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
+            options={(leaders || []).map(leader => ({
+              id: leader.id,
               name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
-            }))} 
-            loading={isLoadingLeaders} 
-            placeholder="Selecciona un líder (opcional)" 
+            }))}
+            loading={isLoadingLeaders}
+            placeholder="Selecciona un líder (opcional)"
           />
-          
           <DialogFooter>
-            <Button 
-              type="button" 
-              variant="ghost" 
-              onClick={() => onOpenChange(false)} 
-              disabled={loading}
-            >
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>

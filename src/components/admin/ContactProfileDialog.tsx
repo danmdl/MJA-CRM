@@ -80,68 +80,68 @@ const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
   </div>
 );
 
-const ContactInfoField = ({ 
-  label, 
-  value, 
-  onChange, 
-  icon: Icon, 
-  type = "text", 
-  placeholder = "" 
-}: { 
-  label: string; 
-  value: string; 
-  onChange: (value: string) => void; 
-  icon?: React.ComponentType<{ className: string }>; 
-  type?: string; 
-  placeholder?: string; 
+const ContactInfoField = ({
+  label,
+  value,
+  onChange,
+  icon: Icon,
+  type = "text",
+  placeholder = ""
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  icon?: React.ComponentType<{ className: string }>;
+  type?: string;
+  placeholder?: string;
 }) => (
   <div className="space-y-2">
     <Label htmlFor={label.toLowerCase().replace(/\s/g, '-')}>{label}</Label>
     {Icon && (
       <div className="relative">
         <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input 
-          id={label.toLowerCase().replace(/\s/g, '-')} 
-          type={type} 
-          className="pl-10" 
-          value={value} 
-          onChange={(e) => onChange(e.target.value)} 
-          placeholder={placeholder} 
+        <Input
+          id={label.toLowerCase().replace(/\s/g, '-')}
+          type={type}
+          className="pl-10"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
         />
       </div>
     )}
     {!Icon && (
-      <Input 
-        id={label.toLowerCase().replace(/\s/g, '-')} 
-        type={type} 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
-        placeholder={placeholder} 
+      <Input
+        id={label.toLowerCase().replace(/\s/g, '-')}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
       />
     )}
   </div>
 );
 
-const SelectField = ({ 
-  label, 
-  value, 
-  onChange, 
-  options, 
-  placeholder, 
-  disabled = false 
-}: { 
-  label: string; 
-  value: string | null; 
-  onChange: (value: string | null) => void; 
-  options: Array<{ id: string; name: string }>; 
-  placeholder: string; 
-  disabled?: boolean; 
+const SelectField = ({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false
+}: {
+  label: string;
+  value: string | null;
+  onChange: (value: string | null) => void;
+  options: Array<{ id: string; name: string }>;
+  placeholder: string;
+  disabled?: boolean;
 }) => (
   <div className="space-y-2">
     <Label htmlFor={label.toLowerCase().replace(/\s/g, '-')}>{label}</Label>
-    <Select 
-      value={value || undefined} 
-      onValueChange={(value) => onChange(value === "none" ? null : value)} 
+    <Select
+      value={value || undefined}
+      onValueChange={(v) => onChange(v === 'none' ? null : v)}
       disabled={disabled}
     >
       <SelectTrigger>
@@ -167,7 +167,7 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
         <TableHead className="w-32">Método</TableHead>
         <TableHead>Notas</TableHead>
         <TableHead className="w-32">Registrado por</TableHead>
-      </TableRow>
+      </Row>
     </TableHeader>
     <TableBody>
       {logs.map((log) => (
@@ -199,7 +199,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   useEffect(() => {
     if (open && contactId) {
-      console.log(`[ContactProfileDialog] Opening dialog for contactId: ${contactId}, churchId: ${churchId}`);
       fetchContactDetails();
       fetchContactLogs();
       fetchLeadersAndCells();
@@ -208,181 +207,133 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const fetchContactDetails = async () => {
     setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('id', contactId)
-        .eq('church_id', churchId)
-        .single();
-
-      if (error) {
-        logger.error('Error fetching contact details', error);
-        showError('Error al cargar los detalles del contacto.');
-      } else {
-        setContact(data);
-      }
-    } catch (error: any) {
-      logger.error('Unexpected error fetching contact', error);
-      showError('Error inesperado al cargar el contacto.');
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('id', contactId)
+      .eq('church_id', churchId)
+      .single();
+    if (!error) setContact(data as unknown as Contact);
+    setLoading(false);
   };
 
   const fetchContactLogs = async () => {
     if (!contactId) return;
-    try {
-      const { data, error } = await supabase
-        .from('contact_logs')
-        .select(`
-          *,
-          contacted_by_profile:profiles(first_name, last_name)
-        `)
-        .eq('contact_id', contactId)
-        .order('contact_date', { ascending: false });
-
-      if (error) {
-        logger.error('Error fetching contact logs', error);
-        showError('Error al cargar el historial de contactos.');
-      } else {
-        const logs = data.map(log => ({
-          ...log,
-          contacted_by_name: log.contacted_by_profile ? 
-            `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}` : 
-            'Desconocido'
-        }));
-        setContactLogs(logs);
-      }
-    } catch (error: any) {
-      logger.error('Unexpected error fetching contact logs', error);
-      showError('Error inesperado al cargar el historial de contactos.');
+    const { data, error } = await supabase
+      .from('contact_logs')
+      .select(`
+        *,
+        contacted_by_profile:profiles(first_name, last_name)
+      `)
+      .eq('contact_id', contactId)
+      .order('contact_date', { ascending: false });
+    if (!error) {
+      const logs = (data || []).map((log: any) => ({
+        ...log,
+        contacted_by_name: log.contacted_by_profile
+          ? `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}`
+          : 'Desconocido'
+      }));
+      setContactLogs(logs);
     }
   };
 
   const fetchLeadersAndCells = async () => {
+    // Leaders via Edge Function (safe), fall back gracefully
     try {
-      console.log(`[ContactProfileDialog] Fetching leaders and cells for churchId: ${churchId}`);
-
-      // Leaders via Edge Function to avoid RLS issues and match Equipo
-      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
-      const resp = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
-        },
-        body: JSON.stringify({ action: 'listChurchUsers', churchId }),
-      });
-
-      if (resp.ok) {
-        const data = await resp.json();
-        const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
-        const mapped: Leader[] = (data || [])
-          .filter((u: any) => leaderRoles.includes(u.role))
-          .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name }));
-        setLeaders(mapped);
+      if (session?.access_token) {
+        const resp = await fetch(`https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: 'listChurchUsers', churchId }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
+          const mapped: Leader[] = (data || [])
+            .filter((u: any) => leaderRoles.includes(u.role))
+            .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name }));
+          setLeaders(mapped);
+        } else {
+          setLeaders([]); // do not throw
+        }
       } else {
-        const err = await resp.json().catch(() => ({}));
-        logger.error('Error fetching leaders from edge function', err);
+        setLeaders([]);
       }
-
-      // Cells with normal client (RLS allows for same-church roles)
-      const { data: cellsData, error: cellsError } = await supabase
-        .from('cells')
-        .select('id, name')
-        .eq('church_id', churchId)
-        .order('name', { ascending: true });
-
-      if (cellsError) {
-        logger.error('Error fetching cells', cellsError);
-      } else {
-        setCells(cellsData || []);
-      }
-    } catch (error: any) {
-      logger.error('Unexpected error fetching leaders and cells', error);
+    } catch {
+      setLeaders([]); // swallow error, keep UI alive
     }
+
+    // Cells
+    const { data: cellsData } = await supabase
+      .from('cells')
+      .select('id, name')
+      .eq('church_id', churchId)
+      .order('name', { ascending: true });
+    setCells(cellsData || []);
   };
 
   const handleSave = async () => {
     if (!contact) return;
     setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({
-          first_name: contact.first_name,
-          last_name: contact.last_name,
-          email: contact.email,
-          phone: contact.phone,
-          address: contact.address,
-          apartment_number: contact.apartment_number,
-          barrio: contact.barrio,
-          leader_assigned: contact.leader_assigned,
-          cell_id: contact.cell_id,
-          notes: contact.notes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', contact.id)
-        .eq('church_id', churchId);
-
-      if (error) {
-        logger.error('Error updating contact', error);
-        showError('Error al actualizar el contacto.');
-      } else {
-        showSuccess('Contacto actualizado con éxito.');
-        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-        onOpenChange(false);
-      }
-    } catch (error: any) {
-      logger.error('Unexpected error updating contact', error);
-      showError('Error inesperado al actualizar el contacto.');
-    } finally {
-      setSaving(false);
+    const { error } = await supabase
+      .from('contacts')
+      .update({
+        first_name: contact.first_name,
+        last_name: contact.last_name,
+        email: contact.email,
+        phone: contact.phone,
+        address: contact.address,
+        apartment_number: contact.apartment_number,
+        barrio: contact.barrio,
+        leader_assigned: contact.leader_assigned,
+        cell_id: contact.cell_id,
+        notes: contact.notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', contact.id)
+      .eq('church_id', churchId);
+    if (!error) {
+      showSuccess('Contacto actualizado con éxito.');
+      queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+      onOpenChange(false);
+    } else {
+      showError('Error al actualizar el contacto.');
     }
+    setSaving(false);
   };
 
   const handleAddLog = async () => {
     if (!contactId || !newLog.date) return;
-    try {
-      const { data, error } = await supabase
-        .from('contact_logs')
-        .insert({
-          contact_id: contactId,
-          contacted_by: (await supabase.auth.getUser()).data.user?.id,
-          contact_date: newLog.date,
-          contact_method: newLog.method,
-          notes: newLog.notes,
-        })
-        .select(`
-          *,
-          contacted_by_profile:profiles(first_name, last_name)
-        `)
-        .single();
-
-      if (error) {
-        logger.error('Error adding contact log', error);
-        showError('Error al agregar el registro de contacto.');
-      } else {
-        const logWithContactedByName = {
-          ...data,
-          contacted_by_name: data.contacted_by_profile ? 
-            `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}` : 
-            'Desconocido'
-        };
-        setContactLogs([logWithContactedByName, ...contactLogs]);
-        setNewLog({ date: '', method: '', notes: '' });
-        showSuccess('Registro de contacto agregado con éxito.');
-      }
-    } catch (error: any) {
-      logger.error('Unexpected error adding contact log', error);
-      showError('Error inesperado al agregar el registro de contacto.');
-    }
-  };
-
-  const handleChange = (field: keyof Contact, value: string | null) => {
-    if (contact) {
-      setContact({ ...contact, [field]: value });
+    const { data, error } = await supabase
+      .from('contact_logs')
+      .insert({
+        contact_id: contactId,
+        contacted_by: (await supabase.auth.getUser()).data.user?.id,
+        contact_date: newLog.date,
+        contact_method: newLog.method,
+        notes: newLog.notes,
+      })
+      .select(`
+        *,
+        contacted_by_profile:profiles(first_name, last_name)
+      `)
+      .single();
+    if (!error && data) {
+      const logWithContactedByName = {
+        ...data,
+        contacted_by_name: data.contacted_by_profile
+          ? `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}`
+          : 'Desconocido'
+      };
+      setContactLogs([logWithContactedByName, ...contactLogs]);
+      setNewLog({ date: '', method: '', notes: '' });
+      showSuccess('Registro de contacto agregado con éxito.');
+    } else {
+      showError('Error al agregar el registro de contacto.');
     }
   };
 
@@ -411,77 +362,29 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ContactInfoField 
-                  label="Nombre" 
-                  value={contact.first_name} 
-                  onChange={(value) => handleChange('first_name', value)} 
-                />
-                <ContactInfoField 
-                  label="Apellido" 
-                  value={contact.last_name || ''} 
-                  onChange={(value) => handleChange('last_name', value || null)} 
-                />
+                <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
+                <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
               </div>
-              <ContactInfoField 
-                label="Correo Electrónico" 
-                value={contact.email || ''} 
-                onChange={(value) => handleChange('email', value || null)} 
-                icon={Mail} 
-                type="email" 
-              />
-              <ContactInfoField 
-                label="Teléfono" 
-                value={contact.phone || ''} 
-                onChange={(value) => handleChange('phone', value || null)} 
-                icon={Phone} 
-              />
-              <ContactInfoField 
-                label="Dirección" 
-                value={contact.address || ''} 
-                onChange={(value) => handleChange('address', value || null)} 
-                icon={MapPin} 
-              />
+              <ContactInfoField label="Correo Electrónico" value={contact.email || ''} onChange={(v) => setContact({ ...contact, email: v || null })} icon={Mail} type="email" />
+              <ContactInfoField label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} icon={Phone} />
+              <ContactInfoField label="Dirección" value={contact.address || ''} onChange={(v) => setContact({ ...contact, address: v || null })} icon={MapPin} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ContactInfoField 
-                  label="Número de Apartamento" 
-                  value={contact.apartment_number || ''} 
-                  onChange={(value) => handleChange('apartment_number', value || null)} 
-                  icon={Home} 
-                />
-                <ContactInfoField 
-                  label="Barrio" 
-                  value={contact.barrio || ''} 
-                  onChange={(value) => handleChange('barrio', value || null)} 
-                />
+                <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
+                <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <SelectField 
-                  label="Célula" 
-                  value={contact.cell_id} 
-                  onChange={(value) => handleChange('cell_id', value)} 
-                  options={cells} 
-                  placeholder="Sin célula asignada" 
-                />
-                <SelectField 
-                  label="Líder Asignado" 
-                  value={contact.leader_assigned} 
-                  onChange={(value) => handleChange('leader_assigned', value)} 
-                  options={leaders.map(leader => ({ 
-                    id: leader.id, 
-                    name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
-                  }))} 
-                  placeholder="Sin líder asignado" 
+                <SelectField label="Célula" value={contact.cell_id} onChange={(v) => setContact({ ...contact, cell_id: v })} options={cells} placeholder="Sin célula asignada" />
+                <SelectField
+                  label="Líder Asignado"
+                  value={contact.leader_assigned}
+                  onChange={(v) => setContact({ ...contact, leader_assigned: v })}
+                  options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))}
+                  placeholder="Sin líder asignado"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="notes">Notas</Label>
-                <Textarea 
-                  id="notes" 
-                  value={contact.notes || ''} 
-                  onChange={(e) => handleChange('notes', e.target.value || null)} 
-                  rows={4} 
-                  placeholder="Agrega notas importantes sobre este contacto..." 
-                />
+                <Textarea id="notes" value={contact.notes || ''} onChange={(e) => setContact({ ...contact, notes: e.target.value || null })} rows={4} placeholder="Agrega notas importantes sobre este contacto..." />
               </div>
             </div>
 
@@ -498,35 +401,18 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <Label htmlFor="logDate" className="text-xs">Fecha</Label>
-                      <Input 
-                        id="logDate" 
-                        type="date" 
-                        value={newLog.date} 
-                        onChange={(e) => setNewLog({ ...newLog, date: e.target.value })} 
-                      />
+                      <Input id="logDate" type="date" value={newLog.date} onChange={(e) => setNewLog({ ...newLog, date: e.target.value })} />
                     </div>
                     <div>
                       <Label htmlFor="logMethod" className="text-xs">Método</Label>
-                      <Input 
-                        id="logMethod" 
-                        placeholder="Llamada, WhatsApp, etc." 
-                        value={newLog.method} 
-                        onChange={(e) => setNewLog({ ...newLog, method: e.target.value })} 
-                      />
+                      <Input id="logMethod" placeholder="Llamada, WhatsApp, etc." value={newLog.method} onChange={(e) => setNewLog({ ...newLog, method: e.target.value })} />
                     </div>
                     <div>
                       <Label htmlFor="logNotes" className="text-xs">Notas</Label>
-                      <Input 
-                        id="logNotes" 
-                        placeholder="Detalles del contacto" 
-                        value={newLog.notes} 
-                        onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })} 
-                      />
+                      <Input id="logNotes" placeholder="Detalles del contacto" value={newLog.notes} onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })} />
                     </div>
                   </div>
-                  <Button size="sm" onClick={async () => {
-                    await handleAddLog();
-                  }} disabled={!newLog.date}>
+                  <Button size="sm" onClick={handleAddLog} disabled={!newLog.date}>
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Agregar Registro
                   </Button>
@@ -535,24 +421,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 {contactLogs.length > 0 ? (
                   <ContactLogsTable logs={contactLogs} />
                 ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    No hay registros de contacto aún.
-                  </div>
+                  <div className="text-center py-4 text-muted-foreground">No hay registros de contacto aún.</div>
                 )}
               </CardContent>
             </Card>
 
             <div className="flex justify-end space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => onOpenChange(false)} 
-                disabled={saving}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar Cambios'}
-              </Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+              <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>
             </div>
           </div>
         )}
