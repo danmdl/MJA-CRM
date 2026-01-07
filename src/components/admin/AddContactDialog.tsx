@@ -1,9 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,44 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { CONTACT_FIELDS } from '@/lib/contact-fields';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useQuery } from '@tanstack/react-query';
-
-const addContactSchema = z.object({
-  first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
-  last_name: z.string().optional(),
-  email: z.string().email({ message: 'Introduce un correo válido.' }).optional().or(z.literal('')),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  apartment_number: z.string().optional(),
-  barrio: z.string().optional(),
-  leader_assigned: z.string().optional(),
-  cell_id: z.string().optional(),
-});
-
-interface Cell {
-  id: string;
-  name: string;
-}
 
 interface AddContactDialogProps {
   open: boolean;
@@ -60,52 +23,25 @@ interface AddContactDialogProps {
 
 const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const queryClient = useQueryClient();
 
-  const form = useForm<z.infer<typeof addContactSchema>>({
-    resolver: zodResolver(addContactSchema),
-    defaultValues: {
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      address: '',
-      apartment_number: '',
-      barrio: '',
-      leader_assigned: '',
-      cell_id: '',
-    },
-  });
-
-  // Fetch cells for the current church
-  const { data: cells, isLoading: isLoadingCells } = useQuery<Cell[]>({
-    queryKey: ['cells', churchId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('cells')
-        .select('id, name')
-        .eq('church_id', churchId)
-        .order('name', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching cells:', error);
-        throw new Error('No se pudieron cargar las células.');
-      }
-      return data || [];
-    },
-    enabled: !!churchId,
-  });
-
-  const onSubmit = async (values: z.infer<typeof addContactSchema>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+    
     try {
       const { data, error } = await supabase
         .from('contacts')
         .insert({
-          ...values,
+          first_name: firstName,
+          last_name: lastName || null,
+          email: email || null,
+          phone: phone || null,
           church_id: churchId,
-          email: values.email || null,
-          cell_id: values.cell_id || null,
         })
         .select();
 
@@ -113,8 +49,12 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         console.error('Error adding contact:', error);
         showError(error.message || 'Error al añadir el contacto.');
       } else {
-        showSuccess(`¡Contacto "${values.first_name}" añadido con éxito!`);
-        form.reset();
+        showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
+        // Reset form
+        setFirstName('');
+        setLastName('');
+        setEmail('');
+        setPhone('');
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
         onOpenChange(false);
       }
@@ -135,72 +75,58 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             Introduce los detalles del nuevo contacto para esta iglesia.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {CONTACT_FIELDS.filter(field => field.key !== 'created_at').map(field => (
-              <FormField
-                key={field.key}
-                control={form.control}
-                name={field.key as keyof z.infer<typeof addContactSchema>}
-                render={({ field: formField }) => (
-                  <FormItem>
-                    <FormLabel>{field.label}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type={field.type === 'email' ? 'email' : 'text'}
-                        placeholder={field.label}
-                        {...formField}
-                        value={formField.value || ''}
-                        disabled={loading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ))}
-
-            {/* Cell selector */}
-            <FormField
-              control={form.control}
-              name="cell_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Célula</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ''}
-                    disabled={loading || isLoadingCells}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingCells ? "Cargando células..." : "Selecciona una célula (opcional)"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="">Sin célula asignada</SelectItem>
-                      {cells?.map((cell) => (
-                        <SelectItem key={cell.id} value={cell.id}>
-                          {cell.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="firstName" className="text-sm font-medium">Nombre *</label>
+            <Input
+              id="firstName"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              disabled={loading}
+              required
             />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="lastName" className="text-sm font-medium">Apellido</label>
+            <Input
+              id="lastName"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-sm font-medium">Correo Electrónico</label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="phone" className="text-sm font-medium">Teléfono</label>
+            <Input
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              disabled={loading}
+            />
+          </div>
 
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creando...' : 'Crear Contacto'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Creando...' : 'Crear Contacto'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
