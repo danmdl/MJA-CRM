@@ -26,6 +26,14 @@ import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
 
 const addContactSchema = z.object({
   first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
@@ -36,7 +44,13 @@ const addContactSchema = z.object({
   apartment_number: z.string().optional(),
   barrio: z.string().optional(),
   leader_assigned: z.string().optional(),
+  cell_id: z.string().optional(), // Make cell_id optional
 });
+
+interface Cell {
+  id: string;
+  name: string;
+}
 
 interface AddContactDialogProps {
   open: boolean;
@@ -59,7 +73,27 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
       apartment_number: '',
       barrio: '',
       leader_assigned: '',
+      cell_id: undefined, // Initialize as undefined
     },
+  });
+
+  // Fetch cells for the current church
+  const { data: cells, isLoading: isLoadingCells } = useQuery<Cell[]>({
+    queryKey: ['cells', churchId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cells')
+        .select('id, name')
+        .eq('church_id', churchId)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching cells:', error);
+        throw new Error('No se pudieron cargar las células.');
+      }
+      return data || [];
+    },
+    enabled: !!churchId,
   });
 
   const onSubmit = async (values: z.infer<typeof addContactSchema>) => {
@@ -70,7 +104,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .insert({
           ...values,
           church_id: churchId,
-          email: values.email || null, // Ensure empty string becomes null for DB
+          email: values.email || null,
+          cell_id: values.cell_id || null, // Ensure cell_id is null if not provided
         })
         .select();
 
@@ -80,8 +115,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
       } else {
         showSuccess(`¡Contacto "${values.first_name}" añadido con éxito!`);
         form.reset();
-        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] }); // Refresh the list of contacts for this church
-        onOpenChange(false); // Close the dialog
+        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+        onOpenChange(false);
       }
     } catch (error: any) {
       console.error('Error during add contact:', error);
@@ -115,7 +150,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                         type={field.type}
                         placeholder={field.label}
                         {...formField}
-                        value={formField.value || ''} // Ensure controlled component
+                        value={formField.value || ''}
                         disabled={loading}
                       />
                     </FormControl>
@@ -124,6 +159,38 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 )}
               />
             ))}
+
+            {/* Cell selector */}
+            <FormField
+              control={form.control}
+              name="cell_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Célula</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || ''}
+                    disabled={loading || isLoadingCells}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingCells ? "Cargando células..." : "Selecciona una célula (opcional)"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">Sin célula asignada</SelectItem>
+                      {cells?.map((cell) => (
+                        <SelectItem key={cell.id} value={cell.id}>
+                          {cell.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
