@@ -30,65 +30,65 @@ interface AddContactDialogProps {
 }
 
 // Componentes modulares
-const FormField = ({
-  label,
-  id,
-  value,
-  onChange,
-  type = "text",
-  required = false,
-  disabled = false,
-  placeholder = ""
-}: {
-  label: string;
-  id: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  type?: string;
-  required?: boolean;
-  disabled?: boolean;
-  placeholder?: string;
+const FormField = ({ 
+  label, 
+  id, 
+  value, 
+  onChange, 
+  type = "text", 
+  required = false, 
+  disabled = false, 
+  placeholder = "" 
+}: { 
+  label: string; 
+  id: string; 
+  value: string; 
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; 
+  type?: string; 
+  required?: boolean; 
+  disabled?: boolean; 
+  placeholder?: string; 
 }) => (
   <div className="space-y-2">
     <label htmlFor={id} className="text-sm font-medium">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
-    <Input
-      id={id}
-      type={type}
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      required={required}
-      placeholder={placeholder}
+    <Input 
+      id={id} 
+      type={type} 
+      value={value} 
+      onChange={onChange} 
+      disabled={disabled} 
+      required={required} 
+      placeholder={placeholder} 
     />
   </div>
 );
 
-const SelectField = ({
-  label,
-  value,
-  onChange,
-  options,
-  loading,
-  placeholder,
-  disabled = false
-}: {
-  label: string;
-  value: string | null;
-  onChange: (value: string) => void;
-  options: Array<{ id: string; name: string }>;
-  loading: boolean;
-  placeholder: string;
-  disabled?: boolean;
+const SelectField = ({ 
+  label, 
+  value, 
+  onChange, 
+  options, 
+  loading, 
+  placeholder, 
+  disabled = false 
+}: { 
+  label: string; 
+  value: string | null; 
+  onChange: (value: string) => void; 
+  options: Array<{ id: string; name: string }>; 
+  loading: boolean; 
+  placeholder: string; 
+  disabled?: boolean; 
 }) => (
   <div className="space-y-2">
     <label htmlFor={label.toLowerCase().replace(/\s/g, '-')} className="text-sm font-medium">
       {label}
     </label>
-    <Select
-      value={value || undefined}
-      onValueChange={onChange}
+    <Select 
+      value={value || undefined} 
+      onValueChange={onChange} 
       disabled={disabled || loading}
     >
       <SelectTrigger>
@@ -118,8 +118,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [barrio, setBarrio] = useState('');
   const [leaderAssigned, setLeaderAssigned] = useState<string | null>(null);
   const [cellId, setCellId] = useState<string | null>(null);
-
   const queryClient = useQueryClient();
+
   logger.log('AddContactDialog rendered', { open, churchId });
 
   // Fetch cells for the current church
@@ -144,7 +144,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     enabled: !!churchId,
   });
 
-  // Fetch leaders for the current church (pastor, piloto, encargado_de_celula)
+  // Fetch leaders for the current church (all potential leader roles)
   const { data: leaders, isLoading: isLoadingLeaders } = useQuery<Leader[]>({
     queryKey: ['leaders', churchId],
     queryFn: async () => {
@@ -153,7 +153,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .from('profiles')
         .select('id, first_name, last_name')
         .eq('church_id', churchId)
-        .in('role', ['pastor', 'piloto', 'encargado_de_celula'])
+        .in('role', ['pastor', 'piloto', 'encargado_de_celula', 'general']) // Include all potential leader roles
         .order('first_name', { ascending: true });
 
       if (error) {
@@ -169,10 +169,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    logger.log('Form submitted', {
-      firstName, lastName, email, phone, address, apartmentNumber, barrio, leaderAssigned, cellId, churchId
+    logger.log('Form submitted', { 
+      firstName, lastName, email, phone, address, 
+      apartmentNumber, barrio, leaderAssigned, cellId, churchId 
     });
-
+    
     setLoading(true);
     try {
       logger.log('Attempting to insert contact...');
@@ -198,7 +199,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
       } else {
         logger.log('Contact inserted successfully:', data);
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
-
         // Reset form
         setFirstName('');
         setLastName('');
@@ -209,7 +209,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         setBarrio('');
         setLeaderAssigned(null);
         setCellId(null);
-
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
         onOpenChange(false);
       }
@@ -231,92 +230,86 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField
-            label="Nombre"
-            id="firstName"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-            disabled={loading}
+          <FormField 
+            label="Nombre" 
+            id="firstName" 
+            value={firstName} 
+            onChange={(e) => setFirstName(e.target.value)} 
+            required 
+            disabled={loading} 
           />
-
-          <FormField
-            label="Apellido"
-            id="lastName"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            disabled={loading}
+          <FormField 
+            label="Apellido" 
+            id="lastName" 
+            value={lastName} 
+            onChange={(e) => setLastName(e.target.value)} 
+            disabled={loading} 
           />
-
-          <FormField
-            label="Correo Electrónico"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            disabled={loading}
+          <FormField 
+            label="Correo Electrónico" 
+            id="email" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            type="email" 
+            disabled={loading} 
           />
-
-          <FormField
-            label="Teléfono"
-            id="phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            disabled={loading}
+          <FormField 
+            label="Teléfono" 
+            id="phone" 
+            value={phone} 
+            onChange={(e) => setPhone(e.target.value)} 
+            disabled={loading} 
           />
-
-          <FormField
-            label="Dirección"
-            id="address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            disabled={loading}
+          <FormField 
+            label="Dirección" 
+            id="address" 
+            value={address} 
+            onChange={(e) => setAddress(e.target.value)} 
+            disabled={loading} 
           />
-
-          <FormField
-            label="Número de Apartamento"
-            id="apartmentNumber"
-            value={apartmentNumber}
-            onChange={(e) => setApartmentNumber(e.target.value)}
-            disabled={loading}
+          <FormField 
+            label="Número de Apartamento" 
+            id="apartmentNumber" 
+            value={apartmentNumber} 
+            onChange={(e) => setApartmentNumber(e.target.value)} 
+            disabled={loading} 
           />
-
-          <FormField
-            label="Barrio"
-            id="barrio"
-            value={barrio}
-            onChange={(e) => setBarrio(e.target.value)}
-            disabled={loading}
+          <FormField 
+            label="Barrio" 
+            id="barrio" 
+            value={barrio} 
+            onChange={(e) => setBarrio(e.target.value)} 
+            disabled={loading} 
           />
-
+          
           {/* Cell selector */}
-          <SelectField
-            label="Célula"
-            value={cellId}
-            onChange={(value) => setCellId(value === "none" ? null : value)}
-            options={cells || []}
-            loading={isLoadingCells}
-            placeholder="Selecciona una célula (opcional)"
+          <SelectField 
+            label="Célula" 
+            value={cellId} 
+            onChange={(value) => setCellId(value === "none" ? null : value)} 
+            options={cells || []} 
+            loading={isLoadingCells} 
+            placeholder="Selecciona una célula (opcional)" 
           />
-
+          
           {/* Leader selector */}
-          <SelectField
-            label="Líder Asignado"
-            value={leaderAssigned}
-            onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
-            options={leaders?.map(leader => ({
-              id: leader.id,
-              name: `${leader.first_name} ${leader.last_name}`
-            })) || []}
-            loading={isLoadingLeaders}
-            placeholder="Selecciona un líder (opcional)"
+          <SelectField 
+            label="Líder Asignado" 
+            value={leaderAssigned} 
+            onChange={(value) => setLeaderAssigned(value === "none" ? null : value)} 
+            options={leaders?.map(leader => ({ 
+              id: leader.id, 
+              name: `${leader.first_name} ${leader.last_name}` 
+            })) || []} 
+            loading={isLoadingLeaders} 
+            placeholder="Selecciona un líder (opcional)" 
           />
-
+          
           <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
+            <Button 
+              type="button" 
+              variant="ghost" 
+              onClick={() => onOpenChange(false)} 
               disabled={loading}
             >
               Cancelar

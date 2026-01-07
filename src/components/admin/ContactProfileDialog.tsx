@@ -313,16 +313,17 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     try {
       console.log(`[ContactProfileDialog] Fetching leaders and cells for churchId: ${churchId}`);
 
-      // Fetch leaders (pastor, piloto, encargado_de_celula)
+      // Fetch leaders (all roles that could be leaders)
       const { data: leadersData, error: leadersError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
         .eq('church_id', churchId)
-        .in('role', ['pastor', 'piloto', 'encargado_de_celula'])
+        .in('role', ['pastor', 'piloto', 'encargado_de_celula', 'general']) // Include all potential leader roles
         .order('first_name', { ascending: true });
 
       if (leadersError) {
         logger.error('Error fetching leaders', leadersError);
+        console.error('Error fetching leaders:', leadersError);
       } else {
         console.log(`[ContactProfileDialog] Leaders fetched:`, leadersData);
         setLeaders(leadersData || []);
@@ -337,12 +338,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
       if (cellsError) {
         logger.error('Error fetching cells', cellsError);
+        console.error('Error fetching cells:', cellsError);
       } else {
         console.log(`[ContactProfileDialog] Cells fetched:`, cellsData);
         setCells(cellsData || []);
       }
     } catch (error: any) {
       logger.error('Unexpected error fetching leaders and cells', error);
+      console.error('Unexpected error fetching leaders and cells:', error);
     }
   };
 
