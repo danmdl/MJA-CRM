@@ -184,7 +184,27 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
     extendedContactFields.find(f => f.key === 'created_at')!,
   ].filter(Boolean), [extendedContactFields]);
 
-  const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(defaultVisibleColumns);
+  const storageKey = useMemo(() => `contacts_visible_columns_${churchId || 'global'}`, [churchId]);
+  const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const keys: string[] = JSON.parse(raw);
+        const map = new Map(extendedContactFields.map(f => [f.key, f]));
+        const restored = keys.map(k => map.get(k)).filter(Boolean) as ContactField[];
+        if (restored.length > 0) return restored;
+      }
+    } catch {}
+    return defaultVisibleColumns;
+  });
+
+  useEffect(() => {
+    try {
+      const keys = visibleColumns.map(c => c.key);
+      localStorage.setItem(storageKey, JSON.stringify(keys));
+    } catch {}
+  }, [visibleColumns, storageKey]);
+
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
   const queryClient = useQueryClient();

@@ -274,30 +274,41 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const handleSave = async () => {
     if (!contact) return;
     setSaving(true);
-    const { error } = await supabase
-      .from('contacts')
-      .update({
-        first_name: contact.first_name,
-        last_name: contact.last_name,
-        email: contact.email,
-        phone: contact.phone,
-        address: contact.address,
-        apartment_number: contact.apartment_number,
-        barrio: contact.barrio,
-        leader_assigned: contact.leader_assigned,
-        cell_id: contact.cell_id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', contact.id)
-      .eq('church_id', churchId);
-    if (!error) {
-      showSuccess('Contacto actualizado con éxito.');
-      queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-      onOpenChange(false);
-    } else {
-      showError('Error al actualizar el contacto.');
+    // Guardar en backend (Edge Function)
+    try {
+      const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/update-contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          contactId: contact.id,
+          churchId,
+          data: {
+            first_name: contact.first_name,
+            last_name: contact.last_name,
+            email: contact.email,
+            phone: contact.phone,
+            address: contact.address,
+            apartment_number: contact.apartment_number,
+            barrio: contact.barrio,
+            leader_assigned: contact.leader_assigned,
+            cell_id: contact.cell_id,
+          }
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        showError(err.error || 'Error al actualizar el contacto.');
+      } else {
+        showSuccess('Contacto actualizado con éxito.');
+        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+        onOpenChange(false);
+      }
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleAddLog = async () => {
@@ -358,13 +369,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
                 <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
               </div>
-              <ContactInfoField label="Correo Electrónico" value={contact.email || ''} onChange={(v) => setContact({ ...contact, email: v || null })} icon={Mail} type="email" />
               <ContactInfoField label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} icon={Phone} />
               <ContactInfoField label="Dirección" value={contact.address || ''} onChange={(v) => setContact({ ...contact, address: v || null })} icon={MapPin} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
                 <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
               </div>
+              {/* Email se mueve debajo de Departamento/Barrio */}
+              <ContactInfoField label="Correo Electrónico" value={contact.email || ''} onChange={(v) => setContact({ ...contact, email: v || null })} icon={Mail} type="email" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SelectField label="Célula" value={contact.cell_id} onChange={(v) => setContact({ ...contact, cell_id: v })} options={cells} placeholder="Sin célula asignada" />
                 <SelectField
