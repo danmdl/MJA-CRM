@@ -48,6 +48,7 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
     { to: `/admin/churches/${churchId}/overview`, icon: Info, label: "Resumen" },
     { to: `/admin/churches/${churchId}/database`, icon: Database, label: "Base de Datos" },
     { to: `/admin/churches/${churchId}/team`, icon: Users, label: "Equipo" },
+    { to: `/admin/churches/${churchId}/cells`, icon: ChurchIcon, label: "Células" },
   ];
 
   return (

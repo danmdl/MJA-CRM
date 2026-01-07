@@ -16,6 +16,7 @@ import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
+import CellsPage from "./pages/admin/churches/[churchId]/CellsPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
 import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
 import LoginManagementPage from "./pages/admin/LoginManagementPage"; // New import
@@ -73,6 +74,7 @@ const AppRoutes = () => {
           <Route path="overview" element={<ChurchOverviewPage />} />
           <Route path="database" element={<ChurchDatabasePage />} />
           <Route path="team" element={<ChurchTeamPage />} />
+          <Route path="cells" element={<CellsPage />} />
           <Route index element={<Navigate to="overview" replace />} />
         </Route>
       </Route>
