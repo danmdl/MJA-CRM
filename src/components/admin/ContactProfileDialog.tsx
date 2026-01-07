@@ -247,6 +247,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   // Fetch contact details when dialog opens or contactId changes
   useEffect(() => {
     if (open && contactId) {
+      console.log(`[ContactProfileDialog] Opening dialog for contactId: ${contactId}, churchId: ${churchId}`);
       fetchContactDetails();
       fetchContactLogs();
       fetchLeadersAndCells();
@@ -310,6 +311,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const fetchLeadersAndCells = async () => {
     try {
+      console.log(`[ContactProfileDialog] Fetching leaders and cells for churchId: ${churchId}`);
+
       // Fetch leaders (pastor, piloto, encargado_de_celula)
       const { data: leadersData, error: leadersError } = await supabase
         .from('profiles')
@@ -321,6 +324,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       if (leadersError) {
         logger.error('Error fetching leaders', leadersError);
       } else {
+        console.log(`[ContactProfileDialog] Leaders fetched:`, leadersData);
         setLeaders(leadersData || []);
       }
 
@@ -334,6 +338,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       if (cellsError) {
         logger.error('Error fetching cells', cellsError);
       } else {
+        console.log(`[ContactProfileDialog] Cells fetched:`, cellsData);
         setCells(cellsData || []);
       }
     } catch (error: any) {

@@ -18,6 +18,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { logger } from '@/utils/logger';
 
 // Definir el tipo de rol de usuario para TypeScript
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
@@ -45,7 +46,7 @@ const passwordResetSchema = z.object({
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
   console.log(`[DEBUG CLIENT] fetchChurchUsers called with churchId: ${churchId} and accessToken present: ${!!accessToken}`);
-  
+
   const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
   const response = await fetch(edgeFunctionUrl, {
     method: 'POST',
@@ -55,13 +56,13 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
     },
     body: JSON.stringify({ action: 'listChurchUsers', churchId }),
   });
-  
+
   if (!response.ok) {
     const errorData = await response.json();
     console.error('Error fetching church users from Edge Function:', errorData);
     throw new Error(errorData.error || 'No se pudieron cargar los usuarios de la iglesia.');
   }
-  
+
   const data = await response.json();
   console.log(`[DEBUG CLIENT] Users received from Edge Function for Church ID ${churchId}:`, data);
   return data || [];
@@ -70,7 +71,7 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
 const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session } = useSession();
   const queryClient = useQueryClient();
-  
+
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['churchUsers', churchId],
     queryFn: () => fetchChurchUsers(session?.access_token || '', churchId),
@@ -88,12 +89,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         },
         body: JSON.stringify({ action: 'deleteUser', userId }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al eliminar el usuario.');
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -116,12 +117,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         },
         body: JSON.stringify({ action: 'resendInvite', email, role, churchId }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al reenviar la invitación.');
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -144,12 +145,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         },
         body: JSON.stringify({ action: 'generateInviteLink', email, role, churchId }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al generar el enlace de invitación.');
       }
-      
+
       return response.json();
     },
     onSuccess: (data) => {
@@ -174,12 +175,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         },
         body: JSON.stringify({ action: 'updateUserRole', userId, newRole }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al actualizar el rol del usuario.');
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
