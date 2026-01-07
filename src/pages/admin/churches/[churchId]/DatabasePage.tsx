@@ -16,10 +16,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import AddContactDialog from '@/components/admin/AddContactDialog'; // Import the new dialog
 
 const ChurchDatabasePage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
 
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
@@ -54,7 +56,7 @@ const ChurchDatabasePage = () => {
               />
             </DialogContent>
           </Dialog>
-          <Button>
+          <Button onClick={() => setIsAddContactDialogOpen(true)}> {/* Open AddContactDialog */}
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Contacto
           </Button>
         </div>
@@ -78,6 +80,12 @@ const ChurchDatabasePage = () => {
       <div className="flex-grow">
         <DynamicContactTable churchId={churchId} /> {/* Pass churchId to DynamicContactTable */}
       </div>
+
+      <AddContactDialog
+        open={isAddContactDialogOpen}
+        onOpenChange={setIsAddContactDialogOpen}
+        churchId={churchId}
+      />
     </div>
   );
 };

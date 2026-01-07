@@ -40,6 +40,7 @@ interface Contact {
 }
 
 const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
+  console.log(`[DynamicContactTable] fetchContacts called with churchId: ${churchId}`);
   let query = supabase
     .from('contacts')
     .select('*')
@@ -47,14 +48,18 @@ const fetchContacts = async (churchId?: string): Promise<Contact[]> => {
 
   if (churchId) {
     query = query.eq('church_id', churchId);
+    console.log(`[DynamicContactTable] Filtering contacts by church_id: ${churchId}`);
+  } else {
+    console.warn("[DynamicContactTable] No churchId provided to fetchContacts. Fetching all contacts (if RLS allows).");
   }
 
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching contacts:', error);
+    console.error('[DynamicContactTable] Error fetching contacts:', error);
     throw new Error('No se pudieron cargar los contactos.');
   }
+  console.log(`[DynamicContactTable] Successfully fetched ${data?.length || 0} contacts.`);
   return data || [];
 };
 
@@ -80,6 +85,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   const { data: contacts, isLoading, isError, error } = useQuery<Contact[]>({
     queryKey: ['contacts', churchId], // Include churchId in query key
     queryFn: () => fetchContacts(churchId),
+    enabled: !!churchId, // Only enable query if churchId is available
   });
 
   const handleColumnChange = (columnIndex: number, newFieldKey: string) => {
@@ -104,6 +110,7 @@ const DynamicContactTable = ({ churchId }: DynamicContactTableProps) => {
   }
 
   if (isError) {
+    console.error("[DynamicContactTable] Query error object:", error); // Log the full error object
     showError(error?.message || 'Error al cargar los contactos.');
     return <div className="text-red-500">Error: {error?.message || 'No se pudieron cargar los contactos.'}</div>;
   }

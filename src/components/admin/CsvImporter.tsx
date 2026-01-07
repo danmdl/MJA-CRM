@@ -37,6 +37,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   const allTargetFields = [...requiredFields, ...optionalFields];
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("[CsvImporter] handleFileChange triggered.");
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
@@ -47,6 +48,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
+          console.log("[CsvImporter] Papa.parse complete. Results:", results);
           if (results.meta.fields) {
             setCsvHeaders(results.meta.fields);
             // Attempt to auto-map common headers
@@ -66,7 +68,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           }
         },
         error: (error) => {
-          console.error("Error parsing CSV:", error);
+          console.error("[CsvImporter] Error parsing CSV:", error);
           showError("Error al leer el archivo CSV.");
           setCsvHeaders([]);
           setDataToImport([]);
@@ -80,6 +82,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   };
 
   const handleImportData = async () => {
+    console.log("[CsvImporter] handleImportData triggered.");
     if (!file || dataToImport.length === 0) {
       showError('Por favor, sube un archivo CSV con datos.');
       return;
@@ -114,10 +117,11 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       const batchSize = 1000;
       for (let i = 0; i < recordsToInsert.length; i += batchSize) {
         const batch = recordsToInsert.slice(i, i + batchSize);
+        console.log(`[CsvImporter] Inserting batch ${i / batchSize + 1} of ${Math.ceil(recordsToInsert.length / batchSize)}`);
         const { error } = await supabase.from(tableName).insert(batch);
 
         if (error) {
-          console.error('Error inserting batch:', error);
+          console.error('[CsvImporter] Error inserting batch:', error);
           throw new Error(`Error al insertar datos: ${error.message}`);
         }
       }
@@ -129,7 +133,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       setDataToImport([]);
       setColumnMapping({});
     } catch (error: any) {
-      console.error('Error during import:', error);
+      console.error('[CsvImporter] Error during import:', error);
       showError(error.message || 'Error desconocido al importar datos.');
     } finally {
       dismissToast(toastId);
@@ -224,6 +228,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       </CardContent>
       <CardFooter className="flex justify-end">
         <Button
+          type="button" {/* Added type="button" here */}
           onClick={handleImportData}
           disabled={loading || !file || unmappedRequiredFields.length > 0}
         >
