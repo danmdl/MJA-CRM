@@ -16,7 +16,7 @@ import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import DebugLeaders from './DebugLeaders';
+// Removed DebugLeaders debug import
 import { useSession } from '@/hooks/use-session';
 
 interface Contact {
@@ -357,7 +357,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         </DialogHeader>
         {contact && (
           <div className="space-y-6">
-            <DebugLeaders churchId={churchId} />
             <ProfilePictureSection contact={contact} />
 
             <div className="space-y-4">
