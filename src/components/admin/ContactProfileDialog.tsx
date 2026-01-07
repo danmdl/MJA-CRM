@@ -80,68 +80,68 @@ const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
   </div>
 );
 
-const ContactInfoField = ({
-  label,
-  value,
-  onChange,
-  icon: Icon,
-  type = "text",
-  placeholder = ""
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  icon?: React.ComponentType<{ className: string }>;
-  type?: string;
-  placeholder?: string;
+const ContactInfoField = ({ 
+  label, 
+  value, 
+  onChange, 
+  icon: Icon, 
+  type = "text", 
+  placeholder = "" 
+}: { 
+  label: string; 
+  value: string; 
+  onChange: (value: string) => void; 
+  icon?: React.ComponentType<{ className: string }>; 
+  type?: string; 
+  placeholder?: string; 
 }) => (
   <div className="space-y-2">
     <Label htmlFor={label.toLowerCase().replace(/\s/g, '-')}>{label}</Label>
     {Icon && (
       <div className="relative">
         <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          id={label.toLowerCase().replace(/\s/g, '-')}
-          type={type}
-          className="pl-10"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+        <Input 
+          id={label.toLowerCase().replace(/\s/g, '-')} 
+          type={type} 
+          className="pl-10" 
+          value={value} 
+          onChange={(e) => onChange(e.target.value)} 
+          placeholder={placeholder} 
         />
       </div>
     )}
     {!Icon && (
-      <Input
-        id={label.toLowerCase().replace(/\s/g, '-')}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+      <Input 
+        id={label.toLowerCase().replace(/\s/g, '-')} 
+        type={type} 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)} 
+        placeholder={placeholder} 
       />
     )}
   </div>
 );
 
-const SelectField = ({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  disabled = false
-}: {
-  label: string;
-  value: string | null;
-  onChange: (value: string | null) => void;
-  options: Array<{ id: string; name: string }>;
-  placeholder: string;
-  disabled?: boolean;
+const SelectField = ({ 
+  label, 
+  value, 
+  onChange, 
+  options, 
+  placeholder, 
+  disabled = false 
+}: { 
+  label: string; 
+  value: string | null; 
+  onChange: (value: string | null) => void; 
+  options: Array<{ id: string; name: string }>; 
+  placeholder: string; 
+  disabled?: boolean; 
 }) => (
   <div className="space-y-2">
     <Label htmlFor={label.toLowerCase().replace(/\s/g, '-')}>{label}</Label>
-    <Select
-      value={value || undefined}
-      onValueChange={(value) => onChange(value === "none" ? null : value)}
+    <Select 
+      value={value || undefined} 
+      onValueChange={(value) => onChange(value === "none" ? null : value)} 
       disabled={disabled}
     >
       <SelectTrigger>
@@ -159,43 +159,43 @@ const SelectField = ({
   </div>
 );
 
-const ContactLogForm = ({
-  newLog,
-  setNewLog,
-  onAddLog
-}: {
-  newLog: { date: string; method: string; notes: string };
-  setNewLog: React.Dispatch<React.SetStateAction<{ date: string; method: string; notes: string }>>;
-  onAddLog: () => void;
+const ContactLogForm = ({ 
+  newLog, 
+  setNewLog, 
+  onAddLog 
+}: { 
+  newLog: { date: string; method: string; notes: string }; 
+  setNewLog: React.Dispatch<React.SetStateAction<{ date: string; method: string; notes: string }>>; 
+  onAddLog: () => void; 
 }) => (
   <div className="space-y-3 p-3 bg-muted rounded-md">
     <h4 className="font-medium">Agregar Nuevo Registro</h4>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
       <div>
         <Label htmlFor="logDate" className="text-xs">Fecha</Label>
-        <Input
-          id="logDate"
-          type="date"
-          value={newLog.date}
-          onChange={(e) => setNewLog({ ...newLog, date: e.target.value })}
+        <Input 
+          id="logDate" 
+          type="date" 
+          value={newLog.date} 
+          onChange={(e) => setNewLog({ ...newLog, date: e.target.value })} 
         />
       </div>
       <div>
         <Label htmlFor="logMethod" className="text-xs">Método</Label>
-        <Input
-          id="logMethod"
-          placeholder="Llamada, WhatsApp, etc."
-          value={newLog.method}
-          onChange={(e) => setNewLog({ ...newLog, method: e.target.value })}
+        <Input 
+          id="logMethod" 
+          placeholder="Llamada, WhatsApp, etc." 
+          value={newLog.method} 
+          onChange={(e) => setNewLog({ ...newLog, method: e.target.value })} 
         />
       </div>
       <div>
         <Label htmlFor="logNotes" className="text-xs">Notas</Label>
-        <Input
-          id="logNotes"
-          placeholder="Detalles del contacto"
-          value={newLog.notes}
-          onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })}
+        <Input 
+          id="logNotes" 
+          placeholder="Detalles del contacto" 
+          value={newLog.notes} 
+          onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })} 
         />
       </div>
     </div>
@@ -279,7 +279,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const fetchContactLogs = async () => {
     if (!contactId) return;
-
     try {
       const { data, error } = await supabase
         .from('contact_logs')
@@ -297,8 +296,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         // Map the data to include contacted_by_name
         const logs = data.map(log => ({
           ...log,
-          contacted_by_name: log.contacted_by_profile ?
-            `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}` :
+          contacted_by_name: log.contacted_by_profile ? 
+            `${log.contacted_by_profile.first_name} ${log.contacted_by_profile.last_name}` : 
             'Desconocido'
         }));
         setContactLogs(logs);
@@ -344,7 +343,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const handleSave = async () => {
     if (!contact) return;
-
     setSaving(true);
     try {
       const { error } = await supabase
@@ -383,7 +381,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   const handleAddLog = async () => {
     if (!contactId || !newLog.date) return;
-
     try {
       const { data, error } = await supabase
         .from('contact_logs')
@@ -407,8 +404,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         // Add the new log to the list
         const logWithContactedByName = {
           ...data,
-          contacted_by_name: data.contacted_by_profile ?
-            `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}` :
+          contacted_by_name: data.contacted_by_profile ? 
+            `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}` : 
             'Desconocido'
         };
         setContactLogs([logWithContactedByName, ...contactLogs]);
@@ -453,83 +450,76 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             {/* Contact Information */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ContactInfoField
-                  label="Nombre"
-                  value={contact.first_name}
-                  onChange={(value) => handleChange('first_name', value)}
+                <ContactInfoField 
+                  label="Nombre" 
+                  value={contact.first_name} 
+                  onChange={(value) => handleChange('first_name', value)} 
                 />
-                <ContactInfoField
-                  label="Apellido"
-                  value={contact.last_name || ''}
-                  onChange={(value) => handleChange('last_name', value || null)}
+                <ContactInfoField 
+                  label="Apellido" 
+                  value={contact.last_name || ''} 
+                  onChange={(value) => handleChange('last_name', value || null)} 
                 />
               </div>
-
-              <ContactInfoField
-                label="Correo Electrónico"
-                value={contact.email || ''}
-                onChange={(value) => handleChange('email', value || null)}
-                icon={Mail}
-                type="email"
+              <ContactInfoField 
+                label="Correo Electrónico" 
+                value={contact.email || ''} 
+                onChange={(value) => handleChange('email', value || null)} 
+                icon={Mail} 
+                type="email" 
               />
-
-              <ContactInfoField
-                label="Teléfono"
-                value={contact.phone || ''}
-                onChange={(value) => handleChange('phone', value || null)}
-                icon={Phone}
+              <ContactInfoField 
+                label="Teléfono" 
+                value={contact.phone || ''} 
+                onChange={(value) => handleChange('phone', value || null)} 
+                icon={Phone} 
               />
-
-              <ContactInfoField
-                label="Dirección"
-                value={contact.address || ''}
-                onChange={(value) => handleChange('address', value || null)}
-                icon={MapPin}
+              <ContactInfoField 
+                label="Dirección" 
+                value={contact.address || ''} 
+                onChange={(value) => handleChange('address', value || null)} 
+                icon={MapPin} 
               />
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ContactInfoField
-                  label="Número de Apartamento"
-                  value={contact.apartment_number || ''}
-                  onChange={(value) => handleChange('apartment_number', value || null)}
-                  icon={Home}
+                <ContactInfoField 
+                  label="Número de Apartamento" 
+                  value={contact.apartment_number || ''} 
+                  onChange={(value) => handleChange('apartment_number', value || null)} 
+                  icon={Home} 
                 />
-                <ContactInfoField
-                  label="Barrio"
-                  value={contact.barrio || ''}
-                  onChange={(value) => handleChange('barrio', value || null)}
+                <ContactInfoField 
+                  label="Barrio" 
+                  value={contact.barrio || ''} 
+                  onChange={(value) => handleChange('barrio', value || null)} 
                 />
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <SelectField
-                  label="Célula"
-                  value={contact.cell_id}
-                  onChange={(value) => handleChange('cell_id', value)}
-                  options={cells}
-                  placeholder="Sin célula asignada"
+                <SelectField 
+                  label="Célula" 
+                  value={contact.cell_id} 
+                  onChange={(value) => handleChange('cell_id', value)} 
+                  options={cells} 
+                  placeholder="Sin célula asignada" 
                 />
-
-                <SelectField
-                  label="Líder Asignado"
-                  value={contact.leader_assigned}
-                  onChange={(value) => handleChange('leader_assigned', value)}
-                  options={leaders.map(leader => ({
-                    id: leader.id,
-                    name: `${leader.first_name} ${leader.last_name}`
-                  }))}
-                  placeholder="Sin líder asignado"
+                <SelectField 
+                  label="Líder Asignado" 
+                  value={contact.leader_assigned} 
+                  onChange={(value) => handleChange('leader_assigned', value)} 
+                  options={leaders.map(leader => ({ 
+                    id: leader.id, 
+                    name: `${leader.first_name} ${leader.last_name}` 
+                  }))} 
+                  placeholder="Sin líder asignado" 
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="notes">Notas</Label>
-                <Textarea
-                  id="notes"
-                  value={contact.notes || ''}
-                  onChange={(e) => handleChange('notes', e.target.value || null)}
-                  rows={4}
-                  placeholder="Agrega notas importantes sobre este contacto..."
+                <Textarea 
+                  id="notes" 
+                  value={contact.notes || ''} 
+                  onChange={(e) => handleChange('notes', e.target.value || null)} 
+                  rows={4} 
+                  placeholder="Agrega notas importantes sobre este contacto..." 
                 />
               </div>
             </div>
@@ -544,12 +534,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Add New Log */}
-                <ContactLogForm
-                  newLog={newLog}
-                  setNewLog={setNewLog}
-                  onAddLog={handleAddLog}
+                <ContactLogForm 
+                  newLog={newLog} 
+                  setNewLog={setNewLog} 
+                  onAddLog={handleAddLog} 
                 />
-
+                
                 {/* Contact Logs Table */}
                 {contactLogs.length > 0 ? (
                   <ContactLogsTable logs={contactLogs} />
@@ -562,9 +552,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             </Card>
 
             <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
+              <Button 
+                variant="outline" 
+                onClick={() => onOpenChange(false)} 
                 disabled={saving}
               >
                 Cancelar
