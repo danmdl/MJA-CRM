@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { logger } from '@/utils/logger';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
+import { useSession } from '@/hooks/use-session';
 
 // Interfaces
 interface Cell {
@@ -19,8 +20,8 @@ interface Cell {
 
 interface Leader {
   id: string;
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
 }
 
 interface AddContactDialogProps {
@@ -119,6 +120,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [leaderAssigned, setLeaderAssigned] = useState<string | null>(null);
   const [cellId, setCellId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { session } = useSession();
 
   logger.log('AddContactDialog rendered', { open, churchId });
 
@@ -144,27 +146,31 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     enabled: !!churchId,
   });
 
-  // Fetch leaders for the current church (all potential leader roles)
+  // Fetch leaders for the current church via Edge Function (matches Equipo)
   const { data: leaders, isLoading: isLoadingLeaders } = useQuery<Leader[]>({
     queryKey: ['leaders', churchId],
     queryFn: async () => {
-      logger.log('Fetching leaders for church', { churchId });
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('church_id', churchId)
-        .in('role', ['pastor', 'piloto', 'encargado_de_celula', 'general']) // Include all potential leader roles
-        .order('first_name', { ascending: true });
-
-      if (error) {
-        logger.error('Error fetching leaders', error);
-        throw new Error('No se pudieron cargar los líderes.');
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+      const resp = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ action: 'listChurchUsers', churchId }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || 'No se pudieron cargar los líderes.');
       }
-
-      logger.log('Leaders fetched successfully', data);
-      return data || [];
+      const data = await resp.json();
+      const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
+      const mapped: Leader[] = (data || [])
+        .filter((u: any) => leaderRoles.includes(u.role))
+        .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name }));
+      return mapped;
     },
-    enabled: !!churchId,
+    enabled: !!churchId && !!session?.access_token,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -297,10 +303,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             label="Líder Asignado" 
             value={leaderAssigned} 
             onChange={(value) => setLeaderAssigned(value === "none" ? null : value)} 
-            options={leaders?.map(leader => ({ 
+            options={(leaders || []).map(leader => ({ 
               id: leader.id, 
-              name: `${leader.first_name} ${leader.last_name}` 
-            })) || []} 
+              name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
+            }))} 
             loading={isLoadingLeaders} 
             placeholder="Selecciona un líder (opcional)" 
           />

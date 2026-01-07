@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Mail, Phone, MapPin, Home, Users, Calendar, MessageSquare } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Home, Calendar, MessageSquare } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,8 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DebugLeaders from './DebugLeaders';
+import { useSession } from '@/hooks/use-session';
 
-// Interfaces
 interface Contact {
   id: string;
   first_name: string;
@@ -48,8 +48,8 @@ interface ContactLog {
 
 interface Leader {
   id: string;
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
 }
 
 interface Cell {
@@ -64,7 +64,6 @@ interface ContactProfileDialogProps {
   churchId: string;
 }
 
-// Componentes modulares
 const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
   <div className="flex flex-col items-center space-y-4">
     <div className="relative">
@@ -160,53 +159,6 @@ const SelectField = ({
   </div>
 );
 
-const ContactLogForm = ({ 
-  newLog, 
-  setNewLog, 
-  onAddLog 
-}: { 
-  newLog: { date: string; method: string; notes: string }; 
-  setNewLog: React.Dispatch<React.SetStateAction<{ date: string; method: string; notes: string }>>; 
-  onAddLog: () => void; 
-}) => (
-  <div className="space-y-3 p-3 bg-muted rounded-md">
-    <h4 className="font-medium">Agregar Nuevo Registro</h4>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-      <div>
-        <Label htmlFor="logDate" className="text-xs">Fecha</Label>
-        <Input 
-          id="logDate" 
-          type="date" 
-          value={newLog.date} 
-          onChange={(e) => setNewLog({ ...newLog, date: e.target.value })} 
-        />
-      </div>
-      <div>
-        <Label htmlFor="logMethod" className="text-xs">Método</Label>
-        <Input 
-          id="logMethod" 
-          placeholder="Llamada, WhatsApp, etc." 
-          value={newLog.method} 
-          onChange={(e) => setNewLog({ ...newLog, method: e.target.value })} 
-        />
-      </div>
-      <div>
-        <Label htmlFor="logNotes" className="text-xs">Notas</Label>
-        <Input 
-          id="logNotes" 
-          placeholder="Detalles del contacto" 
-          value={newLog.notes} 
-          onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })} 
-        />
-      </div>
-    </div>
-    <Button size="sm" onClick={onAddLog} disabled={!newLog.date}>
-      <MessageSquare className="mr-2 h-4 w-4" />
-      Agregar Registro
-    </Button>
-  </div>
-);
-
 const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
   <Table>
     <TableHeader>
@@ -234,7 +186,6 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
   </Table>
 );
 
-// Componente principal
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
   const [contact, setContact] = useState<Contact | null>(null);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
@@ -244,8 +195,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
   const queryClient = useQueryClient();
+  const { session } = useSession();
 
-  // Fetch contact details when dialog opens or contactId changes
   useEffect(() => {
     if (open && contactId) {
       console.log(`[ContactProfileDialog] Opening dialog for contactId: ${contactId}, churchId: ${churchId}`);
@@ -295,7 +246,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         logger.error('Error fetching contact logs', error);
         showError('Error al cargar el historial de contactos.');
       } else {
-        // Map the data to include contacted_by_name
         const logs = data.map(log => ({
           ...log,
           contacted_by_name: log.contacted_by_profile ? 
@@ -314,31 +264,30 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     try {
       console.log(`[ContactProfileDialog] Fetching leaders and cells for churchId: ${churchId}`);
 
-      // Fetch all profiles for debugging
-      const { data: allProfiles, error: allProfilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, role')
-        .eq('church_id', churchId);
+      // Leaders via Edge Function to avoid RLS issues and match Equipo
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+      const resp = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ action: 'listChurchUsers', churchId }),
+      });
 
-      console.log(`[ContactProfileDialog] All profiles for church:`, allProfiles, allProfilesError);
-
-      // Fetch leaders (all roles that could be leaders)
-      const { data: leadersData, error: leadersError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('church_id', churchId)
-        .in('role', ['pastor', 'piloto', 'encargado_de_celula', 'general']) // Include all potential leader roles
-        .order('first_name', { ascending: true });
-
-      if (leadersError) {
-        logger.error('Error fetching leaders', leadersError);
-        console.error('Error fetching leaders:', leadersError);
+      if (resp.ok) {
+        const data = await resp.json();
+        const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
+        const mapped: Leader[] = (data || [])
+          .filter((u: any) => leaderRoles.includes(u.role))
+          .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name }));
+        setLeaders(mapped);
       } else {
-        console.log(`[ContactProfileDialog] Leaders fetched:`, leadersData);
-        setLeaders(leadersData || []);
+        const err = await resp.json().catch(() => ({}));
+        logger.error('Error fetching leaders from edge function', err);
       }
 
-      // Fetch cells
+      // Cells with normal client (RLS allows for same-church roles)
       const { data: cellsData, error: cellsError } = await supabase
         .from('cells')
         .select('id, name')
@@ -347,14 +296,11 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
       if (cellsError) {
         logger.error('Error fetching cells', cellsError);
-        console.error('Error fetching cells:', cellsError);
       } else {
-        console.log(`[ContactProfileDialog] Cells fetched:`, cellsData);
         setCells(cellsData || []);
       }
     } catch (error: any) {
       logger.error('Unexpected error fetching leaders and cells', error);
-      console.error('Unexpected error fetching leaders and cells:', error);
     }
   };
 
@@ -418,7 +364,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         logger.error('Error adding contact log', error);
         showError('Error al agregar el registro de contacto.');
       } else {
-        // Add the new log to the list
         const logWithContactedByName = {
           ...data,
           contacted_by_name: data.contacted_by_profile ? 
@@ -461,13 +406,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         </DialogHeader>
         {contact && (
           <div className="space-y-6">
-            {/* Debug info */}
             <DebugLeaders churchId={churchId} />
-            
-            {/* Profile Picture Section */}
             <ProfilePictureSection contact={contact} />
 
-            {/* Contact Information */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ContactInfoField 
@@ -527,7 +468,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   onChange={(value) => handleChange('leader_assigned', value)} 
                   options={leaders.map(leader => ({ 
                     id: leader.id, 
-                    name: `${leader.first_name} ${leader.last_name}` 
+                    name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
                   }))} 
                   placeholder="Sin líder asignado" 
                 />
@@ -544,7 +485,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
             </div>
 
-            {/* Contact Log Section */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -553,14 +493,45 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Add New Log */}
-                <ContactLogForm 
-                  newLog={newLog} 
-                  setNewLog={setNewLog} 
-                  onAddLog={handleAddLog} 
-                />
-                
-                {/* Contact Logs Table */}
+                <div className="space-y-3 p-3 bg-muted rounded-md">
+                  <h4 className="font-medium">Agregar Nuevo Registro</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div>
+                      <Label htmlFor="logDate" className="text-xs">Fecha</Label>
+                      <Input 
+                        id="logDate" 
+                        type="date" 
+                        value={newLog.date} 
+                        onChange={(e) => setNewLog({ ...newLog, date: e.target.value })} 
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="logMethod" className="text-xs">Método</Label>
+                      <Input 
+                        id="logMethod" 
+                        placeholder="Llamada, WhatsApp, etc." 
+                        value={newLog.method} 
+                        onChange={(e) => setNewLog({ ...newLog, method: e.target.value })} 
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="logNotes" className="text-xs">Notas</Label>
+                      <Input 
+                        id="logNotes" 
+                        placeholder="Detalles del contacto" 
+                        value={newLog.notes} 
+                        onChange={(e) => setNewLog({ ...newLog, notes: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={async () => {
+                    await handleAddLog();
+                  }} disabled={!newLog.date}>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Agregar Registro
+                  </Button>
+                </div>
+
                 {contactLogs.length > 0 ? (
                   <ContactLogsTable logs={contactLogs} />
                 ) : (
