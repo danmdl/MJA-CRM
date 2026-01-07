@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChurchSidebarProps {
   isCollapsed: boolean;
+  churchId: string; // Added churchId prop
 }
 
 interface Church {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,11 +17,12 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { ContactField } from '@/lib/contact-fields'; // Import ContactField type
 
 interface CsvImporterProps {
   tableName: string;
-  requiredFields: { key: string; label: string; type: 'text' | 'email' | 'phone' }[];
-  optionalFields: { key: string; label: string; type: 'text' | 'email' | 'phone' }[];
+  requiredFields: ContactField[]; // Updated type to ContactField[]
+  optionalFields: ContactField[]; // Updated type to ContactField[]
   churchId?: string; // Add optional churchId prop
 }
 
@@ -34,7 +35,12 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   const [loading, setLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
 
-  const allTargetFields = [...requiredFields, ...optionalFields];
+  const allTargetFields = useMemo(() => [...requiredFields, ...optionalFields], [requiredFields, optionalFields]);
+
+  // Calculate unmappedRequiredFields in a useMemo hook so it's always up-to-date and accessible
+  const unmappedRequiredFields = useMemo(() => {
+    return requiredFields.filter(field => !columnMapping[field.key]);
+  }, [requiredFields, columnMapping]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log("[CsvImporter] handleFileChange triggered.");
@@ -44,11 +50,11 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       setImportSuccess(false);
       setColumnMapping({}); // Reset mapping
 
+      // Read headers to populate the select dropdown
       Papa.parse(selectedFile, {
         header: true,
-        skipEmptyLines: true,
+        preview: 1, // Only parse the first row to get headers
         complete: (results) => {
-          console.log("[CsvImporter] Papa.parse complete. Results:", results);
           if (results.meta.fields) {
             setCsvHeaders(results.meta.fields);
             // Attempt to auto-map common headers
@@ -68,10 +74,9 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           }
         },
         error: (error) => {
-          console.error("[CsvImporter] Error parsing CSV:", error);
-          showError("Error al leer el archivo CSV.");
-          setCsvHeaders([]);
-          setDataToImport([]);
+          console.error("Error parsing headers:", error);
+          showError("Error al leer los encabezados del archivo.");
+          setHeaders([]);
         }
       });
     }
@@ -89,7 +94,6 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     }
 
     // Validate required fields are mapped
-    const unmappedRequiredFields = requiredFields.filter(field => !columnMapping[field.key]);
     if (unmappedRequiredFields.length > 0) {
       showError(`Los siguientes campos son obligatorios y no están mapeados: ${unmappedRequiredFields.map(f => f.label).join(', ')}`);
       return;
@@ -136,8 +140,20 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       console.error('[CsvImporter] Error during import:', error);
       showError(error.message || 'Error desconocido al importar datos.');
     } finally {
-      dismissToast(toastId);
+      dismissToast(toastId as string); // Cast toastId to string
       setLoading(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (processedData) {
+      const blob = new Blob([processedData], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', originalFileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -172,7 +188,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
 
         {csvHeaders.length > 0 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Mapeo de Columnas</h3>
+            <h3 className="lg:text-lg font-semibold">Mapeo de Columnas</h3>
             <p className="text-sm text-muted-foreground">
               Asigna los encabezados de tu CSV a los campos de la tabla de {tableName}.
             </p>

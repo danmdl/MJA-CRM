@@ -64,7 +64,7 @@ const ChurchesPage = () => {
     if (profile) {
       console.log('[DEBUG] Current User Profile on ChurchesPage:', {
         id: profile.id,
-        email: profile.email, // Assuming email is available in profile or session
+        email: profile.email, // Now 'email' exists on UserProfile
         role: profile.role,
         church_id: profile.church_id,
       });

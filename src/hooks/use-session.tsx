@@ -9,6 +9,7 @@ interface UserProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  email: string | null; // Added email to UserProfile
   role: UserRole;
   church_id: string | null;
 }
