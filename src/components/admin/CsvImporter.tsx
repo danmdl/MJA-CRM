@@ -84,7 +84,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   };
 
   const handleColumnMappingChange = (targetFieldKey: string, csvHeader: string) => {
-    setColumnMapping(prev => ({ ...prev, [targetFieldKey]: csvHeader }));
+    setColumnMapping(prev => ({ ...prev, [targetFieldKey]: csvHeader === '__none__' ? null : csvHeader }));
   };
 
   const handleImportData = async () => {
@@ -189,7 +189,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                   </Label>
                   <Select
                     onValueChange={(value) => handleColumnMappingChange(field.key, value)}
-                    value={columnMapping[field.key] || ''}
+                    value={columnMapping[field.key] ?? undefined}
                     disabled={loading}
                   >
                     <SelectTrigger id={`map-${field.key}`}>
@@ -210,14 +210,14 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                   <Label htmlFor={`map-${field.key}`}>{field.label}</Label>
                   <Select
                     onValueChange={(value) => handleColumnMappingChange(field.key, value)}
-                    value={columnMapping[field.key] || ''}
+                    value={columnMapping[field.key] ?? '__none__'}
                     disabled={loading}
                   >
                     <SelectTrigger id={`map-${field.key}`}>
                       <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">(Opcional)</SelectItem>
+                      <SelectItem value="__none__">(Opcional)</SelectItem>
                       {csvHeaders.map(header => (
                         <SelectItem key={header} value={header}>
                           {header}
