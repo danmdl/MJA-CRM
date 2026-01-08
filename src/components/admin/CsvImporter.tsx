@@ -18,6 +18,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { ContactField } from '@/lib/contact-fields'; // Import ContactField type
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface CsvImporterProps {
   tableName: string;
@@ -34,6 +35,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   const [columnMapping, setColumnMapping] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [ignoreMap, setIgnoreMap] = useState<Record<string, boolean>>({}); // NEW: per-field ignore
 
   const allTargetFields = useMemo(() => [...requiredFields, ...optionalFields], [requiredFields, optionalFields]);
 
@@ -49,6 +51,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       setFile(selectedFile);
       setImportSuccess(false);
       setColumnMapping({}); // Reset mapping
+      setIgnoreMap({}); // Reset ignores
 
       // Parse entire file to get headers and full data
       Papa.parse(selectedFile, {
@@ -87,6 +90,13 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     setColumnMapping(prev => ({ ...prev, [targetFieldKey]: csvHeader === '__none__' ? null : csvHeader }));
   };
 
+  const toggleIgnore = (targetFieldKey: string, ignore: boolean) => {
+    setIgnoreMap(prev => ({ ...prev, [targetFieldKey]: ignore }));
+    if (ignore) {
+      setColumnMapping(prev => ({ ...prev, [targetFieldKey]: null }));
+    }
+  };
+
   const handleImportData = async () => {
     console.log("[CsvImporter] handleImportData triggered.");
     if (!file || dataToImport.length === 0) {
@@ -107,6 +117,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       const recordsToInsert = dataToImport.map(row => {
         const newRecord: Record<string, any> = {};
         allTargetFields.forEach(targetField => {
+          if (ignoreMap[targetField.key]) return; // Skip ignored fields
           const csvHeader = columnMapping[targetField.key];
           if (csvHeader && row[csvHeader] !== undefined) {
             newRecord[targetField.key] = row[csvHeader];
@@ -187,44 +198,62 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                   <Label htmlFor={`map-${field.key}`}>
                     {field.label} <span className="text-red-500">*</span>
                   </Label>
-                  <Select
-                    onValueChange={(value) => handleColumnMappingChange(field.key, value)}
-                    value={columnMapping[field.key] ?? undefined}
-                    disabled={loading}
-                  >
-                    <SelectTrigger id={`map-${field.key}`}>
-                      <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {csvHeaders.map(header => (
-                        <SelectItem key={header} value={header}>
-                          {header}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-3">
+                    <Select
+                      onValueChange={(value) => handleColumnMappingChange(field.key, value)}
+                      value={ignoreMap[field.key] ? undefined : (columnMapping[field.key] ?? undefined)}
+                      disabled={loading || !!ignoreMap[field.key]}
+                    >
+                      <SelectTrigger id={`map-${field.key}`}>
+                        <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {csvHeaders.map(header => (
+                          <SelectItem key={header} value={header}>
+                            {header}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={!!ignoreMap[field.key]}
+                        onCheckedChange={(val) => toggleIgnore(field.key, !!val)}
+                      />
+                      <span>No agregar</span>
+                    </label>
+                  </div>
                 </div>
               ))}
               {optionalFields.map(field => (
                 <div key={field.key} className="space-y-2">
                   <Label htmlFor={`map-${field.key}`}>{field.label}</Label>
-                  <Select
-                    onValueChange={(value) => handleColumnMappingChange(field.key, value)}
-                    value={columnMapping[field.key] ?? '__none__'}
-                    disabled={loading}
-                  >
-                    <SelectTrigger id={`map-${field.key}`}>
-                      <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">(Opcional)</SelectItem>
-                      {csvHeaders.map(header => (
-                        <SelectItem key={header} value={header}>
-                          {header}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-3">
+                    <Select
+                      onValueChange={(value) => handleColumnMappingChange(field.key, value)}
+                      value={ignoreMap[field.key] ? '__none__' : (columnMapping[field.key] ?? '__none__')}
+                      disabled={loading || !!ignoreMap[field.key]}
+                    >
+                      <SelectTrigger id={`map-${field.key}`}>
+                        <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">(Opcional)</SelectItem>
+                        {csvHeaders.map(header => (
+                          <SelectItem key={header} value={header}>
+                            {header}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={!!ignoreMap[field.key]}
+                        onCheckedChange={(val) => toggleIgnore(field.key, !!val)}
+                      />
+                      <span>No agregar</span>
+                    </label>
+                  </div>
                 </div>
               ))}
             </div>
