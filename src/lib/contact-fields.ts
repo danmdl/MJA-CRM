@@ -8,7 +8,6 @@ export const CONTACT_FIELDS = [
   { key: 'leader_assigned', label: 'Referente asignado', type: 'text' },
   { key: 'created_at', label: 'Creado en', type: 'date' },
   { key: 'date_of_birth', label: 'Fecha de nacimiento', type: 'date' },
-  { key: 'age', label: 'Edad', type: 'text' },
 ];
 
 export type ContactField = typeof CONTACT_FIELDS[number];

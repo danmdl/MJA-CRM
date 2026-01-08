@@ -50,10 +50,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       setImportSuccess(false);
       setColumnMapping({}); // Reset mapping
 
-      // Read headers to populate the select dropdown
+      // Parse entire file to get headers and full data
       Papa.parse(selectedFile, {
         header: true,
-        preview: 1, // Only parse the first row to get headers
+        skipEmptyLines: 'greedy',
         complete: (results) => {
           if (results.meta.fields) {
             setCsvHeaders(results.meta.fields);
@@ -74,9 +74,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           }
         },
         error: (error) => {
-          console.error("Error parsing headers:", error);
-          showError("Error al leer los encabezados del archivo.");
-          setHeaders([]);
+          console.error("Error parsing CSV:", error);
+          showError("Error al leer el archivo CSV.");
+          setCsvHeaders([]);
+          setDataToImport([]);
         }
       });
     }
