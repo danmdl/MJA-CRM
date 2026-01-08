@@ -34,8 +34,8 @@ const ChurchDatabasePage = () => {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
   }
 
-  const requiredContactFields = CONTACT_FIELDS.filter(f => f.key !== 'apartment_number' && f.key !== 'leader_assigned' && f.key !== 'created_at');
-  const optionalContactFields = CONTACT_FIELDS.filter(f => f.key === 'apartment_number' || f.key === 'leader_assigned' || f.key === 'created_at');
+  const requiredContactFields = CONTACT_FIELDS.filter(f => f.key === 'first_name');
+  const optionalContactFields = CONTACT_FIELDS.filter(f => f.key !== 'first_name');
 
   const handleClearFilters = () => {
     setSearchTerm('');

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { showSuccess } from '@/utils/toast';
 
 interface TeamUser {
   id: string;
@@ -58,41 +59,30 @@ const Messages = () => {
         .eq('sender_id', session?.user.id);
       setOutbox(data || []);
     };
-    const loadAlerts = async () => {
-      if (!profile?.church_id) return;
-      // Load contacts and last contact logs, then compute stale ones (≥ 7 days or never contacted)
-      const { data: contactsData } = await supabase
-        .from('contacts')
-        .select('id, first_name, last_name, phone, church_id')
-        .eq('church_id', profile.church_id);
-      const { data: logsData } = await supabase
-        .from('contact_logs')
-        .select('contact_id, contact_date')
-        .in('contact_id', (contactsData || []).map((c: any) => c.id));
-      const latestMap: Record<string, string> = {};
-      (logsData || []).forEach((l: any) => {
-        const prev = latestMap[l.contact_id];
-        if (!prev || new Date(l.contact_date) > new Date(prev)) {
-          latestMap[l.contact_id] = l.contact_date;
-        }
-      });
-      const stale = (contactsData || []).filter((c: any) => {
-        const last = latestMap[c.id];
-        if (!last) return true;
-        const days = Math.floor((Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24));
-        return days >= 7;
-      }).map((c: any) => ({
-        id: c.id,
-        name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Sin nombre',
-        phone: c.phone || '',
-        lastContact: latestMap[c.id] || null
-      }));
-      setAlerts(stale);
-    };
     loadTeam();
     loadInbox();
     loadOutbox();
-    loadAlerts();
+
+    // Realtime: update inbox/outbox on new inserts
+    const channels: any[] = [];
+    if (session?.user.id) {
+      const outCh = supabase
+        .channel(`messages_out_${session.user.id}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${session.user.id}` }, () => {
+          loadOutbox();
+        })
+        .subscribe();
+      channels.push(outCh);
+
+      const inCh = supabase
+        .channel(`messages_in_${session.user.id}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_recipients', filter: `recipient_id=eq.${session.user.id}` }, () => {
+          loadInbox();
+        })
+        .subscribe();
+      channels.push(inCh);
+    }
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
   }, [session?.user.id, profile?.church_id]);
 
   const filteredTeam = useMemo(() => {
@@ -121,11 +111,18 @@ const Messages = () => {
     await supabase.from('message_recipients').insert(Array.from(selectedIds).map(id => ({ message_id: msgId, recipient_id: id })));
     setBody('');
     setSelectedIds(new Set());
+    showSuccess('Mensaje enviado');
+    // Refresh outbox (and inbox for good measure)
     const { data: sent } = await supabase
       .from('messages')
       .select('id, body, created_at, sender_id, church_id, message_recipients(recipient_id)')
       .eq('sender_id', session?.user.id);
     setOutbox(sent || []);
+    const { data: inboxData } = await supabase
+      .from('messages')
+      .select('id, body, created_at, sender_id, church_id, message_recipients!inner(recipient_id)')
+      .eq('message_recipients.recipient_id', session?.user.id);
+    setInbox(inboxData || []);
   };
 
   return (
