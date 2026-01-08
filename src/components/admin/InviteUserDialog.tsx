@@ -33,6 +33,9 @@ interface InviteUserDialogProps {
 
 export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
   
@@ -67,7 +70,10 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
         },
         body: JSON.stringify({
           ...values,
-          churchId
+          churchId,
+          first_name: firstName,
+          last_name: lastName,
+          phone,
         }),
       });
       
