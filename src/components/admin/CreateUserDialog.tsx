@@ -183,7 +183,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} disabled={loading} />
+                    <Input type="password" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
