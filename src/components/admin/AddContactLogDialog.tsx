@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,7 +59,7 @@ const AddContactLogDialog: React.FC<AddContactLogDialogProps> = ({ open, onOpenC
           <DialogTitle>Agregar registro</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <Label>Fecha</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -67,10 +68,10 @@ const AddContactLogDialog: React.FC<AddContactLogDialogProps> = ({ open, onOpenC
               <Label>Método</Label>
               <Input placeholder="Llamada, WhatsApp, etc." value={method} onChange={(e) => setMethod(e.target.value)} />
             </div>
-            <div>
-              <Label>Notas</Label>
-              <Input placeholder="Detalle" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
+          </div>
+          <div>
+            <Label>Notas</Label>
+            <Textarea rows={4} placeholder="Detalle" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
           <Button onClick={handleAdd} disabled={!date || loading}>Guardar</Button>
         </div>

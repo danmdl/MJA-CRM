@@ -76,10 +76,7 @@ const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
         Cambiar Foto
       </Button>
     </div>
-    <h2 className="text-xl font-bold">
-      {contact.first_name} {contact.last_name || ''}
-    </h2>
-    {/* Se mostrará la edad junto al campo de fecha de nacimiento más abajo */}
+    {/* Name moved to the top-right section area below selects */}
   </div>
 );
 
@@ -198,6 +195,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [cells, setCells] = useState<Cell[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [addLogOpen, setAddLogOpen] = useState(false);
+  const [historySignal, setHistorySignal] = useState(0);
   const queryClient = useQueryClient();
   const { session } = useSession();
 
@@ -369,13 +367,13 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
           <DialogTitle>Perfil del Contacto</DialogTitle>
         </DialogHeader>
         {contact && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <ProfilePictureSection contact={contact} />
               </div>
               <div className="md:col-span-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <SelectField
                     label="Célula"
                     value={contact.cell_id}
@@ -391,21 +389,25 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     placeholder="Sin referente asignado"
                   />
                 </div>
+                {/* Full name in one line just below the selects */}
+                <div className="mt-3 text-lg font-semibold">
+                  {`${contact.first_name} ${contact.last_name || ''}`.trim()}
+                </div>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
                 <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
               </div>
               <CountryPhoneInput label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} />
               <ContactInfoField label="Dirección" value={contact.address || ''} onChange={(v) => setContact({ ...contact, address: v || null })} icon={MapPin} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
                 <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="fecha-nacimiento">Fecha de nacimiento</Label>
                   <div className="flex items-center gap-3">
@@ -439,18 +441,25 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 Ver historial de registro
               </Button>
             </div>
+
             <AddContactLogDialog
               open={addLogOpen}
-              onOpenChange={setAddLogOpen}
+              onOpenChange={(o) => {
+                setAddLogOpen(o);
+              }}
               churchId={churchId}
               contactId={contact.id}
-              onAdded={() => setLogOpen(true)}
+              onAdded={() => {
+                setLogOpen(true);
+                setHistorySignal((s) => s + 1);
+              }}
             />
             <ContactLogDialog
               open={logOpen}
               onOpenChange={setLogOpen}
               churchId={churchId}
               contactId={contact.id}
+              refreshSignal={historySignal}
             />
 
             <div className="flex justify-end space-x-2">

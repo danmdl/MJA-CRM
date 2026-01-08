@@ -11,9 +11,10 @@ interface ContactLogDialogProps {
   onOpenChange: (open: boolean) => void;
   churchId: string;
   contactId: string;
+  refreshSignal?: number;
 }
 
-const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange, churchId, contactId }) => {
+const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange, churchId, contactId, refreshSignal }) => {
   const [logs, setLogs] = useState<any[]>([]);
 
   const loadLogs = async () => {
@@ -31,7 +32,7 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
 
   useEffect(() => {
     if (open) loadLogs();
-  }, [open]);
+  }, [open, refreshSignal]);
 
   // Removed add form state; history-only
   // Removed handleAdd; history-only
