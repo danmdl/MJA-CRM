@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PlusCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Church {
   id: string;
@@ -62,6 +63,30 @@ const OverviewPage = () => {
     staleTime: 60_000
   });
 
+  // NEW: map of referente names
+  const referenteNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (leaders as any[] || []).forEach(p => {
+      const name = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre';
+      map[p.id] = name;
+    });
+    return map;
+  }, [leaders]);
+
+  // NEW: secondary pastors for this church
+  const { data: secondaryPastors } = useQuery({
+    queryKey: ['churchSecondaryPastors', churchId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('church_pastors')
+        .select('user_id')
+        .eq('church_id', churchId!);
+      return data || [];
+    },
+    enabled: !!churchId
+  });
+  const secondaryNames = (secondaryPastors as any[] || []).map(sp => referenteNameMap[sp.user_id] || 'Sin nombre');
+
   // Cells with names for analytics
   const { data: cells } = useQuery({
     queryKey: ['overview-cells', churchId],
@@ -81,6 +106,8 @@ const OverviewPage = () => {
     enabled: !!churchId
   });
 
+  const queryClient = useQueryClient();
+
   const analytics = useMemo(() => {
     const c = (cells as any[]) || [];
     const ppl = (contacts as any[]) || [];
@@ -93,16 +120,17 @@ const OverviewPage = () => {
 
     const cellsCount = c.length;
 
-    // Totals of people considering referente presence:
-    const peopleInCellsWithReferente = c
-      .filter(x => !!x.encargado_id)
-      .reduce((sum, cell) => sum + (attendeeCounts[cell.id] || 0) + 1, 0); // +1 referente per cell
+    // Unique referentes across all cells
+    const uniqueReferentes = new Set<string>();
+    c.forEach((x: any) => { if (x.encargado_id) uniqueReferentes.add(x.encargado_id); });
 
-    const peopleInCellsWithoutReferente = c
-      .filter(x => !x.encargado_id)
-      .reduce((sum, cell) => sum + (attendeeCounts[cell.id] || 0), 0);
+    // Left card: cells counting the referente (cells + unique referentes, without duplicating referentes across multiple cells)
+    const cellsCountingReferente = cellsCount + uniqueReferentes.size;
 
-    // Days of week fixed headers (Spanish)
+    // Right card: members (contacts) across all cells, excluding referentes
+    const peopleInCellsWithoutReferente = Object.values(attendeeCounts).reduce((sum, n) => sum + n, 0);
+
+    // Fixed weekday headers
     const weekDays = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
     const perDay: Record<string, number> = {};
     weekDays.forEach(d => { perDay[d] = 0; });
@@ -116,6 +144,9 @@ const OverviewPage = () => {
     const cellsPerId: Record<string, number> = {};
     c.forEach((x: any) => { if (x.encargado_id) cellsPerId[x.encargado_id] = (cellsPerId[x.encargado_id] || 0) + 1; });
     const topReferenteEntry = Object.entries(cellsPerId).sort((a,b)=>b[1]-a[1])[0] || null;
+    const topReferente = topReferenteEntry
+      ? { name: referenteNameMap[topReferenteEntry[0]] || 'Sin nombre', count: topReferenteEntry[1] as number }
+      : null;
 
     // Cells with most members (use names)
     const membersPerCell: Record<string, number> = {};
@@ -125,19 +156,8 @@ const OverviewPage = () => {
     c.forEach((x: any) => { cellNameMap[x.id] = x.name; });
     const topCells = topCellsRaw.map(([id, count]) => ({ name: cellNameMap[id] || `Célula ${id.slice(0,6)}`, count: count as number }));
 
-    // Resolve referente name map from leaders
-    const referenteNameMap: Record<string, string> = {};
-    (leaders as any[] || []).forEach(p => {
-      const name = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre';
-      referenteNameMap[p.id] = name;
-    });
-
-    const topReferente = topReferenteEntry
-      ? { name: referenteNameMap[topReferenteEntry[0]] || 'Sin nombre', count: topReferenteEntry[1] as number }
-      : null;
-
-    return { cellsCount, peopleInCellsWithReferente, peopleInCellsWithoutReferente, perDay, topReferente, topCells };
-  }, [cells, contacts, leaders]);
+    return { cellsCount, cellsCountingReferente, peopleInCellsWithoutReferente, perDay, topReferente, topCells };
+  }, [cells, contacts, referenteNameMap]);
 
   const [addSecondPastorOpen, setAddSecondPastorOpen] = useState(false);
   const [selectedSecondPastor, setSelectedSecondPastor] = useState<string | 'none'>('none');
@@ -169,18 +189,11 @@ const OverviewPage = () => {
           <CardTitle>{church.name}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Main Pastor with plus to add a second pastor */}
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="font-medium">Pastor Principal</div>
-              {isAdminOrGeneral && (
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setAddSecondPastorOpen(true)}>
-                  <PlusCircle className="h-4 w-4 mr-1" /> Añadir secundario
-                </Button>
-              )}
-            </div>
-            {isAdminOrGeneral ? (
-              <div className="mt-2 max-w-xs">
+          {/* Pastor Principal (left) and Pastores Secundarios (right) */}
+          <div className="flex items-start justify-between gap-6">
+            <div className="min-w-[260px]">
+              <div className="font-medium mb-2">Pastor Principal</div>
+              {isAdminOrGeneral ? (
                 <Select
                   value={church.pastor_id || undefined}
                   onValueChange={async (val) => {
@@ -197,49 +210,68 @@ const OverviewPage = () => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            ) : (
-              <div className="text-muted-foreground">{church.pastor_id ? 'Asignado' : 'No asignado'}</div>
-            )}
+              ) : (
+                <div className="text-muted-foreground">{church.pastor_id ? 'Asignado' : 'No asignado'}</div>
+              )}
+            </div>
 
-            {/* Dialog to add a second pastor */}
-            <Dialog open={addSecondPastorOpen} onOpenChange={setAddSecondPastorOpen}>
-              <DialogContent className="sm:max-w-[420px]">
-                <DialogHeader>
-                  <DialogTitle>Agregar Pastor Secundario</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <Select
-                    value={selectedSecondPastor}
-                    onValueChange={(val) => setSelectedSecondPastor(val as any)}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Selecciona miembro" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Selecciona miembro</SelectItem>
-                      {(leaders as any[] || []).map(p => (
-                        <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={async () => {
-                        if (!churchId || !selectedSecondPastor || selectedSecondPastor === 'none') return;
-                        const { error } = await supabase.from('church_pastors').insert({ church_id: churchId, user_id: selectedSecondPastor });
-                        if (error) showError(error.message || 'Error al agregar pastor secundario.');
-                        else {
-                          showSuccess('Pastor secundario agregado.');
-                          setAddSecondPastorOpen(false);
-                        }
-                      }}
-                    >
-                      Guardar
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-medium">Pastores Secundarios</div>
+                {isAdminOrGeneral && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setAddSecondPastorOpen(true)}>
+                    <PlusCircle className="h-4 w-4 mr-1" /> Añadir secundario
+                  </Button>
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                {secondaryNames.length === 0 ? (
+                  <div>Sin pastores secundarios</div>
+                ) : (
+                  secondaryNames.map((n) => <div key={n}>{n}</div>)
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Dialog to add a second pastor */}
+          <Dialog open={addSecondPastorOpen} onOpenChange={setAddSecondPastorOpen}>
+            <DialogContent className="sm:max-w-[420px]">
+              <DialogHeader>
+                <DialogTitle>Agregar Pastor Secundario</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <Select
+                  value={selectedSecondPastor}
+                  onValueChange={(val) => setSelectedSecondPastor(val as any)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecciona miembro" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Selecciona miembro</SelectItem>
+                    {(leaders as any[] || []).map(p => (
+                      <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={async () => {
+                      if (!churchId || !selectedSecondPastor || selectedSecondPastor === 'none') return;
+                      const { error } = await supabase.from('church_pastors').insert({ church_id: churchId, user_id: selectedSecondPastor });
+                      if (error) showError(error.message || 'Error al agregar pastor secundario.');
+                      else {
+                        showSuccess('Pastor secundario agregado.');
+                        queryClient.invalidateQueries({ queryKey: ['churchSecondaryPastors', churchId] });
+                        setAddSecondPastorOpen(false);
+                      }
+                    }}
+                  >
+                    Guardar
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <p><strong>Creado en:</strong> {new Date(church.created_at).toLocaleDateString()}</p>
 
@@ -250,11 +282,11 @@ const OverviewPage = () => {
               <div className="text-2xl font-bold">{analytics.cellsCount}</div>
             </div>
             <div className="p-3 rounded border">
-              <div className="text-sm text-muted-foreground">Células con referente</div>
-              <div className="text-2xl font-bold">{analytics.peopleInCellsWithReferente}</div>
+              <div className="text-sm text-muted-foreground">Células contando al referente</div>
+              <div className="text-2xl font-bold">{analytics.cellsCountingReferente}</div>
             </div>
             <div className="p-3 rounded border">
-              <div className="text-sm text-muted-foreground">Células sin referente</div>
+              <div className="text-sm text-muted-foreground">Células sin contar al referente</div>
               <div className="text-2xl font-bold">{analytics.peopleInCellsWithoutReferente}</div>
             </div>
           </div>

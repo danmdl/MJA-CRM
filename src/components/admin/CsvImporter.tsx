@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Upload, CheckCircle2, XCircle } from 'lucide-react';
+import { Upload, CheckCircle2 } from 'lucide-react';
 import Papa from 'papaparse';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { ContactField } from '@/lib/contact-fields'; // Import ContactField type
 import { Checkbox } from '@/components/ui/checkbox';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface CsvImporterProps {
   tableName: string;
@@ -36,6 +37,8 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   const [loading, setLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const [ignoreMap, setIgnoreMap] = useState<Record<string, boolean>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   const allTargetFields = useMemo(() => [...requiredFields, ...optionalFields], [requiredFields, optionalFields]);
 
@@ -50,45 +53,52 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   }, [requiredFields, columnMapping]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("[CsvImporter] handleFileChange triggered.");
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
-      setImportSuccess(false);
-      setColumnMapping({});
-      setIgnoreMap({});
+      parseFile(selectedFile);
+    }
+  };
 
-      // Parse entire file to get headers and full data
-      Papa.parse(selectedFile, {
-        header: true,
-        skipEmptyLines: 'greedy',
-        complete: (results) => {
-          if (results.meta.fields) {
-            setCsvHeaders(results.meta.fields);
-            // Attempt to auto-map common headers
-            const initialMapping: Record<string, string | null> = {};
-            allTargetFields.forEach(targetField => {
-              const matchingCsvHeader = results.meta.fields?.find(csvHeader =>
-                csvHeader.toLowerCase().includes(targetField.label.toLowerCase().replace(/\s/g, '_')) ||
-                csvHeader.toLowerCase().includes(targetField.key.toLowerCase())
-              );
-              initialMapping[targetField.key] = matchingCsvHeader || null;
-            });
-            setColumnMapping(initialMapping);
-            setDataToImport(results.data as Record<string, string>[]);
-          } else {
-            setCsvHeaders([]);
-            setDataToImport([]);
-          }
-        },
-        error: (error) => {
-          console.error("Error parsing CSV:", error);
-          showError("Error al leer el archivo CSV.");
+  const parseFile = (selectedFile: File) => {
+    console.log("[CsvImporter] parseFile triggered.");
+    setFile(selectedFile);
+    setImportSuccess(false);
+    setColumnMapping({});
+    setIgnoreMap({});
+    Papa.parse(selectedFile, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      complete: (results) => {
+        if (results.meta.fields) {
+          setCsvHeaders(results.meta.fields);
+          const initialMapping: Record<string, string | null> = {};
+          allTargetFields.forEach(targetField => {
+            const matchingCsvHeader = results.meta.fields?.find(csvHeader =>
+              csvHeader.toLowerCase().includes(targetField.label.toLowerCase().replace(/\s/g, '_')) ||
+              csvHeader.toLowerCase().includes(targetField.key.toLowerCase())
+            );
+            initialMapping[targetField.key] = matchingCsvHeader || null;
+          });
+          setColumnMapping(initialMapping);
+          setDataToImport(results.data as Record<string, string>[]);
+        } else {
           setCsvHeaders([]);
           setDataToImport([]);
         }
-      });
-    }
+      },
+      error: (error) => {
+        console.error("Error parsing CSV:", error);
+        showError("Error al leer el archivo CSV.");
+        setCsvHeaders([]);
+        setDataToImport([]);
+      }
+    });
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files?.[0];
+    if (f) parseFile(f);
   };
 
   const handleColumnMappingChange = (targetFieldKey: string, csvHeader: string) => {
@@ -153,6 +163,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       setCsvHeaders([]);
       setDataToImport([]);
       setColumnMapping({});
+      // NEW: refresh contacts list immediately
+      if (churchId) {
+        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+      }
     } catch (error: any) {
       console.error('[CsvImporter] Error during import:', error);
       showError(error.message || 'Error desconocido al importar datos.');
@@ -175,13 +189,28 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="csv-file">Archivo CSV</Label>
+          <Label>Archivo CSV</Label>
+          <div className="flex items-center gap-4">
+            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" />
+              Seleccionar archivo
+            </Button>
+            <div
+              className="flex-1 border-2 border-dashed rounded p-4 text-center text-sm text-muted-foreground"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+            >
+              Arrastrar el archivo CSV acá
+            </div>
+          </div>
           <Input
+            ref={fileInputRef}
             id="csv-file"
             type="file"
             accept=".csv"
             onChange={handleFileChange}
             disabled={loading}
+            className="hidden"
           />
           {file && <p className="text-sm text-muted-foreground">Archivo seleccionado: {file.name}</p>}
           {importSuccess && (
@@ -203,32 +232,22 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                   <Label htmlFor={`map-${field.key}`}>
                     {field.label} <span className="text-red-500">*</span>
                   </Label>
-                  <div className="flex items-center gap-3">
-                    <Select
-                      onValueChange={(value) => handleColumnMappingChange(field.key, value)}
-                      value={ignoreMap[field.key] ? undefined : (columnMapping[field.key] ?? undefined)}
-                      disabled={loading || !!ignoreMap[field.key]}
-                    >
-                      <SelectTrigger id={`map-${field.key}`} className="min-w-[280px]">
-                        <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {csvHeaders.map(header => (
-                          <SelectItem key={header} value={header}>
-                            {header}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Checkbox
-                        checked={!!ignoreMap[field.key]}
-                        onCheckedChange={(val) => toggleIgnore(field.key, !!val)}
-                        disabled
-                      />
-                      <span>No agregar (requerido)</span>
-                    </label>
-                  </div>
+                  <Select
+                    onValueChange={(value) => handleColumnMappingChange(field.key, value)}
+                    value={columnMapping[field.key] ?? undefined}
+                    disabled={loading}
+                  >
+                    <SelectTrigger id={`map-${field.key}`} className="min-w-[280px]">
+                      <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {csvHeaders.map(header => (
+                        <SelectItem key={header} value={header}>
+                          {header}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               ))}
               {optionalFields.map(field => (

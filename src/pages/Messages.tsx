@@ -100,9 +100,9 @@ const Messages = () => {
   };
 
   const sendMessage = async () => {
-    if (!profile?.church_id || selectedIds.size === 0 || !body.trim()) return;
+    if (selectedIds.size === 0 || !body.trim()) return;
     const { data, error } = await supabase.from('messages').insert({
-      church_id: profile.church_id,
+      church_id: profile?.church_id || null,
       sender_id: session?.user.id,
       body: body.trim()
     }).select('*').single();
@@ -112,7 +112,6 @@ const Messages = () => {
     setBody('');
     setSelectedIds(new Set());
     showSuccess('Mensaje enviado');
-    // Refresh outbox (and inbox for good measure)
     const { data: sent } = await supabase
       .from('messages')
       .select('id, body, created_at, sender_id, church_id, message_recipients(recipient_id)')
