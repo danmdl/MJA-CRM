@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key } from 'lucide-react'; // Added Key icon
+import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare } from 'lucide-react'; // Added MessageSquare icon
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 
@@ -14,9 +14,7 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
     { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
     { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" }, // New item
     { to: "/admin/profile", icon: User, label: "Perfil" },
-    <Link to="/messages" className="flex items-center rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-      <span className="text-sm">Mensajes</span>
-    </Link>
+    { to: "/messages", icon: MessageSquare, label: "Mensajes" } // Converted from a raw Link to a proper nav item
   ];
 
   return (
