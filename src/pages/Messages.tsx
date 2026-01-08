@@ -29,9 +29,20 @@ const Messages = () => {
 
   useEffect(() => {
     const loadTeam = async () => {
-      if (!profile?.church_id) return;
-      const { data } = await supabase.from('profiles').select('id, first_name, last_name').eq('church_id', profile.church_id);
-      setTeam((data || []).map((p: any) => ({ id: p.id, first_name: p.first_name, last_name: p.last_name, email: null })));
+      const assignableRoles = ['user', 'encargado_de_celula', 'piloto', 'pastor'];
+      let query = supabase.from('profiles')
+        .select('id, first_name, last_name, role, church_id')
+        .in('role', assignableRoles);
+      if (profile?.church_id) {
+        query = query.eq('church_id', profile.church_id);
+      }
+      const { data } = await query;
+      setTeam((data || []).map((p: any) => ({
+        id: p.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        email: null
+      })));
     };
     const loadInbox = async () => {
       const { data } = await supabase

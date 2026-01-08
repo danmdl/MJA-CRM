@@ -35,7 +35,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   const [columnMapping, setColumnMapping] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
-  const [ignoreMap, setIgnoreMap] = useState<Record<string, boolean>>({}); // NEW: per-field ignore
+  const [ignoreMap, setIgnoreMap] = useState<Record<string, boolean>>({});
 
   const allTargetFields = useMemo(() => [...requiredFields, ...optionalFields], [requiredFields, optionalFields]);
 
@@ -44,14 +44,19 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     return requiredFields.filter(field => !columnMapping[field.key]);
   }, [requiredFields, columnMapping]);
 
+  const requiredMissing = useMemo(() => {
+    // Required field is missing if it has no mapping (ignores don't apply to required fields)
+    return requiredFields.filter(f => !columnMapping[f.key]);
+  }, [requiredFields, columnMapping]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log("[CsvImporter] handleFileChange triggered.");
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setImportSuccess(false);
-      setColumnMapping({}); // Reset mapping
-      setIgnoreMap({}); // Reset ignores
+      setColumnMapping({});
+      setIgnoreMap({});
 
       // Parse entire file to get headers and full data
       Papa.parse(selectedFile, {
@@ -105,8 +110,8 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     }
 
     // Validate required fields are mapped
-    if (unmappedRequiredFields.length > 0) {
-      showError(`Los siguientes campos son obligatorios y no están mapeados: ${unmappedRequiredFields.map(f => f.label).join(', ')}`);
+    if (requiredMissing.length > 0) {
+      showError(`Los siguientes campos son obligatorios y no están mapeados: ${requiredMissing.map(f => f.label).join(', ')}`);
       return;
     }
 
@@ -204,7 +209,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                       value={ignoreMap[field.key] ? undefined : (columnMapping[field.key] ?? undefined)}
                       disabled={loading || !!ignoreMap[field.key]}
                     >
-                      <SelectTrigger id={`map-${field.key}`}>
+                      <SelectTrigger id={`map-${field.key}`} className="min-w-[280px]">
                         <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
                       </SelectTrigger>
                       <SelectContent>
@@ -215,12 +220,13 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                         ))}
                       </SelectContent>
                     </Select>
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Checkbox
                         checked={!!ignoreMap[field.key]}
                         onCheckedChange={(val) => toggleIgnore(field.key, !!val)}
+                        disabled
                       />
-                      <span>No agregar</span>
+                      <span>No agregar (requerido)</span>
                     </label>
                   </div>
                 </div>
@@ -234,7 +240,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                       value={ignoreMap[field.key] ? '__none__' : (columnMapping[field.key] ?? '__none__')}
                       disabled={loading || !!ignoreMap[field.key]}
                     >
-                      <SelectTrigger id={`map-${field.key}`}>
+                      <SelectTrigger id={`map-${field.key}`} className="min-w-[280px]">
                         <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
                       </SelectTrigger>
                       <SelectContent>
@@ -264,7 +270,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         <Button
           type="button"
           onClick={handleImportData}
-          disabled={loading || !file || unmappedRequiredFields.length > 0}
+          disabled={loading || !file || requiredMissing.length > 0}
         >
           {loading ? 'Importando...' : (
             <>

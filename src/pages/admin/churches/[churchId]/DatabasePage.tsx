@@ -53,7 +53,7 @@ const ChurchDatabasePage = () => {
                 <Upload className="mr-2 h-4 w-4" /> Importar CSV
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[800px]">
+            <DialogContent className="sm:max-w-[1100px]">
               <DialogHeader>
                 <DialogTitle>Importar Contactos desde CSV</DialogTitle>
                 <DialogDescription>

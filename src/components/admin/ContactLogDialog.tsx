@@ -34,6 +34,23 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
     if (open) loadLogs();
   }, [open, refreshSignal]);
 
+  useEffect(() => {
+    if (!contactId) return;
+    const channel = supabase
+      .channel(`contact_logs_${contactId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'contact_logs', filter: `contact_id=eq.${contactId}` },
+        () => {
+          loadLogs();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [contactId]);
+
   // Removed add form state; history-only
   // Removed handleAdd; history-only
 
