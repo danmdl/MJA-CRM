@@ -70,6 +70,7 @@ const AppRoutes = () => {
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
         <Route path="login-management" element={<LoginManagementPage />} /> {/* New route */}
         <Route path="profile" element={<AdminProfile />} />
+        <Route path="messages" element={<Messages />} /> {/* Added admin messages route */}
         
         {/* Nested routes for specific church details */}
         <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>

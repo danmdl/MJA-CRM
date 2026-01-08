@@ -14,7 +14,7 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
     { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
     { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" }, // New item
     { to: "/admin/profile", icon: User, label: "Perfil" },
-    { to: "/messages", icon: MessageSquare, label: "Mensajes" } // Converted from a raw Link to a proper nav item
+    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" } // Updated to point to admin route
   ];
 
   return (
