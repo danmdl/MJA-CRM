@@ -111,6 +111,38 @@ const TableCellContent = ({
     return text.substring(0, maxLength) + '...';
   };
 
+  const waNumber = (contact.phone || '').replace(/[^\d]/g, '');
+  const mapQuery = encodeURIComponent((contact as any).address || '');
+
+  const baseContent = () => {
+    if (column.key === 'created_at') {
+      const v = (contact as any)[column.key] as string | null | undefined;
+      return v ? formatCompactDate(v) : '-';
+    }
+    if (column.key === 'last_contact_date') {
+      const val = (contact as any).last_contact_date as string | null | undefined;
+      if (!val) return '-';
+      const days = Math.floor((Date.now() - new Date(val).getTime()) / (1000 * 60 * 60 * 24));
+      const red = days >= 7;
+      return (
+        <span className={`inline-flex items-center gap-2 ${red ? 'text-red-600' : ''}`}>
+          <span className={`inline-block w-2 h-2 rounded-full ${red ? 'bg-red-600' : 'bg-muted-foreground/40'}`} />
+          {formatCompactDate(val)}
+        </span>
+      );
+    }
+    if (column.key === 'cell.name') {
+      return contact.cell?.name || '-';
+    }
+    if (column.key === 'leader.first_name') {
+      return contact.leader ? `${contact.leader.first_name} ${contact.leader.last_name}` : '-';
+    }
+    if (column.key === 'age') {
+      return (contact as any).age ?? '-';
+    }
+    return truncateText((contact as any)[column.key] as string);
+  };
+
   return (
     <TableCell
       className={`align-top max-w-xs truncate ${column.key === 'first_name' || column.key === 'last_name' ? "cursor-pointer hover:underline" : ""}`}
@@ -119,34 +151,39 @@ const TableCellContent = ({
           handleViewProfile(contact.id);
         }
       }}
-      title={(contact as any)[column.key] || undefined}
+      title={((contact as any)[column.key] as string) || undefined}
     >
-      {column.key === 'created_at' ? (
-        (contact as any)[column.key] ? formatCompactDate((contact as any)[column.key] as string) : '-'
-      ) : column.key === 'last_contact_date' ? (
-        (() => {
-          const val = (contact as any).last_contact_date as string | null | undefined;
-          if (!val) return '-';
-          const days = Math.floor((Date.now() - new Date(val).getTime()) / (1000 * 60 * 60 * 24));
-          const red = days >= 7;
-          return (
-            <span className={`inline-flex items-center gap-2 ${red ? 'text-red-600' : ''}`}>
-              <span className={`inline-block w-2 h-2 rounded-full ${red ? 'bg-red-600' : 'bg-muted-foreground/40'}`} />
-              {formatCompactDate(val)}
-            </span>
-          );
-        })()
-      ) : column.key === 'cell.name' ? (
-        contact.cell?.name || '-'
-      ) : column.key === 'leader.first_name' ? (
-        contact.leader ?
-          `${contact.leader.first_name} ${contact.leader.last_name}` :
-          '-'
-      ) : column.key === 'age' ? (
-        (contact as any).age ?? '-'
-      ) : (
-        truncateText(contact[column.key] as string)
-      )}
+      <div className="space-y-2">
+        <div>{baseContent()}</div>
+
+        {/* Acciones dentro de la misma celda para Teléfono y Dirección */}
+        {column.key === 'phone' && (
+          <div className="flex gap-2">
+            <a
+              href={waNumber ? `https://wa.me/${waNumber}` : '#'}
+              target="_blank"
+              rel="noreferrer"
+              className={`text-xs px-2 py-1 rounded border ${waNumber ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
+              onClick={(e) => { if (!waNumber) e.preventDefault(); }}
+            >
+              Enviar Whatsapp
+            </a>
+          </div>
+        )}
+        {column.key === 'address' && (
+          <div className="flex gap-2">
+            <a
+              href={(contact as any).address ? `https://www.google.com/maps/search/?api=1&query=${mapQuery}` : '#'}
+              target="_blank"
+              rel="noreferrer"
+              className={`text-xs px-2 py-1 rounded border ${ (contact as any).address ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
+              onClick={(e) => { if (!(contact as any).address) e.preventDefault(); }}
+            >
+              Ver Dirección en Mapa
+            </a>
+          </div>
+        )}
+      </div>
     </TableCell>
   );
 };
@@ -487,7 +524,6 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
                       handleColumnChange={handleColumnChange}
                     />
                   ))}
-                  <TableHead className="w-40">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -508,12 +544,11 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
                           handleViewProfile={handleViewProfile}
                         />
                       ))}
-                      <TableCell>{renderActionsCell(contact)}</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={visibleColumns.length + 2} className="text-center">
+                    <TableCell colSpan={visibleColumns.length + 1} className="text-center">
                       No se encontraron contactos.
                     </TableCell>
                   </TableRow>

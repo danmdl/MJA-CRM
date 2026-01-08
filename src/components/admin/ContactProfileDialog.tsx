@@ -66,7 +66,7 @@ interface ContactProfileDialogProps {
 }
 
 const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
-  <div className="flex flex-col items-center space-y-4">
+  <div className="flex flex-col items-start space-y-4">
     <div className="relative">
       <div className="bg-gray-200 border-2 border-dashed rounded-xl w-24 h-24 flex items-center justify-center">
         <User className="h-12 w-12 text-gray-400" />
@@ -78,16 +78,7 @@ const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
     <h2 className="text-xl font-bold">
       {contact.first_name} {contact.last_name || ''}
     </h2>
-    {contact.date_of_birth ? (
-      <div className="text-sm text-muted-foreground">
-        {(() => {
-          const d = new Date(contact.date_of_birth!);
-          const diff = Date.now() - d.getTime();
-          const age = Math.abs(new Date(diff).getUTCFullYear() - 1970);
-          return `Edad: ${Number.isFinite(age) ? age : '-'}`;
-        })()}
-      </div>
-    ) : null}
+    {/* Se mostrará la edad junto al campo de fecha de nacimiento más abajo */}
   </div>
 );
 
@@ -393,16 +384,25 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fecha-nacimiento">Fecha de nacimiento</Label>
-                  <Input
-                    id="fecha-nacimiento"
-                    type="date"
-                    value={contact.date_of_birth || ''}
-                    onChange={(e) => setContact({ ...contact, date_of_birth: e.target.value || null })}
-                  />
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="fecha-nacimiento"
+                      type="date"
+                      value={contact.date_of_birth || ''}
+                      onChange={(e) => setContact({ ...contact, date_of_birth: e.target.value || null })}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {(() => {
+                        if (!contact.date_of_birth) return 'Edad: -';
+                        const d = new Date(contact.date_of_birth!);
+                        const diff = Date.now() - d.getTime();
+                        const age = Math.abs(new Date(diff).getUTCFullYear() - 1970);
+                        return `Edad: ${Number.isFinite(age) ? age : '-'}`;
+                      })()}
+                    </span>
+                  </div>
                 </div>
               </div>
-              {/* Email se mueve debajo de Departamento/Barrio */}
-              <ContactInfoField label="Correo Electrónico" value={contact.email || ''} onChange={(v) => setContact({ ...contact, email: v || null })} icon={Mail} type="email" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SelectField label="Célula" value={contact.cell_id} onChange={(v) => setContact({ ...contact, cell_id: v })} options={cells} placeholder="Sin célula asignada" />
                 <SelectField
@@ -415,14 +415,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setLogOpen(true)}>
-                <ClipboardList className="mr-2 h-4 w-4" />
-                Ver historial de contacto
-              </Button>
+            <div className="flex justify-center gap-4">
               <Button size="sm" onClick={() => setLogOpen(true)}>
                 <MessageSquare className="mr-2 h-4 w-4" />
-                Agregar registro
+                Agregar Registro
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setLogOpen(true)}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Ver historial de registro
               </Button>
             </div>
             <ContactLogDialog open={logOpen} onOpenChange={setLogOpen} churchId={churchId} contactId={contact.id} />

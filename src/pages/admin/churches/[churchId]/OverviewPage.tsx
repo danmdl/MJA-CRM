@@ -157,7 +157,7 @@ const OverviewPage = () => {
               </div>
             )}
           </div>
-          <p><strong>Fecha de Creación:</strong> {new Date(church.created_at).toLocaleDateString()}</p>
+          <p><strong>Creado en:</strong> {new Date(church.created_at).toLocaleDateString()}</p>
           {/* Removed pinned order and details */}
           
           {/* Analytics */}

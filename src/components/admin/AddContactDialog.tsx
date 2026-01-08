@@ -109,7 +109,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');
@@ -174,7 +173,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .insert({
           first_name: firstName,
           last_name: lastName || null,
-          email: email || null,
           phone: phone || null,
           address: address || null,
           apartment_number: apartmentNumber || null,
@@ -190,7 +188,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
         setFirstName('');
         setLastName('');
-        setEmail('');
         setPhone('');
         setAddress('');
         setApartmentNumber('');
@@ -218,7 +215,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Nombre" id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={loading} />
           <FormField label="Apellido" id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} />
-          <FormField label="Correo Electrónico" id="email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" disabled={loading} />
+          {/* REMOVED: Email field */}
           <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} />
           <FormField label="Dirección" id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={loading} />
           <FormField label="Número de Apartamento" id="apartmentNumber" value={apartmentNumber} onChange={(e) => setApartmentNumber(e.target.value)} disabled={loading} />
