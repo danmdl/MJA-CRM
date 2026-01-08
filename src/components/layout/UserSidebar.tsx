@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { User, LayoutDashboard, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';

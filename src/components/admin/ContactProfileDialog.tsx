@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSession } from '@/hooks/use-session';
 import CountryPhoneInput from '@/components/CountryPhoneInput';
 import ContactLogDialog from './ContactLogDialog';
+import AddContactLogDialog from './AddContactLogDialog';
 
 interface Contact {
   id: string;
@@ -196,6 +197,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
   const [logOpen, setLogOpen] = useState(false);
+  const [addLogOpen, setAddLogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { session } = useSession();
 
@@ -368,7 +370,29 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         </DialogHeader>
         {contact && (
           <div className="space-y-6">
-            <ProfilePictureSection contact={contact} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <ProfilePictureSection contact={contact} />
+              </div>
+              <div className="md:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <SelectField
+                    label="Célula"
+                    value={contact.cell_id}
+                    onChange={(v) => setContact({ ...contact, cell_id: v })}
+                    options={cells}
+                    placeholder="Sin célula asignada"
+                  />
+                  <SelectField
+                    label="Referente asignado"
+                    value={contact.leader_assigned}
+                    onChange={(v) => setContact({ ...contact, leader_assigned: v })}
+                    options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))}
+                    placeholder="Sin referente asignado"
+                  />
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -403,20 +427,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <SelectField label="Célula" value={contact.cell_id} onChange={(v) => setContact({ ...contact, cell_id: v })} options={cells} placeholder="Sin célula asignada" />
-                <SelectField
-                  label="Referente asignado"
-                  value={contact.leader_assigned}
-                  onChange={(v) => setContact({ ...contact, leader_assigned: v })}
-                  options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))}
-                  placeholder="Sin referente asignado"
-                />
-              </div>
             </div>
 
             <div className="flex justify-center gap-4">
-              <Button size="sm" onClick={() => setLogOpen(true)}>
+              <Button size="sm" onClick={() => setAddLogOpen(true)}>
                 <MessageSquare className="mr-2 h-4 w-4" />
                 Agregar Registro
               </Button>
@@ -425,7 +439,19 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 Ver historial de registro
               </Button>
             </div>
-            <ContactLogDialog open={logOpen} onOpenChange={setLogOpen} churchId={churchId} contactId={contact.id} />
+            <AddContactLogDialog
+              open={addLogOpen}
+              onOpenChange={setAddLogOpen}
+              churchId={churchId}
+              contactId={contact.id}
+              onAdded={() => setLogOpen(true)}
+            />
+            <ContactLogDialog
+              open={logOpen}
+              onOpenChange={setLogOpen}
+              churchId={churchId}
+              contactId={contact.id}
+            />
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
