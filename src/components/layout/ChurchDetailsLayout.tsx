@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Outlet } from 'react-router-dom';
-import { useSession } from '@/hooks/use-session';
-import { showError } from '@/utils/toast';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Skeleton } from '@/components/ui/skeleton';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useSession } from "@/hooks/use-session";
+import { showError } from "@/utils/toast";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -25,41 +24,44 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (sessionLoading) return;
 
     if (!churchId) {
-      showError('Error: No se encontró el ID de la iglesia.');
-      navigate('/admin/churches', { replace: true });
+      showError("Error: No se encontró el ID de la iglesia.");
+      navigate("/admin/churches", { replace: true });
       return;
     }
 
-    const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
+    const isAdminOrGeneral = profile?.role === "admin" || profile?.role === "general";
     const isAssignedToChurch = profile?.church_id === churchId;
 
     if (!isAdminOrGeneral && !isAssignedToChurch) {
-      showError('No tienes permiso para acceder a los detalles de esta iglesia.');
-      navigate('/admin/churches', { replace: true });
+      showError("No tienes permiso para acceder a los detalles de esta iglesia.");
+      navigate("/admin/churches", { replace: true });
     } else {
       setAccessChecked(true);
     }
   }, [churchId, profile, sessionLoading, navigate]);
 
   const { data: churchData, isLoading: nameLoading } = useQuery({
-    queryKey: ['churchName', churchId],
+    queryKey: ["churchName", churchId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('churches').select('name').eq('id', churchId).single();
-      if (error) return { name: '' };
+      const { data, error } = await supabase
+        .from("churches")
+        .select("name")
+        .eq("id", churchId)
+        .single();
+      if (error) return { name: "" };
       return data as { name: string };
     },
-    enabled: !!churchId
+    enabled: !!churchId,
   });
 
-  const tabFromPath = () => {
+  const activeTab = (() => {
     const p = location.pathname;
-    if (p.endsWith('/overview')) return 'overview';
-    if (p.endsWith('/database')) return 'database';
-    if (p.endsWith('/team')) return 'team';
-    if (p.endsWith('/cells')) return 'cells';
-    return 'overview';
-  };
-  const activeTab = tabFromPath();
+    if (p.endsWith("/overview")) return "overview";
+    if (p.endsWith("/database")) return "database";
+    if (p.endsWith("/team")) return "team";
+    if (p.endsWith("/cells")) return "cells";
+    return "overview";
+  })();
 
   if (!accessChecked || sessionLoading) {
     return (
@@ -75,7 +77,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         {nameLoading ? (
           <Skeleton className="h-6 w-40" />
         ) : (
-          <h2 className="text-xl font-bold tracking-tight">{churchData?.name || 'Iglesia'}</h2>
+          <h2 className="text-xl font-bold tracking-tight">{churchData?.name || "Iglesia"}</h2>
         )}
       </div>
 

@@ -40,22 +40,22 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
   const allowedChurchRolePaths = [
     '/admin/churches',
     '/admin/csv-deduplicator',
-    '/admin/messages', // Added for church roles
+    '/admin/messages',
   ];
 
-  // Check if the current path starts with any of the allowed church role paths
-  const isCurrentPathAllowedForChurchRole = allowedChurchRolePaths.some(path => 
+  const isCurrentPathAllowedForChurchRole = allowedChurchRolePaths.some(path =>
     location.pathname.startsWith(path)
   );
 
   if (isAdminOrGeneral) {
-    // Admins and Generals have full access to all /admin routes
     return <>{children}</>;
-  } else if (isChurchRole && isCurrentPathAllowedForChurchRole) {
-    // Church roles can access specific /admin paths
-    return <>{children}</>;
+  } else if (isChurchRole) {
+    if (isCurrentPathAllowedForChurchRole) {
+      return <>{children}</>;
+    }
+    // If a church-role user hits a disallowed admin path (like /admin or /admin/dashboard), redirect them to /admin/churches
+    return <Navigate to="/admin/churches" replace />;
   } else {
-    // For any other /admin path, or if not admin/general/church-role, deny access
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
   }

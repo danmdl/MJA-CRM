@@ -33,12 +33,12 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect admin/general users to admin dashboard if they land on non-admin paths
+  // If admin/general lands on a non-admin path, send them to the admin dashboard
   if ((profile?.role === 'admin' || profile?.role === 'general') && !location.pathname.startsWith('/admin')) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // For all other roles (pastor, piloto, encargado_de_celula, user), allow user-level pages and any routes guarded elsewhere
+  // Allow all other roles (pastor, piloto, encargado_de_celula, user) to access user pages
   return <>{children}</>;
 };
 
