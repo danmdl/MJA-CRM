@@ -2,20 +2,27 @@ import { NavLink, Link } from 'react-router-dom';
 import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare } from 'lucide-react'; // Added MessageSquare icon
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
+import { useSession } from '@/hooks/use-session'; // Import useSession
 
 interface SidebarProps {
   isCollapsed: boolean;
 }
 
 const Sidebar = ({ isCollapsed }: SidebarProps) => {
-  const navItems = [
-    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/admin/churches", icon: Church, label: "Iglesias" },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
-    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" }, // New item
-    { to: "/admin/profile", icon: User, label: "Perfil" },
-    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" } // Updated to point to admin route
+  const { profile } = useSession(); // Get the current user's profile
+
+  // Define all possible navigation items
+  const allNavItems = [
+    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general'] },
+    { to: "/admin/churches", icon: Church, label: "Iglesias", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] },
+    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios", roles: ['admin'] }, // Only admin can manage users
+    { to: "/admin/profile", icon: User, label: "Perfil", roles: ['admin', 'general'] }, // Admin/General profile
+    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] }
   ];
+
+  // Filter navigation items based on the user's role
+  const navItems = allNavItems.filter(item => item.roles.includes(profile?.role || 'user'));
 
   return (
     <aside className={cn(
