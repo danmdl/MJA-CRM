@@ -11,7 +11,7 @@ import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface Church {
@@ -73,7 +73,7 @@ const OverviewPage = () => {
     return map;
   }, [leaders]);
 
-  // NEW: secondary pastors for this church
+  // Secondary pastors list (select user_id for removal by composite key)
   const { data: secondaryPastors } = useQuery({
     queryKey: ['churchSecondaryPastors', churchId],
     queryFn: async () => {
@@ -85,28 +85,26 @@ const OverviewPage = () => {
     },
     enabled: !!churchId
   });
-  const secondaryNames = (secondaryPastors as any[] || []).map(sp => referenteNameMap[sp.user_id] || 'Sin nombre');
-
-  // Cells with names for analytics
-  const { data: cells } = useQuery({
-    queryKey: ['overview-cells', churchId],
-    queryFn: async () => {
-      const { data } = await supabase.from('cells').select('id, name, meeting_day, meeting_time, encargado_id').eq('church_id', churchId!);
-      return data || [];
-    },
-    enabled: !!churchId
-  });
-
-  const { data: contacts } = useQuery({
-    queryKey: ['overview-contacts', churchId],
-    queryFn: async () => {
-      const { data } = await supabase.from('contacts').select('id, cell_id').eq('church_id', churchId!);
-      return data || [];
-    },
-    enabled: !!churchId
-  });
+  const secondaryNames = (secondaryPastors as any[] || []).map(sp => ({
+    user_id: sp.user_id,
+    name: referenteNameMap[sp.user_id] || 'Sin nombre'
+  }));
 
   const queryClient = useQueryClient();
+
+  const removeSecondaryPastor = async (userId: string) => {
+    const { error } = await supabase
+      .from('church_pastors')
+      .delete()
+      .eq('church_id', churchId!)
+      .eq('user_id', userId);
+    if (error) {
+      showError(error.message || 'Error al eliminar pastor secundario.');
+    } else {
+      showSuccess('Pastor secundario eliminado.');
+      queryClient.invalidateQueries({ queryKey: ['churchSecondaryPastors', churchId] });
+    }
+  };
 
   const analytics = useMemo(() => {
     const c = (cells as any[]) || [];
@@ -189,8 +187,9 @@ const OverviewPage = () => {
           <CardTitle>{church.name}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Pastor Principal (left) and Pastores Secundarios (right) */}
-          <div className="flex items-start justify-between gap-6">
+          {/* Main pastor + secondary pastors row */}
+          <div className="flex items-center gap-4">
+            {/* Main pastor select (left) */}
             <div className="min-w-[260px]">
               <div className="font-medium mb-2">Pastor Principal</div>
               {isAdminOrGeneral ? (
@@ -215,26 +214,46 @@ const OverviewPage = () => {
               )}
             </div>
 
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-medium">Pastores Secundarios</div>
-                {isAdminOrGeneral && (
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setAddSecondPastorOpen(true)}>
-                    <PlusCircle className="h-4 w-4 mr-1" /> Añadir secundario
-                  </Button>
-                )}
-              </div>
-              <div className="text-sm text-muted-foreground space-y-1">
-                {secondaryNames.length === 0 ? (
-                  <div>Sin pastores secundarios</div>
-                ) : (
-                  secondaryNames.map((n) => <div key={n}>{n}</div>)
-                )}
-              </div>
+            {/* Secondary pastors chips (center, push button to the right) */}
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              {secondaryNames.length === 0 ? (
+                <span className="text-sm text-muted-foreground">Sin pastores secundarios</span>
+              ) : (
+                secondaryNames.map(({ user_id, name }) => (
+                  <div key={user_id} className="flex items-center gap-2 px-3 py-1 rounded border bg-background">
+                    <span className="text-sm">{name}</span>
+                    {isAdminOrGeneral && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-red-600"
+                        onClick={() => removeSecondaryPastor(user_id)}
+                        title="Eliminar pastor secundario"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
+
+            {/* Add secondary button (right) */}
+            {isAdminOrGeneral && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => setAddSecondPastorOpen(true)}
+                title="Añadir pastor secundario"
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Añadir secundario
+              </Button>
+            )}
           </div>
 
-          {/* Dialog to add a second pastor */}
+          {/* Dialog to add a second pastor (unchanged behavior) */}
           <Dialog open={addSecondPastorOpen} onOpenChange={setAddSecondPastorOpen}>
             <DialogContent className="sm:max-w-[420px]">
               <DialogHeader>
