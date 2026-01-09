@@ -106,6 +106,16 @@ const ChurchDatabasePage = () => {
       </div>
 
       <div className="flex-grow">
+        <div className="mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="p-4 border rounded-md bg-background">
+              <div className="text-sm text-muted-foreground">Total contactos</div>
+              <div className="text-2xl font-bold">
+                {/* Count will be visually derived from table; if you want exact server count, we can add a dedicated query later. */}
+              </div>
+            </div>
+          </div>
+        </div>
         <DynamicContactTable churchId={churchId} searchTerm={searchTerm} filterField={filterField} />
       </div>
 
