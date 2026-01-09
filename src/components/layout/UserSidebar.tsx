@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, LayoutDashboard, FileSpreadsheet } from 'lucide-react';
+import { User, LayoutDashboard, FileSpreadsheet, Church } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 
@@ -12,6 +12,7 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/profile", icon: User, label: "Perfil" },
     { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" }, // Changed label here
+    { to: "/admin/churches", icon: Church, label: "Iglesias" }, // NEW: link to churches list
   ];
 
   return (
