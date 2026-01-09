@@ -15,8 +15,6 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
 
   useEffect(() => {
     if (!sessionLoading && session && !profile) {
-      // If session exists but profile is not loaded yet, wait for it
-      // This might happen if profile fetching is slightly delayed
       setLoadingProfile(true);
     } else {
       setLoadingProfile(false);
@@ -35,26 +33,14 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect admin/general to admin dashboard
-  if (profile?.role === 'admin' || profile?.role === 'general') {
-    // If they are already on an admin path, let them continue
-    if (location.pathname.startsWith('/admin')) {
-      return <>{children}</>;
-    }
+  // If an admin/general user lands on a non-admin path, redirect them to their admin dashboard.
+  // This acts as a default landing page redirection for these roles.
+  if ((profile?.role === 'admin' || profile?.role === 'general') && !location.pathname.startsWith('/admin')) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // Redirect pastor/piloto/encargado_de_celula to admin churches page
-  if (['pastor', 'piloto', 'encargado_de_celula'].includes(profile?.role || '')) {
-    // If they are already on an admin path (churches or csv-deduplicator), let them continue
-    if (location.pathname.startsWith('/admin/churches') || location.pathname === '/admin/csv-deduplicator') {
-      return <>{children}</>;
-    }
-    // If they are on the root or a user-specific page, redirect to admin churches
-    return <Navigate to="/admin/churches" replace />;
-  }
-
-  // For 'user' role, or if no specific redirection, render children
+  // For all other authenticated users (including church roles and regular users),
+  // and for admin/general users already on an admin path, render children.
   return <>{children}</>;
 };
 

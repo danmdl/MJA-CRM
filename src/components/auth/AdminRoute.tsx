@@ -40,6 +40,7 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
   const allowedChurchRolePaths = [
     '/admin/churches',
     '/admin/csv-deduplicator',
+    '/admin/messages', // Added for church roles
   ];
 
   // Check if the current path starts with any of the allowed church role paths
