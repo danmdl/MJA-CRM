@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from '@/utils/logger'; // Import the logger utility
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -21,9 +22,19 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
-    if (sessionLoading) return;
+    if (sessionLoading) {
+      logger.log('[ChurchDetailsLayout] Session loading, skipping access check for now.');
+      return;
+    }
+
+    logger.log('[ChurchDetailsLayout] Starting access check for church details.', {
+      userProfile: profile,
+      paramChurchId: churchId,
+      currentPath: location.pathname
+    });
 
     if (!churchId) {
+      logger.error('[ChurchDetailsLayout] No churchId found in params, redirecting to /admin/churches.');
       showError("Error: No se encontró el ID de la iglesia.");
       navigate("/admin/churches", { replace: true });
       return;
@@ -32,13 +43,22 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     const isAdminOrGeneral = profile?.role === "admin" || profile?.role === "general";
     const isAssignedToChurch = profile?.church_id === churchId;
 
+    logger.log('[ChurchDetailsLayout] Authorization check results:', {
+      isAdminOrGeneral,
+      isAssignedToChurch,
+      profileChurchId: profile?.church_id,
+      paramChurchId: churchId
+    });
+
     if (!isAdminOrGeneral && !isAssignedToChurch) {
+      logger.warn('[ChurchDetailsLayout] User not authorized for this church, redirecting to /admin/churches.');
       showError("No tienes permiso para acceder a los detalles de esta iglesia.");
       navigate("/admin/churches", { replace: true });
     } else {
+      logger.log('[ChurchDetailsLayout] User authorized for this church.');
       setAccessChecked(true);
     }
-  }, [churchId, profile, sessionLoading, navigate]);
+  }, [churchId, profile, sessionLoading, navigate, location.pathname]);
 
   const { data: churchData, isLoading: nameLoading } = useQuery({
     queryKey: ["churchName", churchId],
@@ -48,7 +68,11 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         .select("name")
         .eq("id", churchId)
         .single();
-      if (error) return { name: "" };
+      if (error) {
+        logger.error('[ChurchDetailsLayout] Error fetching church name:', error);
+        return { name: "" };
+      }
+      logger.log('[ChurchDetailsLayout] Church name fetched successfully.', { name: data.name });
       return data as { name: string };
     },
     enabled: !!churchId,
@@ -62,8 +86,10 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/cells")) return "cells";
     return "overview";
   })();
+  logger.log('[ChurchDetailsLayout] Active tab:', activeTab);
 
   if (!accessChecked || sessionLoading) {
+    logger.log('[ChurchDetailsLayout] Access not yet checked or session loading, showing loading state.');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Verificando acceso a la iglesia...</div>
