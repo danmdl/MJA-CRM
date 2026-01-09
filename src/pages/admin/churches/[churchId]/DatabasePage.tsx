@@ -23,6 +23,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const ChurchDatabasePage = () => {
   const { churchId } = useParams<{ churchId: string }>();
@@ -41,6 +44,20 @@ const ChurchDatabasePage = () => {
     setSearchTerm('');
     setFilterField(null);
   };
+
+  const { data: totalCount } = useQuery({
+    queryKey: ['contacts-count', churchId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('contacts')
+        .select('id', { count: 'exact', head: true })
+        .eq('church_id', churchId!);
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!churchId,
+    staleTime: 30_000,
+  });
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -105,17 +122,18 @@ const ChurchDatabasePage = () => {
         )}
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Total contactos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{totalCount ?? 0}</div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex-grow">
-        <div className="mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="p-4 border rounded-md bg-background">
-              <div className="text-sm text-muted-foreground">Total contactos</div>
-              <div className="text-2xl font-bold">
-                {/* Count will be visually derived from table; if you want exact server count, we can add a dedicated query later. */}
-              </div>
-            </div>
-          </div>
-        </div>
         <DynamicContactTable churchId={churchId} searchTerm={searchTerm} filterField={filterField} />
       </div>
 

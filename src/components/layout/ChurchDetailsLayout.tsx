@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import ChurchSidebar from './ChurchSidebar';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Outlet } from 'react-router-dom';
-import { useSession } from '@/hooks/use-session'; // Import useSession
+import { useSession } from '@/hooks/use-session';
 import { showError } from '@/utils/toast';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -14,13 +16,13 @@ interface ChurchDetailsLayoutProps {
 
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
-  const { profile, loading: sessionLoading } = useSession(); // Get user profile and session loading state
+  const { profile, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const location = useLocation();
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
-    if (sessionLoading) return; // Wait for session and profile to load
+    if (sessionLoading) return;
 
     if (!churchId) {
       showError('Error: No se encontró el ID de la iglesia.');
@@ -39,6 +41,26 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     }
   }, [churchId, profile, sessionLoading, navigate]);
 
+  const { data: churchData, isLoading: nameLoading } = useQuery({
+    queryKey: ['churchName', churchId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('churches').select('name').eq('id', churchId).single();
+      if (error) return { name: '' };
+      return data as { name: string };
+    },
+    enabled: !!churchId
+  });
+
+  const tabFromPath = () => {
+    const p = location.pathname;
+    if (p.endsWith('/overview')) return 'overview';
+    if (p.endsWith('/database')) return 'database';
+    if (p.endsWith('/team')) return 'team';
+    if (p.endsWith('/cells')) return 'cells';
+    return 'overview';
+  };
+  const activeTab = tabFromPath();
+
   if (!accessChecked || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -48,31 +70,34 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   }
 
   return (
-    <ResizablePanelGroup
-      direction="horizontal"
-      className="h-full w-full"
-      onLayout={(sizes: number[]) => {
-        setIsSidebarCollapsed(sizes[0] < 10);
-      }}
-    >
-      <ResizablePanel
-        defaultSize={15}
-        minSize={4}
-        maxSize={25}
-        collapsible={true}
-        onCollapse={() => setIsSidebarCollapsed(true)}
-        onExpand={() => setIsSidebarCollapsed(false)}
-        className="min-w-[60px] h-full"
-      >
-        <ChurchSidebar isCollapsed={isSidebarCollapsed} churchId={churchId} />
-      </ResizablePanel>
-      <ResizableHandle withHandle />
-      <ResizablePanel defaultSize={85}>
-        <main className="flex-1 p-6 overflow-auto">
+    <div className="h-full w-full">
+      <div className="p-4 border-b">
+        {nameLoading ? (
+          <Skeleton className="h-6 w-40" />
+        ) : (
+          <h2 className="text-xl font-bold tracking-tight">{churchData?.name || 'Iglesia'}</h2>
+        )}
+      </div>
+
+      <div className="p-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
+          className="w-full"
+        >
+          <TabsList className="mb-4">
+            <TabsTrigger value="overview">Resumen</TabsTrigger>
+            <TabsTrigger value="database">Base de Datos</TabsTrigger>
+            <TabsTrigger value="team">Equipo de Células</TabsTrigger>
+            <TabsTrigger value="cells">Células</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <main className="flex-1 overflow-auto">
           {children || <Outlet />}
         </main>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+    </div>
   );
 };
 
