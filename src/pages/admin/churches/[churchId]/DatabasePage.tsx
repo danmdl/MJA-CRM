@@ -124,14 +124,10 @@ const ChurchDatabasePage = () => {
 
       {/* Put stats and the table inside the same relative container so the table's selection toolbar can position next to the cards */}
       <div className="relative">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Total contactos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{totalCount ?? 0}</div>
-            </CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-2">
+          <Card className="flex items-center justify-between p-4">
+            <div className="text-sm font-medium text-muted-foreground">Total contactos</div>
+            <div className="text-2xl font-bold">{totalCount ?? 0}</div>
           </Card>
         </div>
 

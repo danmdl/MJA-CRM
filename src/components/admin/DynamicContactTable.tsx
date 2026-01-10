@@ -446,7 +446,7 @@ const DynamicContactTable = ({
     <div className="space-y-4">
       <div className={useExternalToolbarContainer ? '' : 'relative'}>
         {(someVisibleSelected || allVisibleSelected) && (
-          <div className={useExternalToolbarContainer ? "absolute top-0 right-0 z-10" : "absolute top-0 left-0 right-0 z-10"}>
+          <div className={useExternalToolbarContainer ? "absolute top-0 left-0 right-0 z-10" : "absolute top-0 left-0 right-0 z-10"}>
             <SelectionToolbar
               selectedCount={visibleIds.filter(id => selectedContacts.includes(id)).length}
               canEdit={visibleIds.filter(id => selectedContacts.includes(id)).length === 1}
