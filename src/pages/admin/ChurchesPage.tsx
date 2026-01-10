@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
+import { useNavigate } from 'react-router-dom';
 
 interface Church {
   id: string;
@@ -27,9 +28,9 @@ const fetchChurches = async (): Promise<Church[]> => {
   const { data, error } = await supabase
     .from('churches')
     .select('*')
-    .order('is_pinned', { ascending: false }) // Pinned items first
-    .order('pin_order', { ascending: true, nullsFirst: false }) // Then by pin_order
-    .order('name', { ascending: true }); // Then by name
+    .order('is_pinned', { ascending: false })
+    .order('pin_order', { ascending: true, nullsFirst: false })
+    .order('name', { ascending: true });
 
   if (error) {
     console.error('Error fetching churches:', error);
@@ -39,7 +40,8 @@ const fetchChurches = async (): Promise<Church[]> => {
 };
 
 const ChurchesPage = () => {
-  const { profile } = useSession(); // Get user profile
+  const { profile } = useSession();
+  const navigate = useNavigate();
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -52,16 +54,24 @@ const ChurchesPage = () => {
     queryFn: fetchChurches,
   });
 
+  const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
+  const isChurchRole = ['pastor', 'piloto', 'encargado_de_celula'].includes(profile?.role || '');
+  
+  // Filter churches based on user role
+  const filteredChurches = churches ? 
+    (isAdminOrGeneral ? churches : 
+      (isChurchRole && profile?.church_id ? 
+        churches.filter(church => church.id === profile.church_id) : 
+        [])) : 
+    [];
+
+  // If user is a church role and has an assigned church_id but no churches are loaded,
+  // redirect them directly to their church details
   useEffect(() => {
-    if (profile) {
-      console.log('[DEBUG] Current User Profile on ChurchesPage:', {
-        id: profile.id,
-        email: profile.email,
-        role: profile.role,
-        church_id: profile.church_id,
-      });
+    if (!isLoading && !isAdminOrGeneral && isChurchRole && profile?.church_id && (!churches || churches.length === 0)) {
+      navigate(`/admin/churches/${profile.church_id}/overview`);
     }
-  }, [profile]);
+  }, [isLoading, isAdminOrGeneral, isChurchRole, profile?.church_id, churches, navigate]);
 
   const handleEditChurch = (church: Church) => {
     setSelectedChurch(church);
@@ -77,7 +87,6 @@ const ChurchesPage = () => {
     mutationFn: async ({ churchId, isPinned }: { churchId: string; isPinned: boolean }) => {
       let newPinOrder: number | null = null;
       if (isPinned) {
-        // Find the maximum existing pin_order and add 1, or start at 1
         const maxPinOrder = churches?.reduce((max, c) => (c.is_pinned && c.pin_order !== null ? Math.max(max, c.pin_order) : max), 0) || 0;
         newPinOrder = maxPinOrder + 1;
       }
@@ -99,24 +108,6 @@ const ChurchesPage = () => {
       showError(err.message || 'Error al actualizar el estado de anclaje de la iglesia.');
     },
   });
-
-  const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
-  const isChurchRole = ['pastor', 'piloto', 'encargado_de_celula'].includes(profile?.role || '');
-  
-  // Filter churches based on user role
-  const filteredChurches = churches ? 
-    (isAdminOrGeneral ? churches : 
-      (isChurchRole && profile?.church_id ? 
-        churches.filter(church => church.id === profile.church_id) : 
-        [])) : 
-    [];
-
-  // DEBUG: Log filtering results
-  console.log('[DEBUG ChurchesPage] All churches:', churches);
-  console.log('[DEBUG ChurchesPage] Filtered churches:', filteredChurches);
-  console.log('[DEBUG ChurchesPage] isAdminOrGeneral:', isAdminOrGeneral);
-  console.log('[DEBUG ChurchesPage] isChurchRole:', isChurchRole);
-  console.log('[DEBUG ChurchesPage] profile.church_id:', profile?.church_id);
 
   if (isLoading) {
     return (
@@ -182,7 +173,7 @@ const ChurchesPage = () => {
               <CardDescription>
                 {isAdminOrGeneral 
                   ? 'Haz clic en "Añadir Nueva Iglesia" para empezar.' 
-                  : 'No tienes acceso a ninguna iglesia. Ponte en contacto con un administrador.'}
+                  : 'Cargando tu iglesia asignada...'}
               </CardDescription>
             </CardHeader>
             <CardContent>
