@@ -5,7 +5,7 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { PlusCircle } from 'lucide-react';
-import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
+import InviteUserDialog from '@/components/admin/InviteUserDialog';
 import ChurchUserTable from '@/components/admin/ChurchUserTable';
 
 const ChurchTeamPage = () => {
@@ -17,7 +17,7 @@ const ChurchTeamPage = () => {
   }
 
   return (
-    <div>
+    <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Equipo de la Iglesia</h1>
         <Button onClick={() => setIsInviteDialogOpen(true)}>
