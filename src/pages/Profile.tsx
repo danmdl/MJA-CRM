@@ -60,7 +60,7 @@ const Profile = () => {
   // handleLogout se ha movido al SidebarFooter
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 space-y-6">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 space-y-6"> {/* Added p-6 here */}
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Tu Perfil</CardTitle>

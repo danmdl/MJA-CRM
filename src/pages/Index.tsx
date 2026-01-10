@@ -7,7 +7,7 @@ const Index = () => {
   const { session } = useSession();
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full">
+    <div className="flex flex-col items-center justify-center h-full w-full p-6"> {/* Added p-6 here */}
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <CardTitle className="text-4xl font-bold">¡Bienvenido!</CardTitle>

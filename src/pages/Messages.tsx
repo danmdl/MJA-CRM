@@ -125,7 +125,7 @@ const Messages = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6"> {/* Added p-6 here */}
       <Card className="mb-6">
         <CardHeader><CardTitle>Enviar Mensaje</CardTitle></CardHeader>
         <CardContent className="space-y-3">

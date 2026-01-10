@@ -112,7 +112,7 @@ const ChurchesPage = () => {
 
   if (isLoading) {
     return (
-      <div>
+      <div className="p-6"> {/* Added p-6 here */}
         <h1 className="text-3xl font-bold mb-6">Iglesias</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"> {/* Adjusted grid */}
           <Skeleton className="h-48 w-full" />
@@ -127,11 +127,11 @@ const ChurchesPage = () => {
 
   if (isError) {
     showError(error?.message || 'Error al cargar las iglesias.');
-    return <div className="text-red-500">Error: {error?.message || 'No se pudieron cargar las iglesias.'}</div>;
+    return <div className="text-red-500 p-6">Error: {error?.message || 'No se pudieron cargar las iglesias.'}</div>; {/* Added p-6 here */}
   }
 
   return (
-    <div>
+    <div className="p-6"> {/* Added p-6 here */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Iglesias</h1>
         {isAdminOrGeneral && ( // Only show Add Church button for admin/general

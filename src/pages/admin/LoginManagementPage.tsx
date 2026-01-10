@@ -14,7 +14,7 @@ const LoginManagementPage = () => {
   const isAdmin = profile?.role === 'admin';
 
   return (
-    <div>
+    <div className="p-6"> {/* Added p-6 here */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
         {isAdmin && ( // Only show Create User button for admin

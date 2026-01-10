@@ -107,7 +107,7 @@ const CsvDeduplicatorPage = () => {
   };
 
   return (
-    <div>
+    <div className="p-6"> {/* Added p-6 here */}
       <h1 className="text-3xl font-bold mb-6">Deduplicador de CSV</h1>
       <Card className="max-w-2xl mx-auto">
         <CardHeader>

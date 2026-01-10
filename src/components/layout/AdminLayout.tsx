@@ -31,7 +31,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 h-full overflow-auto"> {/* Removed p-6 here */}
           {children || <Outlet />} {/* Render children if provided, otherwise Outlet */}
         </main>
       </ResizablePanel>

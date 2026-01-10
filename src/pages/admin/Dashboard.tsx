@@ -49,7 +49,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full p-6"> {/* Added p-6 here */}
       <h1 className="text-3xl font-bold mb-2">Dashboard de Administración</h1>
       <p className="text-muted-foreground mb-6">Gestión integral de iglesias y usuarios</p>
 

@@ -56,7 +56,7 @@ const AdminProfile = () => {
   };
 
   return (
-    <div className="space-y-6"> {/* Añadido espacio entre las tarjetas */}
+    <div className="p-6 space-y-6"> {/* Added p-6 here */}
       <h1 className="text-3xl font-bold mb-6">Perfil</h1>
       <Card className="max-w-2xl">
         <CardHeader>
