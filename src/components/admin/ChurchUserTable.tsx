@@ -6,19 +6,20 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2, Key } from 'lucide-react';
+import { MoreHorizontal, Copy, Send, Trash2, Key, Search } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { logger } from '@/utils/logger';
+import React from 'react';
 
 // Definir el tipo de rol de usuario para TypeScript
 type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
@@ -71,12 +72,29 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
 const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session } = useSession();
   const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['churchUsers', churchId],
     queryFn: () => fetchChurchUsers(session?.access_token || '', churchId),
     enabled: !!session?.access_token && !!churchId,
   });
+
+  const filteredUsers = React.useMemo(() => {
+    if (!users) return [];
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return users;
+    
+    return users.filter(user => {
+      const searchableText = [
+        user.first_name || '',
+        user.last_name || '',
+        user.email || '',
+        user.role
+      ].join(' ').toLowerCase();
+      return searchableText.includes(term);
+    });
+  }, [users, searchTerm]);
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -218,6 +236,15 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     },
   });
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '-';
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -248,95 +275,106 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const assignableRoles: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor'];
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Nombre</TableHead>
-          <TableHead>Correo Electrónico</TableHead>
-          <TableHead>Rol</TableHead>
-          <TableHead>Estado</TableHead>
-          <TableHead>Última Actualización</TableHead>
-          <TableHead className="text-right">Acciones</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {users && users.length > 0 ? (
-          users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-2">
-                  {assignableRoles.map(roleOption => {
-                    const rolesArr = (user as any).roles || [user.role];
-                    const checked = rolesArr.includes(roleOption);
-                    return (
-                      <label key={roleOption} className="flex items-center gap-1 text-sm">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(val) => {
-                            const next = new Set(rolesArr);
-                            if (val) next.add(roleOption); else next.delete(roleOption);
-                            updateUserRolesMutation.mutate({ userId: user.id, roles: Array.from(next) as UserRole[] });
-                          }}
-                          disabled={user.id === session?.user.id}
-                        />
-                        <span>{roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g,' ')}</span>
-                      </label>
-                    )
-                  })}
-                </div>
-              </TableCell>
-              <TableCell>{getStatusBadge(user.status)}</TableCell>
-              <TableCell>
-                {user.updated_at ? format(new Date(user.updated_at), "d 'de' MMMM, yyyy", { locale: es }) : '-'}
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Abrir menú</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {user.status === 'invited' && (
+    <div className="space-y-4">
+      {/* Search bar */}
+      <div className="relative w-[320px] max-w-full">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          className="pl-9"
+          placeholder="Buscar por nombre, correo o rol"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Correo Electrónico</TableHead>
+            <TableHead>Rol</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Última Actualización</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredUsers && filteredUsers.length > 0 ? (
+            filteredUsers.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-2">
+                    {assignableRoles.map(roleOption => {
+                      const rolesArr = (user as any).roles || [user.role];
+                      const checked = rolesArr.includes(roleOption);
+                      return (
+                        <label key={roleOption} className="flex items-center gap-1 text-sm">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(val) => {
+                              const next = new Set(rolesArr);
+                              if (val) next.add(roleOption); else next.delete(roleOption);
+                              updateUserRolesMutation.mutate({ userId: user.id, roles: Array.from(next) as UserRole[] });
+                            }}
+                            disabled={user.id === session?.user.id}
+                          />
+                          <span>{roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g,' ')}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </TableCell>
+                <TableCell>{getStatusBadge(user.status)}</TableCell>
+                <TableCell>{formatDate(user.updated_at)}</TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Abrir menú</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {user.status === 'invited' && (
+                        <DropdownMenuItem 
+                          onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          Reenviar Invitación
+                        </DropdownMenuItem>
+                      )}
+                      {user.status === 'invited' && (
+                        <DropdownMenuItem 
+                          onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Copiar Enlace de Invitación
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem 
-                        onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}
+                        onClick={() => deleteUserMutation.mutate(user.id)} 
+                        className="text-red-600"
                       >
-                        <Send className="mr-2 h-4 w-4" />
-                        Reenviar Invitación
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
                       </DropdownMenuItem>
-                    )}
-                    {user.status === 'invited' && (
-                      <DropdownMenuItem 
-                        onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}
-                      >
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copiar Enlace de Invitación
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem 
-                      onClick={() => deleteUserMutation.mutate(user.id)} 
-                      className="text-red-600"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center">
+                {searchTerm ? 'No se encontraron usuarios que coincidan con la búsqueda.' : 'No se encontraron usuarios para esta iglesia.'}
               </TableCell>
             </TableRow>
-          ))
-        ) : (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center">
-              No se encontraron usuarios para esta iglesia.
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 };
 

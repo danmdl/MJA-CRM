@@ -84,6 +84,27 @@ const UserTable = () => {
     enabled: !!session?.access_token && (profile?.role === 'admin' || profile?.role === 'general'),
   });
 
+  // Fetch church names
+  const { data: churches } = useQuery({
+    queryKey: ['churches'],
+    queryFn: async () => {
+      const { data, error } = await (await import('@/integrations/supabase/client')).supabase
+        .from('churches')
+        .select('id, name');
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!session?.access_token,
+  });
+
+  const churchMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    churches?.forEach(church => {
+      map[church.id] = church.name;
+    });
+    return map;
+  }, [churches]);
+
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
@@ -239,6 +260,15 @@ const UserTable = () => {
     resetPasswordMutation.mutate({ userId: userToResetPassword.id, newPassword: values.newPassword });
   };
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '-';
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -310,11 +340,9 @@ const UserTable = () => {
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell>{user.church_id ? user.church_id.substring(0, 8) + '...' : '-'}</TableCell>
+                <TableCell>{user.church_id ? churchMap[user.church_id] || '-' : '-'}</TableCell>
                 <TableCell>{getStatusBadge(user.status)}</TableCell>
-                <TableCell>
-                  {user.updated_at ? format(new Date(user.updated_at), "d 'de' MMMM, yyyy", { locale: es }) : '-'}
-                </TableCell>
+                <TableCell>{formatDate(user.updated_at)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
