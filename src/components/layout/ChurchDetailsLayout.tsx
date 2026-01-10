@@ -102,7 +102,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
       </div>
       
       {/* Main content area */}
-      <main className="flex-1 p-6 overflow-auto"> {/* Added p-6 here */}
+      <main className="flex-1 p-6 overflow-auto">
         {children || <Outlet />}
       </main>
     </div>
