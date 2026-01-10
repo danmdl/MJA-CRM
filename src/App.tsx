@@ -26,6 +26,7 @@ import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 import Messages from "./pages/Messages";
+import PermissionsDashboard from "./pages/admin/PermissionsDashboard";
 
 const queryClient = new QueryClient();
 
@@ -62,13 +63,16 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="churches" element={<ChurchesPage />} />
-        {/* CSV Deduplicator is also accessible via admin path */}
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
         <Route path="login-management" element={<LoginManagementPage />} />
-        {/* New route */}
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
-        {/* Added admin messages route */}
+        {/* Permissions Dashboard - only for admins */}
+        <Route path="permissions" element={
+          <AdminRoute requiredPermission="edit_delete_users">
+            <PermissionsDashboard />
+          </AdminRoute>
+        } />
         {/* Nested routes for specific church details */}
         <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>
           <Route path="overview" element={<ChurchOverviewPage />} />

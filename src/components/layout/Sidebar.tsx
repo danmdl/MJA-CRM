@@ -1,9 +1,9 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare } from 'lucide-react';
+import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 import { useSession } from '@/hooks/use-session';
-import { isReferenceRole } from '@/lib/roles';
+import { usePermissions } from '@/lib/permissions';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -11,22 +11,25 @@ interface SidebarProps {
 
 const Sidebar = ({ isCollapsed }: SidebarProps) => {
   const { profile } = useSession();
+  const { canEditDeleteUsers } = usePermissions();
 
   // Define all possible navigation items
   const allNavItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general'] },
-    { to: "/admin/churches", icon: Church, label: "Iglesias", roles: ['admin', 'general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'] },
+    { to: "/admin/churches", icon: Church, label: "Ministerio", roles: ['admin', 'general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'] },
     { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'] },
-    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios", roles: ['admin'] }, // Only admin can manage users
-    { to: "/admin/profile", icon: User, label: "Perfil", roles: ['admin', 'general'] }, // Admin/General profile
+    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios", roles: ['admin', 'general'], requiresPermission: 'add_users' },
+    { to: "/admin/permissions", icon: Shield, label: "Permisos", roles: ['admin'], requiresPermission: 'edit_delete_users' },
+    { to: "/admin/profile", icon: User, label: "Perfil", roles: ['admin', 'general'] },
     { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'] }
   ];
 
-  // Filter navigation items based on the user's role
-  const navItems = allNavItems.filter(item => 
-    item.roles.includes(profile?.role || 'user') || 
-    (isReferenceRole(profile?.role) && item.roles.includes('reference'))
-  );
+  // Filter navigation items based on the user's role and permissions
+  const navItems = allNavItems.filter(item => {
+    const hasRoleAccess = item.roles.includes(profile?.role || 'user');
+    const hasPermissionAccess = !item.requiresPermission || canEditDeleteUsers();
+    return hasRoleAccess && hasPermissionAccess;
+  });
 
   return (
     <aside className={cn(

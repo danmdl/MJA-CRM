@@ -1,8 +1,9 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, LayoutDashboard, FileSpreadsheet, Church, MessageSquare } from 'lucide-react';
+import { User, LayoutDashboard, FileSpreadsheet, Church, MessageSquare, BarChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 import { useSession } from '@/hooks/use-session';
+import { usePermissions } from '@/lib/permissions';
 
 interface UserSidebarProps {
   isCollapsed: boolean;
@@ -10,6 +11,7 @@ interface UserSidebarProps {
 
 const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
   const { profile } = useSession();
+  const { canSeeOwnChurchAnalytics } = usePermissions();
   
   // Base navigation items for all users
   const baseNavItems = [
@@ -18,14 +20,23 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
     { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
   ];
 
-  // Add church link if user has an assigned church
+  // Add church-related navigation if user has an assigned church
   const navItems = [...baseNavItems];
   if (profile?.church_id) {
     navItems.push({ 
       to: `/admin/churches/${profile.church_id}/overview`, 
       icon: Church, 
-      label: "Mi Iglesia" 
+      label: "Ministerio" 
     });
+    
+    // Add analytics if user can see their church analytics
+    if (canSeeOwnChurchAnalytics()) {
+      navItems.push({ 
+        to: `/admin/churches/${profile.church_id}/overview`, 
+        icon: BarChart, 
+        label: "Analíticas" 
+      });
+    }
   }
 
   return (

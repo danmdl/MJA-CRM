@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
+import { usePermissions } from '@/lib/permissions';
 import { showError } from '@/utils/toast';
-import { isReferenceRole } from '@/lib/roles';
 
 interface AdminRouteProps {
   children: React.ReactNode;
+  requiredPermission?: keyof import('@/lib/permissions').PermissionData;
 }
 
-const AdminRoute = ({ children }: AdminRouteProps) => {
+const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
   const { session, loading: sessionLoading, profile } = useSession();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const [loadingProfile, setLoadingProfile] = useState(true);
   const location = useLocation();
 
@@ -21,7 +23,7 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     }
   }, [session, sessionLoading, profile]);
 
-  if (sessionLoading || loadingProfile) {
+  if (sessionLoading || loadingProfile || permissionsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Verificando acceso...</div>
@@ -33,35 +35,28 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  const userRole = profile?.role;
-  const isAdminOrGeneral = userRole === 'admin' || userRole === 'general';
-  const isChurchRole = isReferenceRole(userRole) || ['pastor', 'encargado_de_celula'].includes(userRole || '');
-
-  console.log('[DEBUG AdminRoute] userRole:', userRole, 'churchId:', profile?.church_id, 'pathname:', location.pathname);
-
-  // Paths that church roles can access under /admin
-  const allowedChurchRolePaths = [
-    '/admin/churches',
-    '/admin/csv-deduplicator',
-    '/admin/messages',
-  ];
-
-  const isCurrentPathAllowedForChurchRole = allowedChurchRolePaths.some(path => 
-    location.pathname.startsWith(path)
-  );
-
-  if (isAdminOrGeneral) {
-    return <>{children}</>;
-  } else if (isChurchRole) {
-    if (isCurrentPathAllowedForChurchRole) {
-      return <>{children}</>;
-    }
-    // If a church-role user hits a disallowed admin path (like /admin or /admin/dashboard), redirect them to /admin/churches
-    return <Navigate to="/admin/churches" replace />;
-  } else {
+  // Check if user has specific permission if required
+  if (requiredPermission && !hasPermission(requiredPermission)) {
     showError('No tienes permiso para acceder a esta página.');
     return <Navigate to="/" replace />;
   }
+
+  // For admin routes, check if user can access admin section
+  if (location.pathname.startsWith('/admin')) {
+    const userRole = profile?.role;
+    const isAdmin = userRole === 'admin';
+    
+    // Only admin, general, and church roles can access admin routes
+    const isGeneral = userRole === 'general';
+    const isChurchRole = ['pastor', 'piloto', 'reference', 'encargado_de_celula'].includes(userRole || '');
+    
+    if (!isAdmin && !isGeneral && !isChurchRole) {
+      showError('No tienes permiso para acceder al panel de administración.');
+      return <Navigate to="/" replace />;
+    }
+  }
+
+  return <>{children}</>;
 };
 
 export default AdminRoute;
