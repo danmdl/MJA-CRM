@@ -218,7 +218,12 @@ const SelectionToolbar = ({
   </div>
 );
 
-const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as string | null }: { churchId?: string; searchTerm?: string; filterField?: string | null }) => {
+const DynamicContactTable = ({ 
+  churchId, 
+  searchTerm = '', 
+  filterField = null as string | null, 
+  useExternalToolbarContainer = false,
+}: { churchId?: string; searchTerm?: string; filterField?: string | null; useExternalToolbarContainer?: boolean }) => {
   logger.log('[DynamicContactTable] Component rendered', { churchId, searchTerm, filterField });
 
   const extendedContactFields = useMemo(() => [
@@ -439,9 +444,9 @@ const DynamicContactTable = ({ churchId, searchTerm = '', filterField = null as 
 
   return (
     <div className="space-y-4">
-      <div className="relative">
+      <div className={useExternalToolbarContainer ? '' : 'relative'}>
         {(someVisibleSelected || allVisibleSelected) && (
-          <div className="absolute top-0 left-0 right-0 z-10">
+          <div className={useExternalToolbarContainer ? "absolute top-0 right-0 z-10" : "absolute top-0 left-0 right-0 z-10"}>
             <SelectionToolbar
               selectedCount={visibleIds.filter(id => selectedContacts.includes(id)).length}
               canEdit={visibleIds.filter(id => selectedContacts.includes(id)).length === 1}

@@ -122,19 +122,27 @@ const ChurchDatabasePage = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total contactos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{totalCount ?? 0}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Put stats and the table inside the same relative container so the table's selection toolbar can position next to the cards */}
+      <div className="relative">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Total contactos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalCount ?? 0}</div>
+            </CardContent>
+          </Card>
+        </div>
 
-      <div className="flex-grow">
-        <DynamicContactTable churchId={churchId} searchTerm={searchTerm} filterField={filterField} />
+        <div className="flex-grow">
+          <DynamicContactTable
+            churchId={churchId}
+            searchTerm={searchTerm}
+            filterField={filterField}
+            useExternalToolbarContainer={true}
+          />
+        </div>
       </div>
 
       <AddContactDialog
