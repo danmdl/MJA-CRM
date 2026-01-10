@@ -3,7 +3,6 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Database, Users, Info, Church as ChurchIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// import SidebarFooter from './SidebarFooter'; // Eliminado: Esta importación ya no es necesaria
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
@@ -11,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChurchSidebarProps {
   isCollapsed: boolean;
-  churchId: string; // Added churchId prop
+  churchId: string;
 }
 
 interface Church {
@@ -44,12 +43,14 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
     showError(error?.message || 'Error al cargar el nombre de la iglesia.');
   }
 
-  const navItems = [
-    { to: `/admin/churches/${churchId}/overview`, icon: Info, label: "Resumen" },
-    { to: `/admin/churches/${churchId}/database`, icon: Database, label: "Base de Datos" },
-    { to: `/admin/churches/${churchId}/team`, icon: Users, label: "Equipo" },
-    { to: `/admin/churches/${churchId}/cells`, icon: ChurchIcon, label: "Células" },
-  ];
+  // Eliminamos los navItems específicos de la iglesia de aquí.
+  // Estos serán manejados por ChurchDetailsLayout en la parte superior del contenido.
+  // const navItems = [
+  //   { to: `/admin/churches/${churchId}/overview`, icon: Info, label: "Resumen" },
+  //   { to: `/admin/churches/${churchId}/database`, icon: Database, label: "Base de Datos" },
+  //   { to: `/admin/churches/${churchId}/team`, icon: Users, label: "Equipo" },
+  //   { to: `/admin/churches/${churchId}/cells`, icon: ChurchIcon, label: "Células" },
+  // ];
 
   return (
     <aside className={cn(
@@ -69,25 +70,23 @@ const ChurchSidebar = ({ isCollapsed, churchId }: ChurchSidebarProps) => {
           </>
         )}
       </div>
-      <nav className="flex flex-col p-2 flex-grow space-y-1">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
-                isActive && 'bg-muted text-primary',
-                isCollapsed ? "justify-center" : "gap-3"
-              )
-            }
-          >
-            <item.icon className="h-4 w-4" />
-            {!isCollapsed && <span className="text-sm">{item.label}</span>}
-          </NavLink>
-        ))}
-      </nav>
-      {/* El SidebarFooter fue eliminado de aquí en un paso anterior */}
+      {/* La navegación detallada de la iglesia se ha movido al ChurchDetailsLayout */}
+      {/* Puedes añadir un enlace para volver a la lista de iglesias si lo deseas */}
+      {/* <nav className="flex flex-col p-2 flex-grow space-y-1">
+        <NavLink
+          to="/admin/churches"
+          className={({ isActive }) =>
+            cn(
+              'flex items-center rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+              isActive && 'bg-muted text-primary',
+              isCollapsed ? "justify-center" : "gap-3"
+            )
+          }
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {!isCollapsed && <span className="text-sm">Volver a Iglesias</span>}
+        </NavLink>
+      </nav> */}
     </aside>
   );
 };
