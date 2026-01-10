@@ -1,17 +1,9 @@
 "use client";
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, } from '@/components/ui/dialog';
 import AddChurchDialog from '@/components/admin/AddChurchDialog';
 import ChurchCard from '@/components/admin/ChurchCard';
 import EditChurchNameDialog from '@/components/admin/EditChurchNameDialog';
@@ -20,7 +12,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSession } from '@/hooks/use-session'; // Import useSession
+import { useSession } from '@/hooks/use-session';
 
 interface Church {
   id: string;
@@ -53,8 +45,8 @@ const ChurchesPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const [churchToDelete, setChurchToDelete] = useState<{ id: string; name: string } | null>(null);
-
   const queryClient = useQueryClient();
+
   const { data: churches, isLoading, isError, error } = useQuery<Church[]>({
     queryKey: ['churches'],
     queryFn: fetchChurches,
@@ -64,7 +56,7 @@ const ChurchesPage = () => {
     if (profile) {
       console.log('[DEBUG] Current User Profile on ChurchesPage:', {
         id: profile.id,
-        email: profile.email, // Now 'email' exists on UserProfile
+        email: profile.email,
         role: profile.role,
         church_id: profile.church_id,
       });
@@ -109,12 +101,21 @@ const ChurchesPage = () => {
   });
 
   const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
+  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(profile?.role || '');
+  
+  // Filter churches based on user role
+  const filteredChurches = churches ? 
+    (isAdminOrGeneral ? churches : 
+      (isChurchRole && profile?.church_id ? 
+        churches.filter(church => church.id === profile.church_id) : 
+        [])) : 
+    [];
 
   if (isLoading) {
     return (
-      <div className="p-6"> {/* Added p-6 here */}
+      <div className="p-6">
         <h1 className="text-3xl font-bold mb-6">Iglesias</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"> {/* Adjusted grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
@@ -127,14 +128,14 @@ const ChurchesPage = () => {
 
   if (isError) {
     showError(error?.message || 'Error al cargar las iglesias.');
-    return <div className="text-red-500 p-6">Error: {error?.message || 'No se pudieron cargar las iglesias.'}</div>; {/* Added p-6 here */}
+    return <div className="text-red-500 p-6">Error: {error?.message || 'No se pudieron cargar las iglesias.'}</div>;
   }
 
   return (
-    <div className="p-6"> {/* Added p-6 here */}
+    <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Iglesias</h1>
-        {isAdminOrGeneral && ( // Only show Add Church button for admin/general
+        {isAdminOrGeneral && (
           <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -153,18 +154,18 @@ const ChurchesPage = () => {
           </Dialog>
         )}
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"> {/* Adjusted grid */}
-        {churches && churches.length > 0 ? (
-          churches.map((church) => (
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {filteredChurches && filteredChurches.length > 0 ? (
+          filteredChurches.map((church) => (
             <ChurchCard
               key={church.id}
               church={church}
               onEdit={handleEditChurch}
               onDelete={handleDeleteChurch}
               onPinToggle={pinChurchMutation.mutate}
-              currentUserChurchId={profile?.church_id} // Pass current user's assigned church ID
-              currentUserRole={profile?.role} // Pass current user's role
+              currentUserChurchId={profile?.church_id}
+              currentUserRole={profile?.role}
             />
           ))
         ) : (
@@ -172,28 +173,19 @@ const ChurchesPage = () => {
             <CardHeader>
               <CardTitle>No hay iglesias registradas</CardTitle>
               <CardDescription>
-                {isAdminOrGeneral ? 'Haz clic en "Añadir Nueva Iglesia" para empezar.' : 'Ponte en contacto con un administrador para ser asignado a una iglesia.'}
+                {isAdminOrGeneral 
+                  ? 'Haz clic en "Añadir Nueva Iglesia" para empezar.' 
+                  : 'No tienes acceso a ninguna iglesia. Ponte en contacto con un administrador.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Optional: Add an icon or illustration here */}
             </CardContent>
           </Card>
         )}
       </div>
-
-      <EditChurchNameDialog
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        church={selectedChurch}
-      />
-
-      <DeleteChurchConfirmationDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        churchId={churchToDelete?.id || null}
-        churchName={churchToDelete?.name || null}
-      />
+      
+      <EditChurchNameDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} church={selectedChurch} />
+      <DeleteChurchConfirmationDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} churchId={churchToDelete?.id || null} churchName={churchToDelete?.name || null} />
     </div>
   );
 };
