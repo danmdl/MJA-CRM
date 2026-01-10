@@ -140,12 +140,13 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
 
         <div className="space-y-4">
           <div className="overflow-x-auto border rounded-md">
-            <Table>
+            {/* Use a fixed table layout so columns respect width constraints and actions stay visible */}
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-32">Fecha</TableHead>
                   <TableHead className="w-32">Método</TableHead>
-                  <TableHead>Notas</TableHead>
+                  <TableHead className="w-full max-w-[36ch]">Notas</TableHead>
                   <TableHead className="w-36 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -162,11 +163,15 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
                         {l.contact_date ? new Date(l.contact_date).toISOString().split('T')[0] : '-'}
                       </TableCell>
                       <TableCell className="align-top">{l.contact_method || '-'}</TableCell>
-                      <TableCell className="align-top max-w-[60ch] break-words whitespace-normal" title={l.notes || ''}>
+                      {/* Constrain notes width and allow wrapping so the actions column stays visible */}
+                      <TableCell
+                        className="align-top break-words whitespace-normal max-w-[36ch] px-2"
+                        title={l.notes || ''}
+                      >
                         {l.notes || '-'}
                       </TableCell>
                       <TableCell className="text-right align-top">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2 flex-shrink-0">
                           <Button
                             size="sm"
                             variant="outline"
