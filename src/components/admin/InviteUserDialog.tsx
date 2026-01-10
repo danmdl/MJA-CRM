@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,9 +15,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 
 // Definir el tipo de rol de usuario
-type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
-const UserRoles = z.enum(['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin']);
+const UserRoles = z.enum(['general', 'pastor', 'referente', 'encargado_de_celula', 'user', 'admin']);
 
 const inviteSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
@@ -38,7 +37,7 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
   const [phone, setPhone] = useState('');
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
-  
+
   const form = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
     defaultValues: {
@@ -55,12 +54,12 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
         setLoading(false);
         return;
       }
-      
+
       console.log('Sending payload to invite-user Edge Function:', {
         ...values,
         churchId
       });
-      
+
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/invite-user`;
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
@@ -76,16 +75,15 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
           phone,
         }),
       });
-      
+
       const data = await response.json();
-      
       if (!response.ok) {
         console.error('Edge Function response error:', data);
         showError(data.error || 'Error desconocido al invocar la función.');
         setLoading(false);
         return;
       }
-      
+
       showSuccess('¡Invitación enviada con éxito!');
       form.reset();
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -102,11 +100,11 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
   };
 
   const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
-  
+
   // Roles disponibles para asignar
   const availableRoles: UserRole[] = churchId 
-    ? ['pastor', 'piloto', 'encargado_de_celula', 'user'] 
-    : ['general', 'pastor', 'piloto', 'encargado_de_celula', 'user', 'admin'];
+    ? ['pastor', 'referente', 'encargado_de_celula', 'user'] 
+    : ['general', 'pastor', 'referente', 'encargado_de_celula', 'user', 'admin'];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -152,7 +150,7 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
                           value={roleOption}
                           disabled={!isAdminOrGeneral && (roleOption === 'admin' || roleOption === 'general')}
                         >
-                          {roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                          {roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
                         </SelectItem>
                       ))}
                     </SelectContent>

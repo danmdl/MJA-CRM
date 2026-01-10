@@ -20,7 +20,7 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 // Definir el tipo de rol de usuario para TypeScript
-type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
 interface User {
   id: string;
@@ -53,13 +53,13 @@ const fetchUsers = async (accessToken: string): Promise<User[]> => {
     },
     body: JSON.stringify({ action: 'listUsers' }),
   });
-  
+
   if (!response.ok) {
     const errorData = await response.json();
     console.error('Error fetching users from Edge Function:', errorData);
     throw new Error(errorData.error || 'No se pudieron cargar los usuarios.');
   }
-  
+
   const data = await response.json();
   return data || [];
 };
@@ -69,7 +69,7 @@ const UserTable = () => {
   const queryClient = useQueryClient();
   const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false);
   const [userToResetPassword, setUserToResetPassword] = useState<User | null>(null);
-  
+
   const form = useForm<z.infer<typeof passwordResetSchema>>({
     resolver: zodResolver(passwordResetSchema),
     defaultValues: {
@@ -116,12 +116,11 @@ const UserTable = () => {
         },
         body: JSON.stringify({ action: 'deleteUser', userId }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al eliminar el usuario.');
       }
-      
       return response.json();
     },
     onSuccess: () => {
@@ -144,12 +143,11 @@ const UserTable = () => {
         },
         body: JSON.stringify({ action: 'resendInvite', email, role, churchId }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al reenviar la invitación.');
       }
-      
       return response.json();
     },
     onSuccess: () => {
@@ -172,12 +170,11 @@ const UserTable = () => {
         },
         body: JSON.stringify({ action: 'generateInviteLink', email, role, churchId }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al generar el enlace de invitación.');
       }
-      
       return response.json();
     },
     onSuccess: (data) => {
@@ -202,12 +199,11 @@ const UserTable = () => {
         },
         body: JSON.stringify({ action: 'updateUserRole', userId, newRole }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al actualizar el rol del usuario.');
       }
-      
       return response.json();
     },
     onSuccess: () => {
@@ -230,12 +226,11 @@ const UserTable = () => {
         },
         body: JSON.stringify({ action: 'resetUserPassword', userId, newPassword }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al cambiar la contraseña.');
       }
-      
       return response.json();
     },
     onSuccess: () => {
@@ -296,7 +291,7 @@ const UserTable = () => {
   };
 
   // Todos los roles disponibles
-  const userRoles: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
+  const userRoles: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
 
   return (
     <>
@@ -329,12 +324,12 @@ const UserTable = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {userRoles.map((roleOption) => (
-                        <SelectItem 
-                          key={roleOption} 
+                        <SelectItem
+                          key={roleOption}
                           value={roleOption}
                           disabled={profile?.role !== 'admin' && (roleOption === 'admin' || roleOption === 'general')}
                         >
-                          {roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                          {roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -353,36 +348,30 @@ const UserTable = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {user.status === 'invited' && (
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role, churchId: user.church_id })}
                         >
-                          <Send className="mr-2 h-4 w-4" />
-                          Reenviar Invitación
+                          <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
                         </DropdownMenuItem>
                       )}
                       {user.status === 'invited' && (
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role, churchId: user.church_id })}
                         >
-                          <Copy className="mr-2 h-4 w-4" />
-                          Copiar Enlace de Invitación
+                          <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
                         </DropdownMenuItem>
                       )}
                       {profile?.role === 'admin' && (
-                        <DropdownMenuItem 
-                          onClick={() => handleOpenPasswordResetDialog(user)}
-                        >
-                          <Key className="mr-2 h-4 w-4" />
-                          Cambiar Contraseña
+                        <DropdownMenuItem onClick={() => handleOpenPasswordResetDialog(user)}>
+                          <Key className="mr-2 h-4 w-4" /> Cambiar Contraseña
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem 
-                        onClick={() => deleteUserMutation.mutate(user.id)} 
+                      <DropdownMenuItem
+                        onClick={() => deleteUserMutation.mutate(user.id)}
                         className="text-red-600"
                         disabled={user.id === session?.user.id}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
+                        <Trash2 className="mr-2 h-4 w-4" /> {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -398,7 +387,6 @@ const UserTable = () => {
           )}
         </TableBody>
       </Table>
-      
       {/* Password Reset Dialog */}
       <Dialog open={isPasswordResetDialogOpen} onOpenChange={setIsPasswordResetDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -417,12 +405,7 @@ const UserTable = () => {
                   <FormItem>
                     <FormLabel htmlFor="newPassword">Nueva Contraseña</FormLabel>
                     <FormControl>
-                      <Input 
-                        id="newPassword" 
-                        type="password" 
-                        {...field} 
-                        disabled={resetPasswordMutation.isPending}
-                      />
+                      <Input id="newPassword" type="password" {...field} disabled={resetPasswordMutation.isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -435,30 +418,22 @@ const UserTable = () => {
                   <FormItem>
                     <FormLabel htmlFor="confirmPassword">Confirmar Nueva Contraseña</FormLabel>
                     <FormControl>
-                      <Input 
-                        id="confirmPassword" 
-                        type="password" 
-                        {...field} 
-                        disabled={resetPasswordMutation.isPending}
-                      />
+                      <Input id="confirmPassword" type="password" {...field} disabled={resetPasswordMutation.isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => setIsPasswordResetDialogOpen(false)}
                   disabled={resetPasswordMutation.isPending}
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={resetPasswordMutation.isPending}
-                >
+                <Button type="submit" disabled={resetPasswordMutation.isPending}>
                   {resetPasswordMutation.isPending ? 'Cambiando...' : 'Cambiar Contraseña'}
                 </Button>
               </DialogFooter>

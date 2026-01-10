@@ -4,7 +4,7 @@ import { Session } from '@supabase/supabase-js';
 import { SessionContext } from '@/hooks/use-session';
 
 // Definir el tipo de rol de usuario
-type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
 // Definir la interfaz para el perfil del usuario
 interface UserProfile {

@@ -22,7 +22,7 @@ import { logger } from '@/utils/logger';
 import React from 'react';
 
 // Definir el tipo de rol de usuario para TypeScript
-type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
 interface User {
   id: string;
@@ -47,7 +47,6 @@ const passwordResetSchema = z.object({
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
   console.log(`[DEBUG CLIENT] fetchChurchUsers called with churchId: ${churchId} and accessToken present: ${!!accessToken}`);
-
   const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
   const response = await fetch(edgeFunctionUrl, {
     method: 'POST',
@@ -84,7 +83,6 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     if (!users) return [];
     const term = searchTerm.toLowerCase().trim();
     if (!term) return users;
-    
     return users.filter(user => {
       const searchableText = [
         user.first_name || '',
@@ -112,7 +110,6 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al eliminar el usuario.');
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -140,7 +137,6 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al reenviar la invitación.');
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -168,7 +164,6 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al generar el enlace de invitación.');
       }
-
       return response.json();
     },
     onSuccess: (data) => {
@@ -198,7 +193,6 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al actualizar el rol del usuario.');
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -221,6 +215,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         },
         body: JSON.stringify({ action: 'updateUserRoles', userId, roles }),
       });
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al actualizar los roles del usuario.');
@@ -272,7 +267,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   };
 
   // Roles que pueden ser asignados a usuarios de iglesia
-  const assignableRoles: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor'];
+  const assignableRoles: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor'];
 
   return (
     <div className="space-y-4">
@@ -286,7 +281,6 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      
       <Table>
         <TableHeader>
           <TableRow>
@@ -315,12 +309,13 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                             checked={checked}
                             onCheckedChange={(val) => {
                               const next = new Set(rolesArr);
-                              if (val) next.add(roleOption); else next.delete(roleOption);
+                              if (val) next.add(roleOption);
+                              else next.delete(roleOption);
                               updateUserRolesMutation.mutate({ userId: user.id, roles: Array.from(next) as UserRole[] });
                             }}
                             disabled={user.id === session?.user.id}
                           />
-                          <span>{roleOption === 'piloto' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g,' ')}</span>
+                          <span>{roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g,' ')}</span>
                         </label>
                       )
                     })}
@@ -338,27 +333,24 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {user.status === 'invited' && (
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}
                         >
-                          <Send className="mr-2 h-4 w-4" />
-                          Reenviar Invitación
+                          <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
                         </DropdownMenuItem>
                       )}
                       {user.status === 'invited' && (
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}
                         >
-                          <Copy className="mr-2 h-4 w-4" />
-                          Copiar Enlace de Invitación
+                          <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem 
-                        onClick={() => deleteUserMutation.mutate(user.id)} 
+                      <DropdownMenuItem
+                        onClick={() => deleteUserMutation.mutate(user.id)}
                         className="text-red-600"
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
+                        <Trash2 className="mr-2 h-4 w-4" /> {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

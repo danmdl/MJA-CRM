@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -29,16 +28,7 @@ interface AddContactDialogProps {
   churchId: string;
 }
 
-const FormField = ({
-  label,
-  id,
-  value,
-  onChange,
-  type = "text",
-  required = false,
-  disabled = false,
-  placeholder = ""
-}: {
+const FormField = ({ label, id, value, onChange, type = "text", required = false, disabled = false, placeholder = "" }: {
   label: string;
   id: string;
   value: string;
@@ -64,15 +54,7 @@ const FormField = ({
   </div>
 );
 
-const SelectField = ({
-  label,
-  value,
-  onChange,
-  options,
-  loading,
-  placeholder,
-  disabled = false
-}: {
+const SelectField = ({ label, value, onChange, options, loading, placeholder, disabled = false }: {
   label: string;
   value: string | null;
   onChange: (value: string) => void;
@@ -85,11 +67,7 @@ const SelectField = ({
     <label htmlFor={label.toLowerCase().replace(/\s/g, '-')} className="text-sm font-medium">
       {label}
     </label>
-    <Select
-      value={value || undefined}
-      onValueChange={onChange}
-      disabled={disabled || loading}
-    >
+    <Select value={value || undefined} onValueChange={onChange} disabled={disabled || loading} >
       <SelectTrigger>
         <SelectValue placeholder={loading ? "Cargando..." : placeholder} />
       </SelectTrigger>
@@ -129,6 +107,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .select('id, name')
         .eq('church_id', churchId)
         .order('name', { ascending: true });
+
       if (error) throw new Error('No se pudieron cargar las células.');
       return data || [];
     },
@@ -149,12 +128,17 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           },
           body: JSON.stringify({ action: 'listChurchUsers', churchId }),
         });
+
         if (resp.ok) {
           const data = await resp.json();
-          const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
+          const leaderRoles = ['pastor', 'referente', 'encargado_de_celula', 'general'];
           return (data || [])
             .filter((u: any) => leaderRoles.includes(u.role))
-            .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name })) as Leader[];
+            .map((u: any) => ({
+              id: u.id,
+              first_name: u.first_name,
+              last_name: u.last_name
+            })) as Leader[];
         }
         return [];
       }
@@ -167,6 +151,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const { error } = await supabase
         .from('contacts')
@@ -182,6 +167,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           church_id: churchId,
           date_of_birth: dateOfBirth || null,
         });
+
       if (error) {
         showError(`Error: ${error.message}`);
       } else {
@@ -213,16 +199,53 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField label="Nombre" id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={loading} />
-          <FormField label="Apellido" id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} />
+          <FormField
+            label="Nombre"
+            id="firstName"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            disabled={loading}
+          />
+          <FormField
+            label="Apellido"
+            id="lastName"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            disabled={loading}
+          />
           {/* REMOVED: Email field */}
           <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} />
-          <FormField label="Dirección" id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={loading} />
-          <FormField label="Número de Apartamento" id="apartmentNumber" value={apartmentNumber} onChange={(e) => setApartmentNumber(e.target.value)} disabled={loading} />
-          <FormField label="Barrio" id="barrio" value={barrio} onChange={(e) => setBarrio(e.target.value)} disabled={loading} />
+          <FormField
+            label="Dirección"
+            id="address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            disabled={loading}
+          />
+          <FormField
+            label="Número de Apartamento"
+            id="apartmentNumber"
+            value={apartmentNumber}
+            onChange={(e) => setApartmentNumber(e.target.value)}
+            disabled={loading}
+          />
+          <FormField
+            label="Barrio"
+            id="barrio"
+            value={barrio}
+            onChange={(e) => setBarrio(e.target.value)}
+            disabled={loading}
+          />
           <div className="space-y-2">
             <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
-            <Input id="dob" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} disabled={loading} />
+            <Input
+              id="dob"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              disabled={loading}
+            />
           </div>
           <SelectField
             label="Célula"

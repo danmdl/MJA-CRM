@@ -14,11 +14,11 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
   // Define all possible navigation items
   const allNavItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general'] },
-    { to: "/admin/churches", icon: Church, label: "Iglesias", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] },
+    { to: "/admin/churches", icon: Church, label: "Iglesias", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
     { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios", roles: ['admin'] }, // Only admin can manage users
     { to: "/admin/profile", icon: User, label: "Perfil", roles: ['admin', 'general'] }, // Admin/General profile
-    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula'] }
+    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] }
   ];
 
   // Filter navigation items based on the user's role

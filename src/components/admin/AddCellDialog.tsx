@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -11,7 +10,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 
-type Leader = { id: string; first_name: string | null; last_name: string | null };
+type Leader = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+};
 
 interface AddCellDialogProps {
   open: boolean;
@@ -61,10 +64,14 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
       });
       if (!resp.ok) return [];
       const data = await resp.json();
-      const leaderRoles = ['pastor', 'piloto', 'encargado_de_celula', 'general'];
+      const leaderRoles = ['pastor', 'referente', 'encargado_de_celula', 'general'];
       return (data || [])
         .filter((u: any) => leaderRoles.includes(u.role))
-        .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name })) as Leader[];
+        .map((u: any) => ({
+          id: u.id,
+          first_name: u.first_name,
+          last_name: u.last_name
+        })) as Leader[];
     },
     enabled: !!churchId && !!session?.access_token,
     staleTime: 60_000,
@@ -75,6 +82,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
       showError('El nombre es obligatorio.');
       return;
     }
+
     setSaving(true);
     if (isEdit && initial) {
       const { error } = await supabase
@@ -88,6 +96,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
         })
         .eq('id', initial.id)
         .eq('church_id', churchId);
+
       if (error) {
         showError(error.message || 'Error al actualizar la célula.');
       } else {
@@ -105,6 +114,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
           meeting_day: meetingDay || null,
           meeting_time: meetingTime || null,
         });
+
       if (error) {
         showError(error.message || 'Error al crear la célula.');
       } else {
@@ -124,13 +134,15 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
             Define el nombre, referente y el horario/dirección de la célula.
           </DialogDescription>
         </DialogHeader>
-
         <div className="space-y-3">
           <div className="space-y-2">
             <Label>Nombre</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre de la célula" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nombre de la célula"
+            />
           </div>
-
           <div className="space-y-2">
             <Label>Referente asignado</Label>
             <Select value={encargado || undefined} onValueChange={(v) => setEncargado(v === 'none' ? null : v)}>
@@ -145,24 +157,33 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
               </SelectContent>
             </Select>
           </div>
-
           <div className="space-y-2">
             <Label>Dirección</Label>
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Calle, número, barrio..." />
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Calle, número, barrio..."
+            />
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Día</Label>
-              <Input value={meetingDay} onChange={(e) => setMeetingDay(e.target.value)} placeholder="Ej: Miércoles" />
+              <Input
+                value={meetingDay}
+                onChange={(e) => setMeetingDay(e.target.value)}
+                placeholder="Ej: Miércoles"
+              />
             </div>
             <div className="space-y-2">
               <Label>Hora</Label>
-              <Input value={meetingTime} onChange={(e) => setMeetingTime(e.target.value)} placeholder="Ej: 19:30" />
+              <Input
+                value={meetingTime}
+                onChange={(e) => setMeetingTime(e.target.value)}
+                placeholder="Ej: 19:30"
+              />
             </div>
           </div>
         </div>
-
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : (isEdit ? 'Guardar cambios' : 'Crear')}</Button>
