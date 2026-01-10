@@ -127,6 +127,102 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
     }
   };
 
+  const tableContent = (
+    <div className="space-y-4">
+      <div className="overflow-x-auto border rounded-md">
+        <Table className="table-fixed w-full">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-32">Fecha</TableHead>
+              <TableHead className="w-32">Método</TableHead>
+              <TableHead className="w-full max-w-[36ch]">Notas</TableHead>
+              <TableHead className="w-36 text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {logs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center">Sin registros</TableCell>
+              </TableRow>
+            ) : logs.map(l => {
+              const editable = within24h(l);
+              return (
+                <TableRow key={l.id}>
+                  <TableCell className="align-top">
+                    {l.contact_date ? new Date(l.contact_date).toISOString().split('T')[0] : '-'}
+                  </TableCell>
+                  <TableCell className="align-top">{l.contact_method || '-'}</TableCell>
+                  <TableCell
+                    className="align-top break-words whitespace-normal max-w-[36ch] px-2"
+                    title={l.notes || ''}
+                  >
+                    {l.notes || '-'}
+                  </TableCell>
+                  <TableCell className="text-right align-top">
+                    <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(l)}
+                        disabled={!editable}
+                        title={editable ? 'Editar registro' : 'No puedes editar (más de 24 horas)'}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDelete(l)}
+                        disabled={!editable}
+                        title={editable ? 'Eliminar registro' : 'No puedes eliminar (más de 24 horas)'}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+
+  const editDialogContent = (
+    <DialogContent className="sm:max-w-[520px]">
+      <DialogHeader>
+        <DialogTitle>Editar registro</DialogTitle>
+        <DialogDescription>Los registros sólo se pueden editar dentro de las primeras 24 horas.</DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div>
+          <Label>Fecha</Label>
+          <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+        </div>
+        <div>
+          <Label>Método</Label>
+          <Input placeholder="Llamada, WhatsApp, etc." value={editMethod} onChange={(e) => setEditMethod(e.target.value)} />
+        </div>
+        <div>
+          <Label>Notas</Label>
+          <Textarea
+            rows={4}
+            placeholder="Detalle"
+            value={editNotes}
+            maxLength={MAX_NOTES}
+            onChange={(e) => setEditNotes(e.target.value)}
+          />
+          <div className="text-sm text-muted-foreground text-right">{editNotes.length}/{MAX_NOTES}</div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={closeEdit} disabled={editLoading}>Cancelar</Button>
+          <Button onClick={handleSaveEdit} disabled={editLoading}>{editLoading ? 'Guardando...' : 'Guardar'}</Button>
+        </DialogFooter>
+      </div>
+    </DialogContent>
+  );
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,106 +230,15 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
           <DialogHeader>
             <DialogTitle>Historial de contacto</DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="overflow-x-auto border rounded-md">
-              <Table className="table-fixed w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-32">Fecha</TableHead>
-                    <TableHead className="w-32">Método</TableHead>
-                    <TableHead className="w-full max-w-[36ch]">Notas</TableHead>
-                    <TableHead className="w-36 text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center">Sin registros</TableCell>
-                    </TableRow>
-                  ) : logs.map(l => {
-                    const editable = within24h(l);
-                    return (
-                      <TableRow key={l.id}>
-                        <TableCell className="align-top">
-                          {l.contact_date ? new Date(l.contact_date).toISOString().split('T')[0] : '-'}
-                        </TableCell>
-                        <TableCell className="align-top">{l.contact_method || '-'}</TableCell>
-                        <TableCell
-                          className="align-top break-words whitespace-normal max-w-[36ch] px-2"
-                          title={l.notes || ''}
-                        >
-                          {l.notes || '-'}
-                        </TableCell>
-                        <TableCell className="text-right align-top">
-                          <div className="flex items-center justify-end gap-2 flex-shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openEdit(l)}
-                              disabled={!editable}
-                              title={editable ? 'Editar registro' : 'No puedes editar (más de 24 horas)'}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(l)}
-                              disabled={!editable}
-                              title={editable ? 'Eliminar registro' : 'No puedes eliminar (más de 24 horas)'}
-                            >
-                              Eliminar
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+          {tableContent}
         </DialogContent>
       </Dialog>
       
-      <Dialog open={!!editingLog} onOpenChange={(open) => { if (!open) closeEdit(); }}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>Editar registro</DialogTitle>
-            <DialogDescription>Los registros sólo se pueden editar dentro de las primeras 24 horas.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Fecha</Label>
-              <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>Método</Label>
-              <Input placeholder="Llamada, WhatsApp, etc." value={editMethod} onChange={(e) => setEditMethod(e.target.value)} />
-            </div>
-            <div>
-              <Label>Notas</Label>
-              <Textarea
-                rows={4}
-                placeholder="Detalle"
-                value={editNotes}
-                maxLength={MAX_NOTES}
-                onChange={(e) => setEditNotes(e.target.value)}
-              />
-              <div className="text-sm text-muted-foreground text-right">{editNotes.length}/{MAX_NOTES}</div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={closeEdit} disabled={editLoading}>Cancelar</Button>
-              <Button onClick={handleSaveEdit} disabled={editLoading}>{editLoading ? 'Guardando...' : 'Guardar'}</Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
+      <Dialog open={!!editingLog} onOpenChange={(isOpen) => { if (!isOpen) closeEdit(); }}>
+        {editDialogContent}
       </Dialog>
     </>
   );
 };
 
 export default ContactLogDialog;
-
-export { AddContactLogDialog } from './AddContactLogDialog';
