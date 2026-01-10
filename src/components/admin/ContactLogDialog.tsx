@@ -128,75 +128,75 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px]">
-        <DialogHeader>
-          <DialogTitle>Historial de contacto</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Historial de contacto</DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="overflow-x-auto border rounded-md">
-            {/* Use a fixed table layout so columns respect width constraints and actions stay visible */}
-            <Table className="table-fixed w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-32">Fecha</TableHead>
-                  <TableHead className="w-32">Método</TableHead>
-                  <TableHead className="w-full max-w-[36ch]">Notas</TableHead>
-                  <TableHead className="w-36 text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.length === 0 ? (
+          <div className="space-y-4">
+            <div className="overflow-x-auto border rounded-md">
+              <Table className="table-fixed w-full">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center">Sin registros</TableCell>
+                    <TableHead className="w-32">Fecha</TableHead>
+                    <TableHead className="w-32">Método</TableHead>
+                    <TableHead className="w-full max-w-[36ch]">Notas</TableHead>
+                    <TableHead className="w-36 text-right">Acciones</TableHead>
                   </TableRow>
-                ) : logs.map(l => {
-                  const editable = within24h(l);
-                  return (
-                    <TableRow key={l.id}>
-                      <TableCell className="align-top">
-                        {l.contact_date ? new Date(l.contact_date).toISOString().split('T')[0] : '-'}
-                      </TableCell>
-                      <TableCell className="align-top">{l.contact_method || '-'}</TableCell>
-                      {/* Constrain notes width and allow wrapping so the actions column stays visible */}
-                      <TableCell
-                        className="align-top break-words whitespace-normal max-w-[36ch] px-2"
-                        title={l.notes || ''}
-                      >
-                        {l.notes || '-'}
-                      </TableCell>
-                      <TableCell className="text-right align-top">
-                        <div className="flex items-center justify-end gap-2 flex-shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openEdit(l)}
-                            disabled={!editable}
-                            title={editable ? 'Editar registro' : 'No puedes editar (más de 24 horas)'}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDelete(l)}
-                            disabled={!editable}
-                            title={editable ? 'Eliminar registro' : 'No puedes eliminar (más de 24 horas)'}
-                          >
-                            Eliminar
-                          </Button>
-                        </div>
-                      </TableCell>
+                </TableHeader>
+                <TableBody>
+                  {logs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center">Sin registros</TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  ) : logs.map(l => {
+                    const editable = within24h(l);
+                    return (
+                      <TableRow key={l.id}>
+                        <TableCell className="align-top">
+                          {l.contact_date ? new Date(l.contact_date).toISOString().split('T')[0] : '-'}
+                        </TableCell>
+                        <TableCell className="align-top">{l.contact_method || '-'}</TableCell>
+                        <TableCell
+                          className="align-top break-words whitespace-normal max-w-[36ch] px-2"
+                          title={l.notes || ''}
+                        >
+                          {l.notes || '-'}
+                        </TableCell>
+                        <TableCell className="text-right align-top">
+                          <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openEdit(l)}
+                              disabled={!editable}
+                              title={editable ? 'Editar registro' : 'No puedes editar (más de 24 horas)'}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDelete(l)}
+                              disabled={!editable}
+                              title={editable ? 'Eliminar registro' : 'No puedes eliminar (más de 24 horas)'}
+                            >
+                              Eliminar
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-      {/* Edit Dialog */}
+        </DialogContent>
+      </Dialog>
+      
       <Dialog open={!!editingLog} onOpenChange={(open) => { if (!open) closeEdit(); }}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
@@ -230,7 +230,7 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
           </div>
         </DialogContent>
       </Dialog>
-    </Dialog>
+    </>
   );
 };
 
