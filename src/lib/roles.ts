@@ -13,3 +13,9 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
 export const getRoleLabel = (role: string): string => {
   return ROLE_LABELS[role as RoleKey] || role;
 };
+
+// Check if role is a reference role
+export const isReferenceRole = (role: string | undefined): boolean => {
+  if (!role) return false;
+  return ['pastor', 'referente', 'encargado_de_celula'].includes(role);
+};

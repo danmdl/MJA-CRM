@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -41,19 +42,20 @@ const fetchChurches = async (): Promise<Church[]> => {
     .from('churches')
     .select('id, name')
     .order('name', { ascending: true });
-  
+
   if (error) {
     console.error('Error fetching churches:', error);
     throw new Error('No se pudieron cargar las iglesias.');
   }
-  
+
   return data || [];
 };
 
-export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
+const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
+
   const form = useForm<z.infer<typeof createUserSchema>>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
@@ -273,3 +275,5 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
     </Dialog>
   );
 };
+
+export default CreateUserDialog;

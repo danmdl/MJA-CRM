@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,7 +31,7 @@ interface InviteUserDialogProps {
   churchId?: string;
 }
 
-export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
+const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -57,7 +58,7 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
 
       console.log('Sending payload to invite-user Edge Function:', {
         ...values,
-        churchId
+        churchId,
       });
 
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/invite-user`;
@@ -150,7 +151,9 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
                           value={roleOption}
                           disabled={!isAdminOrGeneral && (roleOption === 'admin' || roleOption === 'general')}
                         >
-                          {roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                          {roleOption === 'referente' 
+                            ? 'Referente' 
+                            : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -178,3 +181,5 @@ export const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDia
     </Dialog>
   );
 };
+
+export default InviteUserDialog;
