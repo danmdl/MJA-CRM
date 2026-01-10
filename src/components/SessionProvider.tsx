@@ -2,17 +2,15 @@ import { useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { SessionContext } from '@/hooks/use-session';
-
-// Definir el tipo de rol de usuario
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
+import { RoleKey } from '@/lib/roles';
 
 // Definir la interfaz para el perfil del usuario
 interface UserProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null; // ADDED: keep in sync with use-session.tsx
-  role: UserRole;
+  email: string | null;
+  role: RoleKey;
   church_id: string | null;
 }
 
@@ -43,10 +41,13 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
           setProfile(null);
         } else {
           // Merge email from the auth session
-          setProfile({
+          const fullProfile = {
             ...profileData,
             email: session.user.email ?? null,
-          } as UserProfile);
+          } as UserProfile;
+          
+          console.log('[DEBUG] loaded profile from DB:', fullProfile);
+          setProfile(fullProfile);
         }
       } else {
         setProfile(null);

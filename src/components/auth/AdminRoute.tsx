@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { showError } from '@/utils/toast';
+import { isReferenceRole } from '@/lib/roles';
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -34,7 +35,9 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
 
   const userRole = profile?.role;
   const isAdminOrGeneral = userRole === 'admin' || userRole === 'general';
-  const isChurchRole = ['pastor', 'piloto', 'encargado_de_celula'].includes(userRole || '');
+  const isChurchRole = isReferenceRole(userRole) || ['pastor', 'encargado_de_celula'].includes(userRole || '');
+
+  console.log('[DEBUG AdminRoute] userRole:', userRole, 'churchId:', profile?.church_id, 'pathname:', location.pathname);
 
   // Paths that church roles can access under /admin
   const allowedChurchRolePaths = [
@@ -43,7 +46,7 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
     '/admin/messages',
   ];
 
-  const isCurrentPathAllowedForChurchRole = allowedChurchRolePaths.some(path =>
+  const isCurrentPathAllowedForChurchRole = allowedChurchRolePaths.some(path => 
     location.pathname.startsWith(path)
   );
 

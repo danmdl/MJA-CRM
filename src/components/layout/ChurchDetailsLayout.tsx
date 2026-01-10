@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isReferenceRole } from "@/lib/roles";
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -32,6 +33,9 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
     const isAdminOrGeneral = profile?.role === "admin" || profile?.role === "general";
     const isAssignedToChurch = profile?.church_id === churchId;
+    const isReference = isReferenceRole(profile?.role);
+
+    console.log('[DEBUG ChurchDetailsLayout] profile.role:', profile?.role, 'profile.church_id:', profile?.church_id, 'requested churchId:', churchId);
 
     if (!isAdminOrGeneral && !isAssignedToChurch) {
       showError("No tienes permiso para acceder a los detalles de esta iglesia.");

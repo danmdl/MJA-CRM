@@ -12,11 +12,8 @@ import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
+import { ROLE_LABELS, RoleKey } from '@/lib/roles';
 
-// Definir el tipo de rol de usuario para TypeScript
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
-
-// Definir la interfaz para la iglesia
 interface Church {
   id: string;
   name: string;
@@ -27,7 +24,7 @@ const createUserSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
   last_name: z.string().min(1, { message: 'El apellido es obligatorio.' }),
-  role: z.enum(['general', 'pastor', 'referente', 'encargado_de_celula'], {
+  role: z.enum(['general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'], {
     errorMap: () => ({ message: 'El rol es obligatorio.' })
   }),
   church_id: z.string().uuid({ message: 'La iglesia es obligatoria.' }),
@@ -44,11 +41,12 @@ const fetchChurches = async (): Promise<Church[]> => {
     .from('churches')
     .select('id, name')
     .order('name', { ascending: true });
-
+  
   if (error) {
     console.error('Error fetching churches:', error);
     throw new Error('No se pudieron cargar las iglesias.');
   }
+  
   return data || [];
 };
 
@@ -56,7 +54,6 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
-
   const form = useForm<z.infer<typeof createUserSchema>>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
@@ -228,7 +225,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
                       <SelectItem value="placeholder-role-select" disabled>Selecciona un rol</SelectItem>
                       {availableRoles.map((roleOption) => (
                         <SelectItem key={roleOption} value={roleOption}>
-                          {roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                          {ROLE_LABELS[roleOption as RoleKey] || roleOption}
                         </SelectItem>
                       ))}
                     </SelectContent>

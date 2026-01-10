@@ -1,28 +1,32 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare } from 'lucide-react'; // Added MessageSquare icon
+import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
-import { useSession } from '@/hooks/use-session'; // Import useSession
+import { useSession } from '@/hooks/use-session';
+import { isReferenceRole } from '@/lib/roles';
 
 interface SidebarProps {
   isCollapsed: boolean;
 }
 
 const Sidebar = ({ isCollapsed }: SidebarProps) => {
-  const { profile } = useSession(); // Get the current user's profile
+  const { profile } = useSession();
 
   // Define all possible navigation items
   const allNavItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general'] },
-    { to: "/admin/churches", icon: Church, label: "Iglesias", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
+    { to: "/admin/churches", icon: Church, label: "Iglesias", roles: ['admin', 'general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'] },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'] },
     { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios", roles: ['admin'] }, // Only admin can manage users
     { to: "/admin/profile", icon: User, label: "Perfil", roles: ['admin', 'general'] }, // Admin/General profile
-    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] }
+    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'piloto', 'reference', 'encargado_de_celula'] }
   ];
 
   // Filter navigation items based on the user's role
-  const navItems = allNavItems.filter(item => item.roles.includes(profile?.role || 'user'));
+  const navItems = allNavItems.filter(item => 
+    item.roles.includes(profile?.role || 'user') || 
+    (isReferenceRole(profile?.role) && item.roles.includes('reference'))
+  );
 
   return (
     <aside className={cn(

@@ -1,19 +1,32 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, LayoutDashboard, FileSpreadsheet, Church } from 'lucide-react';
+import { User, LayoutDashboard, FileSpreadsheet, Church, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
+import { useSession } from '@/hooks/use-session';
 
 interface UserSidebarProps {
   isCollapsed: boolean;
 }
 
 const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
-  const navItems = [
+  const { profile } = useSession();
+  
+  // Base navigation items for all users
+  const baseNavItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/profile", icon: User, label: "Perfil" },
     { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
-    { to: "/admin/churches", icon: Church, label: "Mis Iglesias" }, // Changed label to be more specific
   ];
+
+  // Add church link if user has an assigned church
+  const navItems = [...baseNavItems];
+  if (profile?.church_id) {
+    navItems.push({ 
+      to: `/admin/churches/${profile.church_id}/overview`, 
+      icon: Church, 
+      label: "Mi Iglesia" 
+    });
+  }
 
   return (
     <aside className={cn(
