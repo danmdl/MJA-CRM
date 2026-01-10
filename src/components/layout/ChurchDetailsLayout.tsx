@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useSession } from "@/hooks/use-session";
@@ -50,10 +49,11 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         .select("name")
         .eq("id", churchId)
         .single();
-
+      
       if (error) {
         return { name: "" };
       }
+      
       return data as { name: string };
     },
     enabled: !!churchId,
@@ -78,22 +78,30 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Tabs at the VERY TOP of the layout - exactly as described */}
+      {/* Church name header */}
+      <div className="border-b bg-background p-4">
+        <h2 className="text-2xl font-bold tracking-tight">
+          {nameLoading ? <Skeleton className="h-8 w-64" /> : churchData?.name || "Iglesia"}
+        </h2>
+      </div>
+      
+      {/* Top tabs navigation */}
       <div className="border-b bg-background">
-        <div className="p-4">
-          <h2 className="text-2xl font-bold tracking-tight">{churchData?.name || "Iglesia"}</h2>
-        </div>
-        <Tabs value={activeTab} onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)} className="w-full">
-          <TabsList className="mb-4">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
+          className="w-full px-4"
+        >
+          <TabsList className="mb-0">
             <TabsTrigger value="overview">Resumen</TabsTrigger>
             <TabsTrigger value="database">Base de Datos</TabsTrigger>
-            <TabsTrigger value="team">Equipo de Células</TabsTrigger>
+            <TabsTrigger value="team">Equipo</TabsTrigger>
             <TabsTrigger value="cells">Células</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
-
-      {/* Main content area below the tabs */}
+      
+      {/* Main content area */}
       <main className="flex-1 p-6 overflow-auto">
         {children || <Outlet />}
       </main>
