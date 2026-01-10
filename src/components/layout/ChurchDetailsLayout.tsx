@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useParams, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useSession } from "@/hooks/use-session";
-import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -22,7 +21,9 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
-    if (sessionLoading) return;
+    if (sessionLoading) {
+      return;
+    }
 
     if (!churchId) {
       showError("Error: No se encontró el ID de la iglesia.");
@@ -36,11 +37,10 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (!isAdminOrGeneral && !isAssignedToChurch) {
       showError("No tienes permiso para acceder a los detalles de esta iglesia.");
       navigate("/admin/churches", { replace: true });
-      return;
+    } else {
+      setAccessChecked(true);
     }
-
-    setAccessChecked(true);
-  }, [churchId, profile, sessionLoading, navigate]);
+  }, [churchId, profile, sessionLoading, navigate, location.pathname]);
 
   const { data: churchData, isLoading: nameLoading } = useQuery({
     queryKey: ["churchName", churchId],
@@ -51,7 +51,9 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         .eq("id", churchId)
         .single();
 
-      if (error) return { name: "" };
+      if (error) {
+        return { name: "" };
+      }
       return data as { name: string };
     },
     enabled: !!churchId,
@@ -76,33 +78,22 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
   return (
     <div className="h-full w-full flex flex-col">
+      {/* Tabs at the VERY TOP of the layout - exactly as described */}
       <div className="border-b bg-background">
-        <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            {nameLoading ? (
-              <Skeleton className="h-6 w-56" />
-            ) : (
-              <h2 className="text-xl font-bold tracking-tight">
-                {churchData?.name || "Iglesia"}
-              </h2>
-            )}
-          </div>
-
-          <Tabs
-            value={activeTab}
-            onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
-            className="w-full"
-          >
-            <TabsList className="w-full justify-start overflow-x-auto">
-              <TabsTrigger value="overview">Resumen</TabsTrigger>
-              <TabsTrigger value="database">Base de Datos</TabsTrigger>
-              <TabsTrigger value="team">Equipo</TabsTrigger>
-              <TabsTrigger value="cells">Células</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <div className="p-4">
+          <h2 className="text-2xl font-bold tracking-tight">{churchData?.name || "Iglesia"}</h2>
         </div>
+        <Tabs value={activeTab} onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)} className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="overview">Resumen</TabsTrigger>
+            <TabsTrigger value="database">Base de Datos</TabsTrigger>
+            <TabsTrigger value="team">Equipo de Células</TabsTrigger>
+            <TabsTrigger value="cells">Células</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
+      {/* Main content area below the tabs */}
       <main className="flex-1 p-6 overflow-auto">
         {children || <Outlet />}
       </main>
