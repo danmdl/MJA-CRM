@@ -319,6 +319,20 @@ const DynamicContactTable = ({
     enabled: !!churchId,
   });
 
+  const { data: totalCount } = useQuery({
+    queryKey: ['contacts-count', churchId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('contacts')
+        .select('id', { count: 'exact', head: true })
+        .eq('church_id', churchId!);
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!churchId,
+    staleTime: 30_000,
+  });
+
   const deleteContactMutation = useMutation({
     mutationFn: async (contactId: string) => {
       const { error } = await supabase.from('contacts').delete().eq('id', contactId);
