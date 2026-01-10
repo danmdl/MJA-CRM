@@ -244,7 +244,7 @@ const OverviewPage = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Main pastor + secondary pastors row */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-4">
             {/* Main pastor select (left) */}
             <div className="min-w-[260px]">
               <div className="font-medium mb-2">Pastor Principal</div>
@@ -270,42 +270,47 @@ const OverviewPage = () => {
               )}
             </div>
 
-            {/* Secondary pastors chips (center, push button to the right) */}
-            <div className="flex flex-wrap items-center gap-2 flex-1">
-              {secondaryNames.length === 0 ? (
-                <span className="text-sm text-muted-foreground">Sin pastores secundarios</span>
-              ) : (
-                secondaryNames.map(({ user_id, name }) => (
-                  <div key={user_id} className="flex items-center gap-2 px-3 py-1 rounded border bg-background">
-                    <span className="text-sm">{name}</span>
-                    {isAdminOrGeneral && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-red-600"
-                        onClick={() => removeSecondaryPastor(user_id)}
-                        title="Eliminar pastor secundario"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))
-              )}
+            {/* Secondary pastors column (center) */}
+            <div className="flex-1">
+              <div className="font-medium mb-2">Pastor Secundario</div>
+              <div className="flex flex-wrap items-center gap-2">
+                {secondaryNames.length === 0 ? (
+                  <span className="text-sm text-muted-foreground">Sin pastores secundarios</span>
+                ) : (
+                  secondaryNames.map(({ user_id, name }) => (
+                    <div key={user_id} className="flex items-center gap-2 px-3 py-1 rounded border bg-background">
+                      <span className="text-sm">{name}</span>
+                      {isAdminOrGeneral && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-red-600"
+                          onClick={() => removeSecondaryPastor(user_id)}
+                          title="Eliminar pastor secundario"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
-            {/* Add secondary button (right) */}
+            {/* Add secondary button (right, top-aligned) */}
             {isAdminOrGeneral && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => setAddSecondPastorOpen(true)}
-                title="Añadir pastor secundario"
-              >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Añadir secundario
-              </Button>
+              <div className="self-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => setAddSecondPastorOpen(true)}
+                  title="Añadir pastor secundario"
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Añadir secundario
+                </Button>
+              </div>
             )}
           </div>
 
