@@ -11,8 +11,8 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/profile", icon: User, label: "Perfil" },
-    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" }, // Changed label here
-    { to: "/admin/churches", icon: Church, label: "Iglesias" }, // NEW: link to churches list
+    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
+    { to: "/admin/churches", icon: Church, label: "Mis Iglesias" }, // Changed label to be more specific
   ];
 
   return (

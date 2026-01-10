@@ -66,6 +66,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         .from("contacts")
         .select("id", { count: "exact", head: true })
         .eq("church_id", churchId!);
+      
       if (error) return 0;
       return count || 0;
     },
