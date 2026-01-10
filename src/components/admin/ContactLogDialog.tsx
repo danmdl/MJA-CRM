@@ -235,3 +235,5 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
 };
 
 export default ContactLogDialog;
+
+export { AddContactLogDialog } from './AddContactLogDialog';
