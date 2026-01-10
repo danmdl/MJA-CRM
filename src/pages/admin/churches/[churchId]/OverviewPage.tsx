@@ -23,6 +23,31 @@ interface Church {
   pin_order: number | null;
 }
 
+interface Cell {
+  id: string;
+  name: string;
+  encargado_id: string | null;
+  address: string | null;
+  meeting_day: string | null;
+  meeting_time: string | null;
+}
+
+interface Contact {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  apartment_number: string | null;
+  barrio: string | null;
+  leader_assigned: string | null;
+  created_at: string;
+  church_id: string;
+  cell_id: string | null;
+  date_of_birth?: string | null;
+}
+
 const fetchChurchDetails = async (churchId: string): Promise<Church> => {
   const { data, error } = await supabase
     .from('churches')
@@ -37,6 +62,25 @@ const fetchChurchDetails = async (churchId: string): Promise<Church> => {
   return data;
 };
 
+const fetchCells = async (churchId: string): Promise<Cell[]> => {
+  const { data, error } = await supabase
+    .from('cells')
+    .select('*')
+    .eq('church_id', churchId)
+    .order('name', { ascending: true });
+  if (error) throw new Error('No se pudieron cargar las células.');
+  return data || [];
+};
+
+const fetchContacts = async (churchId: string): Promise<Contact[]> => {
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('*')
+    .eq('church_id', churchId);
+  if (error) throw new Error('No se pudieron cargar los contactos.');
+  return data || [];
+};
+
 const OverviewPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
@@ -45,6 +89,18 @@ const OverviewPage = () => {
   const { data: church, isLoading, isError, error } = useQuery<Church>({
     queryKey: ['churchDetails', churchId],
     queryFn: () => fetchChurchDetails(churchId!),
+    enabled: !!churchId,
+  });
+
+  const { data: cells, isLoading: isLoadingCells, isError: isErrorCells, error: errorCells } = useQuery<Cell[]>({
+    queryKey: ['overviewCells', churchId],
+    queryFn: () => fetchCells(churchId!),
+    enabled: !!churchId,
+  });
+
+  const { data: contacts, isLoading: isLoadingContacts, isError: isErrorContacts, error: errorContacts } = useQuery<Contact[]>({
+    queryKey: ['overviewContacts', churchId],
+    queryFn: () => fetchContacts(churchId!),
     enabled: !!churchId,
   });
 
@@ -107,8 +163,8 @@ const OverviewPage = () => {
   };
 
   const analytics = useMemo(() => {
-    const c = (cells as any[]) || [];
-    const ppl = (contacts as any[]) || [];
+    const c = cells || []; // Use fetched cells
+    const ppl = contacts || []; // Use fetched contacts
 
     // Build attendee counts per cell
     const attendeeCounts: Record<string, number> = {};
@@ -160,7 +216,7 @@ const OverviewPage = () => {
   const [addSecondPastorOpen, setAddSecondPastorOpen] = useState(false);
   const [selectedSecondPastor, setSelectedSecondPastor] = useState<string | 'none'>('none');
 
-  if (isLoading) {
+  if (isLoading || isLoadingCells || isLoadingContacts) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-1/2" />
@@ -170,9 +226,9 @@ const OverviewPage = () => {
     );
   }
 
-  if (isError) {
-    showError(error?.message || 'Error al cargar los detalles de la iglesia.');
-    return <div className="text-red-500">Error: {error?.message || 'No se pudieron cargar los detalles de la iglesia.'}</div>;
+  if (isError || isErrorCells || isErrorContacts) {
+    showError(error?.message || errorCells?.message || errorContacts?.message || 'Error al cargar los detalles de la iglesia.');
+    return <div className="text-red-500">Error: {error?.message || errorCells?.message || errorContacts?.message || 'No se pudieron cargar los detalles de la iglesia.'}</div>;
   }
 
   if (!church) {
