@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'; // Import Resizable components
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -19,6 +20,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [accessChecked, setAccessChecked] = useState(false);
+  const [isChurchNavCollapsed, setIsChurchNavCollapsed] = useState(false); // State for the inner sidebar collapse
 
   useEffect(() => {
     if (sessionLoading) {
@@ -76,37 +78,69 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Tabs at the very top of the content area */}
-      <div className="p-4 border-b">
-        <Tabs
-          value={activeTab}
-          onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
-          className="w-full"
-        >
-          <TabsList className="mb-4">
-            <TabsTrigger value="overview">Resumen</TabsTrigger>
-            <TabsTrigger value="database">Base de Datos</TabsTrigger>
-            <TabsTrigger value="team">Equipo de Células</TabsTrigger>
-            <TabsTrigger value="cells">Células</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <ResizablePanelGroup
+      direction="horizontal"
+      className="h-full w-full"
+      onLayout={(sizes: number[]) => {
+        setIsChurchNavCollapsed(sizes[0] < 10);
+      }}
+    >
+      {/* Second Column: Church-specific Navigation (Sidebar-like) */}
+      <ResizablePanel
+        defaultSize={15} // Adjust size as needed for the second sidebar
+        minSize={4}
+        maxSize={25}
+        collapsible={true}
+        onCollapse={() => setIsChurchNavCollapsed(true)}
+        onExpand={() => setIsChurchNavCollapsed(false)}
+        className="min-w-[60px] h-full flex flex-col bg-background border-r" // Added flex-col for vertical layout
+      >
+        {/* Church Name Header */}
+        <div className="p-4 border-b">
+          {nameLoading ? (
+            <Skeleton className="h-6 w-40" />
+          ) : (
+            <h2 className="text-xl font-bold tracking-tight break-words whitespace-normal">
+              {!isChurchNavCollapsed && (churchData?.name || "Iglesia")}
+            </h2>
+          )}
+        </div>
 
-      {/* Church Name Header, now below the tabs */}
-      <div className="p-4 border-b">
-        {nameLoading ? (
-          <Skeleton className="h-6 w-40" />
-        ) : (
-          <h2 className="text-xl font-bold tracking-tight">{churchData?.name || "Iglesia"}</h2>
-        )}
-      </div>
+        {/* Tabs for Church Navigation */}
+        <nav className="flex flex-col p-2 flex-grow space-y-1"> {/* Use nav for semantic structure */}
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
+            className="w-full"
+            orientation="vertical" // Make tabs vertical
+          >
+            <TabsList className="flex flex-col h-auto p-0 bg-transparent"> {/* Style TabsList for vertical display */}
+              <TabsTrigger value="overview" className="justify-start data-[state=active]:bg-muted data-[state=active]:text-primary">
+                Resumen
+              </TabsTrigger>
+              <TabsTrigger value="database" className="justify-start data-[state=active]:bg-muted data-[state=active]:text-primary">
+                Base de Datos
+              </TabsTrigger>
+              <TabsTrigger value="team" className="justify-start data-[state=active]:bg-muted data-[state=active]:text-primary">
+                Equipo de Células
+              </TabsTrigger>
+              <TabsTrigger value="cells" className="justify-start data-[state=active]:bg-muted data-[state=active]:text-primary">
+                Células
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </nav>
+      </ResizablePanel>
 
-      {/* Main content for the selected tab */}
-      <main className="flex-1 p-4 overflow-auto">
-        {children || <Outlet />}
-      </main>
-    </div>
+      <ResizableHandle withHandle />
+
+      {/* Third Column: Main Content Area */}
+      <ResizablePanel defaultSize={85}> {/* This panel will contain the actual page content */}
+        <main className="flex-1 p-6 overflow-auto">
+          {children || <Outlet />}
+        </main>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 };
 
