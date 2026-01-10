@@ -8,6 +8,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getRoleLabel, isReferenceRole } from '@/lib/roles';
 
 interface PermissionConfig {
   role: string;
@@ -50,6 +51,18 @@ const defaultPermissions: PermissionConfig[] = [
   {
     role: 'pastor',
     label: 'Pastor',
+    permissions: {
+      seeAllChurches: false,
+      accessAllChurches: false,
+      addUsers: false,
+      editDeleteUsers: false,
+      seeAllAnalytics: false,
+      seeOwnChurchAnalytics: true,
+    },
+  },
+  {
+    role: 'piloto',
+    label: 'Piloto (Legacy)',
     permissions: {
       seeAllChurches: false,
       accessAllChurches: false,
@@ -257,6 +270,11 @@ const PermissionsDashboard = () => {
                   <Badge variant={config.role === 'admin' ? 'default' : 'secondary'}>
                     {config.label}
                   </Badge>
+                  {config.role === 'piloto' && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Usuarios existentes mantendrán este rol
+                    </div>
+                  )}
                 </div>
                 {permissionColumns.map((column) => (
                   <div key={column.key} className="flex justify-center">
@@ -283,20 +301,41 @@ const PermissionsDashboard = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Legend</CardTitle>
+          <CardTitle>Información de Roles</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Check className="h-4 w-4 text-green-600" />
-            <span className="text-sm">Permiso concedido</span>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-medium mb-2">Roles Activos:</h4>
+              <ul className="text-sm space-y-1">
+                <li>• <strong>Admin:</strong> Acceso completo al sistema</li>
+                <li>• <strong>General:</strong> Acceso administrativo extendido</li>
+                <li>• <strong>Pastor:</strong> Gestión de su propia iglesia</li>
+                <li>• <strong>Referente:</strong> Nuevo rol de referencia (reemplaza Piloto)</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Roles Adicionales:</h4>
+              <ul className="text-sm space-y-1">
+                <li>• <strong>Piloto:</strong> Rol legacy para usuarios existentes</li>
+                <li>• <strong>Encargado de Célula:</strong> Gestión de células</li>
+                <li>• <strong>Usuario:</strong> Acceso básico limitado</li>
+              </ul>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <X className="h-4 w-4 text-red-600" />
-            <span className="text-sm">Permiso denegado</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="default">Admin</Badge>
-            <span className="text-sm">El rol Admin siempre tiene todos los permisos</span>
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-green-600" />
+              <span className="text-sm">Permiso concedido</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <X className="h-4 w-4 text-red-600" />
+              <span className="text-sm">Permiso denegado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="default">Admin</Badge>
+              <span className="text-sm">El rol Admin siempre tiene todos los permisos</span>
+            </div>
           </div>
         </CardContent>
       </Card>

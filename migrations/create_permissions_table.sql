@@ -47,6 +47,7 @@ INSERT INTO permissions (role, see_all_churches, access_all_churches, add_users,
   ('admin', true, true, true, true, true, true),
   ('general', true, true, true, true, true, true),
   ('pastor', false, false, false, false, false, true),
+  ('piloto', false, false, false, false, false, true),
   ('reference', false, false, false, false, false, true),
   ('encargado_de_celula', false, false, false, false, false, true),
   ('user', false, false, false, false, false, false)
