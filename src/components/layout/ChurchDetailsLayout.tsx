@@ -59,6 +59,20 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     enabled: !!churchId,
   });
 
+  const { data: totalCount } = useQuery({
+    queryKey: ["contacts-count", churchId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("contacts")
+        .select("id", { count: "exact", head: true })
+        .eq("church_id", churchId!);
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!churchId,
+    staleTime: 30_000,
+  });
+
   const activeTab = (() => {
     const p = location.pathname;
     if (p.endsWith("/overview")) return "overview";
@@ -78,11 +92,25 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Church name header */}
+      {/* Church header with name (left), total count (center), selection toolbar slot (right) */}
       <div className="border-b bg-background p-4">
-        <h2 className="text-2xl font-bold tracking-tight">
-          {nameLoading ? <Skeleton className="h-8 w-64" /> : churchData?.name || "Iglesia"}
-        </h2>
+        <div className="grid grid-cols-3 items-center">
+          <div className="justify-self-start">
+            <h2 className="text-2xl font-bold tracking-tight">
+              {nameLoading ? <Skeleton className="h-8 w-64" /> : churchData?.name || "Iglesia"}
+            </h2>
+          </div>
+          <div className="justify-self-center">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Total contactos</span>
+              <span className="text-2xl font-bold">{totalCount ?? 0}</span>
+            </div>
+          </div>
+          <div className="justify-self-end w-full max-w-[360px]">
+            {/* External selection toolbar portal target */}
+            <div id="selection-toolbar-slot" />
+          </div>
+        </div>
       </div>
       
       {/* Top tabs navigation */}

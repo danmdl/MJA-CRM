@@ -45,20 +45,6 @@ const ChurchDatabasePage = () => {
     setFilterField(null);
   };
 
-  const { data: totalCount } = useQuery({
-    queryKey: ['contacts-count', churchId],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('contacts')
-        .select('id', { count: 'exact', head: true })
-        .eq('church_id', churchId!);
-      if (error) return 0;
-      return count || 0;
-    },
-    enabled: !!churchId,
-    staleTime: 30_000,
-  });
-
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex justify-between items-center mb-6">
@@ -91,7 +77,7 @@ const ChurchDatabasePage = () => {
         </div>
       </div>
 
-      <div className="flex items-center space-x-4 mb-4">
+      <div className="flex items-center space-x-4 mb-0">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -122,24 +108,12 @@ const ChurchDatabasePage = () => {
         )}
       </div>
 
-      {/* Put stats and the table inside the same relative container so the table's selection toolbar can position next to the cards */}
-      <div className="relative">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-2">
-          <Card className="flex items-center justify-between p-4">
-            <div className="text-sm font-medium text-muted-foreground">Total contactos</div>
-            <div className="text-2xl font-bold">{totalCount ?? 0}</div>
-          </Card>
-        </div>
-
-        <div className="flex-grow">
-          <DynamicContactTable
-            churchId={churchId}
-            searchTerm={searchTerm}
-            filterField={filterField}
-            useExternalToolbarContainer={true}
-          />
-        </div>
-      </div>
+      <DynamicContactTable
+        churchId={churchId}
+        searchTerm={searchTerm}
+        filterField={filterField}
+        useExternalToolbarContainer={true}
+      />
 
       <AddContactDialog
         open={isAddContactDialogOpen}

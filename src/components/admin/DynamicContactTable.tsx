@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { logger } from '@/utils/logger';
 import ContactProfileDialog from './ContactProfileDialog';
+import { createPortal } from 'react-dom';
 
 interface Contact {
   id: string;
@@ -456,14 +457,37 @@ const DynamicContactTable = ({
     return <div className="text-red-500">Error: {(error as any)?.message || 'No se pudieron cargar los contactos.'}</div>;
   }
 
+  // Determine external portal container if requested
+  const externalContainer = useExternalToolbarContainer ? document.getElementById('selection-toolbar-slot') : null;
+  const selectedCount = visibleIds.filter(id => selectedContacts.includes(id)).length;
+  const canEdit = selectedCount === 1;
+
   return (
     <div className="space-y-4">
+      {/* Render selection toolbar externally (right side of header) if enabled and container exists */}
+      {(someVisibleSelected || allVisibleSelected) && useExternalToolbarContainer && externalContainer &&
+        createPortal(
+          <SelectionToolbar
+            selectedCount={selectedCount}
+            canEdit={canEdit}
+            onEdit={() => {
+              const only = visibleIds.find(id => selectedContacts.includes(id));
+              if (only) setProfileContactId(only);
+            }}
+            onDeleteSelected={() => handleDeleteSelected(visibleIds.filter(id => selectedContacts.includes(id)))}
+            isDeleting={deleteContactMutation.isPending as any}
+          />,
+          externalContainer
+        )
+      }
+
+      {/* Internal toolbar (fallback) only when not using external container */}
       <div className={useExternalToolbarContainer ? '' : 'relative'}>
-        {(someVisibleSelected || allVisibleSelected) && (
-          <div className={useExternalToolbarContainer ? "absolute top-0 left-0 right-0 z-10" : "absolute top-0 left-0 right-0 z-10"}>
+        {(!useExternalToolbarContainer && (someVisibleSelected || allVisibleSelected)) && (
+          <div className="absolute top-0 left-0 right-0 z-10">
             <SelectionToolbar
-              selectedCount={visibleIds.filter(id => selectedContacts.includes(id)).length}
-              canEdit={visibleIds.filter(id => selectedContacts.includes(id)).length === 1}
+              selectedCount={selectedCount}
+              canEdit={canEdit}
               onEdit={() => {
                 const only = visibleIds.find(id => selectedContacts.includes(id));
                 if (only) setProfileContactId(only);
@@ -473,7 +497,7 @@ const DynamicContactTable = ({
             />
           </div>
         )}
-        <div className="pt-14">
+        <div className={useExternalToolbarContainer ? '' : 'pt-14'}>
           {/* Columns Picker */}
           <div className="flex justify-end">
             <DropdownMenu>
@@ -491,11 +515,9 @@ const DynamicContactTable = ({
                     onCheckedChange={(checked) => {
                       setVisibleColumns(prev => {
                         if (checked) {
-                          // add at end if not present
                           if (prev.some(p => p.key === field.key)) return prev;
                           return [...prev, field];
                         } else {
-                          // ensure at least 1 column remains
                           const filtered = prev.filter(p => p.key !== field.key);
                           return filtered.length > 0 ? filtered : prev;
                         }
