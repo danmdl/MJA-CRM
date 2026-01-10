@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/ModeToggle';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 const TopNav = () => {
   const { profile } = useSession();
