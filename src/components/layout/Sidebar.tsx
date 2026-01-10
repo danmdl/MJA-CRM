@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare, Shield } from 'lucide-react';
+import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare, Shield, BarChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 import { useSession } from '@/hooks/use-session';
@@ -11,24 +11,25 @@ interface SidebarProps {
 
 const Sidebar = ({ isCollapsed }: SidebarProps) => {
   const { profile } = useSession();
-  const { canEditDeleteUsers } = usePermissions();
+  const { canAddUsers, canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
 
-  // Define all possible navigation items
-  const allNavItems = [
-    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general'] },
-    { to: "/admin/churches", icon: Church, label: "Ministerio", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
-    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios", roles: ['admin', 'general'], requiresPermission: 'add_users' },
-    { to: "/admin/permissions", icon: Shield, label: "Permisos", roles: ['admin'], requiresPermission: 'edit_delete_users' },
-    { to: "/admin/profile", icon: User, label: "Perfil", roles: ['admin', 'general'] },
-    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] }
+  // Unified navigation for all users - same buttons, permissions control what they can do
+  const navItems = [
+    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/admin/churches", icon: Church, label: "Ministerio" },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
+    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" },
+    { to: "/admin/permissions", icon: Shield, label: "Permisos" },
+    { to: "/admin/profile", icon: User, label: "Perfil" },
+    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" },
   ];
 
-  // Filter navigation items based on user's role and permissions
-  const navItems = allNavItems.filter(item => {
-    const hasRoleAccess = item.roles.includes(profile?.role || 'user');
-    const hasPermissionAccess = !item.requiresPermission || canEditDeleteUsers();
-    return hasRoleAccess && hasPermissionAccess;
+  // Filter navigation items based on permissions, not roles
+  const filteredNavItems = navItems.filter(item => {
+    if (item.to === "/admin/login-management") return canAddUsers();
+    if (item.to === "/admin/permissions") return canEditDeleteUsers();
+    if (item.to === "/admin/dashboard") return canSeeAllAnalytics();
+    return true; // Everyone can access basic tabs
   });
 
   return (
@@ -40,11 +41,11 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
         "p-4 border-b flex items-center",
         isCollapsed ? "justify-center" : "justify-between"
       )}>
-        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">Panel de Admin</h2>}
+        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">MJA Central</h2>}
         {isCollapsed && <LayoutDashboard className="h-6 w-6 text-primary" />}
       </div>
       <nav className="flex flex-col p-2 flex-grow space-y-1">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

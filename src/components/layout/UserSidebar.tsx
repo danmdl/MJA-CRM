@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, LayoutDashboard, FileSpreadsheet, Church, MessageSquare, BarChart } from 'lucide-react';
+import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare, Shield, BarChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 import { useSession } from '@/hooks/use-session';
@@ -11,33 +11,26 @@ interface UserSidebarProps {
 
 const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
   const { profile } = useSession();
-  const { canSeeOwnChurchAnalytics } = usePermissions();
-  
-  // Base navigation items for all users
-  const baseNavItems = [
-    { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/profile", icon: User, label: "Perfil" },
-    { to: "/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
+  const { canAddUsers, canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
+
+  // Same navigation as admin sidebar - unified experience
+  const navItems = [
+    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/admin/churches", icon: Church, label: "Ministerio" },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
+    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" },
+    { to: "/admin/permissions", icon: Shield, label: "Permisos" },
+    { to: "/admin/profile", icon: User, label: "Perfil" },
+    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" },
   ];
 
-  // Add church-related navigation if user has an assigned church
-  const navItems = [...baseNavItems];
-  if (profile?.church_id) {
-    navItems.push({ 
-      to: `/admin/churches/${profile.church_id}/overview`, 
-      icon: Church, 
-      label: "Ministerio" 
-    });
-    
-    // Add analytics if user can see their church analytics
-    if (canSeeOwnChurchAnalytics()) {
-      navItems.push({ 
-        to: `/admin/churches/${profile.church_id}/overview`, 
-        icon: BarChart, 
-        label: "Analíticas" 
-      });
-    }
-  }
+  // Filter navigation items based on permissions, not roles
+  const filteredNavItems = navItems.filter(item => {
+    if (item.to === "/admin/login-management") return canAddUsers();
+    if (item.to === "/admin/permissions") return canEditDeleteUsers();
+    if (item.to === "/admin/dashboard") return canSeeAllAnalytics();
+    return true; // Everyone can access basic tabs
+  });
 
   return (
     <aside className={cn(
@@ -52,7 +45,7 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
         {isCollapsed && <LayoutDashboard className="h-6 w-6 text-primary" />}
       </div>
       <nav className="flex flex-col p-2 flex-grow space-y-1">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -68,7 +61,6 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
             {!isCollapsed && <span className="text-sm">{item.label}</span>}
           </NavLink>
         ))}
-        <Link to="/messages" className="block rounded px-3 py-2 hover:bg-muted">Mensajes</Link>
       </nav>
       <SidebarFooter isCollapsed={isCollapsed} />
     </aside>
