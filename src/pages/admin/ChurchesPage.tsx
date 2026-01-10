@@ -101,7 +101,7 @@ const ChurchesPage = () => {
   });
 
   const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
-  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(profile?.role || '');
+  const isChurchRole = ['pastor', 'piloto', 'encargado_de_celula'].includes(profile?.role || '');
   
   // Filter churches based on user role
   const filteredChurches = churches ? 
@@ -110,6 +110,13 @@ const ChurchesPage = () => {
         churches.filter(church => church.id === profile.church_id) : 
         [])) : 
     [];
+
+  // DEBUG: Log filtering results
+  console.log('[DEBUG ChurchesPage] All churches:', churches);
+  console.log('[DEBUG ChurchesPage] Filtered churches:', filteredChurches);
+  console.log('[DEBUG ChurchesPage] isAdminOrGeneral:', isAdminOrGeneral);
+  console.log('[DEBUG ChurchesPage] isChurchRole:', isChurchRole);
+  console.log('[DEBUG ChurchesPage] profile.church_id:', profile?.church_id);
 
   if (isLoading) {
     return (
