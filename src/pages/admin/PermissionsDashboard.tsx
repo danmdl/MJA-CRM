@@ -8,7 +8,6 @@ import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getRoleLabel, isReferenceRole } from '@/lib/roles';
 
 interface PermissionConfig {
   role: string;
@@ -51,18 +50,6 @@ const defaultPermissions: PermissionConfig[] = [
   {
     role: 'pastor',
     label: 'Pastor',
-    permissions: {
-      seeAllChurches: false,
-      accessAllChurches: false,
-      addUsers: false,
-      editDeleteUsers: false,
-      seeAllAnalytics: false,
-      seeOwnChurchAnalytics: true,
-    },
-  },
-  {
-    role: 'piloto',
-    label: 'Piloto (Legacy)',
     permissions: {
       seeAllChurches: false,
       accessAllChurches: false,
@@ -270,11 +257,6 @@ const PermissionsDashboard = () => {
                   <Badge variant={config.role === 'admin' ? 'default' : 'secondary'}>
                     {config.label}
                   </Badge>
-                  {config.role === 'piloto' && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Usuarios existentes mantendrán este rol
-                    </div>
-                  )}
                 </div>
                 {permissionColumns.map((column) => (
                   <div key={column.key} className="flex justify-center">
@@ -311,13 +293,12 @@ const PermissionsDashboard = () => {
                 <li>• <strong>Admin:</strong> Acceso completo al sistema</li>
                 <li>• <strong>General:</strong> Acceso administrativo extendido</li>
                 <li>• <strong>Pastor:</strong> Gestión de su propia iglesia</li>
-                <li>• <strong>Referente:</strong> Nuevo rol de referencia (reemplaza Piloto)</li>
+                <li>• <strong>Referente:</strong> Rol de referencia</li>
               </ul>
             </div>
             <div>
               <h4 className="font-medium mb-2">Roles Adicionales:</h4>
               <ul className="text-sm space-y-1">
-                <li>• <strong>Piloto:</strong> Rol legacy para usuarios existentes</li>
                 <li>• <strong>Encargado de Célula:</strong> Gestión de células</li>
                 <li>• <strong>Usuario:</strong> Acceso básico limitado</li>
               </ul>

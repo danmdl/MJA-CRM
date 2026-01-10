@@ -55,7 +55,7 @@ const ChurchesPage = () => {
   });
 
   const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
-  const isChurchRole = ['pastor', 'piloto', 'encargado_de_celula'].includes(profile?.role || '');
+  const isChurchRole = ['pastor', 'reference', 'encargado_de_celula'].includes(profile?.role || '');
   
   // Filter churches based on user role
   const filteredChurches = churches ? 
@@ -112,7 +112,7 @@ const ChurchesPage = () => {
   if (isLoading) {
     return (
       <div className="p-6">
-        <h1 className="text-3xl font-bold mb-6">Iglesias</h1>
+        <h1 className="text-3xl font-bold mb-6">Ministerio</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
@@ -132,7 +132,7 @@ const ChurchesPage = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Iglesias</h1>
+        <h1 className="text-3xl font-bold">Ministerio</h1>
         {isAdminOrGeneral && (
           <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
             <DialogTrigger asChild>
