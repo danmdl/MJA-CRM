@@ -47,10 +47,12 @@ INSERT INTO permissions (role, see_all_churches, access_all_churches, add_users,
   ('admin', true, true, true, true, true, true),
   ('general', true, true, true, true, true, true),
   ('pastor', false, false, false, false, false, true),
-  ('reference', false, false, false, false, false, true),
+  ('referente', false, false, false, false, false, true),
   ('encargado_de_celula', false, false, false, false, false, true),
   ('user', false, false, false, false, false, false)
 ON CONFLICT (role) DO NOTHING;
 
--- MIGRATION: Update existing users with 'piloto' role to 'reference'
-UPDATE profiles SET role = 'reference' WHERE role = 'piloto';
+-- MIGRATION: Update existing users with 'piloto' role to 'referente'
+UPDATE profiles SET role = 'referente' WHERE role = 'piloto';
+-- MIGRATION: Update existing users with 'reference' role to 'referente'  
+UPDATE profiles SET role = 'referente' WHERE role = 'reference';

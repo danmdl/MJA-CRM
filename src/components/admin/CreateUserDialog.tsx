@@ -24,7 +24,7 @@ const createUserSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
   last_name: z.string().min(1, { message: 'El apellido es obligatorio.' }),
-  role: z.enum(['general', 'pastor', 'reference', 'encargado_de_celula'], {
+  role: z.enum(['general', 'pastor', 'referente', 'encargado_de_celula'], {
     errorMap: () => ({ message: 'El rol es obligatorio.' })
   }),
   church_id: z.string().uuid({ message: 'La iglesia es obligatoria.' }),

@@ -1,10 +1,10 @@
-export type RoleKey = 'admin' | 'general' | 'pastor' | 'reference' | 'encargado_de_celula' | 'user';
+export type RoleKey = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
 export const ROLE_LABELS: Record<RoleKey, string> = {
   admin: 'Admin',
   general: 'General',
   pastor: 'Pastor',
-  reference: 'Referente',
+  referente: 'Referente',
   encargado_de_celula: 'Encargado de Célula',
   user: 'Usuario',
 };

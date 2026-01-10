@@ -60,7 +60,7 @@ const defaultPermissions: PermissionConfig[] = [
     },
   },
   {
-    role: 'reference',
+    role: 'referente',
     label: 'Referente',
     permissions: {
       seeAllChurches: false,

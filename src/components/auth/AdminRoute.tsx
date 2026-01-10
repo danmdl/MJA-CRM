@@ -48,7 +48,7 @@ const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
     
     // Only admin, general, and church roles can access admin routes
     const isGeneral = userRole === 'general';
-    const isChurchRole = ['pastor', 'reference', 'encargado_de_celula'].includes(userRole || '');
+    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(userRole || '');
     
     if (!isAdmin && !isGeneral && !isChurchRole) {
       showError('No tienes permiso para acceder al panel de administración.');

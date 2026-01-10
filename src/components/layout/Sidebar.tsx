@@ -16,15 +16,15 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
   // Define all possible navigation items
   const allNavItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['admin', 'general'] },
-    { to: "/admin/churches", icon: Church, label: "Ministerio", roles: ['admin', 'general', 'pastor', 'reference', 'encargado_de_celula'] },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'reference', 'encargado_de_celula'] },
+    { to: "/admin/churches", icon: Church, label: "Ministerio", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
+    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] },
     { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios", roles: ['admin', 'general'], requiresPermission: 'add_users' },
     { to: "/admin/permissions", icon: Shield, label: "Permisos", roles: ['admin'], requiresPermission: 'edit_delete_users' },
     { to: "/admin/profile", icon: User, label: "Perfil", roles: ['admin', 'general'] },
-    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'reference', 'encargado_de_celula'] }
+    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes", roles: ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula'] }
   ];
 
-  // Filter navigation items based on the user's role and permissions
+  // Filter navigation items based on user's role and permissions
   const navItems = allNavItems.filter(item => {
     const hasRoleAccess = item.roles.includes(profile?.role || 'user');
     const hasPermissionAccess = !item.requiresPermission || canEditDeleteUsers();
