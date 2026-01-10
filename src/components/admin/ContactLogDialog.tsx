@@ -75,7 +75,6 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
   const handleDelete = async (row: any) => {
     if (!row) return;
     if (!within24h(row)) {
-      // Extra guard
       showError('No puedes eliminar este registro (más de 24 horas).');
       return;
     }
@@ -127,9 +126,6 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
       loadLogs();
     }
   };
-
-  // Removed add form state; history-only
-  // Removed handleAdd; history-only
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -201,7 +197,7 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
         </div>
       </DialogContent>
       {/* Edit Dialog */}
-      <Dialog open={!!editingLog} onOpenChange={(o) => { if (!o) closeEdit(); }}>
+      <Dialog open={!!editingLog} onOpenChange={(open) => { if (!open) closeEdit(); }}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>Editar registro</DialogTitle>
