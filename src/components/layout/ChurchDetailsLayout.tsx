@@ -107,8 +107,8 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
             </div>
           </div>
           <div className="justify-self-end w-full max-w-[360px]">
-            {/* External selection toolbar portal target */}
-            <div id="selection-toolbar-slot" />
+            {/* External selection toolbar portal target (positioned container so toolbar can be absolutely placed inside it) */}
+            <div id="selection-toolbar-slot" className="relative h-10 flex items-center justify-end" />
           </div>
         </div>
       </div>

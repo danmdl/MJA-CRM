@@ -202,7 +202,7 @@ const SelectionToolbar = ({
   onDeleteSelected: () => void;
   isDeleting: boolean;
 }) => (
-  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+  <div className="flex items-center justify-between px-3 py-2 bg-muted rounded-md shadow">
     <div className="text-sm text-muted-foreground">
       {selectedCount} contacto(s) seleccionado(s)
     </div>
@@ -213,7 +213,7 @@ const SelectionToolbar = ({
       </Button>
       <Button variant="destructive" size="sm" onClick={onDeleteSelected} disabled={isDeleting}>
         <Trash2 className="mr-2 h-4 w-4" />
-        Eliminar Seleccionados
+        Eliminar
       </Button>
     </div>
   </div>
@@ -464,19 +464,22 @@ const DynamicContactTable = ({
 
   return (
     <div className="space-y-4">
-      {/* Render selection toolbar externally (right side of header) if enabled and container exists */}
+      {/* Render selection toolbar externally (right side of header) if enabled and container exists.
+          The toolbar is wrapped in an absolutely positioned wrapper so it doesn't change the header's layout height. */}
       {(someVisibleSelected || allVisibleSelected) && useExternalToolbarContainer && externalContainer &&
         createPortal(
-          <SelectionToolbar
-            selectedCount={selectedCount}
-            canEdit={canEdit}
-            onEdit={() => {
-              const only = visibleIds.find(id => selectedContacts.includes(id));
-              if (only) setProfileContactId(only);
-            }}
-            onDeleteSelected={() => handleDeleteSelected(visibleIds.filter(id => selectedContacts.includes(id)))}
-            isDeleting={deleteContactMutation.isPending as any}
-          />,
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20">
+            <SelectionToolbar
+              selectedCount={selectedCount}
+              canEdit={canEdit}
+              onEdit={() => {
+                const only = visibleIds.find(id => selectedContacts.includes(id));
+                if (only) setProfileContactId(only);
+              }}
+              onDeleteSelected={() => handleDeleteSelected(visibleIds.filter(id => selectedContacts.includes(id)))}
+              isDeleting={deleteContactMutation.isPending as any}
+            />
+          </div>,
           externalContainer
         )
       }
