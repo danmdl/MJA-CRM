@@ -1,8 +1,5 @@
 "use client";
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -11,70 +8,79 @@ interface InviteUserDialogProps {
 }
 
 const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
-  const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('[DEBUG] Form submitted with email:', email);
-    
-    if (!email) {
-      alert('Por favor, introduce un correo electrónico');
-      return;
-    }
-
-    setLoading(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      alert('Invitación enviada con éxito (simulado)');
-      setEmail('');
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Error al enviar invitación');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   console.log('[DEBUG] InviteUserDialog rendered, open:', open);
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Invitar a un nuevo miembro</DialogTitle>
-          <DialogDescription>
-            Introduce el correo electrónico para invitar a un nuevo miembro.
-            {churchId && <p className="text-sm text-muted-foreground mt-1">Church ID: {churchId}</p>}
-          </DialogDescription>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm font-medium">Correo Electrónico</label>
-            <Input 
-              type="email"
-              placeholder="nombre@ejemplo.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Enviando...' : 'Enviar Invitación'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <div style={{
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      backgroundColor: 'white',
+      padding: '20px',
+      border: '1px solid #ccc',
+      borderRadius: '8px',
+      zIndex: 1000,
+      minWidth: '400px'
+    }}>
+      <h2>Invitar a un nuevo miembro</h2>
+      <p>Introduce el correo electrónico para invitar a un nuevo miembro.</p>
+      {churchId && <p>Church ID: {churchId}</p>}
+      
+      <div style={{ marginTop: '16px' }}>
+        <label style={{ display: 'block', marginBottom: '4px' }}>Correo Electrónico:</label>
+        <input
+          type="email"
+          placeholder="nombre@ejemplo.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ccc',
+            borderRadius: '4px'
+          }}
+        />
+      </div>
+      
+      <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={() => onOpenChange(false)}
+          style={{
+            padding: '8px 16px',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            backgroundColor: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            alert('Invitación enviada con éxito (simulado)');
+            setEmail('');
+            onOpenChange(false);
+          }}
+          style={{
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '4px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          Enviar Invitación
+        </button>
+      </div>
+    </div>
   );
 };
 
