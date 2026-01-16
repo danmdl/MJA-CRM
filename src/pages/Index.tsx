@@ -2,12 +2,28 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-session";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { updatePermissions } from "@/utils/update-permissions";
+import { toast } from "sonner";
 
 const Index = () => {
   const { session } = useSession();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleUpdatePermissions = async () => {
+    setIsUpdating(true);
+    try {
+      await updatePermissions();
+      toast.success("Permissions updated successfully!");
+    } catch (error) {
+      toast.error(`Failed to update permissions: ${error.message}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full p-6"> {/* Added p-6 here */}
+    <div className="flex flex-col items-center justify-center h-full w-full p-6">
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <CardTitle className="text-4xl font-bold">¡Bienvenido!</CardTitle>
@@ -21,7 +37,17 @@ const Index = () => {
               Sesión iniciada como: {session.user.email}
             </p>
           )}
-          <Button asChild>
+          
+          <Button 
+            onClick={handleUpdatePermissions} 
+            disabled={isUpdating}
+            className="mb-4 w-full"
+            variant="outline"
+          >
+            {isUpdating ? "Updating..." : "Fix Permissions"}
+          </Button>
+          
+          <Button asChild className="w-full">
             <Link to="/profile">Ir al Perfil</Link>
           </Button>
         </CardContent>
