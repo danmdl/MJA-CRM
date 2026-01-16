@@ -56,6 +56,9 @@ serve(async (req) => {
       .eq('role', callerRole)
       .single();
 
+    console.log(`[DEBUG] Caller role: ${callerRole}, permissions:`, callerPermissions);
+    console.log(`[DEBUG] Is admin: ${isAdmin}, can change role: ${callerPermissions?.change_user_role}`);
+
     const canCallerChangeUserRole = isAdmin || callerPermissions?.change_user_role;
 
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
@@ -327,7 +330,9 @@ serve(async (req) => {
       }
 
       case 'updateUserRole': {
+        console.log(`[DEBUG] updateUserRole action - canCallerChangeUserRole: ${canCallerChangeUserRole}`);
         if (!canCallerChangeUserRole) { // Enforce new permission
+          console.log(`[DEBUG] Permission denied for role: ${callerRole}`);
           return new Response('Forbidden: You do not have permission to update user roles.', { status: 403, headers: corsHeaders });
         }
         if (!userId || !newRole) {
@@ -382,7 +387,9 @@ serve(async (req) => {
       }
 
       case 'updateUserRoles': {
+        console.log(`[DEBUG] updateUserRoles action - canCallerChangeUserRole: ${canCallerChangeUserRole}`);
         if (!canCallerChangeUserRole) { // Enforce new permission
+          console.log(`[DEBUG] Permission denied for role: ${callerRole}`);
           return new Response('Forbidden: You do not have permission to update user roles.', { status: 403, headers: corsHeaders });
         }
         if (!userId || !Array.isArray(requestBody.roles)) {
