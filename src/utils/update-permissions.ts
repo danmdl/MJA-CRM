@@ -8,24 +8,23 @@ export const updatePermissions = async () => {
       throw new Error('No active session');
     }
 
-    // Use the hardcoded Supabase URL from the client configuration
-    const SUPABASE_URL = "https://jczsgvaednptnypxhcje.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjenNndmFlZG5wdG55cHhoY2plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMzk0MTcsImV4cCI6MjA3MjYxNTQxN30.fkM8Kmp-0heCej9dxoZfH3JRHmzS9AXlbGcf8meZS7U";
-
+    // Use the correct Supabase URL from the client
+    const supabaseUrl = supabase.supabaseUrl;
     const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/update-permissions`,
+      `${supabaseUrl}/functions/v1/update-permissions`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': SUPABASE_ANON_KEY,
+          'apikey': supabase.supabaseKey,
         },
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Response error:', errorText);
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 

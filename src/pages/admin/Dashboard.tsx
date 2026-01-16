@@ -6,9 +6,6 @@ import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button'; // Import Button
-import { updatePermissions } from '@/utils/update-permissions'; // Import updatePermissions
-import { toast } from "sonner"; // Import toast for messages
 
 interface DashboardStats {
   totalUsers: number;
@@ -27,7 +24,6 @@ const Dashboard = () => {
     totalCells: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [isUpdatingPermissions, setIsUpdatingPermissions] = useState(false); // State for permission update button
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -74,21 +70,6 @@ const Dashboard = () => {
     fetchStats();
   }, [profile, canSeeAllAnalytics, canSeeOwnChurchAnalytics]);
 
-  const handleUpdatePermissions = async () => {
-    setIsUpdatingPermissions(true);
-    try {
-      await updatePermissions();
-      toast.success("Permissions updated successfully! Please refresh the page.");
-      // Optionally, trigger a re-fetch of stats after permissions are fixed
-      // queryClient.invalidateQueries({ queryKey: ['permissions'] });
-      // queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
-    } catch (error: any) {
-      toast.error(`Failed to update permissions: ${error.message}`);
-    } finally {
-      setIsUpdatingPermissions(false);
-    }
-  };
-
   // If user doesn't have any analytics permissions
   if (!canSeeAllAnalytics() && !canSeeOwnChurchAnalytics()) {
     return (
@@ -120,14 +101,6 @@ const Dashboard = () => {
             <p className="text-sm text-muted-foreground mt-4">
               Contacta a un administrador si necesitas acceso a las estadísticas.
             </p>
-            <Button 
-              onClick={handleUpdatePermissions} 
-              disabled={isUpdatingPermissions}
-              className="mt-6 w-full"
-              variant="outline"
-            >
-              {isUpdatingPermissions ? "Updating..." : "Fix Permissions"}
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -138,14 +111,6 @@ const Dashboard = () => {
     return (
       <div className="p-6">
         <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-        <Button 
-          onClick={handleUpdatePermissions} 
-          disabled={isUpdatingPermissions}
-          className="mb-6"
-          variant="outline"
-        >
-          {isUpdatingPermissions ? "Updating..." : "Fix Permissions"}
-        </Button>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
@@ -164,20 +129,11 @@ const Dashboard = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
-            {canSeeAllAnalytics() ? "Estadísticas generales del sistema" : `Estadísticas de tu iglesia`}
-          </p>
-        </div>
-        <Button 
-          onClick={handleUpdatePermissions} 
-          disabled={isUpdatingPermissions}
-          variant="outline"
-        >
-          {isUpdatingPermissions ? "Updating..." : "Fix Permissions"}
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          {canSeeAllAnalytics() ? "Estadísticas generales del sistema" : `Estadísticas de tu iglesia`}
+        </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
