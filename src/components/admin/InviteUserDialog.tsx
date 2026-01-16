@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
 interface InviteUserDialogProps {
@@ -51,6 +51,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
             {churchId && <p className="text-sm text-muted-foreground mt-1">Church ID: {churchId}</p>}
           </DialogDescription>
         </DialogHeader>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium">Correo Electrónico</label>
