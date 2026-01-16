@@ -27,7 +27,6 @@ import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 import Messages from "./pages/Messages";
 import PermissionsDashboard from "./pages/admin/PermissionsDashboard";
-import FixPermissions from "./pages/FixPermissions";
 
 const queryClient = new QueryClient();
 
@@ -45,13 +44,6 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      
-      {/* Temporary route to fix permissions */}
-      <Route path="/fix-permissions" element={
-        <PrivateRoute>
-          <FixPermissions />
-        </PrivateRoute>
-      } />
       
       {/* User-specific routes, wrapped by PrivateRoute and UserLayout */}
       <Route path="/" element={
