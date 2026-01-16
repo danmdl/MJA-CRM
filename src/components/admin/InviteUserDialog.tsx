@@ -1,68 +1,63 @@
 "use client";
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import CountryPhoneInput from '@/components/CountryPhoneInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
-import { usePermissions } from '@/lib/permissions';
 
 // Definir el tipo de rol de usuario
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
-const UserRoles = z.enum(['general', 'pastor', 'referente', 'encargado_de_celula', 'user', 'admin']);
-
-const inviteSchema = z.object({
-  email: z.string().email({ message: 'Por favor, introduce un correo válido.' }),
-  role: UserRoles,
-});
-
 interface InviteUserDialogProps {
-  open: boolean; // Added missing open prop
+  open: boolean;
   onOpenChange: (open: boolean) => void;
   churchId?: string;
 }
 
-const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => { // Added open prop
+const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<UserRole>('user');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
-  const { canChangeUserRole } = usePermissions();
 
-  const form = useForm<z.infer<typeof inviteSchema>>({
-    resolver: zodResolver(inviteSchema),
-    defaultValues: {
-      email: '',
-      role: 'user',
-    },
-  });
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('[DEBUG] InviteUserDialog onSubmit called');
+    
+    if (!email || !role) {
+      showError('Por favor, completa todos los campos requeridos.');
+      return;
+    }
 
-  const onSubmit = async (values: z.infer<typeof inviteSchema>) => {
     setLoading(true);
     try {
       if (!session?.access_token) {
+        console.error('[DEBUG] No session token');
         showError('No hay sesión activa. Por favor, inicia sesión de nuevo.');
         setLoading(false);
         return;
       }
 
-      console.log('Sending payload to invite-user Edge Function:', {
-        ...values,
+      console.log('[DEBUG] Sending payload to invite-user Edge Function:', {
+        email,
+        role,
         churchId,
+        first_name: firstName,
+        last_name: lastName,
+        phone,
       });
 
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+      console.log('[DEBUG] Edge Function URL:', edgeFunctionUrl);
+      
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
@@ -71,8 +66,8 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         },
         body: JSON.stringify({
           action: 'resendInvite',
-          email: values.email,
-          role: values.role,
+          email,
+          role,
           churchId,
           first_name: firstName,
           last_name: lastName,
@@ -80,7 +75,10 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         }),
       });
 
+      console.log('[DEBUG] Response status:', response.status);
       const data = await response.json();
+      console.log('[DEBUG] Response data:', data);
+      
       if (!response.ok) {
         console.error('Edge Function response error:', data);
         const errorMessage = data.error || 'Error desconocido al invocar la función.';
@@ -94,7 +92,11 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
       }
 
       showSuccess('¡Invitación enviada con éxito!');
-      form.reset();
+      setEmail('');
+      setRole('user');
+      setFirstName('');
+      setLastName('');
+      setPhone('');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       if (churchId) {
         queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
@@ -116,7 +118,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
     : ['general', 'pastor', 'referente', 'encargado_de_celula', 'user', 'admin'];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}> {/* Added open prop */}
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Invitar a un nuevo miembro</DialogTitle>
@@ -125,64 +127,75 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
             {churchId && <p className="text-sm text-muted-foreground mt-1">Se asignará a la iglesia actual.</p>}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Correo Electrónico</FormLabel>
-                  <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Correo Electrónico</label>
+            <Input 
+              placeholder="nombre@ejemplo.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
             />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un rol" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableRoles.map((roleOption) => (
-                        <SelectItem
-                          key={roleOption}
-                          value={roleOption}
-                          disabled={!isAdminOrGeneral && (roleOption === 'admin' || roleOption === 'general')}
-                        >
-                          {roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div><label className="text-sm">Nombre</label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
-              <div><label className="text-sm">Apellido</label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Rol</label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un rol" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableRoles.map((roleOption) => (
+                  <SelectItem
+                    key={roleOption}
+                    value={roleOption}
+                    disabled={!isAdminOrGeneral && (roleOption === 'admin' || roleOption === 'general')}
+                  >
+                    {roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">Nombre</label>
+              <Input 
+                value={firstName} 
+                onChange={(e) => setFirstName(e.target.value)} 
+                placeholder="Nombre"
+              />
             </div>
-            <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v || '')} />
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Enviando...' : 'Enviar Invitación'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+            <div>
+              <label className="text-sm font-medium">Apellido</label>
+              <Input 
+                value={lastName} 
+                onChange={(e) => setLastName(e.target.value)} 
+                placeholder="Apellido"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Teléfono</label>
+            <Input 
+              value={phone} 
+              onChange={(e) => setPhone(e.target.value)} 
+              placeholder="5491122334455"
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Enviando...' : 'Enviar Invitación'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

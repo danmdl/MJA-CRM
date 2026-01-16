@@ -20,7 +20,10 @@ const ChurchTeamPage = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Equipo de la Iglesia</h1>
-        <Button onClick={() => setIsInviteDialogOpen(true)}>
+        <Button onClick={() => {
+          console.log('[DEBUG] Invite button clicked');
+          setIsInviteDialogOpen(true);
+        }}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Invitar Miembro
         </Button>
