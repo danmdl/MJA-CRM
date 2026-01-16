@@ -45,8 +45,8 @@ serve(async (req) => {
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
 
     const { email, role, churchId } = await req.json();
-    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
-    console.log('Edge Function invite-user using SITE_URL:', siteUrl);
+    const siteUrl = Deno.env.get('SITE_URL') ?? 'https://mja-one.vercel.app';
+    console.log('[invite-user] Edge Function using SITE_URL:', siteUrl);
 
     if (!email) {
       return new Response(JSON.stringify({ error: 'Email is required' }), {
