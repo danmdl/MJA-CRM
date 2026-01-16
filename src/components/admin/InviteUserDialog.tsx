@@ -134,7 +134,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={!canChangeUserRole()} />
+                    <Input placeholder="nombre@ejemplo.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -146,7 +146,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canChangeUserRole()}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
@@ -169,15 +169,15 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
               )}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div><label className="text-sm">Nombre</label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={!canChangeUserRole()} /></div>
-              <div><label className="text-sm">Apellido</label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={!canChangeUserRole()} /></div>
+              <div><label className="text-sm">Nombre</label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
+              <div><label className="text-sm">Apellido</label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
             </div>
-            <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v || '')} disabled={!canChangeUserRole()} />
+            <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v || '')} />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading || !canChangeUserRole()}>
+              <Button type="submit" disabled={loading}>
                 {loading ? 'Enviando...' : 'Enviar Invitación'}
               </Button>
             </DialogFooter>

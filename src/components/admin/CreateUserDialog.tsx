@@ -169,7 +169,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => { //
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={loading || !canChangeUserRole()} />
+                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -182,7 +182,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => { //
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} disabled={loading || !canChangeUserRole()} />
+                    <Input type="password" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -195,7 +195,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => { //
                 <FormItem>
                   <FormLabel>Nombre</FormLabel>
                   <FormControl>
-                    <Input placeholder="Primer Nombre" {...field} disabled={loading || !canChangeUserRole()} />
+                    <Input placeholder="Primer Nombre" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -208,7 +208,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => { //
                 <FormItem>
                   <FormLabel>Apellido</FormLabel>
                   <FormControl>
-                    <Input placeholder="Apellido" {...field} disabled={loading || !canChangeUserRole()} />
+                    <Input placeholder="Apellido" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -220,7 +220,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => { //
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || "placeholder-role-select"} disabled={loading || !canChangeUserRole()}>
+                  <Select onValueChange={field.onChange} value={field.value || "placeholder-role-select"} disabled={loading}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
@@ -245,7 +245,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => { //
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Iglesia Asignada</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || "placeholder-church-select"} disabled={loading || isLoadingChurches || !canChangeUserRole()}>
+                  <Select onValueChange={field.onChange} value={field.value || "placeholder-church-select"} disabled={loading || isLoadingChurches}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingChurches ? "Cargando iglesias..." : "Selecciona una iglesia"} />
@@ -269,7 +269,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => { //
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading || isLoadingChurches || !canChangeUserRole()}>
+              <Button type="submit" disabled={loading || isLoadingChurches}>
                 {loading ? 'Creando...' : 'Crear Usuario'}
               </Button>
             </DialogFooter>
