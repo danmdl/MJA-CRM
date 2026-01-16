@@ -1,3 +1,5 @@
+/// <reference types="https://deno.land/std@0.190.0/http/server.ts" />
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -23,9 +25,8 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const supabaseAdmin = createClient(
-      // @ts-ignore - Deno env access
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const { data: userAuth, error: userAuthError } = await supabaseAdmin.auth.getUser(token);
@@ -429,7 +430,7 @@ serve(async (req) => {
           // NEW: Add check to prevent non-admins from assigning admin/general roles as primary
           if (!isAdmin && (primary === 'admin' || primary === 'general')) {
             return new Response('Forbidden: Only administrators can assign admin or general roles.', { status: 403, headers: corsHeaders });
-          }
+        }
           await supabaseAdmin.from('profiles').update({ role: primary }).eq('id', userId);
         }
 
