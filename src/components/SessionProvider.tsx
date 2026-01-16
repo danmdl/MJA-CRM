@@ -32,7 +32,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
       if (session) {
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, role, church_id')
+          .select('id, first_name, last_name, email, role, church_id')
           .eq('id', session.user.id)
           .single();
 
