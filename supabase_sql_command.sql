@@ -1,2 +1,2 @@
-ALTER TABLE public.permissions ADD COLUMN change_user_role boolean DEFAULT FALSE;
-UPDATE public.permissions SET change_user_role = TRUE WHERE role IN ('admin', 'general');
+ALTER TABLE public.permissions ADD COLUMN temp_refresh_col BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.permissions DROP COLUMN temp_refresh_col;
