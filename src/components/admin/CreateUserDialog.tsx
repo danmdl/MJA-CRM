@@ -57,7 +57,6 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[DEBUG] CreateUserDialog onSubmit called');
     
     // Basic validation
     if (!email || !password || !firstName || !lastName || !role) {
@@ -85,15 +84,6 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
         setLoading(false);
         return;
       }
-
-      console.log('[DEBUG] Sending payload to createUser Edge Function:', {
-        email,
-        password,
-        first_name: firstName,
-        last_name: lastName,
-        role,
-        churchId: churchId === '' ? null : churchId,
-      });
 
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
       const response = await fetch(edgeFunctionUrl, {
