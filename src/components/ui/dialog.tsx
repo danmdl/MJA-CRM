@@ -31,16 +31,6 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => {
-  // Debug: Log what children we're receiving and their structure
-  console.log('[DEBUG DIALOG] DialogContent children type:', typeof children);
-  console.log('[DEBUG DIALOG] DialogContent children:', children);
-  console.log('[DEBUG DIALOG] Children array:', React.Children.toArray(children));
-  console.log('[DEBUG DIALOG] Children count:', React.Children.count(children));
-  
-  // Wrap children in a div to ensure single element
-  const childrenArray = React.Children.toArray(children);
-  console.log('[DEBUG DIALOG] Children as array:', childrenArray);
-  
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -52,7 +42,7 @@ const DialogContent = React.forwardRef<
         )}
         {...props}
       >
-        <div>{children}</div>
+        {children}
       </DialogPrimitive.Content>
     </DialogPortal>
   );

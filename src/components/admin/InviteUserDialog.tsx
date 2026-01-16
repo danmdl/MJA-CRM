@@ -27,16 +27,11 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
 
-  console.log('[DEBUG] InviteUserDialog rendered, open:', open, 'churchId:', churchId);
-
-  // Defensive check - ensure we don't render if closed
-  if (!open) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    console.log('[DEBUG] InviteUserDialog handleSubmit called');
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
     if (!email) {
-      alert('Por favor, introduce un correo electrónico');
+      showError('Por favor, introduce un correo electrónico');
       return;
     }
 
@@ -44,14 +39,12 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
     
     try {
       if (!session?.access_token) {
-        console.error('[DEBUG] No session token');
-        alert('No hay sesión activa. Por favor, inicia sesión de nuevo.');
+        showError('No hay sesión activa. Por favor, inicia sesión de nuevo.');
         setLoading(false);
         return;
       }
 
       const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
-      console.log('[DEBUG] Edge Function URL:', edgeFunctionUrl);
       
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
@@ -70,15 +63,12 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         }),
       });
 
-      console.log('[DEBUG] Response status:', response.status);
       const data = await response.json();
-      console.log('[DEBUG] Response data:', data);
       
       if (!response.ok) {
-        console.error('Edge Function response error:', data);
-        alert(data.error || 'Error al enviar invitación.');
+        showError(data.error || 'Error al enviar invitación.');
       } else {
-        alert('Invitación enviada con éxito (simulado)');
+        showSuccess('¡Invitación enviada con éxito!');
         setEmail('');
         setRole('user');
         setFirstName('');
@@ -91,12 +81,13 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         onOpenChange(false);
       }
     } catch (error: any) {
-      console.error('Error al invitar usuario (client-side catch):', error);
-      alert('Error al enviar la invitación.');
+      showError(error.message || 'Error al enviar la invitación.');
     } finally {
       setLoading(false);
     }
   };
+
+  const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,7 +99,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
             {churchId && <p className="text-sm text-muted-foreground mt-1">Se asignará a la iglesia actual.</p>}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium">Correo Electrónico</label>
             <Input 
@@ -131,7 +122,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
                   <SelectItem
                     key={roleOption}
                     value={roleOption}
-                    disabled={!profile?.role || (profile.role === 'admin' || profile.role === 'general') && (roleOption === 'admin' || roleOption === 'general')}
+                    disabled={!isAdminOrGeneral && (roleOption === 'admin' || roleOption === 'general')}
                   >
                     {roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g, ' ')}
                   </SelectItem>
