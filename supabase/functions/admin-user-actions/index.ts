@@ -23,8 +23,9 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      // @ts-ignore - Deno env access
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
 
     const { data: userAuth, error: userAuthError } = await supabaseAdmin.auth.getUser(token);
@@ -64,7 +65,7 @@ serve(async (req) => {
     
     console.log(`[DEBUG] canCallerChangeUserRole: ${canCallerChangeUserRole}`);
 
-    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
+    const siteUrl = 'https://church-crm-lime.vercel.app';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
     switch (action) {
@@ -140,7 +141,7 @@ serve(async (req) => {
         const { data: assignedProfiles, error: assignedProfilesError } = await supabaseAdmin
           .from('profiles')
           .select('id, first_name, last_name, role, updated_at, church_id, phone')
-          .eq('church_id', churchId); // This is the core filter
+          .eq('church_id', churchId);
 
         if (assignedProfilesError) {
           console.error('Error fetching assigned church profiles:', assignedProfilesError);
@@ -241,7 +242,7 @@ serve(async (req) => {
             last_name: last_name || null,
             role: role, 
             church_id: churchId || null,
-            phone: (requestBody && requestBody.phone) || null
+            phone: phone || null
           },
         });
 
