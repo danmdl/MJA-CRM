@@ -71,7 +71,7 @@ const LoginManagementPage = () => {
           <div className="flex gap-2">
             <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" type="button">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Invitar Usuario
                 </Button>
@@ -88,7 +88,7 @@ const LoginManagementPage = () => {
             </Dialog>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button variant="outline" type="button">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Crear Usuario
                 </Button>
