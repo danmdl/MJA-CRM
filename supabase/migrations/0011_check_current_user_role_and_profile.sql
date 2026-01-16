@@ -1,0 +1,1 @@
+SELECT id, email, first_name, last_name, role, church_id FROM profiles WHERE id = (SELECT auth.uid());
