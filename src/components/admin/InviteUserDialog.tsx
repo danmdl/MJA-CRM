@@ -141,7 +141,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
           
           <div>
             <label className="text-sm font-medium">Rol</label>
-            <Select value={role} onValueChange={setRole}>
+            <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un rol" />
               </SelectTrigger>

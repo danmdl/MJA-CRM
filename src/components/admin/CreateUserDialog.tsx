@@ -212,7 +212,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
           
           <div>
             <label className="text-sm font-medium">Rol</label>
-            <Select value={role} onValueChange={setRole} disabled={loading}>
+            <Select value={role} onValueChange={(value) => setRole(value as UserRole)} disabled={loading}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un rol" />
               </SelectTrigger>
