@@ -12,6 +12,11 @@ const ChurchTeamPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
+  const handleInviteClick = () => {
+    console.log('[DEBUG] Invite button clicked - opening dialog');
+    setIsInviteDialogOpen(true);
+  };
+
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
   }
@@ -20,10 +25,7 @@ const ChurchTeamPage = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Equipo de la Iglesia</h1>
-        <Button onClick={() => {
-          console.log('[DEBUG] Invite button clicked');
-          setIsInviteDialogOpen(true);
-        }}>
+        <Button onClick={handleInviteClick}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Invitar Miembro
         </Button>
