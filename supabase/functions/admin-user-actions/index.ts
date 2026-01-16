@@ -58,8 +58,11 @@ serve(async (req) => {
 
     console.log(`[DEBUG] Caller role: ${callerRole}, permissions:`, callerPermissions);
     console.log(`[DEBUG] Is admin: ${isAdmin}, can change role: ${callerPermissions?.change_user_role}`);
+    console.log(`[DEBUG] callerChurchId: ${callerChurchId}`);
 
     const canCallerChangeUserRole = isAdmin || callerPermissions?.change_user_role;
+    
+    console.log(`[DEBUG] canCallerChangeUserRole: ${canCallerChangeUserRole}`);
 
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
@@ -361,6 +364,7 @@ serve(async (req) => {
           return new Response('Error: Target user profile not found.', { status: 404, headers: corsHeaders });
         }
 
+        // FIXED: Check church access only if user is NOT admin/general AND has change_user_role permission
         if (!isAdminOrGeneral && targetProfile.church_id !== callerChurchId) {
           return new Response('Forbidden: You can only update roles for users from your assigned church.', { status: 403, headers: corsHeaders });
         }
@@ -410,6 +414,7 @@ serve(async (req) => {
           return new Response('Error: Target user profile not found.', { status: 404, headers: corsHeaders });
         }
 
+        // FIXED: Check church access only if user is NOT admin/general AND has change_user_role permission
         if (!isAdminOrGeneral && targetProfile.church_id !== callerChurchId) {
           return new Response('Forbidden: You can only update roles for users from your assigned church.', { status: 403, headers: corsHeaders });
         }
