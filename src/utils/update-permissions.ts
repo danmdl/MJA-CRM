@@ -8,24 +8,28 @@ export const updatePermissions = async () => {
       throw new Error('No active session');
     }
 
+    // Use the hardcoded Supabase URL from the client configuration
+    const SUPABASE_URL = "https://jczsgvaednptnypxhcje.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjenNndmFlZG5wdG55cHhoY2plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMzk0MTcsImV4cCI6MjA3MjYxNTQxN30.fkM8Kmp-0heCej9dxoZfH3JRHmzS9AXlbGcf8meZS7U";
+
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-permissions`,
+      `${SUPABASE_URL}/functions/v1/update-permissions`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'apikey': SUPABASE_ANON_KEY,
         },
       }
     );
 
-    const result = await response.json();
-    
     if (!response.ok) {
-      throw new Error(result.error || 'Failed to update permissions');
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
+    const result = await response.json();
     return result;
   } catch (error) {
     console.error('Error updating permissions:', error);
