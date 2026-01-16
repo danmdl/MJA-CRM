@@ -10,7 +10,7 @@ export interface PermissionData {
   edit_delete_users: boolean;
   see_all_analytics: boolean;
   see_own_church_analytics: boolean;
-  change_user_role: boolean; // New permission
+  change_user_role: boolean;
 }
 
 export const usePermissions = () => {
@@ -24,12 +24,10 @@ export const usePermissions = () => {
         .from('permissions')
         .select('*')
         .order('role', { ascending: true });
-      
       if (error) {
         console.error('Error loading permissions:', error);
         return [];
       }
-      
       return data || [];
     },
   });
@@ -47,7 +45,8 @@ export const usePermissions = () => {
     const rolePermission = getPermissionForRole(profile.role);
     if (!rolePermission) return false;
     
-    return rolePermission[permission] || false;
+    // Fix: Ensure we return a boolean
+    return Boolean(rolePermission[permission] || false);
   };
 
   const canSeeAllChurches = () => hasPermission('see_all_churches');
@@ -56,7 +55,7 @@ export const usePermissions = () => {
   const canEditDeleteUsers = () => hasPermission('edit_delete_users');
   const canSeeAllAnalytics = () => hasPermission('see_all_analytics');
   const canSeeOwnChurchAnalytics = () => hasPermission('see_own_church_analytics');
-  const canChangeUserRole = () => hasPermission('change_user_role'); // New helper
+  const canChangeUserRole = () => hasPermission('change_user_role');
 
   return {
     permissions,
@@ -69,6 +68,6 @@ export const usePermissions = () => {
     canEditDeleteUsers,
     canSeeAllAnalytics,
     canSeeOwnChurchAnalytics,
-    canChangeUserRole, // New helper
+    canChangeUserRole,
   };
 };

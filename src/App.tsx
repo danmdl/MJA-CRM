@@ -44,20 +44,26 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      
       {/* User-specific routes, wrapped by PrivateRoute and UserLayout */}
-      <Route path="/" element={<PrivateRoute><UserLayout><Outlet /></UserLayout></PrivateRoute>}>
+      <Route path="/" element={
+        <PrivateRoute>
+          <UserLayout>
+            <Outlet />
+          </UserLayout>
+        </PrivateRoute>
+      }>
         <Route index element={<Index />} />
         <Route path="profile" element={<Profile />} />
         <Route path="messages" element={<Messages />} />
         {/* CSV Deduplicator is now accessible to all authenticated users */}
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
       </Route>
+      
       {/* Admin Routes (accessible by admin, general, and specific church roles for certain paths) */}
       <Route path="/admin" element={
         <AdminRoute>
-          <AdminLayout>
-            <Outlet />
-          </AdminLayout>
+          <AdminLayout />
         </AdminRoute>
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
@@ -67,12 +73,14 @@ const AppRoutes = () => {
         <Route path="login-management" element={<LoginManagementPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
+        
         {/* Permissions Dashboard - only for admins */}
         <Route path="permissions" element={
           <AdminRoute requiredPermission="edit_delete_users">
             <PermissionsDashboard />
           </AdminRoute>
         } />
+        
         {/* Nested routes for specific church details */}
         <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>
           <Route path="overview" element={<ChurchOverviewPage />} />
@@ -82,6 +90,7 @@ const AppRoutes = () => {
           <Route index element={<Navigate to="overview" replace />} />
         </Route>
       </Route>
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -72,7 +72,8 @@ const LoginManagementPage = () => {
             <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
-                  <UserPlus className="mr-2 h-4 w-4" /> Invitar Usuario
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Invitar Usuario
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -82,14 +83,14 @@ const LoginManagementPage = () => {
                     Envía una invitación por correo electrónico para que el usuario complete su registro.
                   </DialogDescription>
                 </DialogHeader>
-                <InviteUserDialog onOpenChange={setIsInviteDialogOpen} />
+                <InviteUserDialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen} />
               </DialogContent>
             </Dialog>
-            
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
-                  <UserPlus className="mr-2 h-4 w-4" /> Crear Usuario
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Crear Usuario
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -99,13 +100,12 @@ const LoginManagementPage = () => {
                     Crea manualmente una nueva cuenta de usuario con todos sus datos.
                   </DialogDescription>
                 </DialogHeader>
-                <CreateUserDialog onOpenChange={setIsCreateDialogOpen} />
+                <CreateUserDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
               </DialogContent>
             </Dialog>
           </div>
         )}
       </div>
-
       <div className="space-y-6">
         {canEditDeleteUsers() && (
           <Card>
@@ -120,7 +120,6 @@ const LoginManagementPage = () => {
             </CardContent>
           </Card>
         )}
-
         {profile?.church_id && (
           <Card>
             <CardHeader>

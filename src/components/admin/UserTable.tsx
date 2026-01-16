@@ -1,3 +1,4 @@
+import React from 'react'; // Added missing React import
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { usePermissions } from '@/lib/permissions'; // Import usePermissions
+import { usePermissions } from '@/lib/permissions';
 
 // Definir el tipo de rol de usuario para TypeScript
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
@@ -67,7 +68,7 @@ const fetchUsers = async (accessToken: string): Promise<User[]> => {
 
 const UserTable = () => {
   const { session, profile } = useSession();
-  const { canChangeUserRole } = usePermissions(); // Use the new permission
+  const { canChangeUserRole } = usePermissions();
   const queryClient = useQueryClient();
   const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false);
   const [userToResetPassword, setUserToResetPassword] = useState<User | null>(null);
@@ -99,7 +100,7 @@ const UserTable = () => {
     enabled: !!session?.access_token,
   });
 
-  const churchMap = React.useMemo(() => {
+  const churchMap = React.useMemo(() => { // Fixed by adding React prefix
     const map: Record<string, string> = {};
     churches?.forEach(church => {
       map[church.id] = church.name;
@@ -346,7 +347,7 @@ const UserTable = () => {
                   <Select
                     value={user.role}
                     onValueChange={(newRole: UserRole) => updateUserRoleMutation.mutate({ userId: user.id, newRole })}
-                    disabled={updateUserRoleMutation.isPending || user.id === session?.user.id || !canChangeUserRole()} // Disabled based on new permission
+                    disabled={updateUserRoleMutation.isPending || user.id === session?.user.id || !canChangeUserRole()}
                   >
                     <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Seleccionar rol" />
@@ -379,22 +380,25 @@ const UserTable = () => {
                       {user.status === 'invited' && (
                         <DropdownMenuItem
                           onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role, churchId: user.church_id })}
-                          disabled={!canChangeUserRole()} // Disable if no permission
+                          disabled={!canChangeUserRole()}
                         >
-                          <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
+                          <Send className="mr-2 h-4 w-4" />
+                          Reenviar Invitación
                         </DropdownMenuItem>
                       )}
                       {user.status === 'invited' && (
                         <DropdownMenuItem
                           onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role, churchId: user.church_id })}
-                          disabled={!canChangeUserRole()} // Disable if no permission
+                          disabled={!canChangeUserRole()}
                         >
-                          <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
+                          <Copy className="mr-2 h-4 w-4" />
+                          Copiar Enlace de Invitación
                         </DropdownMenuItem>
                       )}
                       {profile?.role === 'admin' && (
                         <DropdownMenuItem onClick={() => handleOpenPasswordResetDialog(user)}>
-                          <Key className="mr-2 h-4 w-4" /> Cambiar Contraseña
+                          <Key className="mr-2 h-4 w-4" />
+                          Cambiar Contraseña
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem
@@ -402,7 +406,8 @@ const UserTable = () => {
                         className="text-red-600"
                         disabled={user.id === session?.user.id}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" /> {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -418,6 +423,7 @@ const UserTable = () => {
           )}
         </TableBody>
       </Table>
+
       {/* Password Reset Dialog */}
       <Dialog open={isPasswordResetDialogOpen} onOpenChange={setIsPasswordResetDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">

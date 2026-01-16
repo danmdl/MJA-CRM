@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -13,14 +12,16 @@ interface CountryPhoneInputProps {
   onChange: (value: string | null) => void;
   defaultCountry?: CountryCode;
   hintExample?: string;
+  disabled?: boolean; // Added disabled prop
 }
 
-const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
-  label = "Teléfono",
-  value,
-  onChange,
-  defaultCountry = "AR",
+const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({ 
+  label = "Teléfono", 
+  value, 
+  onChange, 
+  defaultCountry = "AR", 
   hintExample = "Ej: 5491122334455",
+  disabled = false // Default to false
 }) => {
   const [country, setCountry] = useState<CountryCode>(defaultCountry);
   const [phone, setPhone] = useState<string>(value || "");
@@ -44,7 +45,11 @@ const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
     <div className="space-y-2">
       <Label>{label}</Label>
       <div className="grid grid-cols-3 gap-2">
-        <Select value={country} onValueChange={(v: CountryCode) => setCountry(v)}>
+        <Select 
+          value={country} 
+          onValueChange={(v: CountryCode) => setCountry(v)}
+          disabled={disabled} // Pass disabled prop
+        >
           <SelectTrigger className="col-span-1">
             <SelectValue placeholder="País" />
           </SelectTrigger>
@@ -53,12 +58,13 @@ const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
             <SelectItem value="OTHER">Otro</SelectItem>
           </SelectContent>
         </Select>
-        <Input
-          className="col-span-2"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          onBlur={handleBlur}
+        <Input 
+          className="col-span-2" 
+          value={phone} 
+          onChange={(e) => setPhone(e.target.value)} 
+          onBlur={handleBlur} 
           placeholder={hintExample}
+          disabled={disabled} // Pass disabled prop
         />
       </div>
       <div className="text-xs text-muted-foreground">Ejemplo: 5491122334455</div>

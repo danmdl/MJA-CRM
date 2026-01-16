@@ -5,6 +5,7 @@ import { Users, Building, BarChart, Shield, AlertCircle, Eye } from 'lucide-reac
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { showError } from '@/utils/toast';
+import { supabase } from '@/integrations/supabase/client'; // Added missing import
 
 interface DashboardStats {
   totalUsers: number;
@@ -28,7 +29,6 @@ const Dashboard = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        
         if (!canSeeAllAnalytics() && !canSeeOwnChurchAnalytics()) {
           setStats({ totalUsers: 0, totalChurches: 0, totalContacts: 0, totalCells: 0 });
           setLoading(false);
@@ -38,7 +38,6 @@ const Dashboard = () => {
         // Fetch stats based on permissions
         let query = 'total_contacts,total_cells';
         let url = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/get-dashboard-stats`;
-
         if (canSeeAllAnalytics()) {
           // Admin can see all stats
           url += `?stats=${query}`;
@@ -133,13 +132,9 @@ const Dashboard = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground mt-2">
-          {canSeeAllAnalytics() 
-            ? "Estadísticas generales del sistema"
-            : `Estadísticas de tu iglesia`
-          }
+          {canSeeAllAnalytics() ? "Estadísticas generales del sistema" : `Estadísticas de tu iglesia`}
         </p>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -153,7 +148,6 @@ const Dashboard = () => {
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Células</CardTitle>
@@ -166,7 +160,6 @@ const Dashboard = () => {
             </p>
           </CardContent>
         </Card>
-
         {canSeeAllAnalytics() && (
           <>
             <Card>
@@ -179,7 +172,6 @@ const Dashboard = () => {
                 <p className="text-xs text-muted-foreground">Total en el sistema</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Usuarios</CardTitle>
