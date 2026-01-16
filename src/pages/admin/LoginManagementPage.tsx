@@ -88,7 +88,7 @@ const LoginManagementPage = () => {
             </Dialog>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" type="button">
+                <Button type="button">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Crear Usuario
                 </Button>
