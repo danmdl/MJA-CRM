@@ -74,12 +74,8 @@ const AppRoutes = () => {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
         
-        {/* Permissions Dashboard - only for admins */}
-        <Route path="permissions" element={
-          <AdminRoute requiredPermission="edit_delete_users">
-            <PermissionsDashboard />
-          </AdminRoute>
-        } />
+        {/* Permissions Dashboard - accessible to all admin users */}
+        <Route path="permissions" element={<PermissionsDashboard />} />
         
         {/* Nested routes for specific church details */}
         <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>
