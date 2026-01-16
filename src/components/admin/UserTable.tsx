@@ -130,7 +130,12 @@ const UserTable = () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -157,7 +162,12 @@ const UserTable = () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -186,7 +196,12 @@ const UserTable = () => {
       }
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -213,7 +228,12 @@ const UserTable = () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -242,7 +262,12 @@ const UserTable = () => {
       form.reset();
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -314,7 +339,9 @@ const UserTable = () => {
             users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
-                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  {user.email}
+                </TableCell>
                 <TableCell>
                   <Select
                     value={user.role}

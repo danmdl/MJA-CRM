@@ -71,7 +71,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          action: 'inviteUser', // Specify action for admin-user-actions
+          action: 'resendInvite', // Specify action for admin-user-actions (resendInvite also handles initial invite)
           email: values.email,
           role: values.role,
           churchId,
@@ -84,7 +84,12 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
       const data = await response.json();
       if (!response.ok) {
         console.error('Edge Function response error:', data);
-        showError(data.error || 'Error desconocido al invocar la función.');
+        const errorMessage = data.error || 'Error desconocido al invocar la función.';
+        if (errorMessage.includes('Forbidden')) {
+          showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+        } else {
+          showError(errorMessage);
+        }
         setLoading(false);
         return;
       }

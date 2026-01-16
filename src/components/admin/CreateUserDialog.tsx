@@ -26,10 +26,10 @@ const createUserSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().min(1, { message: 'El nombre es obligatorio.' }),
   last_name: z.string().min(1, { message: 'El apellido es obligatorio.' }),
-  role: z.enum(['general', 'pastor', 'referente', 'encargado_de_celula'], {
+  role: z.enum(['general', 'pastor', 'referente', 'encargado_de_celula', 'user'], { // Added 'user' to enum
     errorMap: () => ({ message: 'El rol es obligatorio.' })
   }),
-  church_id: z.string().uuid({ message: 'La iglesia es obligatoria.' }),
+  church_id: z.string().uuid({ message: 'La iglesia es obligatoria.' }).or(z.literal('')), // Allow empty string for no church
 });
 
 interface CreateUserDialogProps {
@@ -66,7 +66,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
       first_name: '',
       last_name: '',
       role: undefined,
-      church_id: undefined,
+      church_id: '', // Default to empty string
     },
   });
 
@@ -112,14 +112,19 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
           first_name: values.first_name,
           last_name: values.last_name,
           role: values.role,
-          churchId: values.church_id,
+          churchId: values.church_id === '' ? null : values.church_id, // Send null if empty string
         }),
       });
 
       const data = await response.json();
       if (!response.ok) {
         console.error('Edge Function response error:', data);
-        showError(data.error || 'Error desconocido al invocar la función.');
+        const errorMessage = data.error || 'Error desconocido al invocar la función.';
+        if (errorMessage.includes('Forbidden')) {
+          showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+        } else {
+          showError(errorMessage);
+        }
         setLoading(false);
         return;
       }
@@ -252,6 +257,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="placeholder-church-select" disabled>Selecciona una iglesia</SelectItem>
+                      <SelectItem value="">Sin iglesia asignada</SelectItem> {/* Option for no church */}
                       {churches?.map((church) => (
                         <SelectItem key={church.id} value={church.id}>
                           {church.name}

@@ -119,7 +119,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
       queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -146,7 +151,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
       queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -175,7 +185,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
       }
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -202,7 +217,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
       queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
     },
     onError: (err) => {
-      showError(err.message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 
@@ -229,7 +249,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
       queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
     },
     onError: (err) => {
-      showError((err as any).message);
+      const errorMessage = (err as any).message || 'Error desconocido.';
+      if (errorMessage.includes('Forbidden')) {
+        showError('No tienes permiso. No tienes los permisos necesarios. Contacta a tu administrador.');
+      } else {
+        showError(errorMessage);
+      }
     },
   });
 

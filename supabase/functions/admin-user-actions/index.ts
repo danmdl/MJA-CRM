@@ -133,7 +133,7 @@ serve(async (req) => {
         // Fetch profiles explicitly assigned to this church
         const { data: assignedProfiles, error: assignedProfilesError } = await supabaseAdmin
           .from('profiles')
-          .select('id, first_name, last_name, role, updated_at, church_id')
+          .select('id, first_name, last_name, role, updated_at, church_id, phone')
           .eq('church_id', churchId); // This is the core filter
 
         if (assignedProfilesError) {
@@ -337,7 +337,7 @@ serve(async (req) => {
           });
         }
 
-        const validRoles = ['admin', 'general', 'pastor', 'piloto', 'encargado_de_celula', 'user'];
+        const validRoles = ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula', 'user'];
         if (!validRoles.includes(newRole)) {
           return new Response(JSON.stringify({ error: 'Invalid role provided' }), {
             status: 400,
@@ -392,12 +392,31 @@ serve(async (req) => {
           });
         }
 
+        const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+          .from('profiles')
+          .select('church_id')
+          .eq('id', userId)
+          .single();
+
+        if (targetProfileError || !targetProfile) {
+          console.error('Error fetching target user profile:', targetProfileError);
+          return new Response('Error: Target user profile not found.', { status: 404, headers: corsHeaders });
+        }
+
+        if (!isAdminOrGeneral && targetProfile.church_id !== callerChurchId) {
+          return new Response('Forbidden: You can only update roles for users from your assigned church.', { status: 403, headers: corsHeaders });
+        }
+
         // clear existing extra roles
         await supabaseAdmin.from('profiles_roles').delete().eq('user_id', userId);
 
         // ensure primary role remains set in profiles (first item if provided)
         if (requestBody.roles.length > 0) {
           const primary = requestBody.roles[0];
+          // NEW: Add check to prevent non-admins from assigning admin/general roles as primary
+          if (!isAdmin && (primary === 'admin' || primary === 'general')) {
+            return new Response('Forbidden: Only administrators can assign admin or general roles.', { status: 403, headers: corsHeaders });
+          }
           await supabaseAdmin.from('profiles').update({ role: primary }).eq('id', userId);
         }
 
