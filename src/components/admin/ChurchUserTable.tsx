@@ -20,6 +20,7 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { logger } from '@/utils/logger';
 import React from 'react';
+import { usePermissions } from '@/lib/permissions'; // Import usePermissions
 
 // Definir el tipo de rol de usuario para TypeScript
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
@@ -70,6 +71,7 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
 
 const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session } = useSession();
+  const { canChangeUserRole } = usePermissions(); // Use the new permission
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -313,7 +315,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                               else next.delete(roleOption);
                               updateUserRolesMutation.mutate({ userId: user.id, roles: Array.from(next) as UserRole[] });
                             }}
-                            disabled={user.id === session?.user.id}
+                            disabled={user.id === session?.user.id || !canChangeUserRole()} // Disabled based on new permission
                           />
                           <span>{roleOption === 'referente' ? 'Referente' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1).replace(/_/g,' ')}</span>
                         </label>
@@ -335,6 +337,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                       {user.status === 'invited' && (
                         <DropdownMenuItem
                           onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}
+                          disabled={!canChangeUserRole()} // Disable if no permission
                         >
                           <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
                         </DropdownMenuItem>
@@ -342,6 +345,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                       {user.status === 'invited' && (
                         <DropdownMenuItem
                           onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}
+                          disabled={!canChangeUserRole()} // Disable if no permission
                         >
                           <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
                         </DropdownMenuItem>

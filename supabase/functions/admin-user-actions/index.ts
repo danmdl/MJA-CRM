@@ -49,6 +49,15 @@ serve(async (req) => {
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
     const isAdmin = callerRole === 'admin';
 
+    // Fetch permissions for the caller
+    const { data: callerPermissions, error: permissionsError } = await supabaseAdmin
+      .from('permissions')
+      .select('change_user_role')
+      .eq('role', callerRole)
+      .single();
+
+    const canCallerChangeUserRole = isAdmin || callerPermissions?.change_user_role;
+
     const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:8080';
     console.log('Edge Function admin-user-actions using SITE_URL:', siteUrl);
 
@@ -203,8 +212,8 @@ serve(async (req) => {
       }
 
       case 'createUser': {
-        if (!isAdmin) {
-          return new Response('Forbidden: Only administrators can create users directly.', { status: 403, headers: corsHeaders });
+        if (!canCallerChangeUserRole) { // Enforce new permission
+          return new Response('Forbidden: You do not have permission to create users with assigned roles.', { status: 403, headers: corsHeaders });
         }
         if (!email || !password || !role) {
           return new Response(JSON.stringify({ error: 'Email, password, and role are required' }), {
@@ -283,6 +292,9 @@ serve(async (req) => {
 
       case 'resendInvite':
       case 'generateInviteLink': {
+        if (!canCallerChangeUserRole) { // Enforce new permission
+          return new Response('Forbidden: You do not have permission to invite users with assigned roles.', { status: 403, headers: corsHeaders });
+        }
         if (!email) {
           return new Response(JSON.stringify({ error: 'Email is required' }), {
             status: 400,
@@ -315,6 +327,9 @@ serve(async (req) => {
       }
 
       case 'updateUserRole': {
+        if (!canCallerChangeUserRole) { // Enforce new permission
+          return new Response('Forbidden: You do not have permission to update user roles.', { status: 403, headers: corsHeaders });
+        }
         if (!userId || !newRole) {
           return new Response(JSON.stringify({ error: 'User ID and new role are required' }), {
             status: 400,
@@ -367,8 +382,8 @@ serve(async (req) => {
       }
 
       case 'updateUserRoles': {
-        if (!isAdminOrGeneral) {
-          return new Response('Forbidden: Only administrators or generals can update user roles.', { status: 403, headers: corsHeaders });
+        if (!canCallerChangeUserRole) { // Enforce new permission
+          return new Response('Forbidden: You do not have permission to update user roles.', { status: 403, headers: corsHeaders });
         }
         if (!userId || !Array.isArray(requestBody.roles)) {
           return new Response(JSON.stringify({ error: 'User ID and roles[] are required' }), {

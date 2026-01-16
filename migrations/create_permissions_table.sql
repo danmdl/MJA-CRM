@@ -1,58 +1,42 @@
--- Create permissions table
-CREATE TABLE IF NOT EXISTS permissions (
-  role TEXT PRIMARY KEY,
-  see_all_churches BOOLEAN DEFAULT FALSE NOT NULL,
-  access_all_churches BOOLEAN DEFAULT FALSE NOT NULL,
-  add_users BOOLEAN DEFAULT FALSE NOT NULL,
-  edit_delete_users BOOLEAN DEFAULT FALSE NOT NULL,
-  see_all_analytics BOOLEAN DEFAULT FALSE NOT NULL,
-  see_own_church_analytics BOOLEAN DEFAULT FALSE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+-- This migration creates the 'permissions' table if it doesn't exist
+-- and adds a 'change_user_role' column.
+
+CREATE TABLE IF NOT EXISTS public.permissions (
+    role text PRIMARY KEY,
+    see_all_churches boolean DEFAULT FALSE,
+    access_all_churches boolean DEFAULT FALSE,
+    add_users boolean DEFAULT FALSE,
+    edit_delete_users boolean DEFAULT FALSE,
+    see_all_analytics boolean DEFAULT FALSE,
+    see_own_church_analytics boolean DEFAULT FALSE,
+    change_user_role boolean DEFAULT FALSE -- New column
 );
 
--- Enable RLS
-ALTER TABLE permissions ENABLE ROW LEVEL SECURITY;
+-- Insert default permissions if the table is empty
+INSERT INTO public.permissions (role, see_all_churches, access_all_churches, add_users, edit_delete_users, see_all_analytics, see_own_church_analytics, change_user_role)
+VALUES
+    ('admin', TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+    ('general', TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+    ('pastor', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE),
+    ('referente', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE),
+    ('encargado_de_celula', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE),
+    ('user', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)
+ON CONFLICT (role) DO UPDATE SET
+    see_all_churches = EXCLUDED.see_all_churches,
+    access_all_churches = EXCLUDED.access_all_churches,
+    add_users = EXCLUDED.add_users,
+    edit_delete_users = EXCLUDED.edit_delete_users,
+    see_all_analytics = EXCLUDED.see_all_analytics,
+    see_own_church_analytics = EXCLUDED.see_own_church_analytics,
+    change_user_role = EXCLUDED.change_user_role; -- Update new column on conflict
 
--- Create policy for all authenticated users to read permissions
-CREATE POLICY "Permissions are viewable by all authenticated users" ON permissions
-  FOR SELECT USING (auth.role() = 'authenticated');
-
--- Create policy only for admins to update permissions
-CREATE POLICY "Only admins can update permissions" ON permissions
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE profiles.id = auth.uid() 
-      AND profiles.role = 'admin'
-    )
-  );
-
--- Create updated_at trigger
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+-- Add the new column if it doesn't exist
+DO $$
 BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-CREATE TRIGGER update_permissions_updated_at 
-  BEFORE UPDATE ON permissions 
-  FOR EACH ROW 
-  EXECUTE FUNCTION update_updated_at_column();
-
--- Insert default permissions
-INSERT INTO permissions (role, see_all_churches, access_all_churches, add_users, edit_delete_users, see_all_analytics, see_own_church_analytics) VALUES
-  ('admin', true, true, true, true, true, true),
-  ('general', true, true, true, true, true, true),
-  ('pastor', false, false, false, false, false, true),
-  ('referente', false, false, false, false, false, true),
-  ('encargado_de_celula', false, false, false, false, false, true),
-  ('user', false, false, false, false, false, false)
-ON CONFLICT (role) DO NOTHING;
-
--- MIGRATION: Update existing users with 'piloto' role to 'referente'
-UPDATE profiles SET role = 'referente' WHERE role = 'piloto';
--- MIGRATION: Update existing users with 'reference' role to 'referente'  
-UPDATE profiles SET role = 'referente' WHERE role = 'reference';
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'permissions' AND column_name = 'change_user_role') THEN
+        ALTER TABLE public.permissions ADD COLUMN change_user_role boolean DEFAULT FALSE;
+        -- Update existing rows for 'admin' and 'general' to TRUE for the new column
+        UPDATE public.permissions SET change_user_role = TRUE WHERE role IN ('admin', 'general');
+    END IF;
+END
+$$;

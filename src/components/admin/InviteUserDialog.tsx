@@ -14,6 +14,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
+import { usePermissions } from '@/lib/permissions'; // Import usePermissions
 
 // Definir el tipo de rol de usuario
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
@@ -38,6 +39,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   const [phone, setPhone] = useState('');
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
+  const { canChangeUserRole } = usePermissions(); // Use the new permission
 
   const form = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
@@ -61,7 +63,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         churchId,
       });
 
-      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/invite-user`;
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`; // Changed to admin-user-actions
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
@@ -69,7 +71,9 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          ...values,
+          action: 'inviteUser', // Specify action for admin-user-actions
+          email: values.email,
+          role: values.role,
           churchId,
           first_name: firstName,
           last_name: lastName,
@@ -126,7 +130,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} />
+                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={!canChangeUserRole()} /> {/* Disabled if no permission */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -138,7 +142,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canChangeUserRole()}> {/* Disabled if no permission */}
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
@@ -163,15 +167,15 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
               )}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div><label className="text-sm">Nombre</label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
-              <div><label className="text-sm">Apellido</label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+              <div><label className="text-sm">Nombre</label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={!canChangeUserRole()} /></div> {/* Disabled if no permission */}
+              <div><label className="text-sm">Apellido</label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={!canChangeUserRole()} /></div> {/* Disabled if no permission */}
             </div>
-            <CountryPhoneInput label="Teléfono" value={phone} onChange={setPhone} />
+            <CountryPhoneInput label="Teléfono" value={phone} onChange={setPhone} disabled={!canChangeUserRole()} /> {/* Disabled if no permission */}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading || !canChangeUserRole()}> {/* Disabled if no permission */}
                 {loading ? 'Enviando...' : 'Enviar Invitación'}
               </Button>
             </DialogFooter>

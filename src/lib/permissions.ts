@@ -10,6 +10,7 @@ export interface PermissionData {
   edit_delete_users: boolean;
   see_all_analytics: boolean;
   see_own_church_analytics: boolean;
+  change_user_role: boolean; // New permission
 }
 
 export const usePermissions = () => {
@@ -55,6 +56,7 @@ export const usePermissions = () => {
   const canEditDeleteUsers = () => hasPermission('edit_delete_users');
   const canSeeAllAnalytics = () => hasPermission('see_all_analytics');
   const canSeeOwnChurchAnalytics = () => hasPermission('see_own_church_analytics');
+  const canChangeUserRole = () => hasPermission('change_user_role'); // New helper
 
   return {
     permissions,
@@ -67,5 +69,6 @@ export const usePermissions = () => {
     canEditDeleteUsers,
     canSeeAllAnalytics,
     canSeeOwnChurchAnalytics,
+    canChangeUserRole, // New helper
   };
 };

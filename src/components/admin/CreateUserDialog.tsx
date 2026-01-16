@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 import { ROLE_LABELS, RoleKey } from '@/lib/roles';
+import { usePermissions } from '@/lib/permissions'; // Import usePermissions
 
 interface Church {
   id: string;
@@ -55,6 +56,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
+  const { canChangeUserRole } = usePermissions(); // Use the new permission
 
   const form = useForm<z.infer<typeof createUserSchema>>({
     resolver: zodResolver(createUserSchema),
@@ -166,7 +168,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={loading} />
+                    <Input placeholder="nombre@ejemplo.com" {...field} disabled={loading || !canChangeUserRole()} /> {/* Disabled if no permission */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -179,7 +181,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} disabled={loading} />
+                    <Input type="password" {...field} disabled={loading || !canChangeUserRole()} /> {/* Disabled if no permission */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -192,7 +194,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
                 <FormItem>
                   <FormLabel>Nombre</FormLabel>
                   <FormControl>
-                    <Input placeholder="Primer Nombre" {...field} disabled={loading} />
+                    <Input placeholder="Primer Nombre" {...field} disabled={loading || !canChangeUserRole()} /> {/* Disabled if no permission */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -205,7 +207,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
                 <FormItem>
                   <FormLabel>Apellido</FormLabel>
                   <FormControl>
-                    <Input placeholder="Apellido" {...field} disabled={loading} />
+                    <Input placeholder="Apellido" {...field} disabled={loading || !canChangeUserRole()} /> {/* Disabled if no permission */}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -217,7 +219,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || "placeholder-role-select"} disabled={loading} >
+                  <Select onValueChange={field.onChange} value={field.value || "placeholder-role-select"} disabled={loading || !canChangeUserRole()} > {/* Disabled if no permission */}
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona un rol" />
@@ -242,7 +244,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Iglesia Asignada</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || "placeholder-church-select"} disabled={loading || isLoadingChurches} >
+                  <Select onValueChange={field.onChange} value={field.value || "placeholder-church-select"} disabled={loading || isLoadingChurches || !canChangeUserRole()} > {/* Disabled if no permission */}
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingChurches ? "Cargando iglesias..." : "Selecciona una iglesia"} />
@@ -265,7 +267,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading} >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading || isLoadingChurches} >
+              <Button type="submit" disabled={loading || isLoadingChurches || !canChangeUserRole()} > {/* Disabled if no permission */}
                 {loading ? 'Creando...' : 'Crear Usuario'}
               </Button>
             </DialogFooter>

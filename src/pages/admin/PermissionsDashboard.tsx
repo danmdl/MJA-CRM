@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, Shield, Users, Building, BarChart, UserPlus, Edit, Eye } from 'lucide-react';
+import { Check, X, Shield, Users, Building, BarChart, UserPlus, Edit, Eye, UserCog } from 'lucide-react'; // Added UserCog icon
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ interface PermissionConfig {
     editDeleteUsers: boolean;
     seeAllAnalytics: boolean;
     seeOwnChurchAnalytics: boolean;
+    changeUserRole: boolean; // New permission
   };
 }
 
@@ -33,6 +34,7 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: true,
       seeAllAnalytics: true,
       seeOwnChurchAnalytics: true,
+      changeUserRole: true, // Admin always has this
     },
   },
   {
@@ -45,6 +47,7 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: true,
       seeAllAnalytics: true,
       seeOwnChurchAnalytics: true,
+      changeUserRole: true, // General also has this
     },
   },
   {
@@ -57,6 +60,7 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: true,
+      changeUserRole: false, // Default to false
     },
   },
   {
@@ -69,6 +73,7 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: true,
+      changeUserRole: false, // Default to false
     },
   },
   {
@@ -81,6 +86,7 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: true,
+      changeUserRole: false, // Default to false
     },
   },
   {
@@ -93,6 +99,7 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: false,
+      changeUserRole: false, // Default to false
     },
   },
 ];
@@ -135,6 +142,7 @@ const PermissionsDashboard = () => {
               editDeleteUsers: savedConfig.edit_delete_users,
               seeAllAnalytics: savedConfig.see_all_analytics,
               seeOwnChurchAnalytics: savedConfig.see_own_church_analytics,
+              changeUserRole: savedConfig.change_user_role, // Load new permission
             },
           };
         }
@@ -174,6 +182,7 @@ const PermissionsDashboard = () => {
             edit_delete_users: config.permissions.editDeleteUsers,
             see_all_analytics: config.permissions.seeAllAnalytics,
             see_own_church_analytics: config.permissions.seeOwnChurchAnalytics,
+            change_user_role: config.permissions.changeUserRole, // Save new permission
           })),
           { onConflict: 'role' }
         );
@@ -199,6 +208,7 @@ const PermissionsDashboard = () => {
     { key: 'editDeleteUsers', label: 'Editar/eliminar usuarios', icon: Edit },
     { key: 'seeAllAnalytics', label: 'Ver todas las analíticas', icon: BarChart },
     { key: 'seeOwnChurchAnalytics', label: 'Ver analíticas de mi iglesia', icon: BarChart },
+    { key: 'changeUserRole', label: 'Cambiar rol de usuario', icon: UserCog }, // New column
   ] as const;
 
   if (isLoading) {
@@ -240,7 +250,7 @@ const PermissionsDashboard = () => {
         <CardContent>
           <div className="space-y-6">
             {/* Header row with permission labels */}
-            <div className="grid grid-cols-7 gap-4 font-medium text-sm text-muted-foreground">
+            <div className="grid grid-cols-8 gap-4 font-medium text-sm text-muted-foreground"> {/* Updated grid-cols */}
               <div>Rol</div>
               {permissionColumns.map((column) => (
                 <div key={column.key} className="text-center">
@@ -252,7 +262,7 @@ const PermissionsDashboard = () => {
 
             {/* Permission rows for each role */}
             {permissions.map((config, roleIndex) => (
-              <div key={config.role} className="grid grid-cols-7 gap-4 items-center">
+              <div key={config.role} className="grid grid-cols-8 gap-4 items-center"> {/* Updated grid-cols */}
                 <div className="font-medium">
                   <Badge variant={config.role === 'admin' ? 'default' : 'secondary'}>
                     {config.label}
