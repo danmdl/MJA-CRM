@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { createContext, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
 
 // Definir el tipo de rol de usuario
@@ -9,7 +9,7 @@ interface UserProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null;
+  email: string | null; // Added email to UserProfile
   role: UserRole;
   church_id: string | null;
 }
@@ -17,16 +17,15 @@ interface UserProfile {
 interface SessionContextType {
   session: Session | null;
   loading: boolean;
-  profile: UserProfile | null;
-  user: { id: string; email?: string | null } | null;
+  profile: UserProfile | null; // Añadir el perfil del usuario
 }
 
-export const useSession = (): SessionContextType => {
+export const SessionContext = createContext<SessionContextType | undefined>(undefined);
+
+export const useSession = () => {
   const context = useContext(SessionContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useSession must be used within a SessionProvider');
   }
   return context;
 };
-
-export default useSession;
