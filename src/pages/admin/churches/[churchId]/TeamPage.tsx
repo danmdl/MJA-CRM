@@ -4,6 +4,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import AddChurchMemberDialog from '@/components/admin/AddChurchMemberDialog';
+import InviteChurchMemberDialog from '@/components/admin/InviteChurchMemberDialog';
 import ChurchTeamTable from '@/components/admin/ChurchTeamTable';
 
 const ChurchTeamPage = () => {
@@ -20,6 +21,7 @@ const ChurchTeamPage = () => {
           </p>
         </div>
         {churchId && <AddChurchMemberDialog churchId={churchId} />}
+        {churchId && <InviteChurchMemberDialog churchId={churchId} />}
       </div>
 
       <Card>

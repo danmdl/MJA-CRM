@@ -29,6 +29,22 @@ const ChurchTeamTable = ({ churchId }: { churchId: string }) => {
   const { canChangeUserRole, canEditDeleteUsers } = usePermissions();
   const queryClient = useQueryClient();
 
+  // Reglas dinámicas de roles visibles
+  const getVisibleRoles = (): UserRole[] => {
+    const roles: UserRole[] = ['pastor', 'referente', 'encargado_de_celula'];
+
+    // Solo admin puede ver y asignar 'general'
+    if (session?.profile?.role === 'admin') roles.push('general');
+
+    // Solo tu cuenta (super admin) puede ver y asignar 'admin'
+    if (session?.user?.email === 'dan.delauretis@gmail.com') roles.push('admin');
+
+    // Nota: 'user' queda completamente oculto del selector
+    return roles;
+  };
+
+  const visibleRoles = getVisibleRoles();
+
   const edgeUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
 
   const { data: users, isLoading, isError, error } = useQuery<ChurchUser[]>({
@@ -103,7 +119,11 @@ const ChurchTeamTable = ({ churchId }: { churchId: string }) => {
     },
   });
 
-  const roles: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
+  const formatRoleLabel = (role: UserRole) => {
+    if (role === 'referente') return 'Referente';
+    if (role === 'encargado_de_celula') return 'Encargado de Célula';
+    return role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ');
+  };
 
   if (isLoading) {
     return (
@@ -145,12 +165,12 @@ const ChurchTeamTable = ({ churchId }: { churchId: string }) => {
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {roles.map((r) => (
+                    {visibleRoles.map((r) => (
                       <SelectItem
                         key={r}
                         value={r}
                       >
-                        {r === 'referente' ? 'Referente' : r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g,' ')}
+                        {formatRoleLabel(r)}
                       </SelectItem>
                     ))}
                   </SelectContent>

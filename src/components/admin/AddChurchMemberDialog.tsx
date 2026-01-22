@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { PlusCircle } from 'lucide-react';
@@ -18,12 +19,15 @@ interface Candidate {
   church_id: string | null;
 }
 
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula';
+
 const AddChurchMemberDialog = ({ churchId }: { churchId: string }) => {
   const { session } = useSession();
   const { canAddUsers } = usePermissions();
   const queryClient = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = React.useState<string>('referente'); // rol inicial al agregar
 
   const edgeUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
 
@@ -55,7 +59,7 @@ const AddChurchMemberDialog = ({ churchId }: { churchId: string }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({ action: 'addUserToChurch', userId: selectedUserId, churchId }),
+        body: JSON.stringify({ action: 'addUserToChurch', userId: selectedUserId, churchId, role: selectedRole }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -67,6 +71,7 @@ const AddChurchMemberDialog = ({ churchId }: { churchId: string }) => {
       showSuccess('Miembro agregado al equipo.');
       setOpen(false);
       setSelectedUserId(null);
+      setSelectedRole('referente');
       queryClient.invalidateQueries({ queryKey: ['churchTeam', churchId] });
     },
     onError: (e: any) => {
@@ -101,6 +106,20 @@ const AddChurchMemberDialog = ({ churchId }: { churchId: string }) => {
               ))}
             </SelectContent>
           </Select>
+          {/* Selector de rol inicial al agregar */}
+          <div className="mt-3">
+            <Label className="text-sm font-medium">Rol inicial</Label>
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar rol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="referente">Referente</SelectItem>
+                <SelectItem value="encargado_de_celula">Encargado de Célula</SelectItem>
+                <SelectItem value="pastor">Pastor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <DialogFooter>
           <Button

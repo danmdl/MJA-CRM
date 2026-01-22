@@ -112,19 +112,13 @@ serve(async (req) => {
           });
         }
 
-        // Admin/General: pueden ver candidatos de cualquier iglesia o sin iglesia
-        // Otros: solo pueden ver usuarios sin iglesia (church_id IS NULL)
-        let query = supabaseAdmin
+        // Política estricta: candidatos son solo usuarios sin iglesia
+        // Admin/General si necesitan mover gente, deben usar un flujo separado
+        const { data, error } = await supabaseAdmin
           .from('profiles')
-          .select('id, email, first_name, last_name, church_id');
+          .select('id, email, first_name, last_name, church_id')
+          .is('church_id', null);
 
-        if (isAdminOrGeneral) {
-          query = query.or(`church_id.is.null,church_id.neq.${churchId}`);
-        } else {
-          query = query.is('church_id', null);
-        }
-
-        const { data, error } = await query;
         if (error) {
           console.error('[admin-user-actions] Error listing candidates:', error);
           return new Response(JSON.stringify({ error: error.message }), {
