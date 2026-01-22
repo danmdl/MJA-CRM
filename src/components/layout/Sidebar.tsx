@@ -11,7 +11,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isCollapsed }: SidebarProps) => {
   const { profile } = useSession();
-  const { canAddUsers, canEditDeleteUsers } = usePermissions();
+  const { canAddUsers, canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
 
   // Unified navigation for all users - same buttons, permissions control what they can do
   const navItems = [
