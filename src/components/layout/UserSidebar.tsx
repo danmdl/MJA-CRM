@@ -18,7 +18,6 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/admin/churches", icon: Church, label: "Ministerio" },
     { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
-    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" },
     { to: "/admin/permissions", icon: Shield, label: "Permisos" },
     { to: "/admin/profile", icon: User, label: "Perfil" },
     { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" },
@@ -26,7 +25,6 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
 
   // Filter navigation items based on permissions, not roles
   const filteredNavItems = navItems.filter(item => {
-    if (item.to === "/admin/login-management") return canAddUsers();
     if (item.to === "/admin/permissions") return canEditDeleteUsers();
     if (item.to === "/admin/dashboard") return canSeeAllAnalytics();
     return true; // Everyone can access basic tabs
