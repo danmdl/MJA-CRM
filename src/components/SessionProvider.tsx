@@ -103,4 +103,11 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 };
 
-export { useSession } from './useSession'; // re-export hook from hook file
+// Explicit export of useSession for consumers
+export const useSession = () => {
+  const context = useContext(SessionContext);
+  if (!context) {
+    throw new Error('useSession must be used within a SessionProvider');
+  }
+  return context;
+};
