@@ -1,7 +1,5 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 // Definir el tipo de rol de usuario
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
@@ -20,14 +18,12 @@ interface SessionContextType {
   session: Session | null;
   loading: boolean;
   profile: UserProfile | null;
-  user: { id: string; email?: string | null } | null; // Añadido para compatibilidad
+  user: { id: string; email?: string | null } | null;
 }
 
-export const SessionContext = createContext<SessionContextType | undefined>(undefined);
-
-export const useSession = () => {
-  const context = useContext(SessionContext);
-  if (context === undefined) {
+export const useSession = (): SessionContextType => {
+  const context = useContext(require('@/components/SessionProvider').SessionContext);
+  if (!context) {
     throw new Error('useSession must be used within a SessionProvider');
   }
   return context;
