@@ -82,7 +82,7 @@ const InviteChurchMemberDialog = ({ churchId }: { churchId: string }) => {
     // Solo admin puede invitar como 'general' o 'admin'
     if (session?.user?.email === 'dan.delauretis@gmail.com') {
       roles.push('general', 'admin');
-    } else if (session?.profile?.role === 'admin') {
+    } else if ((session as any)?.profile?.role === 'admin') {
       roles.push('general');
     }
 

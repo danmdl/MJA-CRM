@@ -34,7 +34,7 @@ const ChurchTeamTable = ({ churchId }: { churchId: string }) => {
     const roles: UserRole[] = ['pastor', 'referente', 'encargado_de_celula'];
 
     // Solo admin puede ver y asignar 'general'
-    if (session?.profile?.role === 'admin') roles.push('general');
+    if ((session as any)?.profile?.role === 'admin') roles.push('general');
 
     // Solo tu cuenta (super admin) puede ver y asignar 'admin'
     if (session?.user?.email === 'dan.delauretis@gmail.com') roles.push('admin');

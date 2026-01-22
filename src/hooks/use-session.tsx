@@ -1,5 +1,7 @@
 import { createContext, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 // Definir el tipo de rol de usuario
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
@@ -9,7 +11,7 @@ interface UserProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null; // Added email to UserProfile
+  email: string | null;
   role: UserRole;
   church_id: string | null;
 }
@@ -17,7 +19,8 @@ interface UserProfile {
 interface SessionContextType {
   session: Session | null;
   loading: boolean;
-  profile: UserProfile | null; // Añadir el perfil del usuario
+  profile: UserProfile | null;
+  user: { id: string; email?: string | null } | null; // Añadido para compatibilidad
 }
 
 export const SessionContext = createContext<SessionContextType | undefined>(undefined);
