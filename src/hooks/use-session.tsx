@@ -22,9 +22,11 @@ interface SessionContextType {
 }
 
 export const useSession = (): SessionContextType => {
-  const context = useContext(require('@/components/SessionProvider').SessionContext);
+  const context = useContext(SessionContext);
   if (!context) {
     throw new Error('useSession must be used within a SessionProvider');
   }
   return context;
 };
+
+export default useSession;
