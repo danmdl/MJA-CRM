@@ -20,7 +20,6 @@ import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
 import CellsPage from "./pages/admin/churches/[churchId]/CellsPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
 import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
-import LoginManagementPage from "./pages/admin/LoginManagementPage";
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
@@ -70,7 +69,7 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="churches" element={<ChurchesPage />} />
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
-        <Route path="login-management" element={<LoginManagementPage />} />
+        {/* REMOVED: LoginManagementPage */}
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
         

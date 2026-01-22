@@ -11,14 +11,14 @@ interface SidebarProps {
 
 const Sidebar = ({ isCollapsed }: SidebarProps) => {
   const { profile } = useSession();
-  const { canAddUsers, canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
+  const { canAddUsers, canEditDeleteUsers } = usePermissions();
 
   // Unified navigation for all users - same buttons, permissions control what they can do
   const navItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/admin/churches", icon: Church, label: "Ministerio" },
     { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
-    { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" },
+    // REMOVED: { to: "/admin/login-management", icon: Key, label: "Gestión de Usuarios" },
     { to: "/admin/permissions", icon: Shield, label: "Permisos" },
     { to: "/admin/profile", icon: User, label: "Perfil" },
     { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" },
@@ -26,7 +26,7 @@ const Sidebar = ({ isCollapsed }: SidebarProps) => {
 
   // Filter navigation items based on permissions, not roles
   const filteredNavItems = navItems.filter(item => {
-    if (item.to === "/admin/login-management") return canAddUsers();
+    // No longer checking for login-management as it's removed
     if (item.to === "/admin/permissions") return canEditDeleteUsers();
     if (item.to === "/admin/dashboard") return canSeeAllAnalytics();
     return true; // Everyone can access basic tabs
