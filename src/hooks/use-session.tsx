@@ -26,5 +26,5 @@ export const useSession = (): SessionContextType => {
   if (!context) {
     throw new Error('useSession must be used within a SessionProvider');
   }
-  return context as SessionContextType;
+  return context;
 };
