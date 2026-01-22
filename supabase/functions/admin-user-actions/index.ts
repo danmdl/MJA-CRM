@@ -46,7 +46,12 @@ serve(async (req) => {
     const callerChurchId = profile.church_id;
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
 
-    const { action, churchId } = await req.json(); // Removed user management specific fields
+    const body = await req.json();
+    const action = body.action;
+    const churchId = body.churchId;
+    const userId = body.userId;
+    const role = body.role;
+
     console.log('[admin-user-actions] Edge Function received action:', action);
 
     switch (action) {
@@ -85,14 +90,165 @@ serve(async (req) => {
           });
         }
 
-        const formattedData = data.map((profile: any) => ({
-          ...profile,
-          status: 'confirmed', // All profiles are confirmed
-          invited_at: profile.updated_at,
-          confirmed_at: profile.updated_at
+        const formattedData = (data || []).map((p: any) => ({
+          ...p,
+          status: 'confirmed',
+          invited_at: p.updated_at,
+          confirmed_at: p.updated_at,
         }));
 
         return new Response(JSON.stringify(formattedData), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'listAvailableChurchCandidates': {
+        if (!churchId) {
+          console.error('[admin-user-actions] Church ID is required for listAvailableChurchCandidates');
+          return new Response(JSON.stringify({ error: 'Church ID is required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Admin/General: pueden ver candidatos de cualquier iglesia o sin iglesia
+        // Otros: solo pueden ver usuarios sin iglesia (church_id IS NULL)
+        let query = supabaseAdmin
+          .from('profiles')
+          .select('id, email, first_name, last_name, church_id');
+
+        if (isAdminOrGeneral) {
+          query = query.or(`church_id.is.null,church_id.neq.${churchId}`);
+        } else {
+          query = query.is('church_id', null);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.error('[admin-user-actions] Error listing candidates:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify(data || []), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'addUserToChurch': {
+        if (!churchId || !userId) {
+          console.error('[admin-user-actions] churchId and userId required for addUserToChurch');
+          return new Response(JSON.stringify({ error: 'churchId and userId are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!isAdminOrGeneral && callerChurchId !== churchId) {
+          console.error('[admin-user-actions] Forbidden: Non-admin trying to add user to different church', { callerChurchId, churchId });
+          return new Response('Forbidden: You can only add users to your assigned church.', { status: 403, headers: corsHeaders });
+        }
+
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({ church_id: churchId })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('[admin-user-actions] Error adding user to church:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'removeUserFromChurch': {
+        if (!churchId || !userId) {
+          console.error('[admin-user-actions] churchId and userId required for removeUserFromChurch');
+          return new Response(JSON.stringify({ error: 'churchId and userId are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Validar que el caller actúe sobre su propia iglesia o sea admin/general
+        if (!isAdminOrGeneral && callerChurchId !== churchId) {
+          console.error('[admin-user-actions] Forbidden: Non-admin trying to remove user from different church', { callerChurchId, churchId });
+          return new Response('Forbidden: You can only remove users from your assigned church.', { status: 403, headers: corsHeaders });
+        }
+
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({ church_id: null })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('[admin-user-actions] Error removing user from church:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'updateUserChurchRole': {
+        if (!userId || !role) {
+          console.error('[admin-user-actions] userId and role required for updateUserChurchRole');
+          return new Response(JSON.stringify({ error: 'userId and role are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Solo admin/general pueden asignar roles admin/general
+        const elevatedRoles = ['admin', 'general'];
+        if (elevatedRoles.includes(role) && !isAdminOrGeneral) {
+          console.error('[admin-user-actions] Forbidden: Non-admin assigning elevated role', { role });
+          return new Response('Forbidden: Only administrators can assign admin/general roles.', { status: 403, headers: corsHeaders });
+        }
+
+        // Si no es admin/general, asegurar que el usuario objetivo esté en su iglesia
+        if (!isAdminOrGeneral) {
+          const { data: target, error: targetErr } = await supabaseAdmin
+            .from('profiles')
+            .select('church_id')
+            .eq('id', userId)
+            .single();
+          if (targetErr || !target || target.church_id !== callerChurchId) {
+            console.error('[admin-user-actions] Forbidden: Non-admin changing role outside their church');
+            return new Response('Forbidden: You can only change roles for users in your church.', { status: 403, headers: corsHeaders });
+          }
+        }
+
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({ role })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('[admin-user-actions] Error updating user role:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

@@ -1,29 +1,40 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { PlusCircle } from 'lucide-react';
+import AddChurchMemberDialog from '@/components/admin/AddChurchMemberDialog';
+import ChurchTeamTable from '@/components/admin/ChurchTeamTable';
 
 const ChurchTeamPage = () => {
+  const params = useParams();
+  const churchId = params.churchId as string;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Equipo de la Iglesia</h1>
           <p className="text-muted-foreground">
-            La gestión de usuarios fue removida; administrá permisos por rol desde la sección de Permisos.
+            Gestioná la pertenencia y el rol de cada miembro de esta iglesia.
           </p>
         </div>
+        {churchId && <AddChurchMemberDialog churchId={churchId} />}
       </div>
-      <div className="rounded-lg border bg-card">
-        <div className="p-6">
-          <p className="text-sm text-muted-foreground">
-            Ir a: <a href="/admin/permissions" className="text-primary underline">Admin → Permisos</a>
-          </p>
-        </div>
-      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Miembros</CardTitle>
+          <CardDescription>Personas asignadas a esta iglesia</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {churchId ? (
+            <ChurchTeamTable churchId={churchId} />
+          ) : (
+            <div className="text-red-500">Iglesia no encontrada.</div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
