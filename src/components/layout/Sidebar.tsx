@@ -1,66 +1,174 @@
-import { NavLink, Link } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare, Shield, BarChart } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import SidebarFooter from './SidebarFooter';
+import React from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
-interface SidebarProps {
-  isCollapsed: boolean;
+interface NavItemConfig {
+  to: string;
+  emoji: string;
+  label: string;
+  badge?: number;
 }
 
-const Sidebar = ({ isCollapsed }: SidebarProps) => {
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  general: 'General',
+  pastor: 'Pastor',
+  referente: 'Referente',
+  encargado_de_celula: 'Líder de Célula',
+  user: 'Usuario',
+};
+
+const Sidebar = () => {
   const { profile } = useSession();
-  const { canAddUsers, canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
+  const navigate = useNavigate();
+  const { canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
 
-  // Unified navigation for all users - same buttons, permissions control what they can do
-  const navItems = [
-    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/admin/churches", icon: Church, label: "Ministerio" },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
-    { to: "/admin/permissions", icon: Shield, label: "Permisos" },
-    { to: "/admin/profile", icon: User, label: "Perfil" },
-    { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" },
-  ];
-
-  // Filter navigation items based on permissions, not roles
-  const filteredNavItems = navItems.filter(item => {
-    if (item.to === "/admin/permissions") return canEditDeleteUsers();
-    if (item.to === "/admin/dashboard") return canSeeAllAnalytics();
-    return true; // Everyone can access basic tabs
+  const { data: contactCount = 0 } = useQuery({
+    queryKey: ['contact-count-sidebar'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('contacts')
+        .select('id', { count: 'exact', head: true });
+      return count ?? 0;
+    },
   });
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
+  const initials = [profile?.first_name?.[0], profile?.last_name?.[0]]
+    .filter(Boolean).join('').toUpperCase() || 'U';
+  const fullName = [profile?.first_name, profile?.last_name]
+    .filter(Boolean).join(' ') || profile?.email || 'Usuario';
+
+  const sections: { title: string; items: NavItemConfig[] }[] = [
+    {
+      title: 'Principal',
+      items: [
+        ...(canSeeAllAnalytics() ? [{ to: '/admin/dashboard', emoji: '📊', label: 'Dashboard' }] : []),
+        { to: '/admin/churches', emoji: '⛪', label: 'Ministerio', badge: contactCount || undefined },
+      ],
+    },
+    {
+      title: 'Gestión',
+      items: [
+        { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
+        { to: '/admin/csv-deduplicator', emoji: '📋', label: 'Limpiar CSV' },
+        ...(canEditDeleteUsers() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
+        { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
+      ],
+    },
+  ];
+
   return (
-    <aside className={cn(
-      "bg-background border-r flex flex-col h-full transition-all duration-300",
-      isCollapsed ? "w-16" : "w-64"
-    )}>
-      <div className={cn(
-        "p-4 border-b flex items-center",
-        isCollapsed ? "justify-center" : "justify-between"
-      )}>
-        {!isCollapsed && <h2 className="text-xl font-bold tracking-tight">MJA Central</h2>}
-        {isCollapsed && <LayoutDashboard className="h-6 w-6 text-primary" />}
+    <aside style={{
+      width: 220, flexShrink: 0,
+      background: '#111113',
+      borderRight: '1px solid rgba(255,255,255,0.07)',
+      display: 'flex', flexDirection: 'column', height: '100%',
+    }}>
+      {/* Logo */}
+      <div style={{
+        padding: '20px 18px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <div style={{
+          width: 32, height: 32, flexShrink: 0,
+          background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+          borderRadius: 8, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 16,
+          boxShadow: '0 0 12px rgba(139,92,246,0.18)',
+        }}>⛪</div>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa' }}>
+            MJA CRM
+          </div>
+          <div style={{ fontSize: 11, color: '#a1a1aa' }}>Panel de administración</div>
+        </div>
       </div>
-      <nav className="flex flex-col p-2 flex-grow space-y-1">
-        {filteredNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
-                isActive && 'bg-muted text-primary',
-                isCollapsed ? "justify-center" : "gap-3"
-              )
-            }
-          >
-            <item.icon className="h-4 w-4" />
-            {!isCollapsed && <span className="text-sm">{item.label}</span>}
-          </NavLink>
+
+      {/* Nav */}
+      <nav style={{
+        flex: 1, padding: '12px 8px', overflowY: 'auto',
+        display: 'flex', flexDirection: 'column', gap: 2,
+      }}>
+        {sections.map(({ title, items }) => (
+          <div key={title}>
+            <div style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const, color: '#52525b',
+              padding: '8px 10px 4px', marginTop: 4,
+            }}>{title}</div>
+            {items.map(item => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] text-[13.5px] no-underline relative transition-all duration-150 ` +
+                  (isActive
+                    ? 'text-[#a78bfa] font-medium'
+                    : 'text-[#a1a1aa] hover:bg-[#18181b] hover:text-[#fafafa]')
+                }
+                style={({ isActive }) => ({
+                  background: isActive ? 'rgba(139,92,246,0.18)' : undefined,
+                })}
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span style={{
+                        position: 'absolute', left: 0,
+                        top: '20%', bottom: '20%',
+                        width: 2.5, background: '#8b5cf6', borderRadius: 2,
+                      }} />
+                    )}
+                    <span>{item.emoji}</span>
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.badge ? (
+                      <span style={{
+                        background: 'rgba(139,92,246,0.18)', color: '#a78bfa',
+                        fontSize: 10, fontWeight: 600,
+                        padding: '1px 6px', borderRadius: 20,
+                        fontFamily: "'Geist Mono', monospace",
+                      }}>
+                        {item.badge.toLocaleString()}
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
-      <SidebarFooter isCollapsed={isCollapsed} />
+
+      {/* User pill */}
+      <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <button
+          onClick={handleLogout}
+          title="Cerrar sesión"
+          className="w-full flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] cursor-pointer bg-transparent border-none text-left hover:bg-[#18181b] transition-colors duration-150"
+        >
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #f43f5e 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: 'white',
+          }}>{initials}</div>
+          <div>
+            <div style={{ fontSize: 12.5, fontWeight: 500, color: '#fafafa' }}>{fullName}</div>
+            <div style={{ fontSize: 10.5, color: '#a1a1aa' }}>
+              {ROLE_LABELS[profile?.role || ''] || 'Usuario'}
+            </div>
+          </div>
+        </button>
+      </div>
     </aside>
   );
 };
