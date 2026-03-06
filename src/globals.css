@@ -37,6 +37,13 @@
   }
 }
 
+html,
+body {
+  background-color: hsl(240, 10%, 3.9%) !important;
+  color: hsl(0, 0%, 98%) !important;
+  font-family: 'Geist', sans-serif !important;
+}
+
 @layer base {
   * { @apply border-border; }
   body {
