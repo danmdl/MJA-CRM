@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import DynamicContactTable from '@/components/admin/DynamicContactTable';
@@ -8,30 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, PlusCircle, Upload, Filter, X } from 'lucide-react';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { usePermissions } from '@/lib/permissions';
 
 const ChurchDatabasePage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
   const [filterField, setFilterField] = useState<string | null>(null);
+  const { canAddUsers, canEditDeleteUsers } = usePermissions();
 
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
@@ -40,40 +26,41 @@ const ChurchDatabasePage = () => {
   const requiredContactFields = CONTACT_FIELDS.filter(f => f.key === 'first_name');
   const optionalContactFields = CONTACT_FIELDS.filter(f => f.key !== 'first_name');
 
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setFilterField(null);
-  };
-
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Contactos de la Iglesia</h1>
         <div className="flex space-x-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="mr-2 h-4 w-4" /> Importar CSV
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[1100px]">
-              <DialogHeader>
-                <DialogTitle>Importar Contactos desde CSV</DialogTitle>
-                <DialogDescription>
-                  Sube un archivo CSV para añadir nuevos contactos a la base de datos de esta iglesia.
-                </DialogDescription>
-              </DialogHeader>
-              <CsvImporter
-                tableName="contacts"
-                requiredFields={requiredContactFields}
-                optionalFields={optionalContactFields}
-                churchId={churchId}
-              />
-            </DialogContent>
-          </Dialog>
-          <Button onClick={() => setIsAddContactDialogOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Crear Contacto
-          </Button>
+          {canAddUsers() && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importar CSV
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[1100px]">
+                <DialogHeader>
+                  <DialogTitle>Importar Contactos desde CSV</DialogTitle>
+                  <DialogDescription>
+                    Sube un archivo CSV para añadir nuevos contactos a la base de datos de esta iglesia.
+                  </DialogDescription>
+                </DialogHeader>
+                <CsvImporter
+                  tableName="contacts"
+                  requiredFields={requiredContactFields}
+                  optionalFields={optionalContactFields}
+                  churchId={churchId}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
+          {canAddUsers() && (
+            <Button onClick={() => setIsAddContactDialogOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Crear Contacto
+            </Button>
+          )}
         </div>
       </div>
 
@@ -90,7 +77,8 @@ const ChurchDatabasePage = () => {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" /> {filterField ? CONTACT_FIELDS.find(f => f.key === filterField)?.label : 'Filtrar'}
+              <Filter className="mr-2 h-4 w-4" />
+              {filterField ? CONTACT_FIELDS.find(f => f.key === filterField)?.label : 'Filtrar'}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -102,8 +90,9 @@ const ChurchDatabasePage = () => {
           </DropdownMenuContent>
         </DropdownMenu>
         {(searchTerm || filterField) && (
-          <Button variant="ghost" onClick={handleClearFilters}>
-            <X className="mr-2 h-4 w-4" /> Limpiar Filtros
+          <Button variant="ghost" onClick={() => { setSearchTerm(''); setFilterField(null); }}>
+            <X className="mr-2 h-4 w-4" />
+            Limpiar Filtros
           </Button>
         )}
       </div>
@@ -113,6 +102,9 @@ const ChurchDatabasePage = () => {
         searchTerm={searchTerm}
         filterField={filterField}
         useExternalToolbarContainer={true}
+        canEdit={canEditDeleteUsers()}
+        canDelete={canEditDeleteUsers()}
+        canAdd={canAddUsers()}
       />
 
       <AddContactDialog
