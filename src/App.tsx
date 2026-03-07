@@ -30,9 +30,17 @@ import PermissionsDashboard from "./pages/admin/PermissionsDashboard";
 
 const queryClient = new QueryClient();
 
+// Guard component: only admin can access permissions page
+const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { profile } = useSession();
+  if (profile && profile.role !== 'admin') {
+    return <Navigate to="/admin/churches" replace />;
+  }
+  return <>{children}</>;
+};
+
 const AppRoutes = () => {
   const { loading } = useSession();
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -44,7 +52,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      
+
       {/* User-specific routes, wrapped by PrivateRoute and UserLayout */}
       <Route path="/" element={
         <PrivateRoute>
@@ -56,11 +64,10 @@ const AppRoutes = () => {
         <Route index element={<Index />} />
         <Route path="profile" element={<Profile />} />
         <Route path="messages" element={<Messages />} />
-        {/* CSV Deduplicator is now accessible to all authenticated users */}
         <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
       </Route>
-      
-      {/* Admin Routes (accessible by admin, general, and specific church roles for certain paths) */}
+
+      {/* Admin Routes */}
       <Route path="/admin" element={
         <AdminRoute>
           <AdminLayout />
@@ -73,10 +80,14 @@ const AppRoutes = () => {
         <Route path="login-management" element={<LoginManagementPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
-        
-        {/* Permissions Dashboard - accessible to all admin users */}
-        <Route path="permissions" element={<PermissionsDashboard />} />
-        
+
+        {/* Permissions Dashboard - ADMIN ONLY */}
+        <Route path="permissions" element={
+          <AdminOnlyRoute>
+            <PermissionsDashboard />
+          </AdminOnlyRoute>
+        } />
+
         {/* Nested routes for specific church details */}
         <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>
           <Route path="overview" element={<ChurchOverviewPage />} />
@@ -86,7 +97,7 @@ const AppRoutes = () => {
           <Route index element={<Navigate to="overview" replace />} />
         </Route>
       </Route>
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
