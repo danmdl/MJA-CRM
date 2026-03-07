@@ -14,11 +14,22 @@ export interface PermissionData {
 }
 
 // Role hierarchy: higher index = higher privilege
-const ROLE_HIERARCHY: string[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
+// Note: DB enum uses 'piloto' for the referente/pilot role
+const ROLE_HIERARCHY: string[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
 
 export const getRoleLevel = (role: string): number => {
   const idx = ROLE_HIERARCHY.indexOf(role);
   return idx === -1 ? 0 : idx;
+};
+
+// Human-readable labels for all roles
+export const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  general: 'General',
+  pastor: 'Pastor',
+  piloto: 'Referente',
+  encargado_de_celula: 'Líder de Célula',
+  user: 'Usuario',
 };
 
 export const usePermissions = () => {
@@ -38,6 +49,9 @@ export const usePermissions = () => {
       }
       return data || [];
     },
+    staleTime: 0,              // Always re-fetch permissions (no cache)
+    refetchOnWindowFocus: true, // Refresh when user switches back to this tab
+    refetchInterval: 30_000,   // Also poll every 30s to catch admin changes
   });
 
   const getPermissionForRole = (role: string): PermissionData | undefined => {
@@ -46,7 +60,6 @@ export const usePermissions = () => {
 
   const hasPermission = (permission: keyof PermissionData): boolean => {
     if (!profile?.role) return false;
-    // Admin always has all permissions
     if (profile.role === 'admin') return true;
     const rolePermission = getPermissionForRole(profile.role);
     if (!rolePermission) return false;
@@ -67,10 +80,8 @@ export const usePermissions = () => {
   // Check if current user can edit/delete a target user based on hierarchy
   const canManageUser = (targetRole: string): boolean => {
     if (!profile?.role) return false;
-    if (profile.role === 'admin') return true; // admin can manage anyone
-    const myLevel = getRoleLevel(profile.role);
-    const targetLevel = getRoleLevel(targetRole);
-    return myLevel > targetLevel; // can only manage roles below yours
+    if (profile.role === 'admin') return true;
+    return getRoleLevel(profile.role) > getRoleLevel(targetRole);
   };
 
   return {
