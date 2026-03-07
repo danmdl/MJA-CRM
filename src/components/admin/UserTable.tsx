@@ -4,7 +4,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Copy, Send, Trash2, Key } from 'lucide-react';
@@ -18,9 +17,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { usePermissions, getRoleLevel } from '@/lib/permissions';
+import { usePermissions, getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
 
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
+// DB enum values for user_role
+type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
 
 interface User {
   id: string;
@@ -44,20 +44,21 @@ const passwordResetSchema = z.object({
 });
 
 const fetchUsers = async (accessToken: string): Promise<User[]> => {
-  const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
-  const response = await fetch(edgeFunctionUrl, {
+  const url = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
     body: JSON.stringify({ action: 'listUsers' }),
   });
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'No se pudieron cargar los usuarios.');
+    const err = await response.json();
+    throw new Error(err.error || 'No se pudieron cargar los usuarios.');
   }
   return response.json();
 };
 
-const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
+// All roles in hierarchy order
+const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
 
 const UserTable = () => {
   const { session, profile } = useSession();
@@ -82,9 +83,8 @@ const UserTable = () => {
   const { data: churches } = useQuery({
     queryKey: ['churches'],
     queryFn: async () => {
-      const { data, error } = await (await import('@/integrations/supabase/client')).supabase
+      const { data } = await (await import('@/integrations/supabase/client')).supabase
         .from('churches').select('id, name');
-      if (error) return [];
       return data || [];
     },
     enabled: !!session?.access_token,
@@ -112,7 +112,7 @@ const UserTable = () => {
 
   const deleteUserMutation = useMutation({
     mutationFn: (userId: string) => callEdge({ action: 'deleteUser', userId }),
-    onSuccess: () => { showSuccess('Usuario eliminado con éxito.'); queryClient.invalidateQueries({ queryKey: ['users'] }); },
+    onSuccess: () => { showSuccess('Usuario eliminado.'); queryClient.invalidateQueries({ queryKey: ['users'] }); },
     onError: (err: any) => showError(err.message || 'Error al eliminar.'),
   });
 
@@ -164,17 +164,15 @@ const UserTable = () => {
     }
   };
 
-  // Only show roles that current user can assign (strictly below their level, or all if admin)
+  // Roles assignable by current user
   const assignableRoles = ALL_ROLES.filter(r => {
-    if (profile?.role === 'admin') return true; // admin can assign any role
-    return getRoleLevel(r) < myLevel; // others can only assign roles below themselves
+    if (profile?.role === 'admin') return r !== 'admin';
+    return getRoleLevel(r) < myLevel;
   });
 
   if (isLoading) return (
     <div className="space-y-2">
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" />
     </div>
   );
 
@@ -196,10 +194,8 @@ const UserTable = () => {
         </TableHeader>
         <TableBody>
           {users && users.length > 0 ? users.map((user) => {
-            const targetLevel = getRoleLevel(user.role);
-            // Hierarchy: can only manage users with strictly lower level (admin can manage all)
             const canManage = profile?.role === 'admin'
-              ? user.id !== session?.user.id // admin can manage everyone except themselves
+              ? user.id !== session?.user.id
               : canManageUser(user.role) && user.id !== session?.user.id;
 
             return (
@@ -210,7 +206,6 @@ const UserTable = () => {
                   <Select
                     value={user.role}
                     onValueChange={(newRole: UserRole) => {
-                      // Cannot assign a role equal to or above your own (unless admin)
                       if (profile?.role !== 'admin' && getRoleLevel(newRole) >= myLevel) {
                         showError('No podés asignar un rol igual o superior al tuyo.');
                         return;
@@ -219,15 +214,13 @@ const UserTable = () => {
                     }}
                     disabled={!canManage || !canChangeUserRole() || updateUserRoleMutation.isPending}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[170px]">
                       <SelectValue placeholder="Seleccionar rol" />
                     </SelectTrigger>
                     <SelectContent>
                       {assignableRoles.map((roleOption) => (
                         <SelectItem key={roleOption} value={roleOption}>
-                          {roleOption === 'encargado_de_celula' ? 'Líder de Célula'
-                            : roleOption === 'referente' ? 'Referente'
-                            : roleOption.charAt(0).toUpperCase() + roleOption.slice(1)}
+                          {ROLE_LABELS[roleOption] || roleOption}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -260,10 +253,7 @@ const UserTable = () => {
                           <Key className="mr-2 h-4 w-4" /> Cambiar Contraseña
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem
-                        onClick={() => deleteUserMutation.mutate(user.id)}
-                        className="text-red-600"
-                      >
+                      <DropdownMenuItem onClick={() => deleteUserMutation.mutate(user.id)} className="text-red-600">
                         <Trash2 className="mr-2 h-4 w-4" />
                         {user.status === 'invited' ? 'Cancelar Invitación' : 'Eliminar Usuario'}
                       </DropdownMenuItem>
