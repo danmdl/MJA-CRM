@@ -13,6 +13,14 @@ export interface PermissionData {
   change_user_role: boolean;
 }
 
+// Role hierarchy: higher index = higher privilege
+const ROLE_HIERARCHY: string[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
+
+export const getRoleLevel = (role: string): number => {
+  const idx = ROLE_HIERARCHY.indexOf(role);
+  return idx === -1 ? 0 : idx;
+};
+
 export const usePermissions = () => {
   const { profile } = useSession();
   const queryClient = useQueryClient();
@@ -38,14 +46,10 @@ export const usePermissions = () => {
 
   const hasPermission = (permission: keyof PermissionData): boolean => {
     if (!profile?.role) return false;
-    
     // Admin always has all permissions
     if (profile.role === 'admin') return true;
-    
     const rolePermission = getPermissionForRole(profile.role);
     if (!rolePermission) return false;
-    
-    // Fix: Ensure we return a boolean
     return Boolean(rolePermission[permission] || false);
   };
 
@@ -56,6 +60,18 @@ export const usePermissions = () => {
   const canSeeAllAnalytics = () => hasPermission('see_all_analytics');
   const canSeeOwnChurchAnalytics = () => hasPermission('see_own_church_analytics');
   const canChangeUserRole = () => hasPermission('change_user_role');
+
+  // Only admin can access permissions management
+  const canAccessPermissions = () => profile?.role === 'admin';
+
+  // Check if current user can edit/delete a target user based on hierarchy
+  const canManageUser = (targetRole: string): boolean => {
+    if (!profile?.role) return false;
+    if (profile.role === 'admin') return true; // admin can manage anyone
+    const myLevel = getRoleLevel(profile.role);
+    const targetLevel = getRoleLevel(targetRole);
+    return myLevel > targetLevel; // can only manage roles below yours
+  };
 
   return {
     permissions,
@@ -69,5 +85,7 @@ export const usePermissions = () => {
     canSeeAllAnalytics,
     canSeeOwnChurchAnalytics,
     canChangeUserRole,
+    canAccessPermissions,
+    canManageUser,
   };
 };
