@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
-import { usePermissions } from '@/lib/permissions';
+import { usePermissions, ROLE_LABELS } from '@/lib/permissions';
 import { supabase } from '@/integrations/supabase/client';
 
 interface NavItemConfig {
@@ -10,15 +10,6 @@ interface NavItemConfig {
   label: string;
   badge?: number;
 }
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrador',
-  general: 'General',
-  pastor: 'Pastor',
-  referente: 'Referente',
-  encargado_de_celula: 'Líder de Célula',
-  user: 'Usuario',
-};
 
 const Sidebar = () => {
   const { profile } = useSession();
@@ -49,7 +40,6 @@ const Sidebar = () => {
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
         { to: '/admin/csv-deduplicator', emoji: '📋', label: 'Limpiar CSV' },
-        // Only admin can see Permissions tab
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
       ],
@@ -75,44 +65,25 @@ const Sidebar = () => {
         gap: 10,
       }}>
         <div style={{
-          width: 32,
-          height: 32,
-          flexShrink: 0,
+          width: 32, height: 32, flexShrink: 0,
           background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 16,
-          boxShadow: '0 0 12px rgba(139,92,246,0.18)',
+          borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, boxShadow: '0 0 12px rgba(139,92,246,0.18)',
         }}>⛪</div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa' }}>
-            MJA CRM
-          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa' }}>MJA CRM</div>
           <div style={{ fontSize: 11, color: '#a1a1aa' }}>Panel de administración</div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav style={{
-        flex: 1,
-        padding: '12px 8px',
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2,
-      }}>
+      <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {sections.map(({ title, items }) => (
           <div key={title}>
             <div style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase' as const,
-              color: '#52525b',
-              padding: '8px 10px 4px',
-              marginTop: 4,
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const, color: '#52525b',
+              padding: '8px 10px 4px', marginTop: 4,
             }}>{title}</div>
             {items.map(item => (
               <NavLink
@@ -122,37 +93,24 @@ const Sidebar = () => {
                   `flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] text-[13.5px] no-underline relative transition-all duration-150 ` +
                   (isActive ? 'text-[#a78bfa] font-medium' : 'text-[#a1a1aa] hover:bg-[#18181b] hover:text-[#fafafa]')
                 }
-                style={({ isActive }) => ({
-                  background: isActive ? 'rgba(139,92,246,0.18)' : undefined,
-                })}
+                style={({ isActive }) => ({ background: isActive ? 'rgba(139,92,246,0.18)' : undefined })}
               >
                 {({ isActive }) => (
                   <>
                     {isActive && (
                       <span style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: '20%',
-                        bottom: '20%',
-                        width: 2.5,
-                        background: '#8b5cf6',
-                        borderRadius: 2,
+                        position: 'absolute', left: 0, top: '20%', bottom: '20%',
+                        width: 2.5, background: '#8b5cf6', borderRadius: 2,
                       }} />
                     )}
                     <span>{item.emoji}</span>
                     <span style={{ flex: 1 }}>{item.label}</span>
                     {item.badge ? (
                       <span style={{
-                        background: 'rgba(139,92,246,0.18)',
-                        color: '#a78bfa',
-                        fontSize: 10,
-                        fontWeight: 600,
-                        padding: '1px 6px',
-                        borderRadius: 20,
-                        fontFamily: "'Geist Mono', monospace",
-                      }}>
-                        {item.badge.toLocaleString()}
-                      </span>
+                        background: 'rgba(139,92,246,0.18)', color: '#a78bfa',
+                        fontSize: 10, fontWeight: 600, padding: '1px 6px',
+                        borderRadius: 20, fontFamily: "'Geist Mono', monospace",
+                      }}>{item.badge.toLocaleString()}</span>
                     ) : null}
                   </>
                 )}
@@ -170,17 +128,10 @@ const Sidebar = () => {
           className="w-full flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] cursor-pointer bg-transparent border-none text-left hover:bg-[#18181b] transition-colors duration-150"
         >
           <div style={{
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            flexShrink: 0,
+            width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
             background: 'linear-gradient(135deg, #8b5cf6 0%, #f43f5e 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 11,
-            fontWeight: 700,
-            color: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: 'white',
           }}>{initials}</div>
           <div>
             <div style={{ fontSize: 12.5, fontWeight: 500, color: '#fafafa' }}>{fullName}</div>
