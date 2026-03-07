@@ -157,7 +157,7 @@ const TableCellContent = ({
       <div className="space-y-2">
         <div>{baseContent()}</div>
 
-        {/* Acciones dentro de la misma celda para Teléfono y Dirección */}
+        {/* Acciones dentro de la misma celda para TelÃ©fono y DirecciÃ³n */}
         {column.key === 'phone' && (
           <div className="flex gap-2">
             <a
@@ -180,7 +180,7 @@ const TableCellContent = ({
               className={`text-xs px-2 py-1 rounded border ${ (contact as any).address ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
               onClick={(e) => { if (!(contact as any).address) e.preventDefault(); }}
             >
-              Ver Dirección en Mapa
+              Ver DirecciÃ³n en Mapa
             </a>
           </div>
         )}
@@ -229,9 +229,9 @@ const DynamicContactTable = ({
 
   const extendedContactFields = useMemo(() => [
     ...CONTACT_FIELDS,
-    { key: 'cell.name', label: 'Célula', type: 'text' },
+    { key: 'cell.name', label: 'CÃ©lula', type: 'text' },
     { key: 'leader.first_name', label: 'Referente', type: 'text' },
-    { key: 'last_contact_date', label: 'Último Contacto', type: 'date' }
+    { key: 'last_contact_date', label: 'Ãltimo Contacto', type: 'date' }
   ], []);
 
   const defaultVisibleColumns: ContactField[] = useMemo(() => [
@@ -293,7 +293,7 @@ const DynamicContactTable = ({
     if (contactsError) throw new Error('No se pudieron cargar los contactos.');
 
     const { data: cellsData, error: cellsError } = await supabase.from('cells').select('id, name');
-    if (cellsError) throw new Error('No se pudieron cargar las células.');
+    if (cellsError) throw new Error('No se pudieron cargar las cÃ©lulas.');
 
     const { data: leadersData, error: leadersError } = await supabase.from('profiles').select('id, first_name, last_name');
     if (leadersError) throw new Error('No se pudieron cargar los referentes.');
@@ -340,7 +340,7 @@ const DynamicContactTable = ({
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      showSuccess('Contacto(s) eliminado(s) con éxito.');
+      showSuccess('Contacto(s) eliminado(s) con Ã©xito.');
       queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
       setSelectedContacts([]);
     },
@@ -375,7 +375,7 @@ const DynamicContactTable = ({
 
   const handleDeleteSelected = (ids: string[]) => {
     if (ids.length === 0) return;
-    if (window.confirm(`¿Estás seguro de que deseas eliminar ${ids.length} contacto(s)?`)) {
+    if (window.confirm(`Â¿EstÃ¡s seguro de que deseas eliminar ${ids.length} contacto(s)?`)) {
       ids.forEach(id => deleteContactMutation.mutate(id));
     }
   };
@@ -434,7 +434,7 @@ const DynamicContactTable = ({
           rel="noreferrer"
           className={`text-xs px-2 py-1 rounded border ${ (c as any).address ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
           onClick={(e) => { if (!(c as any).address) e.preventDefault(); }}
-          title="Ver Dirección en Mapa"
+          title="Ver DirecciÃ³n en Mapa"
         >
           Ver mapa
         </a>
@@ -486,7 +486,7 @@ const DynamicContactTable = ({
 
       {/* Internal toolbar (fallback) only when not using external container */}
       <div className={useExternalToolbarContainer ? '' : 'relative'}>
-        {(!useExternalToolbarContainer && (someVisibleSelected || allVisibleSelected)) && (
+        {canDeleteProp && !useExternalToolbarContainer && (someVisibleSelected || allVisibleSelected) && (
           <div className="absolute top-0 left-0 right-0 z-10">
             <SelectionToolbar
               selectedCount={selectedCount}
