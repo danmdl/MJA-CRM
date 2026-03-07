@@ -224,6 +224,9 @@ const DynamicContactTable = ({
   searchTerm = '', 
   filterField = null as string | null, 
   useExternalToolbarContainer = false,
+  canEdit: canEditProp = true,
+  canDelete: canDeleteProp = true,
+  canAdd: canAddProp = true,
 }: { churchId?: string; searchTerm?: string; filterField?: string | null; useExternalToolbarContainer?: boolean }) => {
   logger.log('[DynamicContactTable] Component rendered', { churchId, searchTerm, filterField });
 
