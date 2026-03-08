@@ -203,9 +203,9 @@ const CellsPage = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setEditing(c)}>Editar</DropdownMenuItem>
+                            {canEditDeleteUsers() && <DropdownMenuItem onClick={() => setEditing(c)}>Editar</DropdownMenuItem>}
                             <DropdownMenuItem onClick={() => setAttendeesFor(c.id)}>Gestionar Asistentes</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600" onClick={() => deleteCell(c.id)}>Eliminar</DropdownMenuItem>
+                            {canEditDeleteUsers() && <DropdownMenuItem className="text-red-600" onClick={() => deleteCell(c.id)}>Eliminar</DropdownMenuItem>}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
