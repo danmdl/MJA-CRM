@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { usePermissions } from '@/lib/permissions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -190,6 +191,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { canEditDeleteUsers } = usePermissions();
   const [newLog, setNewLog] = useState({ date: '', method: '', notes: '' });
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
@@ -464,7 +466,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-              <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>
+              {canEditDeleteUsers() && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
             </div>
           </div>
         )}
