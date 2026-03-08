@@ -131,9 +131,11 @@ const CellsPage = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Células</h1>
+        {canAddUsers() && (
         <Button onClick={() => setIsAddOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Célula
         </Button>
+      )}
       </div>
 
       <Card>
@@ -203,9 +205,9 @@ const CellsPage = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {canEditDeleteUsers() && <DropdownMenuItem onClick={() => setEditing(c)}>Editar</DropdownMenuItem>}
+                            <DropdownMenuItem onClick={() => setEditing(c)}>Editar</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setAttendeesFor(c.id)}>Gestionar Asistentes</DropdownMenuItem>
-                            {canEditDeleteUsers() && <DropdownMenuItem className="text-red-600" onClick={() => deleteCell(c.id)}>Eliminar</DropdownMenuItem>}
+                            <DropdownMenuItem className="text-red-600" onClick={() => deleteCell(c.id)}>Eliminar</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
