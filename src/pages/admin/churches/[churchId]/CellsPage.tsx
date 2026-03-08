@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
+import { usePermissions } from '@/lib/permissions';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,6 +68,7 @@ const fetchAttendeeCounts = async (churchId: string): Promise<Record<string, num
 
 const CellsPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
+  const { canAddUsers, canEditDeleteUsers } = usePermissions();
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editing, setEditing] = useState<CellRow | null>(null);
