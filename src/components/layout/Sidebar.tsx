@@ -121,24 +121,36 @@ const Sidebar = () => {
 
       {/* User pill */}
       <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <button
-          onClick={handleLogout}
-          title="Cerrar sesión"
-          className="w-full flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] cursor-pointer bg-transparent border-none text-left hover:bg-[#18181b] transition-colors duration-150"
-        >
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-            background: 'linear-gradient(135deg, #FFC233 0%, #f43f5e 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: 'white',
-          }}>{initials}</div>
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 500, color: '#fafafa' }}>{fullName}</div>
-            <div style={{ fontSize: 10.5, color: '#a1a1aa' }}>
-              {ROLE_LABELS[profile?.role || ''] || 'Usuario'}
+        <div className="flex items-center gap-1">
+          <NavLink
+            to="/admin/profile"
+            className="flex-1 flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] cursor-pointer bg-transparent border-none text-left hover:bg-[#18181b] transition-colors duration-150 no-underline"
+          >
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+              background: 'linear-gradient(135deg, #FFC233 0%, #f43f5e 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, color: 'white',
+            }}>{initials}</div>
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 500, color: '#fafafa' }}>{fullName}</div>
+              <div style={{ fontSize: 10.5, color: '#a1a1aa' }}>
+                {ROLE_LABELS[profile?.role || ''] || 'Usuario'}
+              </div>
             </div>
-          </div>
-        </button>
+          </NavLink>
+          <button
+            onClick={handleLogout}
+            title="Cerrar sesión"
+            className="p-[7px] rounded-[7px] cursor-pointer bg-transparent border-none hover:bg-[#18181b] transition-colors duration-150 text-[#52525b] hover:text-[#f43f5e]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </aside>
   );

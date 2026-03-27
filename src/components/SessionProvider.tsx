@@ -29,7 +29,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   useEffect(() => {
     // Detect invite link: Supabase puts type=invite in the URL hash
     const hash = window.location.hash;
-    if (hash.includes('type=invite') || hash.includes('type=signup')) {
+    if (hash.includes('type=invite') || hash.includes('type=signup') || hash.includes('type=recovery')) {
       setNeedsPasswordSetup(true);
     }
 

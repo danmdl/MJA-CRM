@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,8 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import React from 'react';
 import { usePermissions, getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
@@ -50,6 +52,10 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const myLevel = getRoleLevel(profile?.role || '');
+  const [resetDialogUser, setResetDialogUser] = useState<{ id: string; email: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [resettingPw, setResettingPw] = useState(false);
 
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['churchUsers', churchId],
@@ -133,6 +139,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   if (isError) return <div className="text-red-500">Error: {error?.message}</div>;
 
   return (
+    <>
     <div className="space-y-4">
       <div className="relative w-[320px] max-w-full">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -211,6 +218,11 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                             <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
                           </DropdownMenuItem>
                         )}
+                        {canEditDeleteUsers() && user.status === 'confirmed' && (
+                          <DropdownMenuItem onClick={() => { setResetDialogUser({ id: user.id, email: user.email }); setNewPassword(''); setShowPw(false); }}>
+                            <KeyRound className="mr-2 h-4 w-4" /> Cambiar Contraseña
+                          </DropdownMenuItem>
+                        )}
                         {canEditDeleteUsers() && (
                           <DropdownMenuItem
                             onClick={() => deleteUserMutation.mutate(user.id)}
@@ -238,6 +250,58 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         </TableBody>
       </Table>
     </div>
+
+    {/* Change Password Dialog */}
+    <Dialog open={!!resetDialogUser} onOpenChange={(open) => { if (!open) setResetDialogUser(null); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Cambiar contraseña</DialogTitle>
+          <p className="text-sm text-muted-foreground">{resetDialogUser?.email}</p>
+        </DialogHeader>
+        <div className="relative">
+          <Input
+            type={showPw ? 'text' : 'password'}
+            placeholder="Nueva contraseña (mín. 6 caracteres)"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw(v => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setResetDialogUser(null)}>Cancelar</Button>
+          <Button
+            disabled={newPassword.length < 6 || resettingPw}
+            onClick={async () => {
+              if (!resetDialogUser || !session?.access_token) return;
+              setResettingPw(true);
+              const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ action: 'resetUserPassword', userId: resetDialogUser.id, newPassword }),
+              });
+              setResettingPw(false);
+              if (resp.ok) {
+                showSuccess('Contraseña actualizada correctamente.');
+                setResetDialogUser(null);
+              } else {
+                const err = await resp.json();
+                showError(err.error || 'Error al cambiar la contraseña.');
+              }
+            }}
+          >
+            {resettingPw ? 'Guardando...' : 'Guardar contraseña'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 };
 
