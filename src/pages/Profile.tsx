@@ -60,47 +60,53 @@ const Profile = () => {
   // handleLogout se ha movido al SidebarFooter
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 space-y-6"> {/* Added p-6 here */}
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Tu Perfil</CardTitle>
-          <CardDescription>
-            Aquí puedes actualizar tu información personal.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleUpdateProfile}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Correo electrónico</Label>
-              <Input type="email" value={session?.user?.email || ''} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Nombre</Label>
-              <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Apellido</Label>
-              <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-end"> {/* Ajustado para alinear a la derecha */}
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Guardando...' : 'Guardar cambios'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-      <PasswordChangeForm /> {/* Añadir el formulario de cambio de contraseña */}
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-6">Perfil</h1>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Personal Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Tu Información Personal</CardTitle>
+            <CardDescription>Actualiza tu información personal aquí.</CardDescription>
+          </CardHeader>
+          <form onSubmit={handleUpdateProfile}>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Correo electrónico</Label>
+                <Input type="email" value={session?.user?.email || ''} disabled />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Nombre</Label>
+                  <Input
+                    id="firstName"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Apellido</Label>
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Guardando...' : 'Guardar cambios'}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+
+        {/* Right: Change Password */}
+        <PasswordChangeForm />
+      </div>
     </div>
   );
 };
