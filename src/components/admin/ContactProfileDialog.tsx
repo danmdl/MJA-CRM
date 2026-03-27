@@ -21,6 +21,7 @@ import { useSession } from '@/hooks/use-session';
 import CountryPhoneInput from '@/components/CountryPhoneInput';
 import ContactLogDialog from './ContactLogDialog';
 import AddContactLogDialog from './AddContactLogDialog';
+import AddressAutocomplete from './AddressAutocomplete';
 
 interface Contact {
   id: string;
@@ -590,7 +591,16 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
               </div>
               <CountryPhoneInput label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} />
-              <ContactInfoField label="Dirección" value={contact.address || ''} onChange={(v) => setContact({ ...contact, address: v || null })} icon={MapPin} />
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-muted-foreground" /> Dirección
+                </label>
+                <AddressAutocomplete
+                  value={contact.address || ''}
+                  onChange={(addr) => setContact({ ...contact, address: addr || null })}
+                  placeholder="Escribe la dirección para buscar y confirmar..."
+                />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
                 <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
