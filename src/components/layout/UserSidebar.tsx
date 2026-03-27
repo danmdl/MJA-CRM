@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { User, Database, Users, FileSpreadsheet, LayoutDashboard, Church, Key, MessageSquare, Shield, BarChart } from 'lucide-react';
+import { User, Database, Users, LayoutDashboard, Church, MessageSquare, Shield, BarChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
 import { useSession } from '@/hooks/use-session';
@@ -17,7 +17,6 @@ const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
   const navItems = [
     { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/admin/churches", icon: Church, label: "Ministerio" },
-    { to: "/admin/csv-deduplicator", icon: FileSpreadsheet, label: "Limpiar CSV" },
     { to: "/admin/permissions", icon: Shield, label: "Permisos" },
     { to: "/admin/profile", icon: User, label: "Perfil" },
     { to: "/admin/messages", icon: MessageSquare, label: "Mensajes" },

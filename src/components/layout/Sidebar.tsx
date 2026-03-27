@@ -39,7 +39,6 @@ const Sidebar = () => {
       title: 'Gestión',
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
-        { to: '/admin/csv-deduplicator', emoji: '📋', label: 'Limpiar CSV' },
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
       ],

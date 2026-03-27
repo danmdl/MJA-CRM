@@ -13,7 +13,6 @@ import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import AdminProfile from "./pages/admin/Profile";
-import CsvDeduplicatorPage from "./pages/admin/CsvDeduplicatorPage";
 import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
@@ -65,7 +64,6 @@ const AppRoutes = () => {
         <Route index element={<Index />} />
         <Route path="profile" element={<Profile />} />
         <Route path="messages" element={<Messages />} />
-        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
       </Route>
 
       {/* Admin Routes */}
@@ -77,7 +75,6 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="churches" element={<ChurchesPage />} />
-        <Route path="csv-deduplicator" element={<CsvDeduplicatorPage />} />
         <Route path="login-management" element={<LoginManagementPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />

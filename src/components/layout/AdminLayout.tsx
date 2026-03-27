@@ -13,7 +13,6 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/admin/permissions') return 'Permisos';
   if (pathname === '/admin/messages') return 'Mensajes';
   if (pathname === '/admin/profile') return 'Perfil';
-  if (pathname === '/admin/csv-deduplicator') return 'Limpiar CSV';
   return 'Admin';
 }
 
