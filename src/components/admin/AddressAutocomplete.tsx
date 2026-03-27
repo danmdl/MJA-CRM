@@ -37,8 +37,8 @@ const AddressAutocomplete = ({
       setLoading(true);
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)},Argentina&format=json&limit=5&addressdetails=1`,
-          { headers: { 'Accept-Language': 'es', 'User-Agent': 'MJA-CRM/1.0' } }
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1&countrycodes=ar&accept-language=es`,
+          { headers: { 'User-Agent': 'MJA-CRM/1.0' } }
         );
         const data: GeoResult[] = await res.json();
         setSuggestions(data);
