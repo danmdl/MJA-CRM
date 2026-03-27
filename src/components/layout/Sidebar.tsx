@@ -66,7 +66,7 @@ const Sidebar = () => {
         <div style={{
           width: 32, height: 32, flexShrink: 0,
           borderRadius: 8, overflow: 'hidden',
-          boxShadow: '0 0 12px rgba(212,160,23,0.35)',
+          boxShadow: '0 0 12px rgba(255,194,51,0.35)',
         }}>
           <img src="/logo.png" alt="MJA Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
@@ -91,23 +91,23 @@ const Sidebar = () => {
                 to={item.to}
                 className={({ isActive }) =>
                   `flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] text-[13.5px] no-underline relative transition-all duration-150 ` +
-                  (isActive ? 'text-[#f0c040] font-medium' : 'text-[#a1a1aa] hover:bg-[#18181b] hover:text-[#fafafa]')
+                  (isActive ? 'text-[#FFD966] font-medium' : 'text-[#a1a1aa] hover:bg-[#18181b] hover:text-[#fafafa]')
                 }
-                style={({ isActive }) => ({ background: isActive ? 'rgba(212,160,23,0.18)' : undefined })}
+                style={({ isActive }) => ({ background: isActive ? 'rgba(255,194,51,0.18)' : undefined })}
               >
                 {({ isActive }) => (
                   <>
                     {isActive && (
                       <span style={{
                         position: 'absolute', left: 0, top: '20%', bottom: '20%',
-                        width: 2.5, background: '#d4a017', borderRadius: 2,
+                        width: 2.5, background: '#FFC233', borderRadius: 2,
                       }} />
                     )}
                     <span>{item.emoji}</span>
                     <span style={{ flex: 1 }}>{item.label}</span>
                     {item.badge ? (
                       <span style={{
-                        background: 'rgba(212,160,23,0.18)', color: '#f0c040',
+                        background: 'rgba(255,194,51,0.18)', color: '#FFD966',
                         fontSize: 10, fontWeight: 600, padding: '1px 6px',
                         borderRadius: 20, fontFamily: "'Geist Mono', monospace",
                       }}>{item.badge.toLocaleString()}</span>
@@ -129,7 +129,7 @@ const Sidebar = () => {
         >
           <div style={{
             width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-            background: 'linear-gradient(135deg, #d4a017 0%, #f43f5e 100%)',
+            background: 'linear-gradient(135deg, #FFC233 0%, #f43f5e 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, fontWeight: 700, color: 'white',
           }}>{initials}</div>
