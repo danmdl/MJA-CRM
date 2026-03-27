@@ -353,6 +353,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     setWhatsappMsg(DEFAULT_WHATSAPP_TEMPLATE(name, cell.name, day, time, addr));
     setWhatsappCell(cell);
   };
+
+  const handleSave = async () => {
     if (!contact) return;
     setSaving(true);
     // Guardar en backend (Edge Function)
