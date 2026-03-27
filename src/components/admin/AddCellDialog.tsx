@@ -30,7 +30,7 @@ const AddressAutocomplete = ({
   onChange,
 }: {
   value: string;
-  onChange: (address: string) => void;
+  onChange: (address: string, lat?: number, lng?: number) => void;
 }) => {
   const [query, setQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<GeoResult[]>([]);
@@ -39,7 +39,6 @@ const AddressAutocomplete = ({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync external value changes (e.g. when editing an existing cell)
   useEffect(() => { setQuery(value); }, [value]);
 
   const search = useCallback((q: string) => {
@@ -62,13 +61,14 @@ const AddressAutocomplete = ({
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
-    onChange(e.target.value); // keep parent in sync while typing
+    onChange(e.target.value); // keep parent in sync while typing (no coords yet)
     search(e.target.value);
   };
 
   const handleSelect = (result: GeoResult) => {
     setQuery(result.display_name);
-    onChange(result.display_name);
+    // Pass coordinates along with address when user picks a suggestion
+    onChange(result.display_name, parseFloat(result.lat), parseFloat(result.lon));
     setSuggestions([]);
     setOpen(false);
   };
@@ -136,6 +136,8 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
   const [name, setName] = useState(initial?.name || '');
   const [encargado, setEncargado] = useState<string | null>(initial?.encargado_id || null);
   const [address, setAddress] = useState(initial?.address || '');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [meetingDay, setMeetingDay] = useState(initial?.meeting_day || '');
   const [meetingTime, setMeetingTime] = useState(initial?.meeting_time || '');
   const [saving, setSaving] = useState(false);
@@ -146,6 +148,8 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
       setName(initial?.name || '');
       setEncargado(initial?.encargado_id || null);
       setAddress(initial?.address || '');
+      setLat(null);
+      setLng(null);
       setMeetingDay(initial?.meeting_day || '');
       setMeetingTime(initial?.meeting_time || '');
     }
@@ -193,6 +197,8 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
           name: name.trim(),
           encargado_id: encargado,
           address: address || null,
+          lat: lat ?? undefined,
+          lng: lng ?? undefined,
           meeting_day: meetingDay || null,
           meeting_time: meetingTime || null,
         })
@@ -213,6 +219,8 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
           church_id: churchId,
           encargado_id: encargado,
           address: address || null,
+          lat: lat ?? null,
+          lng: lng ?? null,
           meeting_day: meetingDay || null,
           meeting_time: meetingTime || null,
         });
@@ -263,7 +271,11 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
             <Label>Dirección</Label>
             <AddressAutocomplete
               value={address}
-              onChange={setAddress}
+              onChange={(addr, alat, alng) => {
+                setAddress(addr);
+                if (alat !== undefined) setLat(alat);
+                if (alng !== undefined) setLng(alng);
+              }}
             />
             <p className="text-xs text-muted-foreground">Escribe la calle y número y selecciona una sugerencia para ubicación exacta en el mapa.</p>
           </div>
