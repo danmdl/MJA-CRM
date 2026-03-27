@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePermissions } from '@/lib/permissions';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList } from 'lucide-react';
+import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Navigation, Send } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -58,7 +58,24 @@ interface Leader {
 interface Cell {
   id: string;
   name: string;
+  lat?: number | null;
+  lng?: number | null;
+  address?: string | null;
+  meeting_day?: string | null;
+  meeting_time?: string | null;
 }
+
+// Haversine distance in km
+const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const DEFAULT_WHATSAPP_TEMPLATE = (contactName: string, cellName: string, day: string, time: string, address: string) =>
+  `Hola ${contactName}! 👋\n\nTe queremos invitar a la célula *${cellName}* que se reúne los *${day}* a las *${time}* en ${address}.\n\n¡Esperamos verte pronto! 🙏`;
 
 interface ContactProfileDialogProps {
   open: boolean;
@@ -201,6 +218,13 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const queryClient = useQueryClient();
   const { session } = useSession();
 
+  // Cell suggestion state
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<(Cell & { distanceKm: number })[] | null>(null);
+  const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
+  const [whatsappMsg, setWhatsappMsg] = useState('');
+  const [editingTemplate, setEditingTemplate] = useState(false);
+
   useEffect(() => {
     if (open && contactId) {
       fetchContactDetails();
@@ -272,13 +296,63 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
     const { data: cellsData } = await supabase
       .from('cells')
-      .select('id, name')
+      .select('id, name, lat, lng, address, meeting_day, meeting_time')
       .eq('church_id', churchId)
       .order('name', { ascending: true });
     setCells(cellsData || []);
   };
 
-  const handleSave = async () => {
+  const suggestCells = async () => {
+    if (!contact?.address) {
+      showError('El contacto no tiene dirección registrada.');
+      return;
+    }
+    const cellsWithCoords = cells.filter(c => c.lat && c.lng);
+    if (cellsWithCoords.length === 0) {
+      showError('Ninguna célula tiene coordenadas registradas. Edita las células y selecciona una dirección del autocompletado.');
+      return;
+    }
+    setSuggesting(true);
+    setSuggestions(null);
+    try {
+      // Geocode contact's address
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(contact.address)},Argentina&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'es', 'User-Agent': 'MJA-CRM/1.0' } }
+      );
+      const data = await res.json();
+      if (!data?.[0]) {
+        showError('No se pudo ubicar la dirección del contacto. Asegúrate de que sea una dirección válida.');
+        setSuggesting(false);
+        return;
+      }
+      const contactLat = parseFloat(data[0].lat);
+      const contactLng = parseFloat(data[0].lon);
+
+      const ranked = cellsWithCoords
+        .map(c => ({ ...c, distanceKm: haversineKm(contactLat, contactLng, c.lat!, c.lng!) }))
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, 3);
+
+      setSuggestions(ranked);
+    } catch {
+      showError('Error al calcular las distancias. Verifica tu conexión.');
+    }
+    setSuggesting(false);
+  };
+
+  const assignCell = async (cell: Cell) => {
+    if (!contact) return;
+    setContact({ ...contact, cell_id: cell.id });
+    setSuggestions(null);
+    // Build WhatsApp message
+    const name = `${contact.first_name} ${contact.last_name || ''}`.trim();
+    const day = cell.meeting_day || 'TBD';
+    const time = cell.meeting_time || 'TBD';
+    const addr = cell.address || '';
+    setWhatsappMsg(DEFAULT_WHATSAPP_TEMPLATE(name, cell.name, day, time, addr));
+    setWhatsappCell(cell);
+  };
     if (!contact) return;
     setSaving(true);
     // Guardar en backend (Edge Function)
@@ -376,13 +450,123 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
               <div className="md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <SelectField
-                    label="Célula"
-                    value={contact.cell_id}
-                    onChange={(v) => setContact({ ...contact, cell_id: v })}
-                    options={cells}
-                    placeholder="Sin célula asignada"
-                  />
+                <div className="space-y-2">
+                  <Label>Célula</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={contact.cell_id || undefined}
+                      onValueChange={(v) => {
+                        const cell = cells.find(c => c.id === v);
+                        setContact({ ...contact, cell_id: v });
+                        if (cell) {
+                          const name = `${contact.first_name} ${contact.last_name || ''}`.trim();
+                          setWhatsappMsg(DEFAULT_WHATSAPP_TEMPLATE(name, cell.name, cell.meeting_day || 'TBD', cell.meeting_time || 'TBD', cell.address || ''));
+                          setWhatsappCell(cell);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="Sin célula asignada" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin célula asignada</SelectItem>
+                        {cells.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 gap-1 text-xs"
+                      onClick={suggestCells}
+                      disabled={suggesting}
+                      title="Sugerir las 3 células más cercanas"
+                    >
+                      <Navigation className="h-3.5 w-3.5" />
+                      {suggesting ? 'Buscando...' : 'Sugerir 3'}
+                    </Button>
+                  </div>
+
+                  {/* Suggestions list */}
+                  {suggestions && suggestions.length > 0 && (
+                    <div className="border rounded-lg overflow-hidden mt-1">
+                      <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted border-b">
+                        3 células más cercanas — selecciona una para asignar
+                      </div>
+                      {suggestions.map((cell, i) => (
+                        <button
+                          key={cell.id}
+                          type="button"
+                          onClick={() => assignCell(cell)}
+                          className="w-full flex items-center justify-between px-3 py-2.5 text-sm hover:bg-muted transition-colors border-b last:border-b-0 text-left"
+                        >
+                          <div>
+                            <span className="font-medium">{i + 1}. {cell.name}</span>
+                            {cell.meeting_day && <span className="ml-2 text-muted-foreground text-xs">{cell.meeting_day} {cell.meeting_time}</span>}
+                          </div>
+                          <span className="text-xs text-primary font-medium shrink-0 ml-3">
+                            {cell.distanceKm < 1 ? `${Math.round(cell.distanceKm * 1000)}m` : `${cell.distanceKm.toFixed(1)}km`}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {suggestions && suggestions.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No se encontraron células con coordenadas.</p>
+                  )}
+
+                  {/* WhatsApp invite after assignment */}
+                  {whatsappCell && contact.cell_id === whatsappCell.id && (
+                    <div className="border border-green-500/30 bg-green-500/5 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm font-medium text-green-400">
+                          <Send className="h-4 w-4" />
+                          ¿Avisar a {contact.first_name} por WhatsApp?
+                        </div>
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditingTemplate(v => !v)}
+                        >
+                          {editingTemplate ? 'Cerrar edición' : 'Editar mensaje'}
+                        </button>
+                      </div>
+                      {editingTemplate && (
+                        <Textarea
+                          value={whatsappMsg}
+                          onChange={e => setWhatsappMsg(e.target.value)}
+                          className="text-xs min-h-[100px] font-mono"
+                        />
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="gap-1.5 text-xs"
+                          onClick={() => {
+                            const phone = (contact.phone || '').replace(/[^\d]/g, '');
+                            const msg = encodeURIComponent(whatsappMsg);
+                            window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                          }}
+                          disabled={!contact.phone}
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          Enviar WhatsApp
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => { setWhatsappCell(null); setSuggestions(null); }}
+                        >
+                          No por ahora
+                        </Button>
+                      </div>
+                      {!contact.phone && (
+                        <p className="text-xs text-amber-400">El contacto no tiene teléfono registrado.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
                   <SelectField
                     label="Referente asignado"
                     value={contact.leader_assigned}
