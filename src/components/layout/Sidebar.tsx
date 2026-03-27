@@ -11,7 +11,7 @@ interface NavItemConfig {
   label: string;
 }
 
-const Sidebar = () => {
+const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
   const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches } = usePermissions();
@@ -120,7 +120,7 @@ const Sidebar = () => {
       {/* Back to churches button — only for multi-church users inside a church */}
       {isInsideChurch && canSeeAllChurches() && (
         <button
-          onClick={() => navigate('/admin/churches')}
+          onClick={() => { navigate('/admin/churches'); onNavigate?.(); }}
           style={{
             margin: '8px 8px 0',
             padding: '6px 10px',
@@ -158,6 +158,7 @@ const Sidebar = () => {
                 key={item.to}
                 to={item.to}
                 end={false}
+                onClick={() => onNavigate?.()}
                 className={({ isActive }) =>
                   `flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] text-[13.5px] no-underline relative transition-all duration-150 ` +
                   (isActive ? 'text-[#FFD966] font-medium' : 'text-[#a1a1aa] hover:bg-[#18181b] hover:text-[#fafafa]')
