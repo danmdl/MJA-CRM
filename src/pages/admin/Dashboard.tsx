@@ -137,7 +137,7 @@ const Dashboard = () => {
   if (statsLoading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
           {[1, 2, 3, 4].map(i => (
             <div key={i} style={{ ...card, padding: '16px 18px', height: 110, opacity: 0.4 }} />
           ))}
@@ -149,7 +149,7 @@ const Dashboard = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Stats grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {statCards.map(s => (
           <div key={s.label} style={{ ...card, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -171,7 +171,7 @@ const Dashboard = () => {
       </div>
 
       {/* Two-column */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
 
         {/* Recent contacts table */}
         <div style={card}>

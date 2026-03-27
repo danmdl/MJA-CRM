@@ -129,8 +129,8 @@ const CellsPage = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Células</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">Células</h1>
         {canAddUsers() && (
         <Button onClick={() => setIsAddOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Célula

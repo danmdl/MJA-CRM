@@ -86,18 +86,18 @@ const ChurchDatabasePage = () => {
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Contactos de la Iglesia</h1>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={handleExport} disabled={exporting}>
-            <Download className="mr-2 h-4 w-4" />
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">Contactos de la Iglesia</h1>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExport} disabled={exporting} size="sm">
+            <Download className="mr-1.5 h-4 w-4" />
             {exporting ? 'Exportando...' : 'Exportar CSV'}
           </Button>
           {canAddUsers() && (
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Upload className="mr-2 h-4 w-4" />
+                <Button variant="outline" size="sm">
+                  <Upload className="mr-1.5 h-4 w-4" />
                   Importar CSV
                 </Button>
               </DialogTrigger>
@@ -118,8 +118,8 @@ const ChurchDatabasePage = () => {
             </Dialog>
           )}
           {canAddUsers() && (
-            <Button onClick={() => setIsAddContactDialogOpen(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
+            <Button onClick={() => setIsAddContactDialogOpen(true)} size="sm">
+              <PlusCircle className="mr-1.5 h-4 w-4" />
               Crear Contacto
             </Button>
           )}

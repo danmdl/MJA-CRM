@@ -215,7 +215,7 @@ const PermissionsDashboard = () => {
     return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Panel de Permisos</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Panel de Permisos</h1>
           <Skeleton className="h-10 w-32" />
         </div>
         <Skeleton className="h-64 w-full" />

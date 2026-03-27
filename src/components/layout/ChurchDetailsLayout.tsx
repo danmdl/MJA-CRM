@@ -99,46 +99,40 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Church header with name (left), total count (center), selection toolbar slot (right) */}
-      <div className="border-b bg-background p-4">
-        <div className="grid grid-cols-3 items-center">
-          <div className="justify-self-start">
-            <h2 className="text-2xl font-bold tracking-tight">
-              {nameLoading ? <Skeleton className="h-8 w-64" /> : churchData?.name || "Iglesia"}
-            </h2>
-          </div>
-          <div className="justify-self-center">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Total contactos</span>
-              <span className="text-2xl font-bold">{totalCount ?? 0}</span>
-            </div>
-          </div>
-          <div className="justify-self-end w-full max-w-[360px]">
-            {/* External selection toolbar portal target (positioned container so toolbar can be absolutely placed inside it) */}
-            <div id="selection-toolbar-slot" className="relative h-10 flex items-center justify-end" />
+      {/* Church header - compact on mobile */}
+      <div className="border-b bg-background px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-bold tracking-tight truncate">
+            {nameLoading ? <Skeleton className="h-6 w-40" /> : churchData?.name || "Iglesia"}
+          </h2>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs text-muted-foreground">Contactos:</span>
+            <span className="text-lg font-bold">{totalCount ?? 0}</span>
           </div>
         </div>
       </div>
-      
-      {/* Top tabs navigation */}
+
+      {/* Scrollable tabs - important on mobile */}
       <div className="border-b bg-background">
-        <Tabs 
-          value={activeTab} 
-          onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
-          className="w-full px-4"
-        >
-          <TabsList className="mb-0">
-            <TabsTrigger value="overview">Resumen</TabsTrigger>
-            <TabsTrigger value="database">Base de Datos</TabsTrigger>
-            <TabsTrigger value="team">Equipo</TabsTrigger>
-            <TabsTrigger value="cells">Células</TabsTrigger>
-            <TabsTrigger value="mapa">🗺️ Mapa</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="overflow-x-auto">
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
+            className="w-full px-3"
+          >
+            <TabsList className="mb-0 w-max">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>
+              <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Base de Datos</TabsTrigger>
+              <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>
+              <TabsTrigger value="cells" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>
+              <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
-      
+
       {/* Main content area */}
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-3 sm:p-6 overflow-auto">
         {children || <Outlet />}
       </main>
     </div>
