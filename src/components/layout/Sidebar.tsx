@@ -64,11 +64,10 @@ const Sidebar = () => {
         gap: 10,
       }}>
         <div style={{
-          width: 32, height: 32, flexShrink: 0,
-          borderRadius: 8, overflow: 'hidden',
-          boxShadow: '0 0 12px rgba(255,194,51,0.35)',
+          width: 36, height: 36, flexShrink: 0,
+          filter: 'drop-shadow(0 0 8px rgba(255,194,51,0.5))',
         }}>
-          <img src="/logo.png" alt="MJA Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src="/logo.png" alt="MJA Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div>
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa' }}>MJA CRM</div>

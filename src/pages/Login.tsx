@@ -63,12 +63,11 @@ const Login = () => {
       }}>
         {/* Logo */}
         <div style={{
-          width: 44, height: 44,
-          borderRadius: 11, overflow: 'hidden',
+          width: 56, height: 56,
           margin: '0 auto 14px',
-          boxShadow: '0 0 20px rgba(255,194,51,0.35)',
+          filter: 'drop-shadow(0 0 14px rgba(255,194,51,0.6))',
         }}>
-          <img src="/logo.png" alt="MJA" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src="/logo.png" alt="MJA" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
 
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.5px', textAlign: 'center', color: '#fafafa' }}>
