@@ -96,6 +96,18 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [cellId, setCellId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { session } = useSession();
+  const firstNameRef = React.useRef<HTMLInputElement>(null);
+
+  // Auto-focus first name when dialog opens
+  React.useEffect(() => {
+    if (open) setTimeout(() => firstNameRef.current?.focus(), 50);
+  }, [open]);
+
+  const resetForm = () => {
+    setFirstName(''); setLastName(''); setPhone('');
+    setAddress(''); setApartmentNumber(''); setBarrio('');
+    setDateOfBirth(''); setLeaderAssigned(null); setCellId(null);
+  };
 
   logger.log('AddContactDialog rendered', { open, churchId });
 
@@ -148,7 +160,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     staleTime: 30_000,
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, keepOpen = false) => {
     e.preventDefault();
     setLoading(true);
 
@@ -172,17 +184,14 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         showError(`Error: ${error.message}`);
       } else {
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
-        setFirstName('');
-        setLastName('');
-        setPhone('');
-        setAddress('');
-        setApartmentNumber('');
-        setBarrio('');
-        setDateOfBirth('');
-        setLeaderAssigned(null);
-        setCellId(null);
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-        onOpenChange(false);
+        if (keepOpen) {
+          resetForm();
+          setTimeout(() => firstNameRef.current?.focus(), 50);
+        } else {
+          resetForm();
+          onOpenChange(false);
+        }
       }
     } finally {
       setLoading(false);
@@ -191,86 +200,120 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="w-full max-w-3xl">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contacto</DialogTitle>
           <DialogDescription>
-            Introduce los detalles del nuevo contacto para esta iglesia.
+            Completa los datos del contacto. Presiona <kbd className="px-1 py-0.5 rounded bg-muted text-xs font-mono">Enter</kbd> para guardar.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField
-            label="Nombre"
-            id="firstName"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-            disabled={loading}
-          />
-          <FormField
-            label="Apellido"
-            id="lastName"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            disabled={loading}
-          />
-          {/* REMOVED: Email field */}
-          <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} />
-          <FormField
-            label="Dirección"
-            id="address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            disabled={loading}
-          />
-          <FormField
-            label="Número de Apartamento"
-            id="apartmentNumber"
-            value={apartmentNumber}
-            onChange={(e) => setApartmentNumber(e.target.value)}
-            disabled={loading}
-          />
-          <FormField
-            label="Barrio"
-            id="barrio"
-            value={barrio}
-            onChange={(e) => setBarrio(e.target.value)}
-            disabled={loading}
-          />
-          <div className="space-y-2">
-            <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
-            <Input
-              id="dob"
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
+        <form onSubmit={handleSubmit}>
+          {/* Row 1: Nombre + Apellido */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="space-y-2">
+              <label htmlFor="firstName" className="text-sm font-medium">
+                Nombre <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="firstName"
+                ref={firstNameRef}
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                disabled={loading}
+                required
+                placeholder="Ej: María"
+              />
+            </div>
+            <FormField
+              label="Apellido"
+              id="lastName"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               disabled={loading}
+              placeholder="Ej: González"
             />
           </div>
-          <SelectField
-            label="Célula"
-            value={cellId}
-            onChange={(value) => setCellId(value === "none" ? null : value)}
-            options={cells || []}
-            loading={isLoadingCells}
-            placeholder="Selecciona una célula (opcional)"
-          />
-          <SelectField
-            label="Referente asignado"
-            value={leaderAssigned}
-            onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
-            options={(leaders || []).map(leader => ({
-              id: leader.id,
-              name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
-            }))}
-            loading={isLoadingLeaders}
-            placeholder="Selecciona un referente (opcional)"
-          />
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
+
+          {/* Row 2: Teléfono + Fecha de nacimiento */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="space-y-2">
+              <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
+              <Input
+                id="dob"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: Dirección + Número de Apartamento */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <FormField
+              label="Dirección"
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={loading}
+              placeholder="Ej: Av. Corrientes 1234"
+            />
+            <FormField
+              label="Número de Apartamento"
+              id="apartmentNumber"
+              value={apartmentNumber}
+              onChange={(e) => setApartmentNumber(e.target.value)}
+              disabled={loading}
+              placeholder="Ej: 3B"
+            />
+          </div>
+
+          {/* Row 4: Barrio + Célula */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <FormField
+              label="Barrio"
+              id="barrio"
+              value={barrio}
+              onChange={(e) => setBarrio(e.target.value)}
+              disabled={loading}
+              placeholder="Ej: Palermo"
+            />
+            <SelectField
+              label="Célula"
+              value={cellId}
+              onChange={(value) => setCellId(value === "none" ? null : value)}
+              options={cells || []}
+              loading={isLoadingCells}
+              placeholder="Selecciona una célula (opcional)"
+            />
+          </div>
+
+          {/* Row 5: Referente (full width) */}
+          <div className="mb-6">
+            <SelectField
+              label="Referente asignado"
+              value={leaderAssigned}
+              onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
+              options={(leaders || []).map(leader => ({
+                id: leader.id,
+                name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
+              }))}
+              loading={isLoadingLeaders}
+              placeholder="Selecciona un referente (opcional)"
+            />
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="ghost" onClick={() => { resetForm(); onOpenChange(false); }} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="button" variant="outline" disabled={loading || !firstName.trim()} onClick={(e) => handleSubmit(e as any, true)}>
+              {loading ? 'Guardando...' : 'Guardar y agregar otro'}
+            </Button>
+            <Button type="submit" disabled={loading || !firstName.trim()}>
               {loading ? 'Creando...' : 'Crear Contacto'}
             </Button>
           </DialogFooter>
