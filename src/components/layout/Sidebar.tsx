@@ -1,20 +1,39 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useMatch } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions, ROLE_LABELS } from '@/lib/permissions';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface NavItemConfig {
   to: string;
   emoji: string;
   label: string;
-  badge?: number;
 }
 
 const Sidebar = () => {
   const { profile } = useSession();
   const navigate = useNavigate();
   const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches } = usePermissions();
+
+  // Detect if we're inside a specific church
+  const churchMatch = useMatch('/admin/churches/:churchId/*');
+  const activeChurchId = churchMatch?.params?.churchId || null;
+
+  // For single-church users, always use their assigned church
+  const singleChurchId = !canSeeAllChurches() ? profile?.church_id : null;
+  const currentChurchId = singleChurchId || activeChurchId;
+
+  // Fetch church name when we have a church context
+  const { data: churchData } = useQuery({
+    queryKey: ['church-name-sidebar', currentChurchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('churches').select('name').eq('id', currentChurchId!).single();
+      return data;
+    },
+    enabled: !!currentChurchId,
+    staleTime: 60_000,
+  });
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -27,29 +46,31 @@ const Sidebar = () => {
   const fullName = [profile?.first_name, profile?.last_name]
     .filter(Boolean).join(' ') || profile?.email || 'Usuario';
 
-  // Single-church users (pastor, referente, encargado) get direct church nav
-  const churchId = profile?.church_id;
-  const isSingleChurch = !canSeeAllChurches() && !!churchId;
+  // When inside a church (either by navigation or single-church assignment)
+  const isInsideChurch = !!currentChurchId;
 
-  const sections: { title: string; items: NavItemConfig[] }[] = isSingleChurch ? [
+  const churchSections: { title: string; items: NavItemConfig[] }[] = [
     {
-      title: 'Mi Iglesia',
+      title: churchData?.name || 'Iglesia',
       items: [
-        { to: `/admin/churches/${churchId}/overview`, emoji: '📋', label: 'Resumen' },
-        { to: `/admin/churches/${churchId}/database`, emoji: '👥', label: 'Base de Datos' },
-        { to: `/admin/churches/${churchId}/team`, emoji: '🤝', label: 'Equipo' },
-        { to: `/admin/churches/${churchId}/cells`, emoji: '🏘️', label: 'Células' },
-        { to: `/admin/churches/${churchId}/mapa`, emoji: '🗺️', label: 'Mapa' },
+        { to: `/admin/churches/${currentChurchId}/overview`, emoji: '📋', label: 'Resumen' },
+        { to: `/admin/churches/${currentChurchId}/database`, emoji: '👥', label: 'Base de Datos' },
+        { to: `/admin/churches/${currentChurchId}/team`, emoji: '🤝', label: 'Equipo' },
+        { to: `/admin/churches/${currentChurchId}/cells`, emoji: '🏘️', label: 'Células' },
+        { to: `/admin/churches/${currentChurchId}/mapa`, emoji: '🗺️', label: 'Mapa' },
       ],
     },
     {
       title: 'Cuenta',
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
+        ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
       ],
     },
-  ] : [
+  ];
+
+  const globalSections: { title: string; items: NavItemConfig[] }[] = [
     {
       title: 'Principal',
       items: [
@@ -66,6 +87,8 @@ const Sidebar = () => {
       ],
     },
   ];
+
+  const sections = isInsideChurch ? churchSections : globalSections;
 
   return (
     <aside style={{
@@ -85,10 +108,7 @@ const Sidebar = () => {
         alignItems: 'center',
         gap: 10,
       }}>
-        <div style={{
-          width: 36, height: 36, flexShrink: 0,
-          filter: 'drop-shadow(0 0 8px rgba(255,194,51,0.5))',
-        }}>
+        <div style={{ width: 36, height: 36, flexShrink: 0, filter: 'drop-shadow(0 0 8px rgba(255,194,51,0.5))' }}>
           <img src="/logo.png" alt="MJA Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div>
@@ -96,6 +116,32 @@ const Sidebar = () => {
           <div style={{ fontSize: 11, color: '#a1a1aa' }}>Panel de administración</div>
         </div>
       </div>
+
+      {/* Back to churches button — only for multi-church users inside a church */}
+      {isInsideChurch && canSeeAllChurches() && (
+        <button
+          onClick={() => navigate('/admin/churches')}
+          style={{
+            margin: '8px 8px 0',
+            padding: '6px 10px',
+            borderRadius: 7,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'transparent',
+            color: '#a1a1aa',
+            fontSize: 12,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            transition: 'all 0.15s',
+          }}
+          onMouseOver={e => (e.currentTarget.style.background = '#18181b')}
+          onMouseOut={e => (e.currentTarget.style.background = 'transparent')}
+        >
+          <span>←</span>
+          <span>Todas las iglesias</span>
+        </button>
+      )}
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -105,11 +151,13 @@ const Sidebar = () => {
               fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
               textTransform: 'uppercase' as const, color: '#52525b',
               padding: '8px 10px 4px', marginTop: 4,
-            }}>{title}</div>
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }} title={title}>{title}</div>
             {items.map(item => (
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={false}
                 className={({ isActive }) =>
                   `flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] text-[13.5px] no-underline relative transition-all duration-150 ` +
                   (isActive ? 'text-[#FFD966] font-medium' : 'text-[#a1a1aa] hover:bg-[#18181b] hover:text-[#fafafa]')
@@ -126,13 +174,6 @@ const Sidebar = () => {
                     )}
                     <span>{item.emoji}</span>
                     <span style={{ flex: 1 }}>{item.label}</span>
-                    {item.badge ? (
-                      <span style={{
-                        background: 'rgba(255,194,51,0.18)', color: '#FFD966',
-                        fontSize: 10, fontWeight: 600, padding: '1px 6px',
-                        borderRadius: 20, fontFamily: "'Geist Mono', monospace",
-                      }}>{item.badge.toLocaleString()}</span>
-                    ) : null}
                   </>
                 )}
               </NavLink>
