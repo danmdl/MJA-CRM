@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useSession } from "@/hooks/use-session";
+import { usePermissions } from "@/lib/permissions";
 import { showError } from "@/utils/toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +17,7 @@ interface ChurchDetailsLayoutProps {
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile, loading: sessionLoading } = useSession();
+  const { canAccessAllChurches } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const [accessChecked, setAccessChecked] = useState(false);
@@ -31,13 +33,12 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
       return;
     }
 
-    const isAdminOrGeneral = profile?.role === "admin" || profile?.role === "general";
+    const canAccessAll = canAccessAllChurches();
     const isAssignedToChurch = profile?.church_id === churchId;
-    const isReference = isReferenceRole(profile?.role);
 
-    console.log('[DEBUG ChurchDetailsLayout] profile.role:', profile?.role, 'profile.church_id:', profile?.church_id, 'requested churchId:', churchId);
+    console.log('[DEBUG ChurchDetailsLayout] profile.role:', profile?.role, 'canAccessAll:', canAccessAll, 'requested churchId:', churchId);
 
-    if (!isAdminOrGeneral && !isAssignedToChurch) {
+    if (!canAccessAll && !isAssignedToChurch) {
       showError("No tienes permiso para acceder a los detalles de esta iglesia.");
       navigate("/admin/churches", { replace: true });
     } else {

@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
+import { usePermissions } from "./lib/permissions";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
@@ -33,7 +34,8 @@ const queryClient = new QueryClient();
 // Guard component: only admin can access permissions page
 const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { profile } = useSession();
-  if (profile && profile.role !== 'admin') {
+  const { canAccessPermissions } = usePermissions();
+  if (profile && !canAccessPermissions()) {
     return <Navigate to="/admin/churches" replace />;
   }
   return <>{children}</>;

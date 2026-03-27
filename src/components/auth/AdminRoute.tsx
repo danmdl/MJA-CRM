@@ -11,7 +11,7 @@ interface AdminRouteProps {
 
 const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
   const { session, loading: sessionLoading, profile } = useSession();
-  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading, canSeeAllChurches } = usePermissions();
   const [loadingProfile, setLoadingProfile] = useState(true);
   const location = useLocation();
 
@@ -41,16 +41,14 @@ const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
     return <Navigate to="/" replace />;
   }
 
-  // For admin routes, check if user can access admin section
+  // For admin routes: any authenticated user with ANY permission can access admin section.
+  // Users with zero permissions (role = 'user') are redirected.
   if (location.pathname.startsWith('/admin')) {
     const userRole = profile?.role;
-    const isAdmin = userRole === 'admin';
-    
-    // Only admin, general, and church roles can access admin routes
-    const isGeneral = userRole === 'general';
     const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(userRole || '');
-    
-    if (!isAdmin && !isGeneral && !isChurchRole) {
+    const hasBroadAccess = canSeeAllChurches();
+
+    if (!hasBroadAccess && !isChurchRole) {
       showError('No tienes permiso para acceder al panel de administración.');
       return <Navigate to="/" replace />;
     }

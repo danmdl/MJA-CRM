@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
+import { usePermissions } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -84,7 +85,8 @@ const fetchContacts = async (churchId: string): Promise<Contact[]> => {
 const OverviewPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
-  const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
+  const { canAccessAllChurches, canEditDeleteUsers } = usePermissions();
+  const isAdminOrGeneral = canAccessAllChurches() || canEditDeleteUsers();
 
   const { data: church, isLoading, isError, error } = useQuery<Church>({
     queryKey: ['churchDetails', churchId],

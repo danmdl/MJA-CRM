@@ -62,7 +62,7 @@ const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'past
 
 const UserTable = () => {
   const { session, profile } = useSession();
-  const { canChangeUserRole, canManageUser } = usePermissions();
+  const { canChangeUserRole, canManageUser, canAddUsers, canEditDeleteUsers } = usePermissions();
   const queryClient = useQueryClient();
   const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false);
   const [userToResetPassword, setUserToResetPassword] = useState<User | null>(null);
@@ -77,7 +77,7 @@ const UserTable = () => {
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => fetchUsers(session?.access_token || ''),
-    enabled: !!session?.access_token && (profile?.role === 'admin' || profile?.role === 'general'),
+    enabled: !!session?.access_token && (canAddUsers() || canEditDeleteUsers()),
   });
 
   const { data: churches } = useQuery({
