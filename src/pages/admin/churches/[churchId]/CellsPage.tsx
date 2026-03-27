@@ -43,12 +43,12 @@ const fetchCells = async (churchId: string): Promise<CellRow[]> => {
 const fetchProfilesMap = async (churchId: string): Promise<Record<string, string>> => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, first_name, last_name, church_id')
+    .select('id, first_name, last_name, email, church_id')
     .eq('church_id', churchId);
   if (error) return {};
   const map: Record<string, string> = {};
   (data || []).forEach(p => {
-    map[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre';
+    map[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email || 'Sin nombre';
   });
   return map;
 };

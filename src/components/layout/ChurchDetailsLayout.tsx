@@ -85,6 +85,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/database")) return "database";
     if (p.endsWith("/team")) return "team";
     if (p.endsWith("/cells")) return "cells";
+    if (p.endsWith("/mapa")) return "mapa";
     return "overview";
   })();
 
@@ -131,6 +132,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
             <TabsTrigger value="database">Base de Datos</TabsTrigger>
             <TabsTrigger value="team">Equipo</TabsTrigger>
             <TabsTrigger value="cells">Células</TabsTrigger>
+            <TabsTrigger value="mapa">🗺️ Mapa</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

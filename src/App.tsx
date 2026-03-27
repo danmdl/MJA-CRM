@@ -18,6 +18,7 @@ import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
 import CellsPage from "./pages/admin/churches/[churchId]/CellsPage";
+import MapaPage from "./pages/admin/churches/[churchId]/MapaPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
 import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
 import LoginManagementPage from "./pages/admin/LoginManagementPage";
@@ -94,6 +95,7 @@ const AppRoutes = () => {
           <Route path="database" element={<ChurchDatabasePage />} />
           <Route path="team" element={<ChurchTeamPage />} />
           <Route path="cells" element={<CellsPage />} />
+          <Route path="mapa" element={<MapaPage />} />
           <Route index element={<Navigate to="overview" replace />} />
         </Route>
       </Route>

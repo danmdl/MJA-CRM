@@ -14,6 +14,7 @@ type Leader = {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  email?: string | null;
 };
 
 interface AddCellDialogProps {
@@ -70,7 +71,8 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
         .map((u: any) => ({
           id: u.id,
           first_name: u.first_name,
-          last_name: u.last_name
+          last_name: u.last_name,
+          email: u.email,
         })) as Leader[];
     },
     enabled: !!churchId && !!session?.access_token,
@@ -151,7 +153,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
                 <SelectItem value="none">Sin asignación</SelectItem>
                 {(leaders || []).map(l => (
                   <SelectItem key={l.id} value={l.id}>
-                    {`${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre'}
+                    {`${l.first_name || ''} ${l.last_name || ''}`.trim() || l.email || 'Sin nombre'}
                   </SelectItem>
                 ))}
               </SelectContent>
