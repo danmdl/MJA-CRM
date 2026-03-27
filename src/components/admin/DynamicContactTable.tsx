@@ -39,54 +39,102 @@ interface Contact {
 const TableHeaderCell = ({
   column,
   index,
-  visibleColumns,
-  extendedContactFields,
+  contacts,
+  activeFilters,
+  onFilterChange,
   handleDragStart,
   handleDragOver,
   handleDrop,
-  handleColumnChange
 }: {
   column: ContactField;
   index: number;
-  visibleColumns: ContactField[];
-  extendedContactFields: ContactField[];
+  contacts: Contact[];
+  activeFilters: Record<string, string[]>;
+  onFilterChange: (fieldKey: string, values: string[]) => void;
   handleDragStart: (e: React.DragEvent<HTMLTableHeaderCellElement>, index: number) => void;
   handleDragOver: (e: React.DragEvent<HTMLTableHeaderCellElement>) => void;
   handleDrop: (e: React.DragEvent<HTMLTableHeaderCellElement>, dropIndex: number) => void;
-  handleColumnChange: (columnIndex: number, newFieldKey: string) => void;
-}) => (
-  <TableHead
-    key={column.key + index}
-    draggable
-    onDragStart={(e) => handleDragStart(e, index)}
-    onDragOver={handleDragOver}
-    onDrop={(e) => handleDrop(e, index)}
-    className={`cursor-move ${column.key === 'apartment_number' ? 'w-24' : ''} ${column.key === 'last_contact_date' ? 'w-32' : ''}`}
-  >
-    <div className="flex items-center gap-1">
-      <GripVertical className="h-4 w-4 text-muted-foreground" />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex items-center gap-1 h-auto p-0 font-semibold text-foreground hover:text-primary">
-            {column.label}
-            <ChevronDown className="ml-1 h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {extendedContactFields.map(field => (
-            <DropdownMenuItem
-              key={field.key}
-              onClick={() => handleColumnChange(index, field.key)}
-              disabled={visibleColumns.some(vc => vc.key === field.key)}
+}) => {
+  const uniqueValues = React.useMemo(() => {
+    const vals = new Set<string>();
+    contacts.forEach(c => {
+      let raw: string | null | undefined;
+      if (column.key === 'cell.name') raw = c.cell?.name;
+      else if (column.key === 'leader.first_name') raw = c.leader ? `${c.leader.first_name} ${c.leader.last_name}`.trim() : null;
+      else raw = (c as any)[column.key];
+      if (raw && typeof raw === 'string' && raw.trim()) vals.add(raw.trim());
+    });
+    return Array.from(vals).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [contacts, column.key]);
+
+  const selected = activeFilters[column.key] || [];
+  const hasFilter = selected.length > 0;
+
+  const toggle = (val: string) => {
+    const next = selected.includes(val)
+      ? selected.filter(v => v !== val)
+      : [...selected, val];
+    onFilterChange(column.key, next);
+  };
+
+  return (
+    <TableHead
+      key={column.key + index}
+      draggable
+      onDragStart={(e) => handleDragStart(e, index)}
+      onDragOver={handleDragOver}
+      onDrop={(e) => handleDrop(e, index)}
+      className={`cursor-move ${column.key === 'apartment_number' ? 'w-24' : ''} ${column.key === 'last_contact_date' ? 'w-32' : ''}`}
+    >
+      <div className="flex items-center gap-1">
+        <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className={`flex items-center gap-1 h-auto p-0 font-semibold hover:text-primary ${hasFilter ? 'text-primary' : 'text-foreground'}`}
             >
-              {field.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  </TableHead>
-);
+              {column.label}
+              {hasFilter
+                ? <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{selected.length}</span>
+                : <ChevronDown className="ml-1 h-3 w-3" />
+              }
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56 max-h-72 overflow-y-auto">
+            {uniqueValues.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-muted-foreground">Sin valores disponibles</div>
+            ) : (
+              <>
+                {hasFilter && (
+                  <>
+                    <div
+                      className="px-3 py-1.5 text-xs text-primary cursor-pointer hover:underline"
+                      onClick={() => onFilterChange(column.key, [])}
+                    >
+                      Limpiar filtro ({selected.length})
+                    </div>
+                    <div className="border-t my-1" />
+                  </>
+                )}
+                {uniqueValues.map(val => (
+                  <DropdownMenuCheckboxItem
+                    key={val}
+                    checked={selected.includes(val)}
+                    onCheckedChange={() => toggle(val)}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {val}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </TableHead>
+  );
+};
 
 const TableCellContent = ({
   contact,
@@ -269,6 +317,20 @@ const DynamicContactTable = ({
   }, [visibleColumns, storageKey]);
 
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
+
+  const handleColumnFilterChange = (fieldKey: string, values: string[]) => {
+    setColumnFilters(prev => {
+      if (values.length === 0) {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      }
+      return { ...prev, [fieldKey]: values };
+    });
+  };
+
+  const activeFilterCount = Object.values(columnFilters).filter(v => v.length > 0).length;
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -388,28 +450,43 @@ const DynamicContactTable = ({
   const filteredContacts = useMemo(() => {
     const term = (searchTerm || '').trim().toLowerCase();
     if (!contacts) return [];
-    if (!term) return contacts;
 
-    const match = (c: Contact, key?: string | null) => {
-      if (!key) {
-        const haystack = [
-          c.first_name, c.last_name, c.email, c.phone, c.address, c.barrio,
-          c.cell?.name || '',
-          c.leader ? `${c.leader.first_name} ${c.leader.last_name}` : ''
-        ].join(' ').toLowerCase();
-        return haystack.includes(term);
+    return contacts.filter(c => {
+      // Search term filter
+      if (term) {
+        const match = (key?: string | null): boolean => {
+          if (!key) {
+            const haystack = [
+              c.first_name, c.last_name, c.email, c.phone, c.address, c.barrio,
+              c.cell?.name || '',
+              c.leader ? `${c.leader.first_name} ${c.leader.last_name}` : ''
+            ].join(' ').toLowerCase();
+            return haystack.includes(term);
+          }
+          if (key === 'leader_assigned') {
+            const leaderName = c.leader ? `${c.leader.first_name} ${c.leader.last_name}`.toLowerCase() : '';
+            return leaderName.includes(term);
+          }
+          const value = (c as any)[key];
+          if (typeof value === 'string') return value.toLowerCase().includes(term);
+          return false;
+        };
+        if (!match(filterField)) return false;
       }
-      if (key === 'leader_assigned') {
-        const leaderName = c.leader ? `${c.leader.first_name} ${c.leader.last_name}`.toLowerCase() : '';
-        return leaderName.includes(term);
-      }
-      const value = (c as any)[key];
-      if (typeof value === 'string') return value.toLowerCase().includes(term);
-      return false;
-    };
 
-    return contacts.filter(c => match(c, filterField));
-  }, [contacts, searchTerm, filterField]);
+      // Column value filters
+      for (const [fieldKey, values] of Object.entries(columnFilters)) {
+        if (values.length === 0) continue;
+        let cellVal: string | null | undefined;
+        if (fieldKey === 'cell.name') cellVal = c.cell?.name;
+        else if (fieldKey === 'leader.first_name') cellVal = c.leader ? `${c.leader.first_name} ${c.leader.last_name}`.trim() : null;
+        else cellVal = (c as any)[fieldKey];
+        if (!cellVal || !values.includes(cellVal.trim())) return false;
+      }
+
+      return true;
+    });
+  }, [contacts, searchTerm, filterField, columnFilters]);
 
   const visibleIds = filteredContacts.map(c => c.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedContacts.includes(id));
@@ -504,8 +581,13 @@ const DynamicContactTable = ({
           </div>
         )}
         <div className={useExternalToolbarContainer ? '' : 'pt-14'}>
-          {/* Columns Picker */}
-          <div className="flex justify-end">
+          {/* Columns Picker + clear filters */}
+          <div className="flex justify-end items-center gap-2">
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" className="text-primary" onClick={() => setColumnFilters({})}>
+                Limpiar filtros ({activeFilterCount})
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="mb-2">
@@ -554,8 +636,9 @@ const DynamicContactTable = ({
                       key={column.key + index}
                       column={column}
                       index={index}
-                      visibleColumns={visibleColumns}
-                      extendedContactFields={extendedContactFields}
+                      contacts={contacts || []}
+                      activeFilters={columnFilters}
+                      onFilterChange={handleColumnFilterChange}
                       handleDragStart={(e, i) => e.dataTransfer.setData("text/plain", i.toString())}
                       handleDragOver={(e) => e.preventDefault()}
                       handleDrop={(e, dropIndex) => {
@@ -568,7 +651,6 @@ const DynamicContactTable = ({
                           setVisibleColumns(newColumns);
                         }
                       }}
-                      handleColumnChange={handleColumnChange}
                     />
                   ))}
                 </TableRow>
