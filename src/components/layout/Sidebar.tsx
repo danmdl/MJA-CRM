@@ -93,7 +93,7 @@ const Sidebar = () => {
                   `flex items-center gap-[9px] px-[10px] py-[7px] rounded-[7px] text-[13.5px] no-underline relative transition-all duration-150 ` +
                   (isActive ? 'text-[#FFD966] font-medium' : 'text-[#a1a1aa] hover:bg-[#18181b] hover:text-[#fafafa]')
                 }
-                style={({ isActive }) => ({ background: isActive ? 'rgba(255,194,51,0.18)' : undefined })}
+                style={({ isActive }) => ({ background: isActive ? 'linear-gradient(90deg, rgba(255,194,51,0.18) 0%, rgba(255,194,51,0.06) 100%)' : undefined })}
               >
                 {({ isActive }) => (
                   <>

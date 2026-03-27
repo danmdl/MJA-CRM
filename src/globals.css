@@ -54,3 +54,20 @@ body {
     font-family: 'Geist Mono', monospace;
   }
 }
+
+/* ── Gold gradient primary buttons ── */
+.btn-primary-gold {
+  background: linear-gradient(160deg, #FFE07A 0%, #FFC233 45%, #B8720A 100%);
+  box-shadow: 0 2px 10px rgba(255,194,51,0.4), inset 0 1px 0 rgba(255,255,255,0.22);
+  border: 1px solid rgba(200,134,10,0.5);
+  color: #1a0e00;
+  font-weight: 600;
+}
+.btn-primary-gold:hover {
+  background: linear-gradient(160deg, #FFEC99 0%, #FFD14D 45%, #C8860A 100%);
+  box-shadow: 0 4px 18px rgba(255,194,51,0.55), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.btn-primary-gold:active {
+  background: linear-gradient(160deg, #FFC233 0%, #B8720A 100%);
+  box-shadow: 0 1px 4px rgba(255,194,51,0.3);
+}
