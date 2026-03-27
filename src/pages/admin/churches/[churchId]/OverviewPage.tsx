@@ -246,9 +246,9 @@ const OverviewPage = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Main pastor + secondary pastors row */}
-          <div className="flex items-start gap-4">
-            {/* Main pastor select (left) */}
-            <div className="min-w-[260px]">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            {/* Main pastor select */}
+            <div className="w-full sm:min-w-[260px] sm:w-auto">
               <div className="font-medium mb-2">Pastor Principal</div>
               {isAdminOrGeneral ? (
                 <Select
@@ -272,9 +272,22 @@ const OverviewPage = () => {
               )}
             </div>
 
-            {/* Secondary pastors column (center) */}
-            <div className="flex-1">
-              <div className="font-medium mb-2">Pastor Secundario</div>
+            {/* Secondary pastors */}
+            <div className="flex-1 w-full">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-medium">Pastor Secundario</div>
+                {isAdminOrGeneral && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setAddSecondPastorOpen(true)}
+                  >
+                    <PlusCircle className="h-3.5 w-3.5 mr-1" />
+                    Añadir
+                  </Button>
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 {secondaryNames.length === 0 ? (
                   <span className="text-sm text-muted-foreground">Sin pastores secundarios</span>
@@ -288,7 +301,6 @@ const OverviewPage = () => {
                           size="sm"
                           className="h-7 px-2 text-red-600"
                           onClick={() => removeSecondaryPastor(user_id)}
-                          title="Eliminar pastor secundario"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -298,22 +310,6 @@ const OverviewPage = () => {
                 )}
               </div>
             </div>
-
-            {/* Add secondary button (right, top-aligned) */}
-            {isAdminOrGeneral && (
-              <div className="self-start">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  onClick={() => setAddSecondPastorOpen(true)}
-                  title="Añadir pastor secundario"
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Añadir secundario
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Dialog to add a second pastor (unchanged behavior) */}
