@@ -30,8 +30,8 @@ const Login = () => {
   };
 
   const focusInput = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.borderColor = '#8b5cf6';
-    e.target.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.15)';
+    e.target.style.borderColor = '#d4a017';
+    e.target.style.boxShadow = '0 0 0 3px rgba(212,160,23,0.15)';
   };
 
   const blurInput = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -49,7 +49,7 @@ const Login = () => {
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         background: [
-          'radial-gradient(ellipse 60% 50% at 50% -10%, rgba(139,92,246,0.15) 0%, transparent 70%)',
+          'radial-gradient(ellipse 60% 50% at 50% -10%, rgba(212,160,23,0.15) 0%, transparent 70%)',
           'radial-gradient(ellipse 40% 40% at 90% 80%, rgba(59,130,246,0.08) 0%, transparent 60%)',
         ].join(', '),
       }} />
@@ -59,17 +59,17 @@ const Login = () => {
         position: 'relative', background: '#111113',
         border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
         padding: '36px 40px', width: 380,
-        boxShadow: '0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(139,92,246,0.18)',
+        boxShadow: '0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(212,160,23,0.18)',
       }}>
         {/* Logo */}
         <div style={{
           width: 44, height: 44,
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-          borderRadius: 11, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 22,
+          borderRadius: 11, overflow: 'hidden',
           margin: '0 auto 14px',
-          boxShadow: '0 0 20px rgba(139,92,246,0.18)',
-        }}>⛪</div>
+          boxShadow: '0 0 20px rgba(212,160,23,0.35)',
+        }}>
+          <img src="/logo.png" alt="MJA" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
 
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.5px', textAlign: 'center', color: '#fafafa' }}>
           MJA CRM
@@ -125,8 +125,8 @@ const Login = () => {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               padding: '10px', borderRadius: 7, fontSize: 14, fontWeight: 500,
               cursor: loading ? 'not-allowed' : 'pointer',
-              background: '#8b5cf6', color: 'white', border: 'none',
-              boxShadow: '0 0 14px rgba(139,92,246,0.35)',
+              background: '#d4a017', color: 'white', border: 'none',
+              boxShadow: '0 0 14px rgba(212,160,23,0.35)',
               fontFamily: "'Geist', sans-serif",
               opacity: loading ? 0.7 : 1,
               transition: 'opacity 0.15s',

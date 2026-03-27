@@ -131,7 +131,9 @@ const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-2xl mx-auto mb-3">⛪</div>
+            <div className="w-12 h-12 rounded-xl overflow-hidden mx-auto mb-3" style={{ boxShadow: '0 0 20px rgba(212,160,23,0.35)' }}>
+              <img src="/logo.png" alt="MJA" className="w-full h-full object-cover" />
+            </div>
             <h1 className="text-2xl font-bold">MJA CRM</h1>
             <p className="text-muted-foreground text-sm mt-1">Bienvenido/a. Configura tu acceso.</p>
           </div>
