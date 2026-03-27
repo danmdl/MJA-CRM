@@ -14,7 +14,7 @@ import { Search } from 'lucide-react';
 import React from 'react';
 import { usePermissions, getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
 
-type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
 interface User {
   id: string;
@@ -42,7 +42,7 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
   return response.json();
 };
 
-const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
+const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
 
 const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session, profile } = useSession();

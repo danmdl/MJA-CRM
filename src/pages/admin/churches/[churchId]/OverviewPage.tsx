@@ -113,7 +113,7 @@ const OverviewPage = () => {
         .select('id, first_name, last_name, church_id, role')
         .eq('church_id', churchId);
       if (error) return [];
-      return (data || []).filter((p: any) => ['pastor', 'piloto', 'encargado_de_celula', 'general'].includes(p.role));
+      return (data || []).filter((p: any) => ['pastor', 'referente', 'encargado_de_celula', 'general'].includes(p.role));
     },
     enabled: !!churchId,
     staleTime: 60_000

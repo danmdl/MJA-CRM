@@ -11,7 +11,7 @@ import { useSession } from '@/hooks/use-session';
 import { getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
 
 // DB enum values for user_role
-type UserRole = 'admin' | 'general' | 'pastor' | 'piloto' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -20,7 +20,7 @@ interface InviteUserDialogProps {
 }
 
 // All roles in hierarchy order (lowest to highest)
-const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
+const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
 
 const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
@@ -36,8 +36,8 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
 
   // Roles available to assign: strictly below current user's level
   // Admin can assign everything except admin itself
-  // General can assign pastor, piloto, encargado_de_celula, user
-  // Pastor can assign piloto, encargado_de_celula, user
+  // General can assign pastor, referente, encargado_de_celula, user
+  // Pastor can assign referente, encargado_de_celula, user
   const assignableRoles = ALL_ROLES.filter(r => {
     if (profile?.role === 'admin') return r !== 'admin'; // admin can assign all except admin
     return getRoleLevel(r) < myLevel; // others can only assign roles below themselves

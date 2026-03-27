@@ -29,7 +29,7 @@ const DebugLeaders = ({ churchId }: { churchId: string }) => {
         .from('profiles')
         .select('id, first_name, last_name, role')
         .eq('church_id', churchId)
-        .in('role', ['pastor', 'piloto', 'encargado_de_celula', 'general']);
+        .in('role', ['pastor', 'referente', 'encargado_de_celula', 'general']);
 
       console.log('[DEBUG] Leader profiles for church:', leaderProfiles, leaderProfilesError);
       

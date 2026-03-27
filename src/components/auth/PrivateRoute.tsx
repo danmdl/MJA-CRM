@@ -38,7 +38,7 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // Allow all other roles (pastor, piloto, encargado_de_celula, user) to access user pages
+  // Allow all other roles (pastor, referente, encargado_de_celula, user) to access user pages
   return <>{children}</>;
 };
 
