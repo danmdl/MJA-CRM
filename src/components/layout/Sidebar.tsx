@@ -14,7 +14,7 @@ interface NavItemConfig {
 const Sidebar = () => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches } = usePermissions();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -22,12 +22,34 @@ const Sidebar = () => {
   };
 
   const initials = [profile?.first_name?.[0], profile?.last_name?.[0]]
-    .filter(Boolean).join('').toUpperCase() || 'U';
+    .filter(Boolean).join('').toUpperCase() || (profile?.email?.[0] || 'U').toUpperCase();
 
   const fullName = [profile?.first_name, profile?.last_name]
     .filter(Boolean).join(' ') || profile?.email || 'Usuario';
 
-  const sections: { title: string; items: NavItemConfig[] }[] = [
+  // Single-church users (pastor, referente, encargado) get direct church nav
+  const churchId = profile?.church_id;
+  const isSingleChurch = !canSeeAllChurches() && !!churchId;
+
+  const sections: { title: string; items: NavItemConfig[] }[] = isSingleChurch ? [
+    {
+      title: 'Mi Iglesia',
+      items: [
+        { to: `/admin/churches/${churchId}/overview`, emoji: '📋', label: 'Resumen' },
+        { to: `/admin/churches/${churchId}/database`, emoji: '👥', label: 'Base de Datos' },
+        { to: `/admin/churches/${churchId}/team`, emoji: '🤝', label: 'Equipo' },
+        { to: `/admin/churches/${churchId}/cells`, emoji: '🏘️', label: 'Células' },
+        { to: `/admin/churches/${churchId}/mapa`, emoji: '🗺️', label: 'Mapa' },
+      ],
+    },
+    {
+      title: 'Cuenta',
+      items: [
+        { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
+        { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
+      ],
+    },
+  ] : [
     {
       title: 'Principal',
       items: [
