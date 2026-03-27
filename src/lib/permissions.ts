@@ -14,8 +14,7 @@ export interface PermissionData {
 }
 
 // Role hierarchy: higher index = higher privilege
-// Note: DB enum uses 'piloto' for the referente/pilot role
-const ROLE_HIERARCHY: string[] = ['user', 'encargado_de_celula', 'piloto', 'pastor', 'general', 'admin'];
+const ROLE_HIERARCHY: string[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
 
 export const getRoleLevel = (role: string): number => {
   const idx = ROLE_HIERARCHY.indexOf(role);
@@ -27,7 +26,7 @@ export const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
   general: 'General',
   pastor: 'Pastor',
-  piloto: 'Referente',
+  referente: 'Referente',
   encargado_de_celula: 'Líder de Célula',
   user: 'Usuario',
 };

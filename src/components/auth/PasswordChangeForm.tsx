@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { showSuccess, showError } from '@/utils/toast';
@@ -18,8 +18,15 @@ const passwordSchema = z.object({
   path: ['confirmPassword'],
 });
 
-const PasswordChangeForm = () => {
+interface PasswordChangeFormProps {
+  isFirstSetup?: boolean;
+  onSuccess?: () => void;
+}
+
+const PasswordChangeForm = ({ isFirstSetup = false, onSuccess }: PasswordChangeFormProps) => {
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const form = useForm<z.infer<typeof passwordSchema>>({
     resolver: zodResolver(passwordSchema),
@@ -38,8 +45,9 @@ const PasswordChangeForm = () => {
     if (error) {
       showError(error.message);
     } else {
-      showSuccess('¡Contraseña actualizada con éxito!');
+      showSuccess('¡Contraseña creada con éxito!');
       form.reset();
+      onSuccess?.();
     }
     setLoading(false);
   };
@@ -47,8 +55,12 @@ const PasswordChangeForm = () => {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Cambiar Contraseña</CardTitle>
-        <CardDescription>Actualiza tu contraseña aquí.</CardDescription>
+        <CardTitle>{isFirstSetup ? 'Crea una contraseña' : 'Cambiar Contraseña'}</CardTitle>
+        <CardDescription>
+          {isFirstSetup
+            ? 'Para completar tu registro, crea una contraseña segura para tu cuenta.'
+            : 'Actualiza tu contraseña aquí.'}
+        </CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -60,7 +72,23 @@ const PasswordChangeForm = () => {
                 <FormItem>
                   <FormLabel htmlFor="password">Nueva Contraseña</FormLabel>
                   <FormControl>
-                    <Input id="password" type="password" {...field} disabled={loading} />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        {...field}
+                        disabled={loading}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -71,9 +99,25 @@ const PasswordChangeForm = () => {
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel htmlFor="confirmPassword">Confirmar Nueva Contraseña</FormLabel>
+                  <FormLabel htmlFor="confirmPassword">Confirmar Contraseña</FormLabel>
                   <FormControl>
-                    <Input id="confirmPassword" type="password" {...field} disabled={loading} />
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirm ? 'text' : 'password'}
+                        {...field}
+                        disabled={loading}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirm(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -81,8 +125,8 @@ const PasswordChangeForm = () => {
             />
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Guardando...' : isFirstSetup ? 'Crear contraseña' : 'Actualizar Contraseña'}
             </Button>
           </CardFooter>
         </form>

@@ -22,8 +22,17 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+
+  const clearPasswordSetup = () => setNeedsPasswordSetup(false);
 
   useEffect(() => {
+    // Detect invite link: Supabase puts type=invite in the URL hash
+    const hash = window.location.hash;
+    if (hash.includes('type=invite') || hash.includes('type=signup')) {
+      setNeedsPasswordSetup(true);
+    }
+
     const getSessionAndProfile = async () => {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -77,6 +86,8 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
     session,
     loading,
     profile,
+    needsPasswordSetup,
+    clearPasswordSetup,
   };
 
   return (

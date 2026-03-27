@@ -64,7 +64,7 @@ const defaultPermissions: PermissionConfig[] = [
     },
   },
   {
-    role: 'piloto',
+    role: 'referente',
     label: 'Referente',
     permissions: {
       seeAllChurches: false,

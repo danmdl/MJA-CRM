@@ -17,7 +17,9 @@ interface UserProfile {
 interface SessionContextType {
   session: Session | null;
   loading: boolean;
-  profile: UserProfile | null; // Añadir el perfil del usuario
+  profile: UserProfile | null;
+  needsPasswordSetup: boolean;
+  clearPasswordSetup: () => void;
 }
 
 export const SessionContext = createContext<SessionContextType | undefined>(undefined);

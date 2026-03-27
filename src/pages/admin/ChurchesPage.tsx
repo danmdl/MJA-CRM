@@ -55,7 +55,7 @@ const ChurchesPage = () => {
   });
 
   const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
-  const isChurchRole = ['pastor', 'piloto', 'encargado_de_celula'].includes(profile?.role || '');
+  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(profile?.role || '');
   
   // Filter churches based on user role
   const filteredChurches = churches ? 

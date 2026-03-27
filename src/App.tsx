@@ -27,6 +27,7 @@ import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 import Messages from "./pages/Messages";
 import PermissionsDashboard from "./pages/admin/PermissionsDashboard";
+import PasswordChangeForm from "./components/auth/PasswordChangeForm";
 
 const queryClient = new QueryClient();
 
@@ -111,16 +112,39 @@ const App = () => (
       <BrowserRouter>
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <div className="h-screen flex flex-col">
-              <main className="flex-grow">
-                <AppRoutes />
-              </main>
-            </div>
+            <PasswordSetupGate>
+              <div className="h-screen flex flex-col">
+                <main className="flex-grow">
+                  <AppRoutes />
+                </main>
+              </div>
+            </PasswordSetupGate>
           </ThemeProvider>
         </SessionProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
+
+const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
+  const { needsPasswordSetup, clearPasswordSetup, session } = useSession();
+
+  if (needsPasswordSetup && session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-2xl mx-auto mb-3">⛪</div>
+            <h1 className="text-2xl font-bold">MJA CRM</h1>
+            <p className="text-muted-foreground text-sm mt-1">Bienvenido/a. Configura tu acceso.</p>
+          </div>
+          <PasswordChangeForm isFirstSetup onSuccess={clearPasswordSetup} />
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
 
 export default App;
