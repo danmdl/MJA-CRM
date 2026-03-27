@@ -14,6 +14,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
 import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '@/lib/permissions';
 
 interface Church {
   id: string;
@@ -42,6 +43,10 @@ const fetchChurches = async (): Promise<Church[]> => {
 const ChurchesPage = () => {
   const { profile } = useSession();
   const navigate = useNavigate();
+  const { canSeeAllChurches, canAddUsers, canEditDeleteUsers } = usePermissions();
+
+  const canSeeAll = canSeeAllChurches();
+  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(profile?.role || '');
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -54,8 +59,7 @@ const ChurchesPage = () => {
     queryFn: fetchChurches,
   });
 
-  const isAdminOrGeneral = profile?.role === 'admin' || profile?.role === 'general';
-  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(profile?.role || '');
+  const isAdminOrGeneral = canSeeAll;
   
   // Filter churches based on user role
   const filteredChurches = churches ? 
