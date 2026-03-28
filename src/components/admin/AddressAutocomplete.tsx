@@ -16,13 +16,11 @@ interface AddressAutocompleteProps {
 
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
-// Load Google Maps script once
 let googleScriptLoaded = false;
 const loadGoogleMaps = (): Promise<void> => {
   return new Promise((resolve) => {
     if ((window as any).google?.maps?.places) { resolve(); return; }
     if (googleScriptLoaded) {
-      // Already loading — wait for it
       const interval = setInterval(() => {
         if ((window as any).google?.maps?.places) { clearInterval(interval); resolve(); }
       }, 100);
@@ -72,11 +70,7 @@ const AddressAutocomplete = ({
     debounceRef.current = setTimeout(() => {
       setLoading(true);
       autocompleteServiceRef.current.getPlacePredictions(
-        {
-          input: q,
-          componentRestrictions: { country: 'ar' },
-          types: ['address'],
-        },
+        { input: q, componentRestrictions: { country: 'ar' }, types: ['address'] },
         (predictions: any[], status: string) => {
           setLoading(false);
           if (status === 'OK' && predictions) {
@@ -100,8 +94,6 @@ const AddressAutocomplete = ({
     setQuery(suggestion.description);
     onChange(suggestion.description);
     setSuggestions([]); setOpen(false);
-
-    // Geocode to get lat/lng
     if (geocoderRef.current) {
       geocoderRef.current.geocode(
         { placeId: suggestion.place_id },
@@ -125,7 +117,6 @@ const AddressAutocomplete = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Fallback if no API key configured
   if (!GOOGLE_API_KEY) {
     return (
       <Input
@@ -138,7 +129,7 @@ const AddressAutocomplete = ({
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative w-full">
       <div className="relative">
         <Input
           value={query}
@@ -153,19 +144,20 @@ const AddressAutocomplete = ({
         </div>
       </div>
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden">
+        <ul className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md overflow-hidden p-0 m-0 list-none">
           {suggestions.map((s) => (
-            <button
-              key={s.place_id}
-              type="button"
-              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0 flex items-start gap-2 rounded-none"
-              onClick={() => handleSelect(s)}
-            >
-              <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
-              <span>{s.description}</span>
-            </button>
+            <li key={s.place_id} className="m-0 p-0">
+              <button
+                type="button"
+                className="w-full text-left px-3 py-2 text-sm flex items-start gap-2 hover:bg-accent hover:text-accent-foreground transition-colors border-b border-border last:border-b-0"
+                onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
+              >
+                <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                <span>{s.description}</span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
