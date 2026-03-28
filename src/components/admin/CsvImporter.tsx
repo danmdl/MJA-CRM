@@ -177,7 +177,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full border-0 shadow-none">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="h-6 w-6" />
@@ -226,7 +226,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
             <p className="text-sm text-muted-foreground">
               Asigna los encabezados de tu CSV a los campos de la tabla de {tableName}.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {requiredFields.map(field => (
                 <div key={field.key} className="space-y-2">
                   <Label htmlFor={`map-${field.key}`}>
@@ -237,7 +237,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                     value={columnMapping[field.key] ?? undefined}
                     disabled={loading}
                   >
-                    <SelectTrigger id={`map-${field.key}`} className="min-w-[280px]">
+                    <SelectTrigger id={`map-${field.key}`} className="w-full">
                       <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
                     </SelectTrigger>
                     <SelectContent>
@@ -259,7 +259,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                       value={ignoreMap[field.key] ? '__none__' : (columnMapping[field.key] ?? '__none__')}
                       disabled={loading || !!ignoreMap[field.key]}
                     >
-                      <SelectTrigger id={`map-${field.key}`} className="min-w-[280px]">
+                      <SelectTrigger id={`map-${field.key}`} className="w-full">
                         <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
                       </SelectTrigger>
                       <SelectContent>

@@ -108,7 +108,7 @@ const ChurchDatabasePage = () => {
                 Importar CSV
               </Button>
               <Dialog open={isCsvDialogOpen} onOpenChange={setIsCsvDialogOpen}>
-                <DialogContent className="sm:max-w-[1100px]">
+                <DialogContent className="sm:max-w-[1200px] max-h-[85vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Importar Contactos desde CSV</DialogTitle>
                     <DialogDescription>
