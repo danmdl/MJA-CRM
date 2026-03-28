@@ -10,6 +10,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { logger } from '@/utils/logger';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/hooks/use-session';
+import AddressAutocomplete from './AddressAutocomplete';
 
 interface Cell {
   id: string;
@@ -255,14 +256,15 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
           {/* Row 3: Dirección + Número de Apartamento */}
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <FormField
-              label="Dirección"
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: Av. Corrientes 1234"
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Dirección</label>
+              <AddressAutocomplete
+                value={address}
+                onChange={(addr) => setAddress(addr || '')}
+                placeholder="Ej: Av. Corrientes 1234"
+                disabled={loading}
+              />
+            </div>
             <FormField
               label="Número de Apartamento"
               id="apartmentNumber"
