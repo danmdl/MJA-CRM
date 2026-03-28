@@ -219,15 +219,16 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={(el) => setDialogContainer(el)} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent ref={(el) => setDialogContainer(el)} className="w-full max-w-5xl flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contacto</DialogTitle>
           <DialogDescription>
             Completa los datos del contacto. Presiona <kbd className="px-1 py-0.5 rounded bg-muted text-xs font-mono">Enter</kbd> para guardar.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           {/* 3-column grid for all fields */}
+          <div className="overflow-y-auto flex-1 pr-1">
           <div className="grid grid-cols-3 gap-x-4 gap-y-4 mb-4">
 
             {/* Nombre */}
@@ -403,8 +404,9 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             </div>
 
           </div>
+          </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 pt-4 border-t">
             <Button type="button" variant="ghost" onClick={() => { resetForm(); onOpenChange(false); }} disabled={loading}>
               Cancelar
             </Button>
