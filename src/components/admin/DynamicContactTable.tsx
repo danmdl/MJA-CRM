@@ -32,8 +32,10 @@ interface Contact {
   church_id: string;
   cell_id: string | null;
   last_contact_date?: string | null;
+  created_by: string | null;
   cell?: { name: string } | null;
   leader?: { first_name: string; last_name: string } | null;
+  created_by_profile?: { first_name: string | null; last_name: string | null } | null;
 }
 
 const TableHeaderCell = ({
@@ -189,6 +191,11 @@ const TableCellContent = ({
     if (column.key === 'age') {
       return (contact as any).age ?? '-';
     }
+    if (column.key === 'created_by_profile') {
+      const p = (contact as any).created_by_profile;
+      if (!p) return '-';
+      return `${p.first_name || ''} ${p.last_name || ''}`.trim() || '-';
+    }
     return truncateText((contact as any)[column.key] as string);
   };
 
@@ -282,7 +289,8 @@ const DynamicContactTable = ({
     ...CONTACT_FIELDS,
     { key: 'cell.name', label: 'Célula', type: 'text' },
     { key: 'leader.first_name', label: 'Referente', type: 'text' },
-    { key: 'last_contact_date', label: 'Último Contacto', type: 'date' }
+    { key: 'last_contact_date', label: 'Último Contacto', type: 'date' },
+    { key: 'created_by_profile', label: 'Creado por', type: 'text' }
   ], []);
 
   const defaultVisibleColumns: ContactField[] = useMemo(() => [
@@ -367,12 +375,14 @@ const DynamicContactTable = ({
       const cell = cellsData?.find(c => c.id === contact.cell_id) || null;
       const leader = leadersData?.find(l => l.id === contact.leader_assigned) || null;
       const age = computeAge(contact.date_of_birth || null);
+      const createdByProfile = contact.created_by ? (leadersData?.find(l => l.id === contact.created_by) || null) : null;
       return {
         ...contact,
         cell,
         leader,
         last_contact_date: contact.latest_log?.[0]?.contact_date || null,
-        age
+        age,
+        created_by_profile: createdByProfile,
       };
     }) || [];
 
@@ -546,7 +556,7 @@ const DynamicContactTable = ({
     <div className="space-y-4">
       {/* Render selection toolbar externally (right side of header) if enabled and container exists.
           The toolbar is wrapped in an absolutely positioned wrapper so it doesn't change the header's layout height. */}
-      {(someVisibleSelected || allVisibleSelected) && useExternalToolbarContainer && externalContainer &&
+      {(someVisibleSelected || allVisibleSelected) && canDeleteProp && useExternalToolbarContainer && externalContainer &&
         createPortal(
           <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20">
             <SelectionToolbar

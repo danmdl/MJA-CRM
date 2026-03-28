@@ -139,7 +139,8 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           }
         });
         if (churchId) {
-          newRecord.church_id = churchId; // Add churchId to each record if provided
+          newRecord.church_id = churchId;
+          newRecord.created_by = session?.user?.id || null;
         }
         return newRecord;
       });
