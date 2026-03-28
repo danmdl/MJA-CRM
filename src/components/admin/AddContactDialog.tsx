@@ -11,6 +11,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { logger } from '@/utils/logger';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/hooks/use-session';
+import { logEvent } from '@/utils/clientLogger';
 import AddressAutocomplete from './AddressAutocomplete';
 
 interface Cell {
@@ -199,6 +200,26 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
       if (error) {
         showError(`Error: ${error.message}`);
+        await logEvent({
+          action: 'create_contact',
+          error,
+          payload: {
+            first_name: firstName,
+            last_name: lastName || null,
+            phone: phone || null,
+            address: address || null,
+            apartment_number: apartmentNumber || null,
+            leader_assigned: leaderAssigned,
+            conector: conector || null,
+            cell_id: cellId,
+            church_id: churchId,
+            date_of_birth: dateOfBirth || null,
+            fecha_contacto: fechaContacto || null,
+            sexo: sexo || null,
+            estado_civil: estadoCivil || null,
+          },
+          context: { church_id: churchId },
+        });
       } else {
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });

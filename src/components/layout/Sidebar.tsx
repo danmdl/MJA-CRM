@@ -65,6 +65,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
+        ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
       ],
     },
@@ -83,6 +84,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
+        ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
       ],
     },

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { logEvent } from '@/utils/clientLogger';
 import { ContactField } from '@/lib/contact-fields'; // Import ContactField type
 import { Checkbox } from '@/components/ui/checkbox';
 import { useQueryClient } from '@tanstack/react-query';
@@ -154,6 +155,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
 
         if (error) {
           console.error('[CsvImporter] Error inserting batch:', error);
+          await logEvent({ action: 'csv_import', error, payload: { batch_size: batch.length, church_id: churchId }, context: { church_id: churchId } });
           throw new Error(`Error al insertar datos: ${error.message}`);
         }
       }

@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { logger } from '@/utils/logger';
 import ContactProfileDialog from './ContactProfileDialog';
+import { logEvent } from '@/utils/clientLogger';
 import { createPortal } from 'react-dom';
 
 interface Contact {
@@ -417,6 +418,7 @@ const DynamicContactTable = ({
     },
     onError: (err: any) => {
       showError(err.message || 'Error al eliminar el contacto.');
+      logEvent({ action: 'delete_contact', error: err, context: { church_id: churchId } });
     },
   });
 
