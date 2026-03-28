@@ -95,7 +95,10 @@ const ChurchDatabasePage = () => {
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3">
-        <h1 className="text-2xl sm:text-3xl font-bold">Contactos de la Iglesia</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold">Contactos de la Iglesia</h1>
+          <div id="selection-toolbar-slot" />
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleExport} disabled={exporting} size="sm">
             <Download className="mr-1.5 h-4 w-4" />
@@ -133,8 +136,6 @@ const ChurchDatabasePage = () => {
           )}
         </div>
       </div>
-
-      <div id="selection-toolbar-slot" className="relative min-h-0" />
 
       <div className="flex items-center space-x-4 mb-0">
         <div className="relative flex-1">

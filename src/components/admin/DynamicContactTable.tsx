@@ -257,20 +257,16 @@ const SelectionToolbar = ({
   onDeleteSelected: () => void;
   isDeleting: boolean;
 }) => (
-  <div className="flex items-center justify-between px-3 py-2 bg-muted rounded-md shadow">
-    <div className="text-sm text-muted-foreground">
-      {selectedCount} contacto(s) seleccionado(s)
-    </div>
-    <div className="flex space-x-2">
-      <Button variant="outline" size="sm" onClick={onEdit} disabled={!canEdit}>
-        <Edit className="mr-2 h-4 w-4" />
-        Editar
-      </Button>
-      <Button variant="destructive" size="sm" onClick={onDeleteSelected} disabled={isDeleting}>
-        <Trash2 className="mr-2 h-4 w-4" />
-        Eliminar
-      </Button>
-    </div>
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground whitespace-nowrap">{selectedCount} seleccionado(s)</span>
+    <Button variant="outline" size="sm" onClick={onEdit} disabled={!canEdit}>
+      <Edit className="mr-1.5 h-3.5 w-3.5" />
+      Editar
+    </Button>
+    <Button variant="destructive" size="sm" onClick={onDeleteSelected} disabled={isDeleting}>
+      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+      Eliminar
+    </Button>
   </div>
 );
 
