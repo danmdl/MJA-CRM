@@ -54,7 +54,7 @@ const FormField = ({ label, id, value, onChange, type = "text", required = false
   </div>
 );
 
-const SelectField = ({ label, value, onChange, options, loading, placeholder, disabled = false }: {
+const SelectField = ({ label, value, onChange, options, loading, placeholder, disabled = false, container }: {
   label: string;
   value: string | null;
   onChange: (value: string) => void;
@@ -62,6 +62,7 @@ const SelectField = ({ label, value, onChange, options, loading, placeholder, di
   loading: boolean;
   placeholder: string;
   disabled?: boolean;
+  container?: HTMLElement | null;
 }) => (
   <div className="space-y-2">
     <label htmlFor={label.toLowerCase().replace(/\s/g, '-')} className="text-sm font-medium">
@@ -71,7 +72,7 @@ const SelectField = ({ label, value, onChange, options, loading, placeholder, di
       <SelectTrigger>
         <SelectValue placeholder={loading ? "Cargando..." : placeholder} />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent container={container ?? undefined}>
         <SelectItem value="none">Sin asignación</SelectItem>
         {options.map((option) => (
           <SelectItem key={option.id} value={option.id}>
@@ -97,6 +98,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const queryClient = useQueryClient();
   const { session } = useSession();
   const firstNameRef = React.useRef<HTMLInputElement>(null);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-focus first name when dialog opens
   React.useEffect(() => {
@@ -200,7 +202,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-3xl">
+      <DialogContent ref={dialogRef} className="w-full max-w-3xl">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contacto</DialogTitle>
           <DialogDescription>
@@ -288,6 +290,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               options={cells || []}
               loading={isLoadingCells}
               placeholder="Selecciona una célula (opcional)"
+              container={dialogRef.current}
             />
           </div>
 
@@ -303,6 +306,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               }))}
               loading={isLoadingLeaders}
               placeholder="Selecciona un referente (opcional)"
+              container={dialogRef.current}
             />
           </div>
 
