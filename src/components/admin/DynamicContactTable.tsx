@@ -558,8 +558,7 @@ const DynamicContactTable = ({
           The toolbar is wrapped in an absolutely positioned wrapper so it doesn't change the header's layout height. */}
       {(someVisibleSelected || allVisibleSelected) && canDeleteProp && useExternalToolbarContainer && externalContainer &&
         createPortal(
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20">
-            <SelectionToolbar
+          <SelectionToolbar
               selectedCount={selectedCount}
               canEdit={canEdit}
               onEdit={() => {
@@ -568,8 +567,7 @@ const DynamicContactTable = ({
               }}
               onDeleteSelected={() => handleDeleteSelected(visibleIds.filter(id => selectedContacts.includes(id)))}
               isDeleting={deleteContactMutation.isPending as any}
-            />
-          </div>,
+            />,
           externalContainer
         )
       }

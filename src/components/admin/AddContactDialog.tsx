@@ -108,7 +108,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const queryClient = useQueryClient();
   const { session } = useSession();
   const firstNameRef = React.useRef<HTMLInputElement>(null);
-  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const [dialogContainer, setDialogContainer] = React.useState<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     if (open) setTimeout(() => firstNameRef.current?.focus(), 50);
@@ -219,7 +219,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={dialogRef} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent ref={(el) => setDialogContainer(el)} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contacto</DialogTitle>
           <DialogDescription>
@@ -321,7 +321,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona..." />
                 </SelectTrigger>
-                <SelectContent container={dialogRef.current ?? undefined}>
+                <SelectContent container={dialogContainer ?? undefined}>
                   <SelectItem value="none">Sin especificar</SelectItem>
                   <SelectItem value="masculino">Masculino</SelectItem>
                   <SelectItem value="femenino">Femenino</SelectItem>
@@ -359,7 +359,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               options={cells || []}
               loading={isLoadingCells}
               placeholder="Selecciona una célula (opcional)"
-              container={dialogRef.current}
+              container={dialogContainer}
             />
             <SelectField
               label="Referente asignado"
@@ -371,7 +371,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               }))}
               loading={isLoadingLeaders}
               placeholder="Selecciona un referente (opcional)"
-              container={dialogRef.current}
+              container={dialogContainer}
             />
           </div>
 
