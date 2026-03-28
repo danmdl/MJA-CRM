@@ -227,8 +227,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          {/* Row 1: Nombre + Apellido */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          {/* 3-column grid for all fields */}
+          <div className="grid grid-cols-3 gap-x-4 gap-y-4 mb-4">
+
+            {/* Nombre */}
             <div className="space-y-2">
               <label htmlFor="firstName" className="text-sm font-medium">
                 Nombre <span className="text-red-500">*</span>
@@ -243,6 +245,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 placeholder="Ej: María"
               />
             </div>
+
+            {/* Apellido */}
             <FormField
               label="Apellido"
               id="lastName"
@@ -251,13 +255,13 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               disabled={loading}
               placeholder="Ej: González"
             />
-          </div>
 
-          {/* Row 2: Teléfono + Fecha de nacimiento */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* Teléfono */}
             <div className="space-y-2">
               <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} />
             </div>
+
+            {/* Fecha de nacimiento */}
             <div className="space-y-2">
               <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
               <Input
@@ -268,39 +272,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 disabled={loading}
               />
             </div>
-          </div>
 
-          {/* Row 3: Dirección + Número de Apartamento */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Dirección</label>
-              <AddressAutocomplete
-                value={address}
-                onChange={(addr) => setAddress(addr || '')}
-                placeholder="Ej: Av. Corrientes 1234"
-                disabled={loading}
-              />
-            </div>
-            <FormField
-              label="Número de Apartamento"
-              id="apartmentNumber"
-              value={apartmentNumber}
-              onChange={(e) => setApartmentNumber(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: 3B"
-            />
-          </div>
-
-          {/* Row 4: Barrio + Fecha de Contacto */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <FormField
-              label="Barrio"
-              id="barrio"
-              value={barrio}
-              onChange={(e) => setBarrio(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: Palermo"
-            />
+            {/* Fecha de Contacto */}
             <div className="space-y-2">
               <label htmlFor="fechaContacto" className="text-sm font-medium">Fecha de Contacto</label>
               <Input
@@ -311,10 +284,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 disabled={loading}
               />
             </div>
-          </div>
 
-          {/* Row 5: Sexo + Estado Civil */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* Sexo */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Sexo</label>
               <Select value={sexo || undefined} onValueChange={(v) => setSexo(v === 'none' ? null : v)} disabled={loading}>
@@ -328,6 +299,39 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Dirección - spans 2 cols */}
+            <div className="col-span-2 space-y-2">
+              <label className="text-sm font-medium">Dirección</label>
+              <AddressAutocomplete
+                value={address}
+                onChange={(addr) => setAddress(addr || '')}
+                placeholder="Ej: Av. Corrientes 1234"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Número de Apartamento */}
+            <FormField
+              label="Número de Apartamento"
+              id="apartmentNumber"
+              value={apartmentNumber}
+              onChange={(e) => setApartmentNumber(e.target.value)}
+              disabled={loading}
+              placeholder="Ej: 3B"
+            />
+
+            {/* Barrio */}
+            <FormField
+              label="Barrio"
+              id="barrio"
+              value={barrio}
+              onChange={(e) => setBarrio(e.target.value)}
+              disabled={loading}
+              placeholder="Ej: Palermo"
+            />
+
+            {/* Estado Civil */}
             <FormField
               label="Estado Civil"
               id="estadoCivil"
@@ -336,22 +340,18 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               disabled={loading}
               placeholder="Ej: Soltero/a, Casado/a..."
             />
-          </div>
 
-          {/* Row 6: Conector (full width) */}
-          <div className="mb-4">
+            {/* Conector */}
             <FormField
               label="Conector"
               id="conector"
               value={conector}
               onChange={(e) => setConector(e.target.value)}
               disabled={loading}
-              placeholder="Nombre de quien conectó al contacto"
+              placeholder="Nombre de quien conectó"
             />
-          </div>
 
-          {/* Row 7: Célula + Referente */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* Célula */}
             <SelectField
               label="Célula"
               value={cellId}
@@ -361,6 +361,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               placeholder="Selecciona una célula (opcional)"
               container={dialogContainer}
             />
+
+            {/* Referente */}
             <SelectField
               label="Referente asignado"
               value={leaderAssigned}
@@ -373,32 +375,33 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               placeholder="Selecciona un referente (opcional)"
               container={dialogContainer}
             />
-          </div>
 
-          {/* Row 8: Observaciones */}
-          <div className="mb-4 space-y-2">
-            <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
-            <Textarea
-              id="observaciones"
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              disabled={loading}
-              placeholder="Notas adicionales sobre el contacto..."
-              rows={2}
-            />
-          </div>
+            {/* Observaciones - spans full row */}
+            <div className="col-span-3 space-y-2">
+              <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
+              <Textarea
+                id="observaciones"
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                disabled={loading}
+                placeholder="Notas adicionales sobre el contacto..."
+                rows={2}
+              />
+            </div>
 
-          {/* Row 9: Pedido de Oración */}
-          <div className="mb-6 space-y-2">
-            <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
-            <Textarea
-              id="pedidoOracion"
-              value={pedidoDeOracion}
-              onChange={(e) => setPedidoDeOracion(e.target.value)}
-              disabled={loading}
-              placeholder="¿Tiene algún pedido de oración?"
-              rows={2}
-            />
+            {/* Pedido de Oración - spans full row */}
+            <div className="col-span-3 space-y-2">
+              <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
+              <Textarea
+                id="pedidoOracion"
+                value={pedidoDeOracion}
+                onChange={(e) => setPedidoDeOracion(e.target.value)}
+                disabled={loading}
+                placeholder="¿Tiene algún pedido de oración?"
+                rows={2}
+              />
+            </div>
+
           </div>
 
           <DialogFooter className="gap-2">
