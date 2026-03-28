@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import CountryPhoneInput from '@/components/CountryPhoneInput';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -85,6 +86,8 @@ const SelectField = ({ label, value, onChange, options, loading, placeholder, di
   </div>
 );
 
+const today = () => new Date().toISOString().split('T')[0];
+
 const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -94,6 +97,12 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [barrio, setBarrio] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<string>('');
+  const [fechaContacto, setFechaContacto] = useState<string>(today());
+  const [sexo, setSexo] = useState<string | null>(null);
+  const [estadoCivil, setEstadoCivil] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [pedidoDeOracion, setPedidoDeOracion] = useState('');
+  const [conector, setConector] = useState('');
   const [leaderAssigned, setLeaderAssigned] = useState<string | null>(null);
   const [cellId, setCellId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -101,7 +110,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const firstNameRef = React.useRef<HTMLInputElement>(null);
   const dialogRef = React.useRef<HTMLDivElement>(null);
 
-  // Auto-focus first name when dialog opens
   React.useEffect(() => {
     if (open) setTimeout(() => firstNameRef.current?.focus(), 50);
   }, [open]);
@@ -109,7 +117,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const resetForm = () => {
     setFirstName(''); setLastName(''); setPhone('');
     setAddress(''); setApartmentNumber(''); setBarrio('');
-    setDateOfBirth(''); setLeaderAssigned(null); setCellId(null);
+    setDateOfBirth(''); setFechaContacto(today());
+    setSexo(null); setEstadoCivil('');
+    setObservaciones(''); setPedidoDeOracion('');
+    setConector('');
+    setLeaderAssigned(null); setCellId(null);
   };
 
   logger.log('AddContactDialog rendered', { open, churchId });
@@ -122,7 +134,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .select('id, name')
         .eq('church_id', churchId)
         .order('name', { ascending: true });
-
       if (error) throw new Error('No se pudieron cargar las células.');
       return data || [];
     },
@@ -143,7 +154,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           },
           body: JSON.stringify({ action: 'listChurchUsers', churchId }),
         });
-
         if (resp.ok) {
           const data = await resp.json();
           const leaderRoles = ['pastor', 'referente', 'encargado_de_celula', 'general'];
@@ -166,7 +176,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const handleSubmit = async (e: React.FormEvent, keepOpen = false) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const { error } = await supabase
         .from('contacts')
@@ -178,9 +187,15 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           apartment_number: apartmentNumber || null,
           barrio: barrio || null,
           leader_assigned: leaderAssigned,
+          conector: conector || null,
           cell_id: cellId,
           church_id: churchId,
           date_of_birth: dateOfBirth || null,
+          fecha_contacto: fechaContacto || null,
+          sexo: sexo || null,
+          estado_civil: estadoCivil || null,
+          observaciones: observaciones || null,
+          pedido_de_oracion: pedidoDeOracion || null,
         });
 
       if (error) {
@@ -203,7 +218,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={dialogRef} className="w-full max-w-3xl">
+      <DialogContent ref={dialogRef} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contacto</DialogTitle>
           <DialogDescription>
@@ -275,7 +290,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             />
           </div>
 
-          {/* Row 4: Barrio + Célula */}
+          {/* Row 4: Barrio + Fecha de Contacto */}
           <div className="grid grid-cols-2 gap-4 mb-4">
             <FormField
               label="Barrio"
@@ -285,6 +300,57 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               disabled={loading}
               placeholder="Ej: Palermo"
             />
+            <div className="space-y-2">
+              <label htmlFor="fechaContacto" className="text-sm font-medium">Fecha de Contacto</label>
+              <Input
+                id="fechaContacto"
+                type="date"
+                value={fechaContacto}
+                onChange={(e) => setFechaContacto(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          {/* Row 5: Sexo + Estado Civil */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Sexo</label>
+              <Select value={sexo || undefined} onValueChange={(v) => setSexo(v === 'none' ? null : v)} disabled={loading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona..." />
+                </SelectTrigger>
+                <SelectContent container={dialogRef.current ?? undefined}>
+                  <SelectItem value="none">Sin especificar</SelectItem>
+                  <SelectItem value="masculino">Masculino</SelectItem>
+                  <SelectItem value="femenino">Femenino</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <FormField
+              label="Estado Civil"
+              id="estadoCivil"
+              value={estadoCivil}
+              onChange={(e) => setEstadoCivil(e.target.value)}
+              disabled={loading}
+              placeholder="Ej: Soltero/a, Casado/a..."
+            />
+          </div>
+
+          {/* Row 6: Conector (full width) */}
+          <div className="mb-4">
+            <FormField
+              label="Conector"
+              id="conector"
+              value={conector}
+              onChange={(e) => setConector(e.target.value)}
+              disabled={loading}
+              placeholder="Nombre de quien conectó al contacto"
+            />
+          </div>
+
+          {/* Row 7: Célula + Referente */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
             <SelectField
               label="Célula"
               value={cellId}
@@ -294,10 +360,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               placeholder="Selecciona una célula (opcional)"
               container={dialogRef.current}
             />
-          </div>
-
-          {/* Row 5: Referente (full width) */}
-          <div className="mb-6">
             <SelectField
               label="Referente asignado"
               value={leaderAssigned}
@@ -309,6 +371,32 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               loading={isLoadingLeaders}
               placeholder="Selecciona un referente (opcional)"
               container={dialogRef.current}
+            />
+          </div>
+
+          {/* Row 8: Observaciones */}
+          <div className="mb-4 space-y-2">
+            <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
+            <Textarea
+              id="observaciones"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              disabled={loading}
+              placeholder="Notas adicionales sobre el contacto..."
+              rows={2}
+            />
+          </div>
+
+          {/* Row 9: Pedido de Oración */}
+          <div className="mb-6 space-y-2">
+            <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
+            <Textarea
+              id="pedidoOracion"
+              value={pedidoDeOracion}
+              onChange={(e) => setPedidoDeOracion(e.target.value)}
+              disabled={loading}
+              placeholder="¿Tiene algún pedido de oración?"
+              rows={2}
             />
           </div>
 

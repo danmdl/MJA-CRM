@@ -17,7 +17,7 @@ import { showError, showSuccess } from '@/utils/toast';
 const exportContactsToCSV = async (churchId: string) => {
   const { data, error } = await supabase
     .from('contacts')
-    .select('first_name, last_name, phone, address, apartment_number, barrio, leader_assigned, date_of_birth, created_at')
+    .select('first_name, last_name, phone, address, apartment_number, barrio, leader_assigned, conector, fecha_contacto, date_of_birth, sexo, estado_civil, observaciones, pedido_de_oracion, created_at')
     .eq('church_id', churchId)
     .order('first_name', { ascending: true });
 
@@ -28,8 +28,9 @@ const exportContactsToCSV = async (churchId: string) => {
 
   const headers = [
     'Nombre', 'Apellido', 'Teléfono', 'Dirección',
-    'Departamento', 'Barrio', 'Referente asignado',
-    'Fecha de nacimiento', 'Creado en'
+    'Departamento', 'Barrio', 'Referente asignado', 'Conector',
+    'Fecha de Contacto', 'Fecha de nacimiento', 'Sexo',
+    'Estado Civil', 'Observaciones', 'Pedido de Oración', 'Creado en'
   ];
 
   const escape = (val: any) => {
@@ -48,7 +49,13 @@ const exportContactsToCSV = async (churchId: string) => {
     escape(c.apartment_number),
     escape(c.barrio),
     escape(c.leader_assigned),
+    escape(c.conector),
+    c.fecha_contacto ? escape(c.fecha_contacto) : '',
     c.date_of_birth ? escape(c.date_of_birth.split('T')[0]) : '',
+    escape(c.sexo),
+    escape(c.estado_civil),
+    escape(c.observaciones),
+    escape(c.pedido_de_oracion),
     c.created_at ? escape(new Date(c.created_at).toLocaleDateString('es-AR')) : '',
   ].join(','));
 
@@ -69,6 +76,7 @@ const ChurchDatabasePage = () => {
   const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
   const [filterField, setFilterField] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { canAddUsers, canEditDeleteUsers } = usePermissions();
 
   if (!churchId) {
@@ -94,28 +102,28 @@ const ChurchDatabasePage = () => {
             {exporting ? 'Exportando...' : 'Exportar CSV'}
           </Button>
           {canAddUsers() && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Upload className="mr-1.5 h-4 w-4" />
-                  Importar CSV
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[1100px]">
-                <DialogHeader>
-                  <DialogTitle>Importar Contactos desde CSV</DialogTitle>
-                  <DialogDescription>
-                    Sube un archivo CSV para añadir nuevos contactos a la base de datos de esta iglesia.
-                  </DialogDescription>
-                </DialogHeader>
-                <CsvImporter
-                  tableName="contacts"
-                  requiredFields={requiredContactFields}
-                  optionalFields={optionalContactFields}
-                  churchId={churchId}
-                />
-              </DialogContent>
-            </Dialog>
+            <>
+              <Button variant="outline" size="sm" onClick={() => setIsCsvDialogOpen(true)}>
+                <Upload className="mr-1.5 h-4 w-4" />
+                Importar CSV
+              </Button>
+              <Dialog open={isCsvDialogOpen} onOpenChange={setIsCsvDialogOpen}>
+                <DialogContent className="sm:max-w-[1100px]">
+                  <DialogHeader>
+                    <DialogTitle>Importar Contactos desde CSV</DialogTitle>
+                    <DialogDescription>
+                      Sube un archivo CSV para añadir nuevos contactos a la base de datos de esta iglesia.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <CsvImporter
+                    tableName="contacts"
+                    requiredFields={requiredContactFields}
+                    optionalFields={optionalContactFields}
+                    churchId={churchId}
+                  />
+                </DialogContent>
+              </Dialog>
+            </>
           )}
           {canAddUsers() && (
             <Button onClick={() => setIsAddContactDialogOpen(true)} size="sm">
