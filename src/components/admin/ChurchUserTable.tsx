@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff, UserPen } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { Search } from 'lucide-react';
 import React from 'react';
 import { usePermissions, getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 
 type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
@@ -56,6 +57,11 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const [newPassword, setNewPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [resettingPw, setResettingPw] = useState(false);
+  const [editDialogUser, setEditDialogUser] = useState<User | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['churchUsers', churchId],
@@ -109,6 +115,13 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
       callEdge({ action: 'updateUserRole', userId, newRole }),
     onSuccess: () => { showSuccess('Rol actualizado.'); queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] }); },
     onError: (err: any) => showError(err.message || 'Error al actualizar rol.'),
+  });
+
+  const updateUserProfileMutation = useMutation({
+    mutationFn: ({ userId, first_name, last_name, phone }: { userId: string; first_name: string; last_name: string; phone: string }) =>
+      callEdge({ action: 'updateUserProfile', userId, first_name, last_name, phone }),
+    onSuccess: () => { showSuccess('Perfil actualizado.'); queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] }); },
+    onError: (err: any) => showError(err.message || 'Error al actualizar perfil.'),
   });
 
   const formatDate = (d: string | null) => {
@@ -218,6 +231,16 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                             <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
                           </DropdownMenuItem>
                         )}
+                        {canEditDeleteUsers() && (
+                          <DropdownMenuItem onClick={() => {
+                            setEditDialogUser(user);
+                            setEditFirstName(user.first_name || '');
+                            setEditLastName(user.last_name || '');
+                            setEditPhone('');
+                          }}>
+                            <UserPen className="mr-2 h-4 w-4" /> Editar Usuario
+                          </DropdownMenuItem>
+                        )}
                         {canEditDeleteUsers() && user.status === 'confirmed' && (
                           <DropdownMenuItem onClick={() => { setResetDialogUser({ id: user.id, email: user.email }); setNewPassword(''); setShowPw(false); }}>
                             <KeyRound className="mr-2 h-4 w-4" /> Cambiar Contraseña
@@ -250,6 +273,55 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         </TableBody>
       </Table>
     </div>
+
+    {/* Edit User Dialog */}
+    <Dialog open={!!editDialogUser} onOpenChange={(open) => { if (!open) setEditDialogUser(null); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Editar Usuario</DialogTitle>
+          <p className="text-sm text-muted-foreground">{editDialogUser?.email}</p>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Nombre</Label>
+              <Input value={editFirstName} onChange={e => setEditFirstName(e.target.value)} placeholder="Nombre" />
+            </div>
+            <div className="space-y-1">
+              <Label>Apellido</Label>
+              <Input value={editLastName} onChange={e => setEditLastName(e.target.value)} placeholder="Apellido" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Teléfono</Label>
+            <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Ej: 5491122334455" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setEditDialogUser(null)}>Cancelar</Button>
+          <Button
+            disabled={savingEdit}
+            onClick={async () => {
+              if (!editDialogUser) return;
+              setSavingEdit(true);
+              try {
+                await updateUserProfileMutation.mutateAsync({
+                  userId: editDialogUser.id,
+                  first_name: editFirstName.trim(),
+                  last_name: editLastName.trim(),
+                  phone: editPhone.trim(),
+                });
+                setEditDialogUser(null);
+              } finally {
+                setSavingEdit(false);
+              }
+            }}
+          >
+            {savingEdit ? 'Guardando...' : 'Guardar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     {/* Change Password Dialog */}
     <Dialog open={!!resetDialogUser} onOpenChange={(open) => { if (!open) setResetDialogUser(null); }}>

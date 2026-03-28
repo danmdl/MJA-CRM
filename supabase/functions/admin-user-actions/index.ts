@@ -188,6 +188,35 @@ serve(async (req) => {
         });
       }
 
+      case 'updateUserProfile': {
+        if (!isAdminOrGeneral) {
+          return new Response('Forbidden: Only administrators or generals can update user profiles.', { status: 403, headers: corsHeaders });
+        }
+
+        const updateData: Record<string, any> = {};
+        if (first_name !== undefined) updateData.first_name = first_name || null;
+        if (last_name !== undefined) updateData.last_name = last_name || null;
+        if (phone !== undefined) updateData.phone = phone || null;
+
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update(updateData)
+          .eq('id', userId);
+
+        if (error) {
+          console.error('[admin-user-actions] Error updating user profile:', error);
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: 'Profile updated successfully' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       case 'listUsers': {
         if (!isAdminOrGeneral) {
           return new Response('Forbidden: Only administrators or generals can list all users.', { status: 403, headers: corsHeaders });
