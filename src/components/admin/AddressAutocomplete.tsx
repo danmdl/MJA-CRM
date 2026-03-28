@@ -129,35 +129,47 @@ const AddressAutocomplete = ({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full">
-      <div className="relative">
-        <Input
-          value={query}
-          onChange={handleInput}
-          onFocus={() => suggestions.length > 0 && setOpen(true)}
-          placeholder={placeholder}
-          disabled={disabled || !ready}
-          className="pr-8"
-        />
-        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
-        </div>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <Input
+        value={query}
+        onChange={handleInput}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        placeholder={placeholder}
+        disabled={disabled || !ready}
+        style={{ paddingRight: '2rem' }}
+      />
+      <div style={{ position: 'absolute', right: '0.625rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--muted-foreground)' }}>
+        {loading ? <Loader2 style={{ width: '0.875rem', height: '0.875rem', animation: 'spin 1s linear infinite' }} /> : <MapPin style={{ width: '0.875rem', height: '0.875rem' }} />}
       </div>
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md overflow-hidden p-0 m-0 list-none">
-          {suggestions.map((s) => (
-            <li key={s.place_id} className="m-0 p-0">
-              <button
-                type="button"
-                className="w-full text-left px-3 py-2 text-sm flex items-start gap-2 hover:bg-accent hover:text-accent-foreground transition-colors border-b border-border last:border-b-0"
-                onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
-              >
-                <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
-                <span>{s.description}</span>
-              </button>
-            </li>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 9999, backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+          {suggestions.map((s, i) => (
+            <button
+              key={s.place_id}
+              type="button"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                width: '100%',
+                textAlign: 'left',
+                padding: '8px 12px',
+                fontSize: '0.875rem',
+                background: 'none',
+                border: 'none',
+                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
+                cursor: 'pointer',
+                color: 'var(--popover-foreground)',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+              onMouseDown={e => { e.preventDefault(); handleSelect(s); }}
+            >
+              <MapPin style={{ width: '0.875rem', height: '0.875rem', marginTop: '2px', flexShrink: 0, color: 'var(--primary)' }} />
+              <span>{s.description}</span>
+            </button>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
