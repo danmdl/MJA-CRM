@@ -95,7 +95,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');
-  const [barrio, setBarrio] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<string>('');
   const [fechaContacto, setFechaContacto] = useState<string>(today());
   const [sexo, setSexo] = useState<string | null>(null);
@@ -116,7 +115,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   const resetForm = () => {
     setFirstName(''); setLastName(''); setPhone('');
-    setAddress(''); setApartmentNumber(''); setBarrio('');
+    setAddress(''); setApartmentNumber('');
     setDateOfBirth(''); setFechaContacto(today());
     setSexo(null); setEstadoCivil('');
     setObservaciones(''); setPedidoDeOracion('');
@@ -185,7 +184,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           phone: phone || null,
           address: address || null,
           apartment_number: apartmentNumber || null,
-          barrio: barrio || null,
           leader_assigned: leaderAssigned,
           conector: conector || null,
           cell_id: cellId,
@@ -219,17 +217,15 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={(el) => setDialogContainer(el)} className="w-full max-w-5xl flex flex-col max-h-[90vh]">
+      <DialogContent ref={(el) => setDialogContainer(el)} className="w-full max-w-6xl flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contacto</DialogTitle>
-          <DialogDescription>
-            Completa los datos del contacto. Presiona <kbd className="px-1 py-0.5 rounded bg-muted text-xs font-mono">Enter</kbd> para guardar.
-          </DialogDescription>
+
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           {/* 3-column grid for all fields */}
           <div className="overflow-y-auto flex-1 pr-1">
-          <div className="grid grid-cols-3 gap-x-4 gap-y-4 mb-4">
+          <div className="grid grid-cols-4 gap-x-3 gap-y-4 mb-2">
 
             {/* Nombre */}
             <div className="space-y-2">
@@ -259,7 +255,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
             {/* Teléfono */}
             <div className="space-y-2">
-              <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} />
+              <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} hideExample />
             </div>
 
             {/* Fecha de nacimiento */}
@@ -302,7 +298,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             </div>
 
             {/* Dirección - spans 2 cols */}
-            <div className="col-span-2 space-y-2">
+            <div className="col-span-3 space-y-2">
               <label className="text-sm font-medium">Dirección</label>
               <AddressAutocomplete
                 value={address}
@@ -322,17 +318,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               placeholder="Ej: 3B"
             />
 
-            {/* Barrio */}
-            <FormField
-              label="Barrio"
-              id="barrio"
-              value={barrio}
-              onChange={(e) => setBarrio(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: Palermo"
-            />
-
-            {/* Estado Civil */}
+{/* Estado Civil */}
             <FormField
               label="Estado Civil"
               id="estadoCivil"
@@ -378,7 +364,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             />
 
             {/* Observaciones - spans full row */}
-            <div className="col-span-3 space-y-2">
+            <div className="col-span-4 space-y-2">
               <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
               <Textarea
                 id="observaciones"
@@ -391,7 +377,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             </div>
 
             {/* Pedido de Oración - spans full row */}
-            <div className="col-span-3 space-y-2">
+            <div className="col-span-4 space-y-2">
               <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
               <Textarea
                 id="pedidoOracion"

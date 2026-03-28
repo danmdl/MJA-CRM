@@ -12,7 +12,8 @@ interface CountryPhoneInputProps {
   onChange: (value: string | null) => void;
   defaultCountry?: CountryCode;
   hintExample?: string;
-  disabled?: boolean; // Added disabled prop
+  disabled?: boolean;
+  hideExample?: boolean;
 }
 
 const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({ 
@@ -21,7 +22,8 @@ const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
   onChange, 
   defaultCountry = "AR", 
   hintExample = "Ej: 5491122334455",
-  disabled = false // Default to false
+  disabled = false,
+  hideExample = false
 }) => {
   const [country, setCountry] = useState<CountryCode>(defaultCountry);
   const [phone, setPhone] = useState<string>(value || "");
@@ -67,7 +69,7 @@ const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
           disabled={disabled} // Pass disabled prop
         />
       </div>
-      <div className="text-xs text-muted-foreground">Ejemplo: 5491122334455</div>
+      {!hideExample && <div className="text-xs text-muted-foreground">Ejemplo: 5491122334455</div>}
     </div>
   );
 };

@@ -153,12 +153,12 @@ const AddressAutocomplete = ({
         </div>
       </div>
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden">
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden">
           {suggestions.map((s) => (
             <button
               key={s.place_id}
               type="button"
-              className="w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors border-b last:border-b-0 flex items-start gap-2"
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0 flex items-start gap-2 rounded-none"
               onClick={() => handleSelect(s)}
             >
               <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
