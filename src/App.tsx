@@ -21,8 +21,10 @@ import CellsPage from "./pages/admin/churches/[churchId]/CellsPage";
 import MapaPage from "./pages/admin/churches/[churchId]/MapaPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
 import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
+import PoolPage from "./pages/admin/churches/[churchId]/PoolPage";
 import LoginManagementPage from "./pages/admin/LoginManagementPage";
 import LogsPage from "./pages/admin/LogsPage";
+import ZonasPage from "./pages/admin/ZonasPage";
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
@@ -81,6 +83,7 @@ const AppRoutes = () => {
         <Route path="churches" element={<ChurchesPage />} />
         <Route path="login-management" element={<LoginManagementPage />} />
           <Route path="logs" element={<LogsPage />} />
+          <Route path="zonas" element={<ZonasPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
 
@@ -98,6 +101,7 @@ const AppRoutes = () => {
           <Route path="team" element={<ChurchTeamPage />} />
           <Route path="cells" element={<CellsPage />} />
           <Route path="mapa" element={<MapaPage />} />
+          <Route path="pool" element={<PoolPage />} />
           <Route index element={<Navigate to="overview" replace />} />
         </Route>
       </Route>
