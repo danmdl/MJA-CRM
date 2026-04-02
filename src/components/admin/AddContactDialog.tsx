@@ -9,7 +9,6 @@ import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { logger } from '@/utils/logger';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/hooks/use-session';
 import { logEvent } from '@/utils/clientLogger';
 import AddressAutocomplete from './AddressAutocomplete';
@@ -57,6 +56,8 @@ const FormField = ({ label, id, value, onChange, type = "text", required = false
   </div>
 );
 
+const nativeSelectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+
 const SelectField = ({ label, value, onChange, options, loading, placeholder, disabled = false }: {
   label: string;
   value: string | null;
@@ -67,22 +68,18 @@ const SelectField = ({ label, value, onChange, options, loading, placeholder, di
   disabled?: boolean;
 }) => (
   <div className="space-y-2">
-    <label htmlFor={label.toLowerCase().replace(/\s/g, '-')} className="text-sm font-medium">
-      {label}
-    </label>
-    <Select value={value || undefined} onValueChange={onChange} disabled={disabled || loading} >
-      <SelectTrigger>
-        <SelectValue placeholder={loading ? "Cargando..." : placeholder} />
-      </SelectTrigger>
-      <SelectContent position="item-aligned">
-        <SelectItem value="none">Sin asignación</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.id} value={option.id}>
-            {option.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <label className="text-sm font-medium">{label}</label>
+    <select
+      className={nativeSelectClass}
+      value={value || 'none'}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled || loading}
+    >
+      <option value="none">{loading ? 'Cargando...' : 'Sin asignación'}</option>
+      {options.map((option) => (
+        <option key={option.id} value={option.id}>{option.name}</option>
+      ))}
+    </select>
   </div>
 );
 
@@ -304,16 +301,16 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             {/* Sexo */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Sexo</label>
-              <Select value={sexo || undefined} onValueChange={(v) => setSexo(v === 'none' ? null : v)} disabled={loading}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona..." />
-                </SelectTrigger>
-                <SelectContent position="item-aligned">
-                  <SelectItem value="none">Sin especificar</SelectItem>
-                  <SelectItem value="masculino">Masculino</SelectItem>
-                  <SelectItem value="femenino">Femenino</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                className={nativeSelectClass}
+                value={sexo || 'none'}
+                onChange={(e) => setSexo(e.target.value === 'none' ? null : e.target.value)}
+                disabled={loading}
+              >
+                <option value="none">Sin especificar</option>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
             </div>
 
             {/* Dirección - spans 2 cols */}
