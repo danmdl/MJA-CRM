@@ -9,7 +9,7 @@ interface Suggestion {
 
 interface AddressAutocompleteProps {
   value: string;
-  onChange: (address: string, lat?: number, lng?: number) => void;
+  onChange: (address: string, lat?: number, lng?: number, barrio?: string) => void;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -115,10 +115,18 @@ const AddressAutocomplete = ({
       geocoderRef.current.geocode(
         { placeId: suggestion.place_id },
         (results: any[], status: string) => {
-          if (!mountedRef.current) return; // don't call onChange if unmounted
+          if (!mountedRef.current) return;
           if (status === 'OK' && results[0]) {
             const loc = results[0].geometry.location;
-            onChange(suggestion.description, loc.lat(), loc.lng());
+            // Extract barrio from address components
+            const components = results[0].address_components || [];
+            const barrio = (
+              components.find((c: any) => c.types.includes('neighborhood'))?.long_name ||
+              components.find((c: any) => c.types.includes('sublocality_level_1'))?.long_name ||
+              components.find((c: any) => c.types.includes('sublocality'))?.long_name ||
+              ''
+            );
+            onChange(suggestion.description, loc.lat(), loc.lng(), barrio);
           }
         }
       );

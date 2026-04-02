@@ -376,7 +376,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               <label className="text-sm font-medium">Dirección</label>
               <AddressAutocomplete
                 value={address}
-                onChange={(addr) => setAddress(addr || '')}
+                onChange={(addr, lat, lng, barrio) => {
+                  setAddress(addr || '');
+                  if (barrio) setBarrio(barrio);
+                }}
                 placeholder="Ej: Av. Corrientes 1234"
                 disabled={loading}
               />

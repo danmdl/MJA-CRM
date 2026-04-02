@@ -598,7 +598,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 </label>
                 <AddressAutocomplete
                   value={contact.address || ''}
-                  onChange={(addr) => setContact({ ...contact, address: addr || null })}
+                  onChange={(addr, lat, lng, barrio) => setContact(prev => ({ ...prev!, address: addr || null, ...(barrio ? { barrio } : {}) }))}
                   placeholder="Escribe la dirección para buscar y confirmar..."
                 />
               </div>
