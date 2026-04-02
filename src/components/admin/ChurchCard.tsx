@@ -61,6 +61,26 @@ const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId
         <Button asChild>
           <a href={`/admin/churches/${church.id}/overview`}>Ver Detalles</a>
         </Button>
+        {currentUserRole === 'admin' && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(church)}>
+                <Pencil className="mr-2 h-4 w-4" /> Editar nombre
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => onDelete(church.id, church.name)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Eliminar iglesia
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </CardContent>
     </Card>
   );

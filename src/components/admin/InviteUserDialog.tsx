@@ -29,6 +29,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [numeroCuerda, setNumeroCuerda] = useState('');
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
 
@@ -61,7 +62,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         showError(data.error || 'Error al enviar invitación.');
       } else {
         showSuccess('¡Invitación enviada con éxito!');
-        setEmail(''); setRole('user'); setFirstName(''); setLastName(''); setPhone('');
+        setEmail(''); setRole('user'); setFirstName(''); setLastName(''); setPhone(''); setNumeroCuerda('');
         queryClient.invalidateQueries({ queryKey: ['users'] });
         if (churchId) queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
         setTimeout(() => onOpenChange(false), 50);

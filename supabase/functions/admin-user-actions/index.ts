@@ -45,7 +45,7 @@ serve(async (req) => {
     const callerChurchId = profile.church_id;
     const isAdminOrGeneral = callerRole === 'admin' || callerRole === 'general';
 
-    const { action, email, role, churchId, userId, newRole, roles, newPassword, first_name, last_name, phone } = await req.json();
+    const { action, email, role, churchId, userId, newRole, roles, newPassword, first_name, last_name, phone, numero_cuerda } = await req.json();
     const siteUrl = Deno.env.get('SITE_URL') ?? 'https://mja-one.vercel.app';
     console.log('[admin-user-actions] Edge Function using SITE_URL:', siteUrl);
 
@@ -72,7 +72,7 @@ serve(async (req) => {
 
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'user', church_id: churchId || null, first_name: first_name || null, last_name: last_name || null, phone: phone || null }
+          data: { role: role || 'user', church_id: churchId || null, first_name: first_name || null, last_name: last_name || null, phone: phone || null, numero_cuerda: numero_cuerda || null }
         });
 
         if (error) {

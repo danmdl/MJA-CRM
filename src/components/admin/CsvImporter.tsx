@@ -38,6 +38,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   const [loading, setLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const [importErrors, setImportErrors] = useState<{row: number, field: string, value: string, message: string}[]>([]);
+  const [failedContacts, setFailedContacts] = useState<{row: number, data: Record<string, string>}[]>([]);
   const [ignoreMap, setIgnoreMap] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -66,6 +67,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     setFile(selectedFile);
     setImportSuccess(false);
     setImportErrors([]);
+    setFailedContacts([]);
     setColumnMapping({});
     setIgnoreMap({});
     Papa.parse(selectedFile, {
@@ -194,25 +196,38 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         setImportErrors(validationErrors);
       }
 
-      // Insert in batches to avoid hitting limits for large files
-      const batchSize = 1000;
-      for (let i = 0; i < recordsToInsert.length; i += batchSize) {
-        const batch = recordsToInsert.slice(i, i + batchSize);
-        console.log(`[CsvImporter] Inserting batch ${i / batchSize + 1} of ${Math.ceil(recordsToInsert.length / batchSize)}`);
-        const { error } = await supabase.from(tableName).insert(batch);
-
+      // Insert records individually to track exactly which ones fail
+      const failed: {row: number, data: Record<string, string>}[] = [];
+      let successCount = 0;
+      
+      for (let i = 0; i < recordsToInsert.length; i++) {
+        const { error } = await supabase.from(tableName).insert(recordsToInsert[i]);
         if (error) {
-          console.error('[CsvImporter] Error inserting batch:', error);
-          await logEvent({ action: 'csv_import', error, payload: { batch_size: batch.length, church_id: churchId }, context: { church_id: churchId } });
-          // Try to extract column name from error
           const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);
           const valMatch = colMatch ? colMatch[1] : '';
-          setImportErrors(prev => [...prev, { row: i + 1, field: 'Desconocido', value: valMatch, message: error.message }]);
-          throw new Error(`Error al insertar datos: ${error.message}`);
+          setImportErrors(prev => [...prev, { 
+            row: i + 1, 
+            field: 'Error de inserción', 
+            value: valMatch, 
+            message: error.message 
+          }]);
+          // Store the original CSV row data for display
+          failed.push({ row: i + 1, data: dataToImport[i] as Record<string, string> });
+          await logEvent({ action: 'csv_import', error, payload: { row: i + 1, church_id: churchId }, context: { church_id: churchId } });
+        } else {
+          successCount++;
         }
       }
+      
+      if (failed.length > 0) {
+        setFailedContacts(failed);
+      }
+      
+      if (successCount === 0 && failed.length > 0) {
+        throw new Error(`No se pudo importar ningún contacto. ${failed.length} fila(s) con errores.`);
+      }
 
-      showSuccess('¡Datos importados con éxito!');
+      showSuccess(`¡Importación completada! ${recordsToInsert.length - (failedContacts.length || 0)} contactos importados.`);
       setImportSuccess(true);
       setFile(null);
       setCsvHeaders([]);
@@ -269,15 +284,16 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           />
           {file && <p className="text-sm text-muted-foreground">Archivo seleccionado: {file.name}</p>}
           {importSuccess && (
-            <p className="text-sm text-green-600 flex items-center gap-1">
-              <CheckCircle2 className="h-4 w-4" /> Importación completada{importErrors.length > 0 ? ` con ${importErrors.length} advertencia(s).` : '.'}
+            <p className="text-sm text-green-600 flex items-center gap-1 mt-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Importación completada{failedContacts.length > 0 ? ` — ${failedContacts.length} contacto(s) no pudieron importarse (ver abajo)` : ' con éxito'}.
             </p>
           )}
           {importErrors.length > 0 && (
-            <div className="mt-2 border border-yellow-500 rounded-md overflow-hidden">
+            <div className="mt-3 border border-yellow-500 rounded-md overflow-hidden">
               <div className="bg-yellow-500/10 px-3 py-2 flex items-center gap-2 text-yellow-600 font-medium text-sm">
                 <span>⚠️</span>
-                <span>{importErrors.length} fila(s) con problemas</span>
+                <span>{importErrors.length} fila(s) con advertencias de formato — el campo fue importado como vacío</span>
               </div>
               <div className="max-h-48 overflow-y-auto">
                 <table className="w-full text-xs">
@@ -296,6 +312,36 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                         <td className="px-3 py-1.5 font-medium">{err.field}</td>
                         <td className="px-3 py-1.5 font-mono text-red-500">{err.value || '(vacío)'}</td>
                         <td className="px-3 py-1.5 text-muted-foreground">{err.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {failedContacts.length > 0 && (
+            <div className="mt-3 border border-red-500 rounded-md overflow-hidden">
+              <div className="bg-red-500/10 px-3 py-2 flex items-center gap-2 text-red-600 font-medium text-sm">
+                <span>❌</span>
+                <span>{failedContacts.length} contacto(s) NO importados — datos originales del CSV:</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left px-3 py-1.5 font-medium">Fila</th>
+                      {Object.keys(failedContacts[0]?.data || {}).slice(0, 6).map(k => (
+                        <th key={k} className="text-left px-3 py-1.5 font-medium">{k}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {failedContacts.map((fc, i) => (
+                      <tr key={i} className="hover:bg-red-500/5">
+                        <td className="px-3 py-1.5 font-mono text-red-500">{fc.row}</td>
+                        {Object.values(fc.data).slice(0, 6).map((v, j) => (
+                          <td key={j} className="px-3 py-1.5">{String(v || '')}</td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
