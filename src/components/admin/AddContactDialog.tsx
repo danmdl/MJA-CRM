@@ -235,7 +235,25 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     }
   };
 
+  const formStyles = `
+    .contact-form-grid { grid-template-columns: 1fr; }
+    .contact-form-col-wide { grid-column: span 1; }
+    .contact-form-col-full { grid-column: span 1; }
+    @media (min-width: 640px) {
+      .contact-form-grid { grid-template-columns: repeat(2, 1fr); }
+      .contact-form-col-wide { grid-column: span 2; }
+      .contact-form-col-full { grid-column: span 2; }
+    }
+    @media (min-width: 1024px) {
+      .contact-form-grid { grid-template-columns: repeat(4, 1fr); }
+      .contact-form-col-wide { grid-column: span 3; }
+      .contact-form-col-full { grid-column: span 4; }
+    }
+  `;
+
   return (
+    <>
+    <style>{formStyles}</style>
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 1000, display: open ? 'flex' : 'none', alignItems: 'flex-start', justifyContent: 'center', padding: '0' }}
       onClick={(e) => { if (e.target === e.currentTarget) { onOpenChange(false); } }}
@@ -250,7 +268,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ overflowY: 'auto', flex: 1, padding: '16px 24px' }}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-4 mb-2">
+          <div className="contact-form-grid" style={{ display: "grid", gap: "12px 12px", marginBottom: "8px" }}>
 
             {/* Nombre */}
             <div className="space-y-2">
@@ -351,7 +369,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             </div>
 
             {/* Dirección - spans 2 cols */}
-            <div className="col-span-1 sm:col-span-2 lg:col-span-3 space-y-2">
+            <div className="contact-form-col-wide space-y-2">
               <label className="text-sm font-medium">Dirección</label>
               <AddressAutocomplete
                 value={address}
@@ -415,7 +433,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             />
 
             {/* Observaciones - spans full row */}
-            <div className="col-span-1 sm:col-span-2 lg:col-span-4 space-y-2">
+            <div className="contact-form-col-full space-y-2">
               <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
               <Textarea
                 id="observaciones"
@@ -428,7 +446,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             </div>
 
             {/* Pedido de Oración - spans full row */}
-            <div className="col-span-1 sm:col-span-2 lg:col-span-4 space-y-2">
+            <div className="contact-form-col-full space-y-2">
               <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
               <Textarea
                 id="pedidoOracion"
@@ -457,6 +475,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         </form>
       </div>
     </div>
+    </>
   );
 };
 
