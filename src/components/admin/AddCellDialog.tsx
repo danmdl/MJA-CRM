@@ -112,7 +112,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
         showError(error.message || 'Error al actualizar la célula.');
       } else {
         showSuccess('Célula actualizada con éxito.');
-        onOpenChange(false);
+        setTimeout(() => onOpenChange(false), 50);
       }
     } else {
       const { error } = await supabase
@@ -132,7 +132,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
         showError(error.message || 'Error al crear la célula.');
       } else {
         showSuccess('Célula creada con éxito.');
-        onOpenChange(false);
+        setTimeout(() => onOpenChange(false), 50);
       }
     }
     setSaving(false);
@@ -202,7 +202,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
           </div>
         </div>
         <DialogFooter className="mt-4">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => setTimeout(() => onOpenChange(false), 50)} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : (isEdit ? 'Guardar cambios' : 'Crear')}</Button>
         </DialogFooter>
       </DialogContent>

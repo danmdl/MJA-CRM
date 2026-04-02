@@ -45,7 +45,7 @@ const AddContactLogDialog: React.FC<AddContactLogDialogProps> = ({ open, onOpenC
         setDate('');
         setMethod('');
         setNotes('');
-        onOpenChange(false);
+        setTimeout(() => onOpenChange(false), 50);
         if (onAdded) onAdded();
       }
     } finally {
@@ -54,7 +54,7 @@ const AddContactLogDialog: React.FC<AddContactLogDialogProps> = ({ open, onOpenC
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) setTimeout(() => onOpenChange(false), 50); else onOpenChange(true); }}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Agregar registro</DialogTitle>

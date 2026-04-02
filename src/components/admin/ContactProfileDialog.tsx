@@ -205,6 +205,7 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
 );
 
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
+  const safeClose = () => setTimeout(() => safeClose(), 50);
   const [contact, setContact] = useState<Contact | null>(null);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -389,7 +390,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       } else {
         showSuccess('Contacto actualizado con éxito.');
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-        onOpenChange(false);
+        safeClose();
       }
     } finally {
       setSaving(false);
@@ -429,7 +430,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   if (loading) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
         <DialogContent>
           <div className="flex items-center justify-center h-32">
             <div>Cargando contacto...</div>
@@ -440,7 +441,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Perfil del Contacto</DialogTitle>
@@ -661,7 +662,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             />
 
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+              <Button variant="outline" onClick={() => safeClose()} disabled={saving}>Cancelar</Button>
               {canEditDeleteUsers() && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
             </div>
           </div>

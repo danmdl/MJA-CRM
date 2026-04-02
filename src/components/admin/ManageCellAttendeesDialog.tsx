@@ -84,7 +84,7 @@ const ManageCellAttendeesDialog = ({ open, onOpenChange, churchId, cellId }: Man
         if (error) throw error;
       }
       showSuccess('Asistentes actualizados.');
-      onOpenChange(false);
+      setTimeout(() => onOpenChange(false), 50);
     } catch (e: any) {
       showError(e.message || 'Error al actualizar asistentes.');
     } finally {
@@ -120,7 +120,7 @@ const ManageCellAttendeesDialog = ({ open, onOpenChange, churchId, cellId }: Man
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => setTimeout(() => onOpenChange(false), 50)} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
         </DialogFooter>
       </DialogContent>

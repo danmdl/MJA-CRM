@@ -275,7 +275,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     </div>
 
     {/* Edit User Dialog */}
-    <Dialog open={!!editDialogUser} onOpenChange={(open) => { if (!open) setEditDialogUser(null); }}>
+    <Dialog open={!!editDialogUser} onOpenChange={(open) => { if (!open) setTimeout(() => setEditDialogUser(null), 50); }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Editar Usuario</DialogTitle>
@@ -298,7 +298,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setEditDialogUser(null)}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => setTimeout(() => setEditDialogUser(null), 50)}>Cancelar</Button>
           <Button
             disabled={savingEdit}
             onClick={async () => {
@@ -311,7 +311,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                   last_name: editLastName.trim(),
                   phone: editPhone.trim(),
                 });
-                setEditDialogUser(null);
+                setTimeout(() => setEditDialogUser(null), 50);
               } finally {
                 setSavingEdit(false);
               }
@@ -324,7 +324,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     </Dialog>
 
     {/* Change Password Dialog */}
-    <Dialog open={!!resetDialogUser} onOpenChange={(open) => { if (!open) setResetDialogUser(null); }}>
+    <Dialog open={!!resetDialogUser} onOpenChange={(open) => { if (!open) setTimeout(() => setResetDialogUser(null), 50); }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Cambiar contraseña</DialogTitle>
@@ -347,7 +347,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
           </button>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setResetDialogUser(null)}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => setTimeout(() => setResetDialogUser(null), 50)}>Cancelar</Button>
           <Button
             disabled={newPassword.length < 6 || resettingPw}
             onClick={async () => {
@@ -361,7 +361,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
               setResettingPw(false);
               if (resp.ok) {
                 showSuccess('Contraseña actualizada correctamente.');
-                setResetDialogUser(null);
+                setTimeout(() => setResetDialogUser(null), 50);
               } else {
                 const err = await resp.json();
                 showError(err.error || 'Error al cambiar la contraseña.');

@@ -64,7 +64,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         setEmail(''); setRole('user'); setFirstName(''); setLastName(''); setPhone('');
         queryClient.invalidateQueries({ queryKey: ['users'] });
         if (churchId) queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
-        onOpenChange(false);
+        setTimeout(() => onOpenChange(false), 50);
       }
     } catch (error: any) {
       showError(error.message || 'Error al enviar la invitación.');
@@ -74,7 +74,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) setTimeout(() => onOpenChange(false), 50); else onOpenChange(true); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Invitar a un nuevo miembro</DialogTitle>
@@ -118,7 +118,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="5491122334455" disabled={loading} />
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
+            <Button type="button" variant="ghost" onClick={() => setTimeout(() => onOpenChange(false), 50)} disabled={loading}>Cancelar</Button>
             <Button type="submit" disabled={loading}>
               {loading ? 'Enviando...' : 'Enviar Invitación'}
             </Button>
