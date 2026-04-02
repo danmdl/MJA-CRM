@@ -92,6 +92,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [address, setAddress] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<string>('');
+  const [edad, setEdad] = useState<string>('');
   const [fechaContacto, setFechaContacto] = useState<string>(today());
   const [sexo, setSexo] = useState<string | null>(null);
   const [estadoCivil, setEstadoCivil] = useState('');
@@ -185,6 +186,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           church_id: churchId,
           created_by: session?.user?.id || null,
           date_of_birth: dateOfBirth || null,
+          edad: edad ? parseInt(edad) : null,
           fecha_contacto: fechaContacto || null,
           sexo: sexo || null,
           estado_civil: estadoCivil || null,
@@ -287,28 +289,34 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 id="dob"
                 type="date"
                 value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
+                onChange={(e) => {
+                  setDateOfBirth(e.target.value);
+                  if (e.target.value) {
+                    const dob = new Date(e.target.value);
+                    const now = new Date();
+                    let age = now.getFullYear() - dob.getFullYear();
+                    const m = now.getMonth() - dob.getMonth();
+                    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+                    if (age >= 0) setEdad(String(age));
+                  }
+                }}
                 disabled={loading}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 
-            {/* Edad - auto calculated */}
+            {/* Edad - editable, auto-filled from date of birth */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Edad</label>
               <input
-                type="text"
-                readOnly
-                value={dateOfBirth ? (() => {
-                  const dob = new Date(dateOfBirth);
-                  const today = new Date();
-                  let age = today.getFullYear() - dob.getFullYear();
-                  const m = today.getMonth() - dob.getMonth();
-                  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-                  return age >= 0 ? `${age} años` : '';
-                })() : ''}
-                placeholder="Se calcula automáticamente"
-                className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-default"
+                type="number"
+                min="0"
+                max="120"
+                value={edad}
+                onChange={(e) => setEdad(e.target.value)}
+                disabled={loading}
+                placeholder="Ej: 32"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 
