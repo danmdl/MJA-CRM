@@ -14,7 +14,6 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
-      console.error("[update-contact] Missing Authorization header")
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
@@ -25,17 +24,14 @@ serve(async (req) => {
     )
 
     const { contactId, churchId, data } = await req.json()
-    console.log("[update-contact] Payload received", { contactId, churchId })
 
     if (!contactId || !churchId || !data) {
-      console.error("[update-contact] Missing required fields")
       return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
     // Validate user
     const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
     if (userErr || !userData?.user) {
-      console.error("[update-contact] Invalid token", userErr)
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
@@ -47,56 +43,61 @@ serve(async (req) => {
       .single()
 
     if (callerErr || !callerProfile) {
-      console.error("[update-contact] Caller profile not found", callerErr)
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
     const isAdminOrGeneral = callerProfile.role === "admin" || callerProfile.role === "general"
+    const isConector = callerProfile.role === "user"
+
+    // Church access check
     if (!isAdminOrGeneral && callerProfile.church_id !== churchId) {
-      console.error("[update-contact] Caller not allowed for this church", { callerChurch: callerProfile.church_id, churchId })
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // Verify contact belongs to the church
+    // Check edit_delete_contacts permission from permissions table
+    const { data: perm } = await supabaseAdmin
+      .from("permissions")
+      .select("edit_delete_contacts")
+      .eq("role", callerProfile.role)
+      .single()
+
+    const hasEditPermission = perm?.edit_delete_contacts === true
+
+    // Fetch the contact to check ownership for Connectors
     const { data: targetContact, error: contactErr } = await supabaseAdmin
       .from("contacts")
-      .select("id, church_id")
+      .select("id, church_id, created_by")
       .eq("id", contactId)
       .eq("church_id", churchId)
       .single()
 
     if (contactErr || !targetContact) {
-      console.error("[update-contact] Contact not found or not in church", contactErr)
       return new Response(JSON.stringify({ error: "Contact not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // Fetch before state
-    const { data: before } = await supabaseAdmin
-      .from("contacts")
-      .select("*")
-      .eq("id", contactId)
-      .eq("church_id", churchId)
-      .single()
+    // Permission check:
+    // - Admin/General with edit_delete_contacts: always allowed
+    // - Other roles with edit_delete_contacts: allowed if same church
+    // - Conector (user role): only allowed if they created the contact
+    const isOwner = targetContact.created_by === userData.user.id
 
-    // Sanitize incoming fields to only allow valid columns
+    if (!hasEditPermission && !(isConector && isOwner)) {
+      console.error("[update-contact] Permission denied", { role: callerProfile.role, hasEditPermission, isConector, isOwner })
+      return new Response(JSON.stringify({ error: "No tienes permiso para editar contactos." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } })
+    }
+
+    // Sanitize incoming fields
     const allowedKeys = new Set([
-      "first_name",
-      "last_name",
-      "email",
-      "phone",
-      "address",
-      "apartment_number",
-      "barrio",
-      "leader_assigned",
-      "cell_id",
-      "date_of_birth",
+      "first_name", "last_name", "email", "phone", "address",
+      "apartment_number", "barrio", "leader_assigned", "cell_id",
+      "date_of_birth", "fecha_contacto", "sexo", "estado_civil",
+      "observaciones", "pedido_de_oracion", "conector", "edad",
+      "numero_cuerda", "zona",
     ])
     const sanitized: Record<string, unknown> = {}
     for (const k in data) {
       if (allowedKeys.has(k)) sanitized[k] = data[k]
     }
-
-    console.log("[update-contact] Updating contact with", sanitized)
 
     const { error: updateErr } = await supabaseAdmin
       .from("contacts")
@@ -105,34 +106,17 @@ serve(async (req) => {
       .eq("church_id", churchId)
 
     if (updateErr) {
-      console.error("[update-contact] Update failed", updateErr)
       return new Response(JSON.stringify({ error: updateErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
-    // Fetch after state
-    const { data: after } = await supabaseAdmin
-      .from("contacts")
-      .select("*")
-      .eq("id", contactId)
-      .eq("church_id", churchId)
-      .single()
-
     // Log activity
-    const { error: logErr } = await supabaseAdmin
-      .from("activity_logs")
-      .insert({
-        user_id: userData.user.id,
-        church_id: churchId,
-        action: "update",
-        entity_type: "contact",
-        entity_id: contactId,
-        before_data: before ?? null,
-        after_data: after ?? null,
-      })
-
-    if (logErr) {
-      console.error("[update-contact] Failed to write activity log", logErr)
-    }
+    await supabaseAdmin.from("activity_logs").insert({
+      user_id: userData.user.id,
+      church_id: churchId,
+      action: "update",
+      entity_type: "contact",
+      entity_id: contactId,
+    }).then(() => {})
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } })
   } catch (e) {

@@ -37,6 +37,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   const [columnMapping, setColumnMapping] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [importErrors, setImportErrors] = useState<{row: number, field: string, value: string, message: string}[]>([]);
   const [ignoreMap, setIgnoreMap] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -64,6 +65,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     console.log("[CsvImporter] parseFile triggered.");
     setFile(selectedFile);
     setImportSuccess(false);
+    setImportErrors([]);
     setColumnMapping({});
     setIgnoreMap({});
     Papa.parse(selectedFile, {
@@ -173,6 +175,25 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         return newRecord;
       });
 
+      // Pre-validate rows and collect errors before inserting
+      const validationErrors: {row: number, field: string, value: string, message: string}[] = [];
+      recordsToInsert.forEach((record, idx) => {
+        allTargetFields.forEach(f => {
+          if (DATE_FIELDS.has(f.key) && record[f.key] !== null && record[f.key] !== undefined) {
+            const raw = dataToImport[idx][columnMapping[f.key] || ''] || '';
+            const dateRegex = /^(\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{2}[\/\-]\d{2}[\/\-]\d{2})$/;
+            if (raw && !dateRegex.test(String(raw).trim())) {
+              validationErrors.push({ row: idx + 1, field: f.label, value: String(raw), message: 'Formato de fecha inválido (use AAAA-MM-DD)' });
+              record[f.key] = null; // sanitize to null
+            }
+          }
+        });
+      });
+
+      if (validationErrors.length > 0) {
+        setImportErrors(validationErrors);
+      }
+
       // Insert in batches to avoid hitting limits for large files
       const batchSize = 1000;
       for (let i = 0; i < recordsToInsert.length; i += batchSize) {
@@ -183,6 +204,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         if (error) {
           console.error('[CsvImporter] Error inserting batch:', error);
           await logEvent({ action: 'csv_import', error, payload: { batch_size: batch.length, church_id: churchId }, context: { church_id: churchId } });
+          // Try to extract column name from error
+          const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);
+          const valMatch = colMatch ? colMatch[1] : '';
+          setImportErrors(prev => [...prev, { row: i + 1, field: 'Desconocido', value: valMatch, message: error.message }]);
           throw new Error(`Error al insertar datos: ${error.message}`);
         }
       }
@@ -245,8 +270,38 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           {file && <p className="text-sm text-muted-foreground">Archivo seleccionado: {file.name}</p>}
           {importSuccess && (
             <p className="text-sm text-green-600 flex items-center gap-1">
-              <CheckCircle2 className="h-4 w-4" /> Importación completada.
+              <CheckCircle2 className="h-4 w-4" /> Importación completada{importErrors.length > 0 ? ` con ${importErrors.length} advertencia(s).` : '.'}
             </p>
+          )}
+          {importErrors.length > 0 && (
+            <div className="mt-2 border border-yellow-500 rounded-md overflow-hidden">
+              <div className="bg-yellow-500/10 px-3 py-2 flex items-center gap-2 text-yellow-600 font-medium text-sm">
+                <span>⚠️</span>
+                <span>{importErrors.length} fila(s) con problemas</span>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left px-3 py-1.5 font-medium">Fila</th>
+                      <th className="text-left px-3 py-1.5 font-medium">Campo</th>
+                      <th className="text-left px-3 py-1.5 font-medium">Valor recibido</th>
+                      <th className="text-left px-3 py-1.5 font-medium">Problema</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {importErrors.map((err, i) => (
+                      <tr key={i} className="hover:bg-muted/50">
+                        <td className="px-3 py-1.5 font-mono">{err.row}</td>
+                        <td className="px-3 py-1.5 font-medium">{err.field}</td>
+                        <td className="px-3 py-1.5 font-mono text-red-500">{err.value || '(vacío)'}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">{err.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
         </div>
 
