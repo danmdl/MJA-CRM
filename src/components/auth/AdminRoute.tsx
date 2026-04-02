@@ -45,7 +45,7 @@ const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
   // Users with zero permissions (role = 'user') are redirected.
   if (location.pathname.startsWith('/admin')) {
     const userRole = profile?.role;
-    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(userRole || '');
+    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'user'].includes(userRole || '');
     const hasBroadAccess = canSeeAllChurches();
 
     if (!hasBroadAccess && !isChurchRole) {
