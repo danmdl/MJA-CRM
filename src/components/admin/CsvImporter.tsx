@@ -71,7 +71,8 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       skipEmptyLines: 'greedy',
       complete: (results) => {
         if (results.meta.fields) {
-          setCsvHeaders(results.meta.fields);
+          const validHeaders = results.meta.fields.filter(h => h && h.trim() !== '');
+          setCsvHeaders(validHeaders);
           const initialMapping: Record<string, string | null> = {};
           allTargetFields.forEach(targetField => {
             const matchingCsvHeader = results.meta.fields?.find(csvHeader =>
@@ -244,9 +245,9 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                       <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
                     </SelectTrigger>
                     <SelectContent>
-                      {csvHeaders.map(header => (
-                        <SelectItem key={header} value={header}>
-                          {header}
+                      {csvHeaders.map((header, i) => (
+                        <SelectItem key={header || `empty-${i}`} value={header || `__empty_${i}__`}>
+                          {header || '(columna vacía)'}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -267,9 +268,9 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">(Opcional)</SelectItem>
-                        {csvHeaders.map(header => (
-                          <SelectItem key={header} value={header}>
-                            {header}
+                        {csvHeaders.map((header, i) => (
+                          <SelectItem key={header || `empty-${i}`} value={header || `__empty_${i}__`}>
+                            {header || '(columna vacía)'}
                           </SelectItem>
                         ))}
                       </SelectContent>
