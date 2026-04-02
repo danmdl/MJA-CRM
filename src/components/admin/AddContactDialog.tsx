@@ -237,20 +237,20 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: open ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: open ? 'flex' : 'none', alignItems: 'flex-start', justifyContent: 'center', padding: '0' }}
       onClick={(e) => { if (e.target === e.currentTarget) { onOpenChange(false); } }}
     >
       {/* Backdrop */}
       <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: -1 }} />
       {/* Modal */}
-      <div style={{ backgroundColor: 'hsl(240,10%,3.9%)', border: '1px solid hsl(240,3.7%,15.9%)', borderRadius: '12px', width: '100%', maxWidth: '1100px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.8)' }}>
+      <div className="w-full lg:max-w-5xl lg:my-4 lg:rounded-xl lg:border lg:border-[hsl(240,3.7%,15.9%)] lg:shadow-2xl" style={{ backgroundColor: 'hsl(240,10%,3.9%)', display: 'flex', flexDirection: 'column', height: '100dvh', maxHeight: '100dvh' }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid hsl(240,3.7%,15.9%)', flexShrink: 0 }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'hsl(0,0%,98%)' }}>Crear Nuevo Contacto</h2>
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ overflowY: 'auto', flex: 1, padding: '16px 24px' }}>
-          <div className="grid grid-cols-4 gap-x-3 gap-y-4 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-4 mb-2">
 
             {/* Nombre */}
             <div className="space-y-2">
@@ -314,10 +314,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 min="0"
                 max="120"
                 value={edad}
-                onChange={(e) => setEdad(e.target.value)}
+                onChange={(e) => !dateOfBirth && setEdad(e.target.value)}
+                readOnly={!!dateOfBirth}
                 disabled={loading}
                 placeholder="Ej: 32"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`flex h-10 w-full rounded-md border border-input px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${dateOfBirth ? 'bg-muted text-muted-foreground cursor-default' : 'bg-background'}`}
               />
             </div>
 
@@ -350,7 +351,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             </div>
 
             {/* Dirección - spans 2 cols */}
-            <div className="col-span-3 space-y-2">
+            <div className="col-span-1 sm:col-span-2 lg:col-span-3 space-y-2">
               <label className="text-sm font-medium">Dirección</label>
               <AddressAutocomplete
                 value={address}
@@ -414,7 +415,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             />
 
             {/* Observaciones - spans full row */}
-            <div className="col-span-4 space-y-2">
+            <div className="col-span-1 sm:col-span-2 lg:col-span-4 space-y-2">
               <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
               <Textarea
                 id="observaciones"
@@ -427,7 +428,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             </div>
 
             {/* Pedido de Oración - spans full row */}
-            <div className="col-span-4 space-y-2">
+            <div className="col-span-1 sm:col-span-2 lg:col-span-4 space-y-2">
               <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
               <Textarea
                 id="pedidoOracion"
