@@ -98,16 +98,21 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [estadoCivil, setEstadoCivil] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [pedidoDeOracion, setPedidoDeOracion] = useState('');
-  const [conector, setConector] = useState('');
+  const [conector, setConector] = useState(() => ''); // will be set in useEffect
   const [leaderAssigned, setLeaderAssigned] = useState<string | null>(null);
   const [cellId, setCellId] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { session } = useSession();
+  const { session, profile } = useSession();
   const firstNameRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (open) {
       setTimeout(() => firstNameRef.current?.focus(), 50);
+      // Auto-fill Conector with user's name if their role is 'user' (Conector)
+      if (profile?.role === 'user' && !conector) {
+        const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+        if (name) setConector(name);
+      }
     } else {
       resetForm();
     }

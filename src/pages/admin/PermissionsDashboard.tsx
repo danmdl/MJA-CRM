@@ -91,7 +91,7 @@ const defaultPermissions: PermissionConfig[] = [
   },
   {
     role: 'user',
-    label: 'Usuario',
+    label: 'Conector',
     permissions: {
       seeAllChurches: false,
       accessAllChurches: false,

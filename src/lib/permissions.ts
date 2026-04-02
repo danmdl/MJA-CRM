@@ -28,7 +28,7 @@ export const ROLE_LABELS: Record<string, string> = {
   pastor: 'Pastor',
   referente: 'Referente',
   encargado_de_celula: 'Líder de Célula',
-  user: 'Usuario',
+  user: 'Conector',
 };
 
 export const usePermissions = () => {
