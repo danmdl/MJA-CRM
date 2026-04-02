@@ -106,7 +106,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const firstNameRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
-    if (open) setTimeout(() => firstNameRef.current?.focus(), 50);
+    if (open) {
+      setTimeout(() => firstNameRef.current?.focus(), 50);
+    } else {
+      resetForm();
+    }
   }, [open]);
 
   const resetForm = () => {
@@ -223,7 +227,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           resetForm();
           setTimeout(() => firstNameRef.current?.focus(), 50);
         } else {
-          resetForm();
           onOpenChange(false);
         }
       }
@@ -232,12 +235,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     }
   };
 
-  if (!open) return null;
-
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
-      onClick={(e) => { if (e.target === e.currentTarget) { resetForm(); onOpenChange(false); } }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: open ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+      onClick={(e) => { if (e.target === e.currentTarget) { onOpenChange(false); } }}
     >
       {/* Backdrop */}
       <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: -1 }} />
@@ -442,7 +443,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '16px 24px', borderTop: '1px solid hsl(240,3.7%,15.9%)', flexShrink: 0 }}>
-            <Button type="button" variant="ghost" onClick={() => { resetForm(); onOpenChange(false); }} disabled={loading}>
+            <Button type="button" variant="ghost" onClick={() => { onOpenChange(false); }} disabled={loading}>
               Cancelar
             </Button>
             <Button type="button" variant="outline" disabled={loading || !firstName.trim()} onClick={(e) => handleSubmit(e as any, true)}>
