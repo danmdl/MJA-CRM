@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePermissions } from '@/lib/permissions';
+import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -83,6 +84,12 @@ const ChurchDatabasePage = () => {
   const [ageGroupFilter, setAgeGroupFilter] = useState<string | null>(null);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { canAddUsers, canEditDeleteUsers } = usePermissions();
+  const { profile } = useSession();
+  // Contacts permissions - separate from team member permissions
+  // Connectors can always add contacts (that's their job)
+  // Anyone with access can add contacts; edit/delete requires permission OR being a connector
+  const canAddContacts = () => canAddUsers() || profile?.role === 'user';
+  const canEditContacts = () => canEditDeleteUsers() || profile?.role === 'user';
 
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
@@ -109,7 +116,7 @@ const ChurchDatabasePage = () => {
             <Download className="mr-1.5 h-4 w-4" />
             {exporting ? 'Exportando...' : 'Exportar CSV'}
           </Button>
-          {canAddUsers() && (
+          {canAddContacts() && (
             <>
               <Button variant="outline" size="sm" onClick={() => setIsCsvDialogOpen(true)}>
                 <Upload className="mr-1.5 h-4 w-4" />
@@ -133,7 +140,7 @@ const ChurchDatabasePage = () => {
               </Dialog>
             </>
           )}
-          {canAddUsers() && (
+          {canAddContacts() && (
             <Button onClick={() => setIsAddContactDialogOpen(true)} size="sm">
               <PlusCircle className="mr-1.5 h-4 w-4" />
               Crear Contacto
@@ -196,9 +203,9 @@ const ChurchDatabasePage = () => {
         filterField={filterField}
         ageGroup={ageGroup}
         useExternalToolbarContainer={true}
-        canEdit={canEditDeleteUsers()}
-        canDelete={canEditDeleteUsers()}
-        canAdd={canAddUsers()}
+        canEdit={canEditContacts()}
+        canDelete={canEditContacts()}
+        canAdd={canAddContacts()}
       />
 
       <AddContactDialog
