@@ -50,12 +50,26 @@ const AddressAutocomplete = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const autocompleteServiceRef = useRef<any>(null);
   const geocoderRef = useRef<any>(null);
+  const mountedRef = useRef(true); // track if component is still mounted
 
-  useEffect(() => { setQuery(value); }, [value]);
+  // Track mounted state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Cancel any pending debounce on unmount
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  useEffect(() => { 
+    if (mountedRef.current) setQuery(value); 
+  }, [value]);
 
   useEffect(() => {
     if (!GOOGLE_API_KEY) return;
     loadGoogleMaps().then(() => {
+      if (!mountedRef.current) return;
       autocompleteServiceRef.current = new (window as any).google.maps.places.AutocompleteService();
       geocoderRef.current = new (window as any).google.maps.Geocoder();
       setReady(true);
@@ -65,13 +79,16 @@ const AddressAutocomplete = ({
   const search = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (q.length < 3 || !autocompleteServiceRef.current) {
-      setSuggestions([]); setOpen(false); return;
+      if (mountedRef.current) { setSuggestions([]); setOpen(false); }
+      return;
     }
     debounceRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
       setLoading(true);
       autocompleteServiceRef.current.getPlacePredictions(
         { input: q, componentRestrictions: { country: 'ar' }, types: ['address'] },
         (predictions: any[], status: string) => {
+          if (!mountedRef.current) return; // don't setState if unmounted
           setLoading(false);
           if (status === 'OK' && predictions) {
             setSuggestions(predictions.map(p => ({ description: p.description, place_id: p.place_id })));
@@ -98,6 +115,7 @@ const AddressAutocomplete = ({
       geocoderRef.current.geocode(
         { placeId: suggestion.place_id },
         (results: any[], status: string) => {
+          if (!mountedRef.current) return; // don't call onChange if unmounted
           if (status === 'OK' && results[0]) {
             const loc = results[0].geometry.location;
             onChange(suggestion.description, loc.lat(), loc.lng());
@@ -107,8 +125,10 @@ const AddressAutocomplete = ({
     }
   };
 
+  // Close dropdown when clicking outside — properly cleaned up on unmount
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      if (!mountedRef.current) return;
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
@@ -142,7 +162,7 @@ const AddressAutocomplete = ({
         {loading ? <Loader2 style={{ width: '0.875rem', height: '0.875rem', animation: 'spin 1s linear infinite' }} /> : <MapPin style={{ width: '0.875rem', height: '0.875rem' }} />}
       </div>
       {open && suggestions.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 9999, backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 9999, backgroundColor: 'hsl(240,10%,3.9%)', border: '1px solid hsl(240,3.7%,15.9%)', borderRadius: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.8)', overflow: 'hidden' }}>
           {suggestions.map((s, i) => (
             <button
               key={s.place_id}
@@ -157,9 +177,9 @@ const AddressAutocomplete = ({
                 fontSize: '0.875rem',
                 background: 'hsl(240,10%,3.9%)',
                 border: 'none',
-                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
+                borderBottom: i < suggestions.length - 1 ? '1px solid hsl(240,3.7%,15.9%)' : 'none',
                 cursor: 'pointer',
-                color: 'var(--popover-foreground)',
+                color: 'hsl(0,0%,98%)',
               }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(240,3.7%,15.9%)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(240,10%,3.9%)')}
