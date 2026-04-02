@@ -402,15 +402,19 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               placeholder="Ej: Soltero/a, Casado/a..."
             />
 
-{/* Conector */}
-            <FormField
-              label="Conector"
-              id="conector"
-              value={conector}
-              onChange={(e) => setConector(e.target.value)}
-              disabled={loading}
-              placeholder="Nombre de quien conectó"
-            />
+{/* Conector - read-only for Conector role */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Conector</label>
+              <Input
+                id="conector"
+                value={conector}
+                onChange={(e) => { if (profile?.role !== 'user') setConector(e.target.value); }}
+                disabled={loading}
+                readOnly={profile?.role === 'user'}
+                placeholder="Nombre de quien conectó"
+                className={profile?.role === 'user' ? 'bg-muted text-muted-foreground cursor-default' : ''}
+              />
+            </div>
 
 {/* Referente */}
             <SelectField
