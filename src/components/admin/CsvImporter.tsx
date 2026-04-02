@@ -140,16 +140,20 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
 
       const sanitizeValue = (key: string, val: string): any => {
         if (val === '' || val === null || val === undefined) return null;
+        const trimmed = String(val).trim();
+        if (trimmed === '' || trimmed === '.' || trimmed === '-' || trimmed === 'N/A' || trimmed === 'n/a') return null;
         if (DATE_FIELDS.has(key)) {
-          // Try to parse as date - if invalid, return null
-          const d = new Date(val);
-          return isNaN(d.getTime()) ? null : val;
+          // Strict date validation: must match YYYY-MM-DD, DD/MM/YYYY, or MM/DD/YYYY
+          const dateRegex = /^(\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{2}[\/\-]\d{2}[\/\-]\d{2})$/;
+          if (!dateRegex.test(trimmed)) return null;
+          const d = new Date(trimmed);
+          return isNaN(d.getTime()) ? null : trimmed;
         }
         if (NUMBER_FIELDS.has(key)) {
-          const n = parseInt(val);
+          const n = parseInt(trimmed);
           return isNaN(n) ? null : n;
         }
-        return val;
+        return trimmed;
       };
 
       const recordsToInsert = dataToImport.map(row => {
