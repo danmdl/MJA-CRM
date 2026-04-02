@@ -57,7 +57,7 @@ const FormField = ({ label, id, value, onChange, type = "text", required = false
   </div>
 );
 
-const SelectField = ({ label, value, onChange, options, loading, placeholder, disabled = false, container }: {
+const SelectField = ({ label, value, onChange, options, loading, placeholder, disabled = false }: {
   label: string;
   value: string | null;
   onChange: (value: string) => void;
@@ -65,7 +65,6 @@ const SelectField = ({ label, value, onChange, options, loading, placeholder, di
   loading: boolean;
   placeholder: string;
   disabled?: boolean;
-  container?: HTMLElement | null;
 }) => (
   <div className="space-y-2">
     <label htmlFor={label.toLowerCase().replace(/\s/g, '-')} className="text-sm font-medium">
@@ -75,7 +74,7 @@ const SelectField = ({ label, value, onChange, options, loading, placeholder, di
       <SelectTrigger>
         <SelectValue placeholder={loading ? "Cargando..." : placeholder} />
       </SelectTrigger>
-      <SelectContent container={container ?? undefined}>
+      <SelectContent position="item-aligned">
         <SelectItem value="none">Sin asignación</SelectItem>
         {options.map((option) => (
           <SelectItem key={option.id} value={option.id}>
@@ -108,7 +107,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const queryClient = useQueryClient();
   const { session } = useSession();
   const firstNameRef = React.useRef<HTMLInputElement>(null);
-  const [dialogContainer, setDialogContainer] = React.useState<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     if (open) setTimeout(() => firstNameRef.current?.focus(), 50);
@@ -238,7 +236,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={(el) => setDialogContainer(el)} className="w-full max-w-6xl flex flex-col max-h-[90vh]">
+      <DialogContent className="w-full max-w-6xl flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contacto</DialogTitle>
 
@@ -310,7 +308,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona..." />
                 </SelectTrigger>
-                <SelectContent container={dialogContainer ?? undefined}>
+                <SelectContent position="item-aligned">
                   <SelectItem value="none">Sin especificar</SelectItem>
                   <SelectItem value="masculino">Masculino</SelectItem>
                   <SelectItem value="femenino">Femenino</SelectItem>
@@ -367,7 +365,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               options={cells || []}
               loading={isLoadingCells}
               placeholder="Selecciona una célula (opcional)"
-              container={dialogContainer}
             />
 
             {/* Referente */}
@@ -381,7 +378,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               }))}
               loading={isLoadingLeaders}
               placeholder="Selecciona un referente (opcional)"
-              container={dialogContainer}
             />
 
             {/* Observaciones - spans full row */}
