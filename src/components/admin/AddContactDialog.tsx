@@ -1,7 +1,6 @@
 "use client";
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import CountryPhoneInput from '@/components/CountryPhoneInput';
@@ -223,7 +222,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           setTimeout(() => firstNameRef.current?.focus(), 50);
         } else {
           resetForm();
-          setTimeout(() => onOpenChange(false), 100);
+          onOpenChange(false);
         }
       }
     } finally {
@@ -231,16 +230,23 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-6xl flex flex-col max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Crear Nuevo Contacto</DialogTitle>
+  if (!open) return null;
 
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          {/* 3-column grid for all fields */}
-          <div className="overflow-y-auto flex-1 pr-1">
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+      onClick={(e) => { if (e.target === e.currentTarget) { resetForm(); onOpenChange(false); } }}
+    >
+      {/* Backdrop */}
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: -1 }} />
+      {/* Modal */}
+      <div style={{ backgroundColor: 'hsl(240,10%,3.9%)', border: '1px solid hsl(240,3.7%,15.9%)', borderRadius: '12px', width: '100%', maxWidth: '1100px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.8)' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid hsl(240,3.7%,15.9%)', flexShrink: 0 }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'hsl(0,0%,98%)' }}>Crear Nuevo Contacto</h2>
+        </div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div style={{ overflowY: 'auto', flex: 1, padding: '16px 24px' }}>
           <div className="grid grid-cols-4 gap-x-3 gap-y-4 mb-2">
 
             {/* Nombre */}
@@ -408,7 +414,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </div>
           </div>
 
-          <DialogFooter className="gap-2 pt-4 border-t">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '16px 24px', borderTop: '1px solid hsl(240,3.7%,15.9%)', flexShrink: 0 }}>
             <Button type="button" variant="ghost" onClick={() => { resetForm(); onOpenChange(false); }} disabled={loading}>
               Cancelar
             </Button>
@@ -418,10 +424,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             <Button type="submit" disabled={loading || !firstName.trim()}>
               {loading ? 'Creando...' : 'Crear Contacto'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 
