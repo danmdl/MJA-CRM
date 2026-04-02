@@ -46,7 +46,7 @@ const ChurchesPage = () => {
   const { canSeeAllChurches, canAddUsers, canEditDeleteUsers } = usePermissions();
 
   const canSeeAll = canSeeAllChurches();
-  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula'].includes(profile?.role || '');
+  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'user'].includes(profile?.role || '');
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -69,13 +69,12 @@ const ChurchesPage = () => {
         [])) : 
     [];
 
-  // If user is a church role and has an assigned church_id but no churches are loaded,
-  // redirect them directly to their church details
+  // If user can't see all churches but has an assigned church_id, redirect directly to their church
   useEffect(() => {
-    if (!isLoading && !isAdminOrGeneral && isChurchRole && profile?.church_id && (!churches || churches.length === 0)) {
-      navigate(`/admin/churches/${profile.church_id}/overview`);
+    if (!isLoading && !isAdminOrGeneral && isChurchRole && profile?.church_id) {
+      navigate(`/admin/churches/${profile.church_id}/database`);
     }
-  }, [isLoading, isAdminOrGeneral, isChurchRole, profile?.church_id, churches, navigate]);
+  }, [isLoading, isAdminOrGeneral, isChurchRole, profile?.church_id, navigate]);
 
   const handleEditChurch = (church: Church) => {
     setSelectedChurch(church);
