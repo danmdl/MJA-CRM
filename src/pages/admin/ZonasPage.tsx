@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, ChevronRight, MapPin, Upload } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
+import CuerdaCsvImporter from '@/components/admin/CuerdaCsvImporter';
 
 interface Barrio { id: string; nombre: string; zona_id: string; }
-interface Cuerda { id: string; numero: string; zona_id: string; }
+interface Cuerda { id: string; numero: string; zona_id: string; address?: string | null; referente_name?: string | null; meeting_day?: string | null; meeting_time?: string | null; }
 interface Zona {
   id: string; nombre: string; church_id: string;
   barrios: Barrio[];
@@ -25,6 +26,7 @@ const ZonasPage = () => {
   const [newBarrioName, setNewBarrioName] = useState<Record<string, string>>({});
   const [newZonaName, setNewZonaName] = useState('');
   const [addingZona, setAddingZona] = useState(false);
+  const [csvImporterOpen, setCsvImporterOpen] = useState(false);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'general';
 
@@ -33,7 +35,7 @@ const ZonasPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('zonas')
-        .select('id, nombre, church_id, barrios(id, nombre, zona_id), cuerdas(id, numero, zona_id)')
+        .select('id, nombre, church_id, barrios(id, nombre, zona_id), cuerdas(id, numero, zona_id, address, referente_name, meeting_day, meeting_time)')
         .eq('church_id', profile!.church_id!)
         .order('nombre');
       if (error) throw error;
@@ -110,9 +112,14 @@ const ZonasPage = () => {
             Cada zona tiene sus cuerdas asignadas y sus barrios. Los barrios se usan para auto-asignar contactos al pool.
           </p>
         </div>
-        <Button onClick={() => setAddingZona(true)} size="sm">
-          <Plus className="mr-1.5 h-4 w-4" /> Nueva Zona
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setCsvImporterOpen(true)} size="sm" variant="outline">
+            <Upload className="mr-1.5 h-4 w-4" /> Importar Cuerdas CSV
+          </Button>
+          <Button onClick={() => setAddingZona(true)} size="sm">
+            <Plus className="mr-1.5 h-4 w-4" /> Nueva Zona
+          </Button>
+        </div>
       </div>
 
       {addingZona && (
@@ -153,7 +160,10 @@ const ZonasPage = () => {
                     {/* Cuerdas badges */}
                     <div className="flex gap-1 flex-wrap">
                       {zona.cuerdas?.map(c => (
-                        <Badge key={c.id} variant="outline" className="text-xs">N°{c.numero}</Badge>
+                        <Badge key={c.id} variant="outline" className="text-xs gap-1">
+                          N°{c.numero}
+                          {c.referente_name && <span className="text-muted-foreground">· {c.referente_name}</span>}
+                        </Badge>
                       ))}
                     </div>
                     <Button
@@ -169,44 +179,71 @@ const ZonasPage = () => {
 
               {expandedZona === zona.id && (
                 <CardContent className="pt-0 pb-4 px-4">
-                  <div className="pl-6 space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-2">Barrios</p>
-                    {zona.barrios?.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No hay barrios definidos aún.</p>
+                  <div className="pl-6 space-y-4">
+                    {/* Cuerdas section */}
+                    {zona.cuerdas && zona.cuerdas.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-2">Cuerdas</p>
+                        <div className="space-y-1.5">
+                          {zona.cuerdas.map(c => (
+                            <div key={c.id} className="flex items-start gap-3 py-1.5 px-2 rounded hover:bg-muted text-sm">
+                              <span className="font-mono font-bold text-primary min-w-[40px]">#{c.numero}</span>
+                              <div className="flex-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                                {c.referente_name && <span>👤 {c.referente_name}</span>}
+                                {c.address && <span>📍 {c.address}</span>}
+                                {(c.meeting_day || c.meeting_time) && (
+                                  <span>🕐 {[c.meeting_day, c.meeting_time].filter(Boolean).join(' · ')}</span>
+                                )}
+                                {!c.referente_name && !c.address && !c.meeting_day && (
+                                  <span className="italic">Sin datos adicionales</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    {zona.barrios?.map(barrio => (
-                      <div key={barrio.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted group">
-                        <span className="text-sm">{barrio.nombre}</span>
+
+                    {/* Barrios section */}
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-2">Barrios</p>
+                      {zona.barrios?.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No hay barrios definidos aún.</p>
+                      )}
+                      {zona.barrios?.map(barrio => (
+                        <div key={barrio.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted group">
+                          <span className="text-sm">{barrio.nombre}</span>
+                          <Button
+                            variant="ghost" size="sm"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-red-500"
+                            onClick={() => deleteBarrioMutation.mutate(barrio.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+
+                      {/* Add barrio */}
+                      <div className="flex gap-2 mt-3">
+                        <Input
+                          placeholder="Nombre del barrio..."
+                          value={newBarrioName[zona.id] || ''}
+                          onChange={e => setNewBarrioName(prev => ({ ...prev, [zona.id]: e.target.value }))}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && newBarrioName[zona.id]?.trim()) {
+                              addBarrioMutation.mutate({ zonaId: zona.id, nombre: newBarrioName[zona.id] });
+                            }
+                          }}
+                          className="h-8 text-sm"
+                        />
                         <Button
-                          variant="ghost" size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-red-500"
-                          onClick={() => deleteBarrioMutation.mutate(barrio.id)}
+                          size="sm" className="h-8"
+                          disabled={!newBarrioName[zona.id]?.trim() || addBarrioMutation.isPending}
+                          onClick={() => addBarrioMutation.mutate({ zonaId: zona.id, nombre: newBarrioName[zona.id] })}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Agregar
                         </Button>
                       </div>
-                    ))}
-
-                    {/* Add barrio */}
-                    <div className="flex gap-2 mt-3">
-                      <Input
-                        placeholder="Nombre del barrio..."
-                        value={newBarrioName[zona.id] || ''}
-                        onChange={e => setNewBarrioName(prev => ({ ...prev, [zona.id]: e.target.value }))}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && newBarrioName[zona.id]?.trim()) {
-                            addBarrioMutation.mutate({ zonaId: zona.id, nombre: newBarrioName[zona.id] });
-                          }
-                        }}
-                        className="h-8 text-sm"
-                      />
-                      <Button
-                        size="sm" className="h-8"
-                        disabled={!newBarrioName[zona.id]?.trim() || addBarrioMutation.isPending}
-                        onClick={() => addBarrioMutation.mutate({ zonaId: zona.id, nombre: newBarrioName[zona.id] })}
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1" /> Agregar
-                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -215,6 +252,14 @@ const ZonasPage = () => {
           ))}
         </div>
       )}
+      {/* CSV Importer Dialog */}
+      <CuerdaCsvImporter
+        open={csvImporterOpen}
+        onOpenChange={setCsvImporterOpen}
+        churchId={profile?.church_id || ''}
+        zonas={(zonas || []).map(z => ({ id: z.id, nombre: z.nombre }))}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['zonas-admin'] })}
+      />
     </div>
   );
 };
