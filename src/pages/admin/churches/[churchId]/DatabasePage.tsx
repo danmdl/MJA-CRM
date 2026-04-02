@@ -77,6 +77,7 @@ const ChurchDatabasePage = () => {
   const [filterField, setFilterField] = useState<string | null>(null);
   const [ageGroup, setAgeGroup] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [ageGroupFilter, setAgeGroupFilter] = useState<string | null>(null);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { canAddUsers, canEditDeleteUsers } = usePermissions();
 

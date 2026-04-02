@@ -472,6 +472,28 @@ const DynamicContactTable = ({
 
   const handleViewProfile = (contactId: string) => setProfileContactId(contactId);
 
+  const AGE_GROUPS: Record<string, [number, number]> = {
+    crecer:       [0,  12],
+    adolescente:  [13, 17],
+    joven:        [18, 25],
+    joven_adulto: [26, 35],
+    adulto_mayor: [36, 999],
+  };
+
+  const getContactAge = (c: any): number | null => {
+    // Use edad field first, then calculate from date_of_birth
+    if (c.edad != null && c.edad !== '') return Number(c.edad);
+    if (c.date_of_birth) {
+      const dob = new Date(c.date_of_birth);
+      const now = new Date();
+      let age = now.getFullYear() - dob.getFullYear();
+      const m = now.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+      return age >= 0 ? age : null;
+    }
+    return null;
+  };
+
   const filteredContacts = useMemo(() => {
     const term = (searchTerm || '').trim().toLowerCase();
     if (!contacts) return [];

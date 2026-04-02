@@ -95,6 +95,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [edad, setEdad] = useState<string>('');
   const [fechaContacto, setFechaContacto] = useState<string>(today());
   const [sexo, setSexo] = useState<string | null>(null);
+  const [barrio, setBarrio] = useState('');
   const [estadoCivil, setEstadoCivil] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [pedidoDeOracion, setPedidoDeOracion] = useState('');
@@ -119,6 +120,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     setDateOfBirth(''); setFechaContacto(today());
     setSexo(null); setEstadoCivil('');
     setObservaciones(''); setPedidoDeOracion('');
+    setBarrio('');
     setConector('');
     setLeaderAssigned(null); setCellId(null);
   };
@@ -193,6 +195,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           edad: edad ? parseInt(edad) : null,
           fecha_contacto: fechaContacto || null,
           sexo: sexo || null,
+          barrio: barrio || null,
           estado_civil: estadoCivil || null,
           observaciones: observaciones || null,
           pedido_de_oracion: pedidoDeOracion || null,
@@ -397,6 +400,16 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               onChange={(e) => setEstadoCivil(e.target.value)}
               disabled={loading}
               placeholder="Ej: Soltero/a, Casado/a..."
+            />
+
+            {/* Barrio */}
+            <FormField
+              label="Barrio"
+              id="barrio"
+              value={barrio}
+              onChange={(e) => setBarrio(e.target.value)}
+              disabled={loading}
+              placeholder="Ej: Palermo"
             />
 
             {/* Conector */}
