@@ -293,6 +293,25 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               />
             </div>
 
+            {/* Edad - auto calculated */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Edad</label>
+              <input
+                type="text"
+                readOnly
+                value={dateOfBirth ? (() => {
+                  const dob = new Date(dateOfBirth);
+                  const today = new Date();
+                  let age = today.getFullYear() - dob.getFullYear();
+                  const m = today.getMonth() - dob.getMonth();
+                  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+                  return age >= 0 ? `${age} años` : '';
+                })() : ''}
+                placeholder="Se calcula automáticamente"
+                className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-default"
+              />
+            </div>
+
             {/* Fecha de Contacto */}
             <div className="space-y-2">
               <label htmlFor="fechaContacto" className="text-sm font-medium">Fecha de Contacto</label>
