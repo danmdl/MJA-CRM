@@ -14,12 +14,12 @@ import { showError } from '@/utils/toast';
 
 const LoginManagementPage = () => {
   const { profile } = useSession();
-  const { canAddUsers, canEditDeleteUsers } = usePermissions();
+  const { canAddMembers, canEditDeleteMembers } = usePermissions();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
   // If user doesn't have any user management permissions, show access denied
-  if (!canAddUsers() && !canEditDeleteUsers()) {
+  if (!canAddMembers() && !canEditDeleteMembers()) {
     return (
       <div className="p-6">
         <Card className="max-w-2xl mx-auto">
@@ -67,7 +67,7 @@ const LoginManagementPage = () => {
             Administra las cuentas de usuario del sistema
           </p>
         </div>
-        {canAddUsers() && (
+        {canAddMembers() && (
           <div className="flex gap-2">
             <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
               <DialogTrigger asChild>
@@ -107,7 +107,7 @@ const LoginManagementPage = () => {
         )}
       </div>
       <div className="space-y-6">
-        {canEditDeleteUsers() && (
+        {canEditDeleteMembers() && (
           <Card>
             <CardHeader>
               <CardTitle>Usuarios del Sistema</CardTitle>

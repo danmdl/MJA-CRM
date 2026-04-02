@@ -213,6 +213,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const { canEditDeleteContacts } = usePermissions();
+  const { profile } = useSession();
   const [newLog, setNewLog] = useState({ date: '', method: '', notes: '' });
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
@@ -714,7 +715,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => safeClose()} disabled={saving}>Cancelar</Button>
-              {canEditDeleteContacts() && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
+              {(canEditDeleteContacts() || profile?.role === 'user') && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
             </div>
           </div>
         )}
