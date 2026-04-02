@@ -5,7 +5,7 @@ import DynamicContactTable from '@/components/admin/DynamicContactTable';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, PlusCircle, Upload, Filter, X, Download } from 'lucide-react';
+import { Search, PlusCircle, Upload, Filter, X, Download, Users } from 'lucide-react';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
@@ -75,6 +75,7 @@ const ChurchDatabasePage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
   const [filterField, setFilterField] = useState<string | null>(null);
+  const [ageGroup, setAgeGroup] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { canAddUsers, canEditDeleteUsers } = usePermissions();
@@ -162,8 +163,23 @@ const ChurchDatabasePage = () => {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        {(searchTerm || filterField) && (
-          <Button variant="ghost" onClick={() => { setSearchTerm(''); setFilterField(null); }}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant={ageGroup ? 'default' : 'outline'}>
+              <Users className="mr-2 h-4 w-4" />
+              {ageGroup || 'Grupo Etario'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {[null, 'Niño', 'Adolescente', 'Joven', 'Joven Adulto', 'Adulto', 'Crecer'].map(g => (
+              <DropdownMenuItem key={g ?? 'all'} onClick={() => setAgeGroup(g)}>
+                {g === null ? 'Todos' : g}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {(searchTerm || filterField || ageGroup) && (
+          <Button variant="ghost" onClick={() => { setSearchTerm(''); setFilterField(null); setAgeGroup(null); }}>
             <X className="mr-2 h-4 w-4" />
             Limpiar Filtros
           </Button>
@@ -174,6 +190,7 @@ const ChurchDatabasePage = () => {
         churchId={churchId}
         searchTerm={searchTerm}
         filterField={filterField}
+        ageGroup={ageGroup}
         useExternalToolbarContainer={true}
         canEdit={canEditDeleteUsers()}
         canDelete={canEditDeleteUsers()}

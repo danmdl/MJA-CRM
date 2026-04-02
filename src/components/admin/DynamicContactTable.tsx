@@ -274,12 +274,13 @@ const SelectionToolbar = ({
 const DynamicContactTable = ({ 
   churchId, 
   searchTerm = '', 
-  filterField = null as string | null, 
+  filterField = null as string | null,
+  ageGroup = null as string | null,
   useExternalToolbarContainer = false,
   canEdit: canEditProp = true,
   canDelete: canDeleteProp = true,
   canAdd: canAddProp = true,
-}: { churchId?: string; searchTerm?: string; filterField?: string | null; useExternalToolbarContainer?: boolean }) => {
+}: { churchId?: string; searchTerm?: string; filterField?: string | null; ageGroup?: string | null; useExternalToolbarContainer?: boolean }) => {
   logger.log('[DynamicContactTable] Component rendered', { churchId, searchTerm, filterField });
 
   const extendedContactFields = useMemo(() => [
@@ -453,6 +454,22 @@ const DynamicContactTable = ({
     }
   };
 
+
+  const getAgeGroup = (age: number | null): string | null => {
+    if (age === null) return null;
+    if (age < 13) return 'Niño';
+    if (age < 17) return 'Adolescente';
+    if (age < 27) return 'Joven';
+    if (age < 45) return 'Joven Adulto';
+    if (age < 60) return 'Adulto';
+    return 'Crecer';
+  };
+
+  const getEffectiveAge = (contact: any): number | null => {
+    if (contact.edad != null) return Number(contact.edad);
+    return contact.age ?? null;
+  };
+
   const handleViewProfile = (contactId: string) => setProfileContactId(contactId);
 
   const filteredContacts = useMemo(() => {
@@ -492,9 +509,15 @@ const DynamicContactTable = ({
         if (!cellVal || !values.includes(cellVal.trim())) return false;
       }
 
+      // Age group filter
+      if (ageGroup) {
+        const effectiveAge = getEffectiveAge(c);
+        if (getAgeGroup(effectiveAge) !== ageGroup) return false;
+      }
+
       return true;
     });
-  }, [contacts, searchTerm, filterField, columnFilters]);
+  }, [contacts, searchTerm, filterField, columnFilters, ageGroup]);
 
   const visibleIds = filteredContacts.map(c => c.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedContacts.includes(id));
