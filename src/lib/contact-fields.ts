@@ -16,7 +16,6 @@ export const CONTACT_FIELDS = [
   { key: 'estado_civil', label: 'Estado Civil', type: 'text' },
   { key: 'observaciones', label: 'Observaciones', type: 'text' },
   { key: 'pedido_de_oracion', label: 'Pedido de Oración', type: 'text' },
-  { key: 'created_at', label: 'Creado en', type: 'date' },
 ];
 
 export type ContactField = typeof CONTACT_FIELDS[number];

@@ -131,13 +131,35 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     const toastId = showLoading('Importando datos...');
 
     try {
+      // Fields that should never be set from CSV (DB-managed)
+      const BLOCKED_FIELDS = new Set(['created_at', 'id', 'church_id', 'created_by']);
+      // Fields that are dates - empty/invalid values must be null
+      const DATE_FIELDS = new Set(['fecha_contacto', 'date_of_birth', 'created_at']);
+      // Fields that are numbers
+      const NUMBER_FIELDS = new Set(['edad']);
+
+      const sanitizeValue = (key: string, val: string): any => {
+        if (val === '' || val === null || val === undefined) return null;
+        if (DATE_FIELDS.has(key)) {
+          // Try to parse as date - if invalid, return null
+          const d = new Date(val);
+          return isNaN(d.getTime()) ? null : val;
+        }
+        if (NUMBER_FIELDS.has(key)) {
+          const n = parseInt(val);
+          return isNaN(n) ? null : n;
+        }
+        return val;
+      };
+
       const recordsToInsert = dataToImport.map(row => {
         const newRecord: Record<string, any> = {};
         allTargetFields.forEach(targetField => {
+          if (BLOCKED_FIELDS.has(targetField.key)) return; // Never import these
           if (ignoreMap[targetField.key]) return; // Skip ignored fields
           const csvHeader = columnMapping[targetField.key];
           if (csvHeader && row[csvHeader] !== undefined) {
-            newRecord[targetField.key] = row[csvHeader];
+            newRecord[targetField.key] = sanitizeValue(targetField.key, row[csvHeader]);
           }
         });
         if (churchId) {
