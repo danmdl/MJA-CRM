@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePermissions } from '@/lib/permissions';
-import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -83,13 +82,7 @@ const ChurchDatabasePage = () => {
   const [exporting, setExporting] = useState(false);
   const [ageGroupFilter, setAgeGroupFilter] = useState<string | null>(null);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
-  const { canAddUsers, canEditDeleteUsers } = usePermissions();
-  const { profile } = useSession();
-  // Contacts permissions - separate from team member permissions
-  // Connectors can always add contacts (that's their job)
-  // Anyone with access can add contacts; edit/delete requires permission OR being a connector
-  const canAddContacts = () => canAddUsers() || profile?.role === 'user';
-  const canEditContacts = () => canEditDeleteUsers() || profile?.role === 'user';
+  const { canAddContacts, canEditDeleteContacts } = usePermissions();
 
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
@@ -203,8 +196,8 @@ const ChurchDatabasePage = () => {
         filterField={filterField}
         ageGroup={ageGroup}
         useExternalToolbarContainer={true}
-        canEdit={canEditContacts()}
-        canDelete={canEditContacts()}
+        canEdit={canEditDeleteContacts()}
+        canDelete={canEditDeleteContacts()}
         canAdd={canAddContacts()}
       />
 

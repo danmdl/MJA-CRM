@@ -212,7 +212,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { canEditDeleteUsers } = usePermissions();
+  const { canEditDeleteContacts } = usePermissions();
   const [newLog, setNewLog] = useState({ date: '', method: '', notes: '' });
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
@@ -714,7 +714,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => safeClose()} disabled={saving}>Cancelar</Button>
-              {canEditDeleteUsers() && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
+              {canEditDeleteContacts() && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
             </div>
           </div>
         )}

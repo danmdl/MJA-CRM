@@ -32,6 +32,10 @@ const defaultPermissions: PermissionConfig[] = [
       accessAllChurches: true,
       addUsers: true,
       editDeleteUsers: true,
+      addMembers: true,
+      addContacts: true,
+      editDeleteContacts: true,
+      editDeleteMembers: true,
       seeAllAnalytics: true,
       seeOwnChurchAnalytics: true,
       changeUserRole: true, // Admin always has this
@@ -45,6 +49,10 @@ const defaultPermissions: PermissionConfig[] = [
       accessAllChurches: true,
       addUsers: true,
       editDeleteUsers: true,
+      addMembers: true,
+      addContacts: true,
+      editDeleteContacts: true,
+      editDeleteMembers: true,
       seeAllAnalytics: true,
       seeOwnChurchAnalytics: true,
       changeUserRole: true, // General also has this
@@ -60,7 +68,11 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: true,
-      changeUserRole: false, // Default to false
+      changeUserRole: false,
+      addMembers: false,
+      addContacts: true,
+      editDeleteContacts: false,
+      editDeleteMembers: false, // Default to false
     },
   },
   {
@@ -73,7 +85,11 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: true,
-      changeUserRole: false, // Default to false
+      changeUserRole: false,
+      addMembers: false,
+      addContacts: true,
+      editDeleteContacts: false,
+      editDeleteMembers: false, // Default to false
     },
   },
   {
@@ -86,7 +102,11 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: true,
-      changeUserRole: false, // Default to false
+      changeUserRole: false,
+      addMembers: false,
+      addContacts: true,
+      editDeleteContacts: false,
+      editDeleteMembers: false, // Default to false
     },
   },
   {
@@ -99,7 +119,11 @@ const defaultPermissions: PermissionConfig[] = [
       editDeleteUsers: false,
       seeAllAnalytics: false,
       seeOwnChurchAnalytics: false,
-      changeUserRole: false, // Default to false
+      changeUserRole: false,
+      addMembers: false,
+      addContacts: true,
+      editDeleteContacts: false,
+      editDeleteMembers: false, // Default to false
     },
   },
 ];
@@ -142,7 +166,11 @@ const PermissionsDashboard = () => {
               editDeleteUsers: savedConfig.edit_delete_users,
               seeAllAnalytics: savedConfig.see_all_analytics,
               seeOwnChurchAnalytics: savedConfig.see_own_church_analytics,
-              changeUserRole: savedConfig.change_user_role, // Load new permission
+              changeUserRole: savedConfig.change_user_role,
+              addMembers: savedConfig.add_members ?? false,
+              addContacts: savedConfig.add_contacts ?? true,
+              editDeleteContacts: savedConfig.edit_delete_contacts ?? false,
+              editDeleteMembers: savedConfig.edit_delete_members ?? false, // Load new permission
             },
           };
         }
@@ -182,7 +210,11 @@ const PermissionsDashboard = () => {
             edit_delete_users: config.permissions.editDeleteUsers,
             see_all_analytics: config.permissions.seeAllAnalytics,
             see_own_church_analytics: config.permissions.seeOwnChurchAnalytics,
-            change_user_role: config.permissions.changeUserRole, // Save new permission
+            change_user_role: config.permissions.changeUserRole,
+            add_members: config.permissions.addMembers,
+            add_contacts: config.permissions.addContacts,
+            edit_delete_contacts: config.permissions.editDeleteContacts,
+            edit_delete_members: config.permissions.editDeleteMembers, // Save new permission
           })),
           { onConflict: 'role' }
         );
@@ -208,7 +240,11 @@ const PermissionsDashboard = () => {
     { key: 'editDeleteUsers', label: 'Editar/eliminar usuarios', icon: Edit },
     { key: 'seeAllAnalytics', label: 'Ver todas las analíticas', icon: BarChart },
     { key: 'seeOwnChurchAnalytics', label: 'Ver analíticas de mi iglesia', icon: BarChart },
-    { key: 'changeUserRole', label: 'Cambiar rol de usuario', icon: UserCog }, // New column
+    { key: 'changeUserRole', label: 'Cambiar rol de usuario', icon: UserCog },
+    { key: 'addMembers', label: 'Agregar miembro', icon: UserPlus },
+    { key: 'editDeleteMembers', label: 'Editar/eliminar miembro', icon: Edit },
+    { key: 'addContacts', label: 'Agregar contacto', icon: UserPlus },
+    { key: 'editDeleteContacts', label: 'Editar/eliminar contacto', icon: Edit },
   ] as const;
 
   if (isLoading) {

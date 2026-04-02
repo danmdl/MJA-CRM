@@ -11,7 +11,7 @@ import { usePermissions } from '@/lib/permissions';
 const ChurchTeamPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const { canAddUsers } = usePermissions();
+  const { canAddMembers } = usePermissions();
 
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
@@ -21,7 +21,7 @@ const ChurchTeamPage = () => {
     <div className="p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold">Equipo de la Iglesia</h1>
-        {canAddUsers() && (
+        {canAddMembers() && (
           <Button onClick={() => setIsInviteDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Invitar Miembro

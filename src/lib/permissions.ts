@@ -11,6 +11,10 @@ export interface PermissionData {
   see_all_analytics: boolean;
   see_own_church_analytics: boolean;
   change_user_role: boolean;
+  add_members: boolean;
+  add_contacts: boolean;
+  edit_delete_contacts: boolean;
+  edit_delete_members: boolean;
 }
 
 // Role hierarchy: higher index = higher privilege
@@ -72,6 +76,10 @@ export const usePermissions = () => {
   const canSeeAllAnalytics = () => hasPermission('see_all_analytics');
   const canSeeOwnChurchAnalytics = () => hasPermission('see_own_church_analytics');
   const canChangeUserRole = () => hasPermission('change_user_role');
+  const canAddMembers = () => hasPermission('add_members');
+  const canAddContacts = () => hasPermission('add_contacts');
+  const canEditDeleteContacts = () => hasPermission('edit_delete_contacts');
+  const canEditDeleteMembers = () => hasPermission('edit_delete_members');
 
   // Only admin can access permissions management
   const canAccessPermissions = () => profile?.role === 'admin';
@@ -95,6 +103,10 @@ export const usePermissions = () => {
     canSeeAllAnalytics,
     canSeeOwnChurchAnalytics,
     canChangeUserRole,
+    canAddMembers,
+    canAddContacts,
+    canEditDeleteContacts,
+    canEditDeleteMembers,
     canAccessPermissions,
     canManageUser,
   };

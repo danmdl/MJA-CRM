@@ -49,7 +49,7 @@ const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'past
 
 const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session, profile } = useSession();
-  const { canChangeUserRole, canEditDeleteUsers, canAddUsers } = usePermissions();
+  const { canChangeUserRole, canEditDeleteMembers, canAddMembers } = usePermissions();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const myLevel = getRoleLevel(profile?.role || '');
@@ -212,7 +212,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                 <TableCell>{formatDate(user.updated_at)}</TableCell>
                 <TableCell className="text-right">
                   {/* Only show actions menu if user has edit/delete permissions and can manage this user */}
-                  {(canEditDeleteUsers() || canAddUsers()) && canManageThisUser ? (
+                  {(canEditDeleteMembers() || canAddMembers()) && canManageThisUser ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -221,17 +221,17 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {user.status === 'invited' && canAddUsers() && (
+                        {user.status === 'invited' && canAddMembers() && (
                           <DropdownMenuItem onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}>
                             <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
                           </DropdownMenuItem>
                         )}
-                        {user.status === 'invited' && canAddUsers() && (
+                        {user.status === 'invited' && canAddMembers() && (
                           <DropdownMenuItem onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}>
                             <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
                           </DropdownMenuItem>
                         )}
-                        {canEditDeleteUsers() && (
+                        {canEditDeleteMembers() && (
                           <DropdownMenuItem onClick={() => {
                             setEditDialogUser(user);
                             setEditFirstName(user.first_name || '');
@@ -241,12 +241,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                             <UserPen className="mr-2 h-4 w-4" /> Editar Usuario
                           </DropdownMenuItem>
                         )}
-                        {canEditDeleteUsers() && user.status === 'confirmed' && (
+                        {canEditDeleteMembers() && user.status === 'confirmed' && (
                           <DropdownMenuItem onClick={() => { setResetDialogUser({ id: user.id, email: user.email }); setNewPassword(''); setShowPw(false); }}>
                             <KeyRound className="mr-2 h-4 w-4" /> Cambiar Contraseña
                           </DropdownMenuItem>
                         )}
-                        {canEditDeleteUsers() && (
+                        {canEditDeleteMembers() && (
                           <DropdownMenuItem
                             onClick={() => deleteUserMutation.mutate(user.id)}
                             className="text-red-600"
