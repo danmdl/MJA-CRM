@@ -108,11 +108,9 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   React.useEffect(() => {
     if (open) {
       setTimeout(() => firstNameRef.current?.focus(), 50);
-      // Auto-fill Conector with user's name if their role is 'user' (Conector)
-      if (profile?.role === 'user' && !conector) {
-        const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
-        if (name) setConector(name);
-      }
+      // Auto-fill Conector with the logged-in user's full name
+      const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
+      if (name) setConector(name);
     } else {
       resetForm();
     }
