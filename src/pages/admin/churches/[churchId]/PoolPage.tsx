@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +7,6 @@ import { showSuccess, showError } from '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -20,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 
@@ -36,6 +35,68 @@ interface Contact {
   conector: string | null; fecha_contacto: string | null;
   numero_cuerda: string | null; edad: string | null;
 }
+
+// ─── Accent-insensitive normalize ────────────────────────────────
+const normalize = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+// ─── Hardcoded cuerda→zona map (fallback when DB barrios are empty) ─
+const CUERDA_ZONA_FALLBACK: Record<string, string> = {
+  '101': 'San Martin', '201': 'San Martin',
+  '102': 'Villa Lynch', '202': 'Villa Lynch',
+  '103': 'Ballester', '203': 'Ballester',
+  '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
+  '104': 'Villa Maipu', '204': 'Villa Maipu',
+  '105': 'Loma Hermosa', '205': 'Loma Hermosa',
+  '106': 'Jose L. Suarez', '206': 'Jose L. Suarez',
+  '107': 'Santos Lugares', '207': 'Santos Lugares',
+  '108': 'Billinghurst', '208': 'Billinghurst',
+  '109': 'Caseros', '209': 'Caseros',
+  '301': 'Bonich', '302': 'Bonich',
+};
+
+// ─── Resizable Table Header ──────────────────────────────────────
+const ResizableHeader = ({
+  children,
+  width,
+  onResize,
+  className = '',
+}: {
+  children: React.ReactNode;
+  width: number;
+  onResize: (delta: number) => void;
+  className?: string;
+}) => {
+  const startX = useRef(0);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    startX.current = e.clientX;
+    const onMove = (ev: MouseEvent) => {
+      onResize(ev.clientX - startX.current);
+      startX.current = ev.clientX;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  return (
+    <th
+      className={`relative text-left text-xs font-medium text-muted-foreground px-3 py-2 select-none ${className}`}
+      style={{ width, minWidth: 60 }}
+    >
+      {children}
+      <div
+        onMouseDown={onMouseDown}
+        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors"
+      />
+    </th>
+  );
+};
 
 // ─── Main Component ──────────────────────────────────────────────
 const PoolPage = () => {
@@ -53,7 +114,26 @@ const PoolPage = () => {
     cuerdaNum?: string;
     preview?: { zona: string; count: number }[];
   } | null>(null);
-  const [undoData, setUndoData] = useState<{ contactIds: string[]; prevStates: { zona_id: string | null; zona: string | null; numero_cuerda: string | null }[] } | null>(null);
+  const [undoData, setUndoData] = useState<{
+    contactIds: string[];
+    prevStates: { zona_id: string | null; zona: string | null; numero_cuerda: string | null }[];
+  } | null>(null);
+
+  // Resizable column widths
+  const [colWidths, setColWidths] = useState({
+    nombre: 160,
+    apellido: 140,
+    edad: 60,
+    direccion: 220,
+    asignar: 120,
+    cuerdaSug: 110,
+    zonaSug: 130,
+    cuerda: 100,
+  });
+
+  const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
+    setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
+  };
 
   const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
 
@@ -89,7 +169,7 @@ const PoolPage = () => {
     enabled: !!zonas?.length,
   });
 
-  // Fetch ALL contacts so we can show correct counts on all pool cards
+  // Fetch ALL contacts for real counts
   const { data: allContacts, isLoading } = useQuery<Contact[]>({
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
@@ -106,32 +186,55 @@ const PoolPage = () => {
     enabled: !!churchId,
   });
 
-  // ─── Zona detection ───────────────────────────────────────────
+  // ─── Zona detection (accent-insensitive) ───────────────────────
   const detectZonaForContact = useCallback((contact: Contact): Zona | null => {
     if (!zonas?.length) return null;
-    const text = ((contact.barrio || '') + ' ' + (contact.address || '')).toLowerCase();
+    const text = normalize((contact.barrio || '') + ' ' + (contact.address || ''));
     if (!text.trim()) return null;
-    // Match against barrios table first (more specific)
+
+    // 1. Match against barrios table (accent-insensitive)
     if (barrios?.length) {
       for (const barrio of barrios) {
-        if (text.includes(barrio.nombre.toLowerCase())) {
+        if (text.includes(normalize(barrio.nombre))) {
           return zonas.find(z => z.id === barrio.zona_id) || null;
         }
       }
     }
-    // Fallback: match zona name directly
-    return zonas.find(z => text.includes(z.nombre.toLowerCase())) || null;
+
+    // 2. Match against zona name directly (accent-insensitive)
+    const zonaMatch = zonas.find(z => text.includes(normalize(z.nombre)));
+    if (zonaMatch) return zonaMatch;
+
+    // 3. Fallback: hardcoded map — check if barrio text matches any known zona name
+    for (const [, zonaName] of Object.entries(CUERDA_ZONA_FALLBACK)) {
+      if (text.includes(normalize(zonaName))) {
+        return zonas.find(z => normalize(z.nombre) === normalize(zonaName)) || null;
+      }
+    }
+
+    return null;
   }, [zonas, barrios]);
 
   const detectCuerdaForContact = useCallback((_contact: Contact, suggestedZona: Zona | null): Cuerda | null => {
     if (!suggestedZona || !cuerdas?.length) return null;
-    const zonaCuerdas = cuerdas.filter(c => c.zona_id === suggestedZona.id);
+    const zonaCuerdas = cuerdas.filter(c => c.zona_id === suggestedZona.id).sort((a, b) => a.numero.localeCompare(b.numero));
     return zonaCuerdas[0] || null;
   }, [cuerdas]);
 
-  // ─── Pool counts ──────────────────────────────────────────────
+  // Determine the "home" zona for this church (the one with the most assigned contacts)
+  const homeZonaId = useMemo(() => {
+    if (!allContacts?.length || !zonas?.length) return null;
+    const counts: Record<string, number> = {};
+    allContacts.forEach(c => {
+      if (c.zona_id) counts[c.zona_id] = (counts[c.zona_id] || 0) + 1;
+    });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || zonas[0]?.id || null;
+  }, [allContacts, zonas]);
+
+  // ─── Pool counts + external detection ──────────────────────────
   const poolCounts = useMemo(() => {
-    const counts: Record<string, number> = { unassigned: 0 };
+    const counts: Record<string, number> = { unassigned: 0, external: 0 };
     zonas?.forEach(z => { counts[z.id] = 0; });
     allContacts?.forEach(c => {
       if (!c.zona_id) counts.unassigned++;
@@ -140,25 +243,17 @@ const PoolPage = () => {
     return counts;
   }, [allContacts, zonas]);
 
-  // ─── Filtered contacts ────────────────────────────────────────
-  const filteredContacts = useMemo(() => {
-    if (!allContacts) return [];
-    let filtered = activePool === 'unassigned'
-      ? allContacts.filter(c => !c.zona_id)
-      : allContacts.filter(c => c.zona_id === activePool);
-    if (searchTerm) {
-      const s = searchTerm.toLowerCase();
-      filtered = filtered.filter(c =>
-        (c.first_name || '').toLowerCase().includes(s) ||
-        (c.last_name || '').toLowerCase().includes(s) ||
-        (c.address || '').toLowerCase().includes(s) ||
-        (c.barrio || '').toLowerCase().includes(s)
-      );
-    }
-    return filtered;
-  }, [allContacts, activePool, searchTerm]);
+  // Count contacts whose SUGGESTED zona differs from home zona (external pool)
+  const externalContacts = useMemo(() => {
+    if (!allContacts || !homeZonaId) return [];
+    return allContacts.filter(c => {
+      if (c.zona_id) return false; // already assigned
+      const sug = detectZonaForContact(c);
+      return sug && sug.id !== homeZonaId;
+    });
+  }, [allContacts, homeZonaId, detectZonaForContact]);
 
-  // ─── Suggestions ──────────────────────────────────────────────
+  // ─── Suggestions map ──────────────────────────────────────────
   const suggestions = useMemo(() => {
     const map: Record<string, { zona: Zona | null; cuerda: Cuerda | null }> = {};
     allContacts?.forEach(c => {
@@ -171,23 +266,49 @@ const PoolPage = () => {
     return map;
   }, [allContacts, detectZonaForContact, detectCuerdaForContact]);
 
+  // ─── Filtered contacts ────────────────────────────────────────
+  const filteredContacts = useMemo(() => {
+    if (!allContacts) return [];
+    let filtered: Contact[];
+    if (activePool === 'unassigned') {
+      filtered = allContacts.filter(c => !c.zona_id);
+    } else if (activePool === 'external') {
+      filtered = externalContacts;
+    } else {
+      filtered = allContacts.filter(c => c.zona_id === activePool);
+    }
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      filtered = filtered.filter(c =>
+        (c.first_name || '').toLowerCase().includes(s) ||
+        (c.last_name || '').toLowerCase().includes(s) ||
+        (c.address || '').toLowerCase().includes(s) ||
+        (c.barrio || '').toLowerCase().includes(s)
+      );
+    }
+    return filtered;
+  }, [allContacts, activePool, searchTerm, externalContacts]);
+
   // ─── Auto-assign preview ──────────────────────────────────────
   const autoAssignPreview = useMemo(() => {
     const counts: Record<string, number> = {};
     let noMatch = 0;
+    let external = 0;
     allContacts?.forEach(c => {
       if (c.zona_id) return;
       const sug = suggestions[c.id];
       if (sug?.zona) {
         counts[sug.zona.nombre] = (counts[sug.zona.nombre] || 0) + 1;
+        if (homeZonaId && sug.zona.id !== homeZonaId) external++;
       } else {
         noMatch++;
       }
     });
     const result = Object.entries(counts).map(([zona, count]) => ({ zona, count })).sort((a, b) => b.count - a.count);
-    if (noMatch > 0) result.push({ zona: 'Sin coincidencia (no se asignarán)', count: noMatch });
+    if (external > 0) result.push({ zona: '⚠️ Irán a pool externo (otra zona)', count: external });
+    if (noMatch > 0) result.push({ zona: '❌ Sin coincidencia (no se asignarán)', count: noMatch });
     return result;
-  }, [allContacts, suggestions]);
+  }, [allContacts, suggestions, homeZonaId]);
 
   // ─── Mutations ────────────────────────────────────────────────
   const assignSingleMutation = useMutation({
@@ -203,7 +324,6 @@ const PoolPage = () => {
       if (cuerdaNum) updateData.numero_cuerda = cuerdaNum;
       const { error } = await supabase.from('contacts').update(updateData).eq('id', contactId);
       if (error) throw error;
-      // Save undo state
       setUndoData({
         contactIds: [contactId],
         prevStates: [{
@@ -284,7 +404,7 @@ const PoolPage = () => {
     onError: (err: any) => showError(err.message),
   });
 
-  // ─── Cuerdas grouped by zona for dropdown ─────────────────────
+  // ─── Cuerdas grouped by zona ──────────────────────────────────
   const cuerdaMenuItems = useMemo(() => {
     if (!zonas?.length || !cuerdas?.length) return [];
     return zonas.map(zona => {
@@ -292,6 +412,8 @@ const PoolPage = () => {
       return { zona, cuerdas: zonaCuerdas };
     }).filter(g => g.cuerdas.length > 0);
   }, [zonas, cuerdas]);
+
+  const isUnassignedView = activePool === 'unassigned' || activePool === 'external';
 
   // ─── Render ───────────────────────────────────────────────────
   return (
@@ -321,6 +443,7 @@ const PoolPage = () => {
 
       {/* ─── Pool Cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+        {/* Sin asignar */}
         <Card
           className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'unassigned' ? 'ring-2 ring-primary' : ''}`}
           onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}
@@ -338,6 +461,7 @@ const PoolPage = () => {
           </CardContent>
         </Card>
 
+        {/* Zona cards */}
         {zonas?.map(zona => (
           <Card
             key={zona.id}
@@ -352,6 +476,24 @@ const PoolPage = () => {
             </CardContent>
           </Card>
         ))}
+
+        {/* Pool externo */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'external' ? 'ring-2 ring-orange-500' : ''} ${externalContacts.length > 0 ? 'border-orange-500/30' : ''}`}
+          onClick={() => { setActivePool('external'); setSearchTerm(''); }}
+        >
+          <CardContent className="pt-3 pb-3 px-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] text-orange-400">Pool externo</p>
+                <p className={`text-2xl font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>
+                  {isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : externalContacts.length}
+                </p>
+              </div>
+              {externalContacts.length > 0 && <ExternalLink className="h-5 w-5 text-orange-400 opacity-70" />}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* ─── Toolbar ────────────────────────────────────────────── */}
@@ -393,50 +535,54 @@ const PoolPage = () => {
                 ? 'Sin resultados para esta búsqueda.'
                 : activePool === 'unassigned'
                   ? 'Todos los contactos están asignados a una zona ✅'
-                  : 'No hay contactos en esta zona todavía.'}
+                  : activePool === 'external'
+                    ? 'No hay contactos en el pool externo.'
+                    : 'No hay contactos en esta zona todavía.'}
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[120px]">Nombre</TableHead>
-                    <TableHead className="min-w-[100px]">Apellido</TableHead>
-                    <TableHead className="w-16 text-center">Edad</TableHead>
-                    <TableHead className="min-w-[180px]">Dirección</TableHead>
-                    {activePool === 'unassigned' && isAdminOrPastor && (
-                      <TableHead className="w-32">Asignar</TableHead>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
+                    <ResizableHeader width={colWidths.apellido} onResize={resizeCol('apellido')}>Apellido</ResizableHeader>
+                    <ResizableHeader width={colWidths.edad} onResize={resizeCol('edad')} className="text-center">Edad</ResizableHeader>
+                    <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
+                    {isUnassignedView && isAdminOrPastor && (
+                      <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>
                     )}
-                    {activePool === 'unassigned' && (
+                    {isUnassignedView && (
                       <>
-                        <TableHead className="w-28">Cuerda sug.</TableHead>
-                        <TableHead className="w-28">Zona sug.</TableHead>
+                        <ResizableHeader width={colWidths.cuerdaSug} onResize={resizeCol('cuerdaSug')}>Cuerda sug.</ResizableHeader>
+                        <ResizableHeader width={colWidths.zonaSug} onResize={resizeCol('zonaSug')}>Zona sug.</ResizableHeader>
                       </>
                     )}
-                    {activePool !== 'unassigned' && (
-                      <TableHead className="w-24">Cuerda</TableHead>
+                    {!isUnassignedView && (
+                      <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
                     )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                  </tr>
+                </thead>
+                <tbody>
                   {filteredContacts.map(c => {
                     const sug = suggestions[c.id];
-                    const sugZona = sug?.zona;
-                    const sugCuerda = sug?.cuerda;
+                    const sugZona = sug?.zona || null;
+                    const sugCuerda = sug?.cuerda || null;
                     const hasAddress = !!(c.address || c.barrio);
+                    const isExternal = sugZona && homeZonaId && sugZona.id !== homeZonaId;
 
                     return (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.first_name}</TableCell>
-                        <TableCell>{c.last_name || '—'}</TableCell>
-                        <TableCell className="text-center text-muted-foreground tabular-nums">{c.edad || '—'}</TableCell>
-                        <TableCell className="max-w-[220px]">
-                          <span className="text-xs truncate block">{c.address || '—'}</span>
+                      <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
+                        <td className="px-3 py-2.5 text-sm font-medium" style={{ width: colWidths.nombre }}>{c.first_name}</td>
+                        <td className="px-3 py-2.5 text-sm" style={{ width: colWidths.apellido }}>{c.last_name || '—'}</td>
+                        <td className="px-3 py-2.5 text-sm text-center text-muted-foreground tabular-nums" style={{ width: colWidths.edad }}>{c.edad || '—'}</td>
+                        <td className="px-3 py-2.5" style={{ width: colWidths.direccion }}>
+                          <span className="text-xs block truncate">{c.address || '—'}</span>
                           {c.barrio && <span className="text-[11px] text-muted-foreground">{c.barrio}</span>}
-                        </TableCell>
+                        </td>
 
-                        {activePool === 'unassigned' && isAdminOrPastor && (
-                          <TableCell>
+                        {/* Assign button */}
+                        {isUnassignedView && isAdminOrPastor && (
+                          <td className="px-3 py-2.5" style={{ width: colWidths.asignar }}>
                             {!hasAddress ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -456,6 +602,7 @@ const PoolPage = () => {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56 max-h-[320px] overflow-y-auto">
+                                  {/* Quick-assign to suggestion */}
                                   {sugZona && sugCuerda && (
                                     <>
                                       <DropdownMenuItem
@@ -464,14 +611,30 @@ const PoolPage = () => {
                                           zonaId: sugZona.id, zonaName: sugZona.nombre,
                                           cuerdaNum: sugCuerda.numero,
                                         })}
-                                        className="text-xs"
+                                        className="text-xs font-medium"
                                       >
                                         <Zap className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
-                                        {sugZona.nombre} · Cuerda {sugCuerda.numero}
+                                        ⚡ {sugZona.nombre} · Cuerda {sugCuerda.numero}
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                     </>
                                   )}
+                                  {sugZona && !sugCuerda && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={() => setConfirmDialog({
+                                          type: 'manual', contactId: c.id,
+                                          zonaId: sugZona.id, zonaName: sugZona.nombre,
+                                        })}
+                                        className="text-xs font-medium"
+                                      >
+                                        <Zap className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+                                        ⚡ {sugZona.nombre}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
+                                  {/* All cuerdas grouped by zona */}
                                   {cuerdaMenuItems.map(({ zona, cuerdas: zc }) => (
                                     <React.Fragment key={zona.id}>
                                       <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">
@@ -492,6 +655,7 @@ const PoolPage = () => {
                                       ))}
                                     </React.Fragment>
                                   ))}
+                                  {/* Zona only */}
                                   <DropdownMenuSeparator />
                                   <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">
                                     Solo zona (sin cuerda)
@@ -511,36 +675,46 @@ const PoolPage = () => {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             )}
-                          </TableCell>
+                          </td>
                         )}
 
-                        {activePool === 'unassigned' && (
+                        {/* Cuerda sug. + Zona sug. */}
+                        {isUnassignedView && (
                           <>
-                            <TableCell>
+                            <td className="px-3 py-2.5" style={{ width: colWidths.cuerdaSug }}>
                               {sugCuerda ? (
-                                <Badge variant="secondary" className="text-xs font-mono">{sugCuerda.numero}</Badge>
+                                <Badge className={`text-xs font-mono ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
+                                  {sugCuerda.numero}
+                                </Badge>
                               ) : <span className="text-xs text-muted-foreground">—</span>}
-                            </TableCell>
-                            <TableCell>
+                            </td>
+                            <td className="px-3 py-2.5" style={{ width: colWidths.zonaSug }}>
                               {sugZona ? (
-                                <Badge className="bg-green-500/15 text-green-600 dark:text-green-400 hover:bg-green-500/15 text-[11px]">{sugZona.nombre}</Badge>
+                                <Badge className={`text-[11px] ${isExternal
+                                  ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15'
+                                  : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'
+                                }`}>
+                                  {sugZona.nombre}
+                                  {isExternal && <ExternalLink className="h-3 w-3 ml-1 inline" />}
+                                </Badge>
                               ) : <span className="text-xs text-muted-foreground">Sin datos</span>}
-                            </TableCell>
+                            </td>
                           </>
                         )}
 
-                        {activePool !== 'unassigned' && (
-                          <TableCell>
+                        {/* Cuerda for assigned */}
+                        {!isUnassignedView && (
+                          <td className="px-3 py-2.5" style={{ width: colWidths.cuerda }}>
                             {c.numero_cuerda ? (
                               <Badge variant="secondary" className="text-xs font-mono">{c.numero_cuerda}</Badge>
                             ) : <span className="text-xs text-muted-foreground">—</span>}
-                          </TableCell>
+                          </td>
                         )}
-                      </TableRow>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
@@ -549,6 +723,7 @@ const PoolPage = () => {
       <div className="flex gap-4 text-xs text-muted-foreground">
         <span>Total: {allContacts?.length || 0}</span>
         <span>Sin asignar: {poolCounts.unassigned}</span>
+        <span>Pool externo: {externalContacts.length}</span>
         <span>Mostrando: {filteredContacts.length}</span>
       </div>
 
