@@ -17,7 +17,7 @@ import { showError, showSuccess } from '@/utils/toast';
 const exportContactsToCSV = async (churchId: string) => {
   const { data, error } = await supabase
     .from('contacts')
-    .select('first_name, last_name, phone, address, apartment_number, barrio, leader_assigned, conector, fecha_contacto, date_of_birth, sexo, estado_civil, observaciones, pedido_de_oracion, created_at')
+    .select('first_name, last_name, phone, address, apartment_number, barrio, numero_cuerda, zona, leader_assigned, conector, fecha_contacto, date_of_birth, edad, sexo, estado_civil, observaciones, pedido_de_oracion, created_at')
     .eq('church_id', churchId)
     .order('first_name', { ascending: true });
 
@@ -28,8 +28,8 @@ const exportContactsToCSV = async (churchId: string) => {
 
   const headers = [
     'Nombre', 'Apellido', 'Teléfono', 'Dirección',
-    'Departamento', 'Barrio', 'Referente asignado', 'Conector',
-    'Fecha de Contacto', 'Fecha de nacimiento', 'Sexo',
+    'Departamento', 'Barrio', 'N° Cuerda', 'Zona', 'Referente asignado', 'Conector',
+    'Fecha de Contacto', 'Fecha de nacimiento', 'Edad', 'Sexo',
     'Estado Civil', 'Observaciones', 'Pedido de Oración', 'Creado en'
   ];
 
@@ -48,10 +48,13 @@ const exportContactsToCSV = async (churchId: string) => {
     escape(c.address),
     escape(c.apartment_number),
     escape(c.barrio),
+    escape(c.numero_cuerda),
+    escape(c.zona),
     escape(c.leader_assigned),
     escape(c.conector),
     c.fecha_contacto ? escape(c.fecha_contacto) : '',
     c.date_of_birth ? escape(c.date_of_birth.split('T')[0]) : '',
+    escape(c.edad),
     escape(c.sexo),
     escape(c.estado_civil),
     escape(c.observaciones),

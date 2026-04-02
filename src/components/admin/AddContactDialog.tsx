@@ -95,7 +95,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [edad, setEdad] = useState<string>('');
   const [fechaContacto, setFechaContacto] = useState<string>(today());
   const [sexo, setSexo] = useState<string | null>(null);
-  const [barrio, setBarrio] = useState('');
   const [estadoCivil, setEstadoCivil] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [pedidoDeOracion, setPedidoDeOracion] = useState('');
@@ -120,7 +119,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     setDateOfBirth(''); setFechaContacto(today());
     setSexo(null); setEstadoCivil('');
     setObservaciones(''); setPedidoDeOracion('');
-    setBarrio('');
     setConector('');
     setLeaderAssigned(null); setCellId(null);
   };
@@ -195,7 +193,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           edad: edad ? parseInt(edad) : null,
           fecha_contacto: fechaContacto || null,
           sexo: sexo || null,
-          barrio: barrio || null,
           estado_civil: estadoCivil || null,
           observaciones: observaciones || null,
           pedido_de_oracion: pedidoDeOracion || null,
@@ -376,10 +373,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               <label className="text-sm font-medium">Dirección</label>
               <AddressAutocomplete
                 value={address}
-                onChange={(addr, lat, lng, barrio) => {
-                  setAddress(addr || '');
-                  if (barrio) setBarrio(barrio);
-                }}
+                onChange={(addr) => setAddress(addr || '')}
                 placeholder="Ej: Av. Corrientes 1234"
                 disabled={loading}
               />
@@ -405,17 +399,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               placeholder="Ej: Soltero/a, Casado/a..."
             />
 
-            {/* Barrio */}
-            <FormField
-              label="Barrio"
-              id="barrio"
-              value={barrio}
-              onChange={(e) => setBarrio(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: Palermo"
-            />
-
-            {/* Conector */}
+{/* Conector */}
             <FormField
               label="Conector"
               id="conector"
@@ -425,17 +409,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               placeholder="Nombre de quien conectó"
             />
 
-            {/* Célula */}
-            <SelectField
-              label="Célula"
-              value={cellId}
-              onChange={(value) => setCellId(value === "none" ? null : value)}
-              options={cells || []}
-              loading={isLoadingCells}
-              placeholder="Selecciona una célula (opcional)"
-            />
-
-            {/* Referente */}
+{/* Referente */}
             <SelectField
               label="Referente asignado"
               value={leaderAssigned}

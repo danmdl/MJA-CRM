@@ -37,6 +37,8 @@ interface Contact {
   church_id: string;
   cell_id: string | null;
   date_of_birth?: string | null;
+  numero_cuerda?: string | null;
+  zona?: string | null;
 }
 
 interface ContactLog {
@@ -381,6 +383,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             leader_assigned: contact.leader_assigned,
             cell_id: contact.cell_id,
             date_of_birth: contact.date_of_birth || null,
+            numero_cuerda: contact.numero_cuerda || null,
+            zona: contact.zona || null,
           }
         }),
       });
@@ -605,6 +609,53 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
                 <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
+                {/* Zona / Cuerda */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-muted-foreground">Número de Cuerda</label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    value={contact.numero_cuerda || ''}
+                    onChange={(e) => {
+                      const cuerda = e.target.value;
+                      const zonaMap: Record<string, string> = {
+                        '101': 'San Martín', '201': 'San Martín',
+                        '102': 'Villa Lynch', '202': 'Villa Lynch',
+                        '103': 'Ballester', '203': 'Ballester',
+                        '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
+                        '104': 'Villa Maipú', '204': 'Villa Maipú',
+                        '105': 'Loma Hermosa', '205': 'Loma Hermosa',
+                        '106': 'Jose L. Suarez', '206': 'Jose L. Suarez',
+                        '107': 'Santos Lugares', '207': 'Santos Lugares',
+                        '108': 'Billinghurst', '208': 'Billinghurst',
+                        '109': 'Caseros', '209': 'Caseros',
+                        '301': 'Bonich', '302': 'Bonich',
+                      };
+                      setContact({ ...contact, numero_cuerda: cuerda || null, zona: zonaMap[cuerda] || contact.zona || null });
+                    }}
+                  >
+                    <option value="">Sin cuerda</option>
+                    <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
+                    <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
+                    <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
+                    <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
+                    <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
+                    <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
+                    <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
+                    <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
+                    <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
+                    <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
+                    <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-muted-foreground">Zona</label>
+                  <input
+                    readOnly
+                    value={contact.zona || ''}
+                    className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default"
+                    placeholder="Se completa al elegir cuerda"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-2">
