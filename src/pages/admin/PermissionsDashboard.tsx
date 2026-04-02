@@ -284,32 +284,34 @@ const PermissionsDashboard = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {/* Header row with permission labels */}
-            <div className="grid grid-cols-8 gap-4 font-medium text-sm text-muted-foreground"> {/* Updated grid-cols */}
-              <div>Rol</div>
-              {permissionColumns.map((column) => (
-                <div key={column.key} className="text-center">
-                  <column.icon className="h-4 w-4 mx-auto mb-1" />
-                  {column.label}
-                </div>
-              ))}
-            </div>
-
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left font-medium text-muted-foreground pb-4 pr-4 min-w-[120px]">Rol</th>
+                  {permissionColumns.map((column) => (
+                    <th key={column.key} className="text-center font-medium text-muted-foreground pb-4 px-2 min-w-[90px]">
+                      <column.icon className="h-4 w-4 mx-auto mb-1" />
+                      <span className="block leading-tight">{column.label}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
             {/* Permission rows for each role */}
             {permissions.map((config, roleIndex) => (
-              <div key={config.role} className="grid grid-cols-8 gap-4 items-center"> {/* Updated grid-cols */}
-                <div className="font-medium">
+              <tr key={config.role}>
+                <td className="py-3 pr-4">
                   <Badge variant={config.role === 'admin' ? 'default' : 'secondary'}>
                     {config.label}
                   </Badge>
-                </div>
+                </td>
                 {permissionColumns.map((column) => (
-                  <div key={column.key} className="flex justify-center">
+                  <td key={column.key} className="text-center py-3 px-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-12 h-12 p-0"
+                      className="w-10 h-10 p-0 mx-auto"
                       onClick={() => updatePermission(roleIndex, column.key as keyof PermissionConfig['permissions'])}
                       disabled={config.role === 'admin' && config.permissions[column.key as keyof PermissionConfig['permissions']]}
                     >
@@ -319,10 +321,12 @@ const PermissionsDashboard = () => {
                         <X className="h-4 w-4 text-red-600" />
                       )}
                     </Button>
-                  </div>
+                  </td>
                 ))}
-              </div>
+              </tr>
             ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
