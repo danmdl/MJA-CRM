@@ -223,7 +223,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           setTimeout(() => firstNameRef.current?.focus(), 50);
         } else {
           resetForm();
-          onOpenChange(false);
+          setTimeout(() => onOpenChange(false), 100);
         }
       }
     } finally {
@@ -277,24 +277,26 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             {/* Fecha de nacimiento */}
             <div className="space-y-2">
               <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
-              <Input
+              <input
                 id="dob"
                 type="date"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
                 disabled={loading}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 
             {/* Fecha de Contacto */}
             <div className="space-y-2">
               <label htmlFor="fechaContacto" className="text-sm font-medium">Fecha de Contacto</label>
-              <Input
+              <input
                 id="fechaContacto"
                 type="date"
                 value={fechaContacto}
                 onChange={(e) => setFechaContacto(e.target.value)}
                 disabled={loading}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 

@@ -155,14 +155,14 @@ const AddressAutocomplete = ({
                 textAlign: 'left',
                 padding: '8px 12px',
                 fontSize: '0.875rem',
-                background: 'none',
+                background: 'hsl(240,10%,3.9%)',
                 border: 'none',
                 borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
                 cursor: 'pointer',
                 color: 'var(--popover-foreground)',
               }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--accent)')}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(240,3.7%,15.9%)')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(240,10%,3.9%)')}
               onMouseDown={e => { e.preventDefault(); handleSelect(s); }}
             >
               <MapPin style={{ width: '0.875rem', height: '0.875rem', marginTop: '2px', flexShrink: 0, color: 'var(--primary)' }} />
