@@ -315,6 +315,18 @@ const PoolPage = () => {
         pool_assigned_at: new Date().toISOString(), pool_assigned_by: session?.user?.id,
       }).eq('id', contactId);
       if (error) throw error;
+      // Log transfer
+      await supabase.from('contact_transfers').insert({
+        contact_id: contactId,
+        from_cuerda: contact?.numero_cuerda || null,
+        to_cuerda: cuerdaNum,
+        from_zona: contact?.zona || null,
+        to_zona: zonaName,
+        from_cell_id: contact?.cell_id || null,
+        to_cell_id: cellId,
+        transferred_by: session?.user?.id,
+        transfer_type: 'pool_assignment',
+      });
       setUndoData({
         contactIds: [contactId],
         prevStates: [{ zona_id: contact?.zona_id || null, zona: contact?.zona || null, numero_cuerda: contact?.numero_cuerda || null, cell_id: contact?.cell_id || null }],
@@ -345,6 +357,18 @@ const PoolPage = () => {
           cell_id: sug.cell.id, zona_id: zonaId, zona: zonaName, numero_cuerda: cuerdaNum,
           pool_assigned_at: new Date().toISOString(), pool_assigned_by: session?.user?.id,
         }).eq('id', contact.id);
+        // Log transfer
+        await supabase.from('contact_transfers').insert({
+          contact_id: contact.id,
+          from_cuerda: contact.numero_cuerda || null,
+          to_cuerda: cuerdaNum,
+          from_zona: contact.zona || null,
+          to_zona: zonaName,
+          from_cell_id: contact.cell_id || null,
+          to_cell_id: sug.cell.id,
+          transferred_by: session?.user?.id,
+          transfer_type: 'auto_assignment',
+        });
         count++;
       }
       if (count === 0) throw new Error('No se pudo asignar ningún contacto.');
