@@ -19,12 +19,13 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
+import AddContactDialog from '@/components/admin/AddContactDialog';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface Zona { id: string; nombre: string; }
@@ -86,6 +87,7 @@ const PoolPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [addContactOpen, setAddContactOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'auto' | 'manual';
     contactId?: string;
@@ -467,6 +469,11 @@ const PoolPage = () => {
             <Upload className="h-4 w-4" /> Importar CSV
           </Button>
         )}
+        {isAdminOrPastor && (
+          <Button size="sm" variant="outline" onClick={() => setAddContactOpen(true)} className="gap-1.5">
+            <PlusCircle className="h-4 w-4" /> Crear Contacto
+          </Button>
+        )}
         <div className="flex-1" />
         <div className="relative w-64 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -717,6 +724,16 @@ const PoolPage = () => {
           }
         }}
         contactId={selectedContactId || ''}
+        churchId={churchId!}
+      />
+
+      {/* Add Contact Dialog */}
+      <AddContactDialog
+        open={addContactOpen}
+        onOpenChange={(o) => {
+          setAddContactOpen(o);
+          if (!o) queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+        }}
         churchId={churchId!}
       />
     </div>
