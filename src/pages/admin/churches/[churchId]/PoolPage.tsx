@@ -239,14 +239,12 @@ const PoolPage = () => {
 
   // ─── Pool counts ───────────────────────────────────────────────
   const poolCounts = useMemo(() => {
-    const counts: Record<string, number> = { unassigned: 0, external: 0 };
-    zonas?.forEach(z => { counts[z.id] = 0; });
+    let unassigned = 0;
     allContacts?.forEach(c => {
-      if (!c.zona_id && !c.cell_id) counts.unassigned++;
-      else if (c.zona_id && counts[c.zona_id] !== undefined) counts[c.zona_id]++;
+      if (!c.zona_id && !c.cell_id) unassigned++;
     });
-    return counts;
-  }, [allContacts, zonas]);
+    return { unassigned };
+  }, [allContacts]);
 
   const externalContacts = useMemo(() => {
     if (!allContacts || !homeZonaId) return [];
@@ -263,7 +261,6 @@ const PoolPage = () => {
     let filtered: Contact[];
     if (activePool === 'unassigned') filtered = allContacts.filter(c => !c.zona_id && !c.cell_id);
     else if (activePool === 'external') filtered = externalContacts;
-    else filtered = allContacts.filter(c => c.zona_id === activePool);
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       filtered = filtered.filter(c =>
@@ -274,7 +271,8 @@ const PoolPage = () => {
     return filtered;
   }, [allContacts, activePool, searchTerm, externalContacts]);
 
-  const isUnassignedView = activePool === 'unassigned' || activePool === 'external';
+  // Pool is always unassigned or external view now (no zona cards)
+  const isUnassignedView = true;
 
   // ─── Auto-assign preview ───────────────────────────────────────
   const autoAssignPreview = useMemo(() => {
@@ -426,8 +424,8 @@ const PoolPage = () => {
         )}
       </div>
 
-      {/* Pool Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+      {/* Pool Cards — only Sin asignar + Pool externo */}
+      <div className="grid grid-cols-2 gap-3 max-w-md">
         <Card className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'unassigned' ? 'ring-2 ring-primary' : ''}`} onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}>
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center justify-between">
@@ -439,14 +437,6 @@ const PoolPage = () => {
             </div>
           </CardContent>
         </Card>
-        {zonas?.map(zona => (
-          <Card key={zona.id} className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === zona.id ? 'ring-2 ring-primary' : ''}`} onClick={() => { setActivePool(zona.id); setSearchTerm(''); }}>
-            <CardContent className="pt-3 pb-3 px-4">
-              <p className="text-[11px] text-muted-foreground truncate">{zona.nombre}</p>
-              <p className="text-2xl font-bold tabular-nums">{isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : (poolCounts[zona.id] || 0)}</p>
-            </CardContent>
-          </Card>
-        ))}
         <Card className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'external' ? 'ring-2 ring-orange-500' : ''} ${externalContacts.length > 0 ? 'border-orange-500/30' : ''}`} onClick={() => { setActivePool('external'); setSearchTerm(''); }}>
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center justify-between">
@@ -481,7 +471,7 @@ const PoolPage = () => {
             <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : !filteredContacts.length ? (
             <p className="text-sm text-muted-foreground py-10 text-center">
-              {searchTerm ? 'Sin resultados.' : activePool === 'unassigned' ? 'Todos asignados ✅' : activePool === 'external' ? 'Pool externo vacío.' : 'Sin contactos en esta zona.'}
+              {searchTerm ? 'Sin resultados.' : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Pool externo vacío.'}
             </p>
           ) : (
             <div className="overflow-x-auto">
