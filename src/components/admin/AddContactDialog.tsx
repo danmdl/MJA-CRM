@@ -90,6 +90,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [contactLat, setContactLat] = useState<number | null>(null);
+  const [contactLng, setContactLng] = useState<number | null>(null);
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<string>('');
   const [edad, setEdad] = useState<string>('');
@@ -200,6 +202,9 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           observaciones: observaciones || null,
           pedido_de_oracion: pedidoDeOracion || null,
           numero_cuerda: profile?.numero_cuerda || null,
+          lat: contactLat,
+          lng: contactLng,
+          estado_seguimiento: 'nuevo',
         });
 
       if (error) {
@@ -385,7 +390,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               <label className="text-sm font-medium">Dirección</label>
               <AddressAutocomplete
                 value={address}
-                onChange={(addr) => setAddress(addr || '')}
+                onChange={(addr, lat, lng) => { setAddress(addr || ''); if (lat !== undefined) setContactLat(lat); if (lng !== undefined) setContactLng(lng); }}
                 placeholder="Ej: Av. Corrientes 1234"
                 disabled={loading}
               />

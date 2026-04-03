@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { useQuery } from '@tanstack/react-query';
+import DuplicateDetectorPanel from '@/components/admin/DuplicateDetectorPanel';
 
 const exportContactsToCSV = async (churchId: string) => {
   const { data, error } = await supabase
@@ -124,6 +125,7 @@ const ChurchDatabasePage = () => {
             <Download className="mr-1.5 h-4 w-4" />
             {exporting ? 'Exportando...' : 'Exportar CSV'}
           </Button>
+          <DuplicateDetectorPanel churchId={churchId!} />
           {canAddContacts() && (
             <Button onClick={() => setIsAddContactDialogOpen(true)} size="sm">
               <PlusCircle className="mr-1.5 h-4 w-4" />
