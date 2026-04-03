@@ -107,6 +107,24 @@ const OverviewPage = () => {
     enabled: !!churchId,
   });
 
+  // Fetch cuerdas + zonas for analytics breakdowns
+  const { data: cuerdas } = useQuery({
+    queryKey: ['overviewCuerdas', churchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('cuerdas').select('id, numero, zona_id');
+      return data || [];
+    },
+    enabled: !!churchId,
+  });
+  const { data: zonas } = useQuery({
+    queryKey: ['overviewZonas', churchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('zonas').select('id, nombre').eq('church_id', churchId!);
+      return data || [];
+    },
+    enabled: !!churchId,
+  });
+
   // Load leaders for main pastor selection (also used to resolve names)
   const { data: leaders } = useQuery({
     queryKey: ['leaders-for-pastor', churchId],
@@ -213,8 +231,41 @@ const OverviewPage = () => {
     c.forEach((x: any) => { cellNameMap[x.id] = x.name; });
     const topCells = topCellsRaw.map(([id, count]) => ({ name: cellNameMap[id] || `Célula ${id.slice(0,6)}`, count: count as number }));
 
-    return { cellsCount, cellsCountingReferente, peopleInCellsWithoutReferente, perDay, topReferente, topCells };
-  }, [cells, contacts, referenteNameMap]);
+    // Build cuerda and zona maps
+    const cuerdaMap = new Map((cuerdas || []).map((cr: any) => [cr.id, cr]));
+    const zonaMap = new Map((zonas || []).map((z: any) => [z.id, z]));
+
+    // Cells per zona (localidad)
+    const perZona: Record<string, number> = {};
+    c.forEach((cell: any) => {
+      const cuerda = cuerdaMap.get(cell.cuerda_id);
+      const zona = cuerda ? zonaMap.get(cuerda.zona_id) : null;
+      const zonaName = zona?.nombre || 'Sin zona';
+      perZona[zonaName] = (perZona[zonaName] || 0) + 1;
+    });
+
+    // Cells per cuerda
+    const perCuerda: Record<string, number> = {};
+    c.forEach((cell: any) => {
+      const cuerda = cuerdaMap.get(cell.cuerda_id);
+      const num = cuerda?.numero || 'Sin cuerda';
+      perCuerda[num] = (perCuerda[num] || 0) + 1;
+    });
+
+    // Personas per cuerda (con y sin piloto)
+    const personasPorCuerda: Record<string, { conPiloto: number; sinPiloto: number }> = {};
+    c.forEach((cell: any) => {
+      const cuerda = cuerdaMap.get(cell.cuerda_id);
+      const num = cuerda?.numero || 'Sin cuerda';
+      if (!personasPorCuerda[num]) personasPorCuerda[num] = { conPiloto: 0, sinPiloto: 0 };
+      const members = attendeeCounts[cell.id] || 0;
+      const hasPiloto = !!cell.encargado_id;
+      personasPorCuerda[num].conPiloto += members + (hasPiloto ? 1 : 0);
+      personasPorCuerda[num].sinPiloto += members;
+    });
+
+    return { cellsCount, cellsCountingReferente, peopleInCellsWithoutReferente, perDay, topReferente, topCells, perZona, perCuerda, personasPorCuerda };
+  }, [cells, contacts, referenteNameMap, cuerdas, zonas]);
 
   const [addSecondPastorOpen, setAddSecondPastorOpen] = useState(false);
   const [selectedSecondPastor, setSelectedSecondPastor] = useState<string | 'none'>('none');
@@ -239,194 +290,162 @@ const OverviewPage = () => {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Resumen de {church.name}</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{church.name}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Main pastor + secondary pastors row */}
-          <div className="flex flex-col sm:flex-row items-start gap-4">
-            {/* Main pastor select */}
-            <div className="w-full sm:min-w-[260px] sm:w-auto">
-              <div className="font-medium mb-2">Pastor Principal</div>
-              {isAdminOrGeneral ? (
-                <Select
-                  value={church.pastor_id || undefined}
-                  onValueChange={async (val) => {
-                    const newVal = val === 'none' ? null : val;
-                    const { error } = await supabase.from('churches').update({ pastor_id: newVal }).eq('id', churchId!);
-                    if (error) showError(error.message || 'Error al actualizar el pastor.');
-                  }}
-                >
-                  <SelectTrigger><SelectValue placeholder="Selecciona un pastor" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin asignación</SelectItem>
-                    {(leaders as any[] || []).map(p => (
-                      <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="text-muted-foreground">{church.pastor_id ? 'Asignado' : 'No asignado'}</div>
+    <div className="space-y-5">
+      {/* Header: church name + pastor controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-3xl font-bold">{church.name}</h1>
+        {isAdminOrGeneral && (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Pastor:</span>
+              <Select
+                value={church.pastor_id || undefined}
+                onValueChange={async (val) => {
+                  const newVal = val === 'none' ? null : val;
+                  const { error } = await supabase.from('churches').update({ pastor_id: newVal }).eq('id', churchId!);
+                  if (error) showError(error.message);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder="Sin pastor" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignación</SelectItem>
+                  {(leaders as any[] || []).map(p => (
+                    <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setAddSecondPastorOpen(true)}>
+              <PlusCircle className="h-3.5 w-3.5" /> Pastor 2°
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Secondary pastors badges (only show if any exist) */}
+      {secondaryNames.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Pastores secundarios:</span>
+          {secondaryNames.map(({ user_id, name }) => (
+            <div key={user_id} className="flex items-center gap-1 px-2 py-0.5 rounded border text-xs bg-background">
+              <span>{name}</span>
+              {isAdminOrGeneral && (
+                <button className="text-red-500 hover:text-red-400 ml-1" onClick={() => removeSecondaryPastor(user_id)}>×</button>
               )}
             </div>
+          ))}
+        </div>
+      )}
 
-            {/* Secondary pastors */}
-            <div className="flex-1 w-full">
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-medium">Pastor Secundario</div>
-                {isAdminOrGeneral && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => setAddSecondPastorOpen(true)}
-                  >
-                    <PlusCircle className="h-3.5 w-3.5 mr-1" />
-                    Añadir
-                  </Button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {secondaryNames.length === 0 ? (
-                  <span className="text-sm text-muted-foreground">Sin pastores secundarios</span>
-                ) : (
-                  secondaryNames.map(({ user_id, name }) => (
-                    <div key={user_id} className="flex items-center gap-2 px-3 py-1 rounded border bg-background">
-                      <span className="text-sm">{name}</span>
-                      {isAdminOrGeneral && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-red-600"
-                          onClick={() => removeSecondaryPastor(user_id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Dialog to add a second pastor (unchanged behavior) */}
-          <Dialog open={addSecondPastorOpen} onOpenChange={setAddSecondPastorOpen}>
-            <DialogContent className="sm:max-w-[420px]">
-              <DialogHeader>
-                <DialogTitle>Agregar Pastor Secundario</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <Select
-                  value={selectedSecondPastor}
-                  onValueChange={(val) => setSelectedSecondPastor(val as any)}
-                >
-                  <SelectTrigger><SelectValue placeholder="Selecciona miembro" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Selecciona miembro</SelectItem>
-                    {(leaders as any[] || []).map(p => (
-                      <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex justify-end">
-                  <Button
-                    onClick={async () => {
-                      if (!churchId || !selectedSecondPastor || selectedSecondPastor === 'none') return;
-                      const { error } = await supabase.from('church_pastors').insert({ church_id: churchId, user_id: selectedSecondPastor });
-                      if (error) showError(error.message || 'Error al agregar pastor secundario.');
-                      else {
-                        showSuccess('Pastor secundario agregado.');
-                        queryClient.invalidateQueries({ queryKey: ['churchSecondaryPastors', churchId] });
-                        setAddSecondPastorOpen(false);
-                      }
-                    }}
-                  >
-                    Guardar
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <p><strong>Creado en:</strong> {new Date(church.created_at).toLocaleDateString()}</p>
-
-          {/* Updated analytics cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-3 rounded border">
-              <div className="text-sm text-muted-foreground">Número de Células</div>
-              <div className="text-2xl font-bold">{analytics.cellsCount}</div>
-            </div>
-            <div className="p-3 rounded border">
-              <div className="text-sm text-muted-foreground">Células contando al referente</div>
-              <div className="text-2xl font-bold">{analytics.cellsCountingReferente}</div>
-            </div>
-            <div className="p-3 rounded border">
-              <div className="text-sm text-muted-foreground">Células sin contar al referente</div>
-              <div className="text-2xl font-bold">{analytics.peopleInCellsWithoutReferente}</div>
-            </div>
-          </div>
-
-          {/* Fixed weekday headers */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <PipelineSummaryCard churchId={churchId!} />
-            <div className="p-3 rounded border">
-              <div className="font-medium mb-2">Células por Día</div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d => (
-                  <div key={d} className="flex justify-between"><span>{d}</span><span className="font-medium">{analytics.perDay[d]}</span></div>
+      {/* Dialog to add a second pastor */}
+      <Dialog open={addSecondPastorOpen} onOpenChange={setAddSecondPastorOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Agregar Pastor Secundario</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Select value={selectedSecondPastor} onValueChange={(val) => setSelectedSecondPastor(val as any)}>
+              <SelectTrigger><SelectValue placeholder="Selecciona miembro" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Selecciona miembro</SelectItem>
+                {(leaders as any[] || []).map(p => (
+                  <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
                 ))}
-              </div>
-            </div>
-            <div className="p-3 rounded border">
-              <div className="font-medium mb-2">Células por Hora</div>
-              <div className="space-y-1 text-sm">
-                {Object.keys(analytics.perDay).length === 0 ? (
-                  <div className="text-muted-foreground">Sin datos</div>
-                ) : (
-                  // Keep original perTime rendering (unchanged)
-                  Object.entries(analytics.perDay).length === 0 ? <div className="text-muted-foreground">Sin datos</div> : null
-                )}
-              </div>
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end">
+              <Button onClick={async () => {
+                if (!churchId || !selectedSecondPastor || selectedSecondPastor === 'none') return;
+                const { error } = await supabase.from('church_pastors').insert({ church_id: churchId, user_id: selectedSecondPastor });
+                if (error) showError(error.message);
+                else { showSuccess('Pastor secundario agregado.'); queryClient.invalidateQueries({ queryKey: ['churchSecondaryPastors', churchId] }); setAddSecondPastorOpen(false); }
+              }}>Guardar</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-3 rounded border">
-              <div className="font-medium mb-2">Referente con más Células</div>
-              <div className="text-sm">
-                {analytics.topReferente ? (
-                  <span>{analytics.topReferente.name} · {analytics.topReferente.count} célula(s)</span>
-                ) : (
-                  <span className="text-muted-foreground">Sin datos</span>
-                )}
-              </div>
-            </div>
-            <div className="p-3 rounded border">
-              <div className="font-medium mb-2">Células con más Miembros</div>
-              <div className="text-sm space-y-1">
-                {analytics.topCells.length === 0 ? (
-                  <span className="text-muted-foreground">Sin datos</span>
-                ) : (
-                  analytics.topCells.map((c) => (
-                    <div key={c.name} className="flex justify-between">
-                      <span>{c.name}</span>
-                      <span className="font-medium">{c.count}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+      {/* 3 stat cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-4 rounded border">
+          <div className="text-sm text-muted-foreground">Cantidad de Células</div>
+          <div className="text-3xl font-bold">{analytics.cellsCount}</div>
+        </div>
+        <div className="p-4 rounded border">
+          <div className="text-sm text-muted-foreground">Personas en células</div>
+          <div className="text-3xl font-bold">{analytics.cellsCountingReferente}</div>
+        </div>
+        <div className="p-4 rounded border">
+          <div className="text-sm text-muted-foreground">Personas sin contar al Piloto</div>
+          <div className="text-3xl font-bold">{analytics.peopleInCellsWithoutReferente}</div>
+        </div>
+      </div>
+
+      {/* Pipeline + Células por Día */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <PipelineSummaryCard churchId={churchId!} />
+        <div className="p-4 rounded border">
+          <div className="font-medium mb-3">Células por Día</div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d => (
+              <div key={d} className="flex justify-between"><span>{d}</span><span className="font-bold tabular-nums">{analytics.perDay[d]}</span></div>
+            ))}
           </div>
+        </div>
+      </div>
 
-          <p className="text-muted-foreground">
-            Estos números muestran el estado actual; el histórico se irá construyendo con el uso.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Células por Localidad + Células por Cuerda */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-4 rounded border">
+          <div className="font-medium mb-3">Células por Localidad</div>
+          <div className="space-y-1 text-sm">
+            {analytics.perZona && Object.entries(analytics.perZona).length > 0 ? (
+              Object.entries(analytics.perZona).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([zona, count]) => (
+                <div key={zona} className="flex justify-between"><span>{zona}</span><span className="font-bold tabular-nums">{count as number}</span></div>
+              ))
+            ) : <span className="text-muted-foreground">Sin datos</span>}
+          </div>
+        </div>
+        <div className="p-4 rounded border">
+          <div className="font-medium mb-3">Células por Cuerda</div>
+          <div className="space-y-1 text-sm">
+            {analytics.perCuerda && Object.entries(analytics.perCuerda).length > 0 ? (
+              Object.entries(analytics.perCuerda).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([cuerda, count]) => (
+                <div key={cuerda} className="flex justify-between"><span>Cuerda {cuerda}</span><span className="font-bold tabular-nums">{count as number}</span></div>
+              ))
+            ) : <span className="text-muted-foreground">Sin datos</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Personas por Cuerda + Top cells */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-4 rounded border">
+          <div className="font-medium mb-3">Personas por Cuerda</div>
+          <div className="space-y-1 text-sm">
+            {analytics.personasPorCuerda && Object.entries(analytics.personasPorCuerda).length > 0 ? (
+              Object.entries(analytics.personasPorCuerda).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([cuerda, data]: [string, any]) => (
+                <div key={cuerda} className="flex justify-between">
+                  <span>Cuerda {cuerda}</span>
+                  <span className="tabular-nums"><span className="font-bold">{data.conPiloto}</span> <span className="text-muted-foreground text-xs">(sin piloto: {data.sinPiloto})</span></span>
+                </div>
+              ))
+            ) : <span className="text-muted-foreground">Sin datos</span>}
+          </div>
+        </div>
+        <div className="p-4 rounded border">
+          <div className="font-medium mb-3">Células con más Miembros</div>
+          <div className="space-y-1 text-sm">
+            {analytics.topCells.length === 0 ? (
+              <span className="text-muted-foreground">Sin datos</span>
+            ) : (
+              analytics.topCells.map((c) => (
+                <div key={c.name} className="flex justify-between"><span>{c.name}</span><span className="font-bold tabular-nums">{c.count}</span></div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
