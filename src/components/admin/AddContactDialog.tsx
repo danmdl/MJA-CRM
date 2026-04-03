@@ -95,6 +95,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<string>('');
   const [edad, setEdad] = useState<string>('');
+  const [rangoEtario, setRangoEtario] = useState<string>('');
   const [fechaContacto, setFechaContacto] = useState<string>(today());
   const [sexo, setSexo] = useState<string | null>(null);
   const [estadoCivil, setEstadoCivil] = useState('');
@@ -333,7 +334,15 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                     let age = now.getFullYear() - dob.getFullYear();
                     const m = now.getMonth() - dob.getMonth();
                     if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
-                    if (age >= 0) setEdad(String(age));
+                    if (age >= 0) {
+                      setEdad(String(age));
+                      if (age <= 12) setRangoEtario('Niño (0-12)');
+                      else if (age <= 17) setRangoEtario('Adolescente (13-17)');
+                      else if (age <= 25) setRangoEtario('Joven (18-25)');
+                      else if (age <= 35) setRangoEtario('Adulto joven (26-35)');
+                      else if (age <= 55) setRangoEtario('Adulto (36-55)');
+                      else setRangoEtario('Adulto mayor (56+)');
+                    }
                   }
                 }}
                 disabled={loading}
@@ -341,32 +350,65 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               />
             </div>
 
-            {/* Edad - editable, auto-filled from date of birth */}
+            {/* Edad + Rango Etario */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Edad</label>
               <input
                 type="number"
+                inputMode="numeric"
                 min="0"
                 max="120"
                 value={edad}
-                onChange={(e) => !dateOfBirth && setEdad(e.target.value)}
+                onChange={(e) => {
+                  if (dateOfBirth) return;
+                  const v = e.target.value;
+                  setEdad(v);
+                  const n = parseInt(v);
+                  if (!isNaN(n)) {
+                    if (n <= 12) setRangoEtario('Niño (0-12)');
+                    else if (n <= 17) setRangoEtario('Adolescente (13-17)');
+                    else if (n <= 25) setRangoEtario('Joven (18-25)');
+                    else if (n <= 35) setRangoEtario('Adulto joven (26-35)');
+                    else if (n <= 55) setRangoEtario('Adulto (36-55)');
+                    else setRangoEtario('Adulto mayor (56+)');
+                  } else {
+                    setRangoEtario('');
+                  }
+                }}
                 readOnly={!!dateOfBirth}
                 disabled={loading}
                 placeholder="Ej: 32"
-                className={`flex h-10 w-full rounded-md border border-input px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${dateOfBirth ? 'bg-muted text-muted-foreground cursor-default' : 'bg-background'}`}
+                className={`flex h-10 w-full rounded-md border border-input px-3 py-2 text-sm ${dateOfBirth ? 'bg-muted text-muted-foreground cursor-default' : 'bg-background'}`}
               />
             </div>
 
-            {/* Fecha de Contacto */}
+            {/* Rango Etario */}
             <div className="space-y-2">
-              <label htmlFor="fechaContacto" className="text-sm font-medium">Fecha de Contacto</label>
+              <label className="text-sm font-medium">Rango Etario</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={rangoEtario}
+                onChange={(e) => setRangoEtario(e.target.value)}
+                disabled={loading}
+              >
+                <option value="">Sin especificar</option>
+                <option value="Niño (0-12)">Niño (0-12)</option>
+                <option value="Adolescente (13-17)">Adolescente (13-17)</option>
+                <option value="Joven (18-25)">Joven (18-25)</option>
+                <option value="Adulto joven (26-35)">Adulto joven (26-35)</option>
+                <option value="Adulto (36-55)">Adulto (36-55)</option>
+                <option value="Adulto mayor (56+)">Adulto mayor (56+)</option>
+              </select>
+            </div>
+
+            {/* Fecha de Contacto - auto today, readonly */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Fecha de Contacto</label>
               <input
-                id="fechaContacto"
                 type="date"
                 value={fechaContacto}
-                onChange={(e) => setFechaContacto(e.target.value)}
-                disabled={loading}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                readOnly
+                className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-default"
               />
             </div>
 
@@ -407,14 +449,23 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             />
 
 {/* Estado Civil */}
-            <FormField
-              label="Estado Civil"
-              id="estadoCivil"
-              value={estadoCivil}
-              onChange={(e) => setEstadoCivil(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: Soltero/a, Casado/a..."
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Estado Civil</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={estadoCivil}
+                onChange={(e) => setEstadoCivil(e.target.value)}
+                disabled={loading}
+              >
+                <option value="">Sin especificar</option>
+                <option value="Soltero/a">Soltero/a</option>
+                <option value="Casado/a">Casado/a</option>
+                <option value="En pareja">En pareja</option>
+                <option value="Viudo/a">Viudo/a</option>
+                <option value="Separado/a">Separado/a</option>
+                <option value="N/A">N/A</option>
+              </select>
+            </div>
 
 {/* Conector - read-only for Conector role */}
             <div className="space-y-2">
@@ -422,26 +473,13 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               <Input
                 id="conector"
                 value={conector}
-                onChange={(e) => { if (profile?.role !== 'conector') setConector(e.target.value); }}
                 disabled={loading}
-                readOnly={profile?.role === 'conector'}
-                placeholder="Nombre de quien conectó"
-                className={profile?.role === 'conector' ? 'bg-muted text-muted-foreground cursor-default' : ''}
+                readOnly
+                className="bg-muted text-muted-foreground cursor-default"
               />
             </div>
 
-{/* Líder de Célula */}
-            <SelectField
-              label="Líder de Célula"
-              value={leaderAssigned}
-              onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
-              options={(leaders || []).map(leader => ({
-                id: leader.id,
-                name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
-              }))}
-              loading={isLoadingLeaders}
-              placeholder="Sin líder asignado"
-            />
+
 
             {/* Observaciones - spans full row */}
             <div className="contact-form-col-full space-y-2">
