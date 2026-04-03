@@ -441,38 +441,32 @@ const OverviewPage = () => {
         </div>
       </div>
 
-      {/* Células por Día — compact grid */}
+      {/* Células por Día — full day names */}
       <div className="p-4 rounded border">
         <div className="font-medium mb-3">Células por Día</div>
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-3 text-sm">
           {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d => (
             <div key={d} className="text-center">
-              <div className="text-muted-foreground text-xs">{d.slice(0,3)}</div>
+              <div className="text-muted-foreground text-xs">{d}</div>
               <div className="text-lg font-bold tabular-nums">{analytics.perDay[d]}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Células por Localidad + Células por Cuerda — 5 cols, show 5 + Ver más */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 4 analytics cards in one row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <CompactList
           title="Células por Localidad"
           items={Object.entries(analytics.perZona || {}).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([k, v]) => ({ label: k, value: v as number }))}
         />
         <CompactList
           title="Células por Cuerda"
-          items={Object.entries(analytics.perCuerda || {}).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([k, v]) => ({ label: `Cuerda ${k}`, value: v as number }))}
-          columns={5}
+          items={Object.entries(analytics.perCuerda || {}).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([k, v]) => ({ label: `Cda ${k}`, value: v as number }))}
         />
-      </div>
-
-      {/* Personas por Cuerda + Top cells */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <CompactList
           title="Personas por Cuerda"
-          items={Object.entries(analytics.personasPorCuerda || {}).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([k, d]: [string, any]) => ({ label: `Cuerda ${k}`, value: d.conPiloto, sub: `sin piloto: ${d.sinPiloto}` }))}
-          columns={5}
+          items={Object.entries(analytics.personasPorCuerda || {}).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([k, d]: [string, any]) => ({ label: `Cda ${k}`, value: d.conPiloto, sub: `s/p: ${d.sinPiloto}` }))}
         />
         <CompactList
           title="Células con más Miembros"
