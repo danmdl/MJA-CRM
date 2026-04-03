@@ -36,7 +36,7 @@ interface Contact {
   last_contact_date?: string | null;
   created_by: string | null;
   estado_seguimiento?: string | null;
-  cell?: { name: string } | null;
+  cell?: { name: string; address?: string | null; lat?: number | null; lng?: number | null } | null;
   leader?: { first_name: string; last_name: string } | null;
   created_by_profile?: { first_name: string | null; last_name: string | null } | null;
 }
@@ -186,7 +186,25 @@ const TableCellContent = ({
       );
     }
     if (column.key === 'cell.name') {
-      return contact.cell?.name || '-';
+      if (!contact.cell?.name) return '-';
+      return (
+        <div className="space-y-1">
+          <span className="text-sm">{contact.cell.name}</span>
+          {contact.cell.address && (
+            <p className="text-[10px] text-muted-foreground truncate max-w-[180px]" title={contact.cell.address}>{contact.cell.address}</p>
+          )}
+          <div className="flex gap-1">
+            {contact.cell.lat && contact.cell.lng && (
+              <button
+                className="text-[10px] px-1.5 py-0.5 rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps?q=${contact.cell!.lat},${contact.cell!.lng}`, '_blank'); }}
+              >
+                Ver en Mapa
+              </button>
+            )}
+          </div>
+        </div>
+      );
     }
     if (column.key === 'leader.first_name') {
       return contact.leader ? `${contact.leader.first_name} ${contact.leader.last_name}` : '-';
@@ -371,7 +389,7 @@ const DynamicContactTable = ({
     const { data: contactsData, error: contactsError } = await contactQuery;
     if (contactsError) throw new Error('No se pudieron cargar los contactos.');
 
-    const { data: cellsData, error: cellsError } = await supabase.from('cells').select('id, name');
+    const { data: cellsData, error: cellsError } = await supabase.from('cells').select('id, name, address, lat, lng');
     if (cellsError) throw new Error('No se pudieron cargar las células.');
 
     const { data: leadersData, error: leadersError } = await supabase.from('profiles').select('id, first_name, last_name');
