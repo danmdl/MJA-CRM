@@ -24,6 +24,7 @@ import {
 import { useSession } from '@/hooks/use-session';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
+import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface Zona { id: string; nombre: string; }
@@ -84,6 +85,7 @@ const PoolPage = () => {
   const [activePool, setActivePool] = useState<string>('unassigned');
   const [searchTerm, setSearchTerm] = useState('');
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'auto' | 'manual';
     contactId?: string;
@@ -507,8 +509,12 @@ const PoolPage = () => {
 
                     return (
                       <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
-                        <td className="px-3 py-2.5 text-sm font-medium" style={{ width: colWidths.nombre }}>{c.first_name}</td>
-                        <td className="px-3 py-2.5 text-sm" style={{ width: colWidths.apellido }}>{c.last_name || '—'}</td>
+                        <td className="px-3 py-2.5 text-sm font-medium" style={{ width: colWidths.nombre }}>
+                          <button className="hover:underline text-left" onClick={() => setSelectedContactId(c.id)}>{c.first_name}</button>
+                        </td>
+                        <td className="px-3 py-2.5 text-sm" style={{ width: colWidths.apellido }}>
+                          <button className="hover:underline text-left" onClick={() => setSelectedContactId(c.id)}>{c.last_name || '—'}</button>
+                        </td>
                         <td className="px-3 py-2.5 text-sm text-center text-muted-foreground tabular-nums" style={{ width: colWidths.edad }}>{c.edad || '—'}</td>
                         <td className="px-3 py-2.5" style={{ width: colWidths.direccion }}>
                           <span className="text-xs block truncate">{c.address || '—'}</span>
@@ -700,6 +706,19 @@ const PoolPage = () => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Contact Profile Dialog */}
+      <ContactProfileDialog
+        open={!!selectedContactId}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSelectedContactId(null);
+            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          }
+        }}
+        contactId={selectedContactId || ''}
+        churchId={churchId!}
+      />
     </div>
   );
 };
