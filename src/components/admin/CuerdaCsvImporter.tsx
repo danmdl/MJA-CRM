@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle2, X, MapPin, Loader2 } from 'lucide-react';
 import Papa from 'papaparse';
+import { normalize } from '@/lib/normalize';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -61,9 +62,6 @@ const CuerdaCsvImporter = ({ open, onOpenChange, churchId, zonas, onSuccess }: C
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const normalize = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
   const resetState = () => {
     setStep('upload');

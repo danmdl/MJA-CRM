@@ -69,13 +69,7 @@ interface Cell {
 }
 
 // Haversine distance in km
-const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
+
 
 const DEFAULT_WHATSAPP_TEMPLATE = (contactName: string, cellName: string, day: string, time: string, address: string) =>
   `Hola ${contactName}! 👋\n\nTe queremos invitar a la célula *${cellName}* que se reúne los *${day}* a las *${time}* en ${address}.\n\n¡Esperamos verte pronto! 🙏`;
@@ -317,57 +311,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     setCells(cellsData || []);
   };
 
-  const suggestCells = async () => {
-    if (!contact?.address) {
-      showError('El contacto no tiene dirección registrada.');
-      return;
-    }
-    const cellsWithCoords = cells.filter(c => c.lat && c.lng);
-    if (cellsWithCoords.length === 0) {
-      showError('Ninguna célula tiene coordenadas registradas. Edita las células y selecciona una dirección del autocompletado.');
-      return;
-    }
-    setSuggesting(true);
-   
-    try {
-      // Geocode contact's address
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(contact.address)}&format=json&limit=1&countrycodes=ar&accept-language=es`,
-        { headers: { 'User-Agent': 'MJA-CRM/1.0' } }
-      );
-      const data = await res.json();
-      if (!data?.[0]) {
-        showError('No se pudo ubicar la dirección del contacto. Asegúrate de que sea una dirección válida.');
-        setSuggesting(false);
-        return;
-      }
-      const contactLat = parseFloat(data[0].lat);
-      const contactLng = parseFloat(data[0].lon);
 
-      const ranked = cellsWithCoords
-        .map(c => ({ ...c, distanceKm: haversineKm(contactLat, contactLng, c.lat!, c.lng!) }))
-        .sort((a, b) => a.distanceKm - b.distanceKm)
-        .slice(0, 3);
 
-      setSuggestions(ranked);
-    } catch {
-      showError('Error al calcular las distancias. Verifica tu conexión.');
-    }
-    setSuggesting(false);
-  };
-
-  const assignCell = async (cell: Cell) => {
-    if (!contact) return;
-    setContact({ ...contact, cell_id: cell.id });
-   
-    // Build WhatsApp message
-    const name = `${contact.first_name} ${contact.last_name || ''}`.trim();
-    const day = cell.meeting_day || 'TBD';
-    const time = cell.meeting_time || 'TBD';
-    const addr = cell.address || '';
-    setWhatsappMsg(DEFAULT_WHATSAPP_TEMPLATE(name, cell.name, day, time, addr));
-    setWhatsappCell(cell);
-  };
 
   const handleSave = async () => {
     if (!contact) return;

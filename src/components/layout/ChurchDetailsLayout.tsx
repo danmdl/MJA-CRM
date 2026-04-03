@@ -84,7 +84,6 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/database")) return "database";
     if (p.endsWith("/team")) return "team";
     if (p.endsWith("/cuerdas")) return "cuerdas";
-    if (p.endsWith("/cells")) return "cells";
     if (p.endsWith("/mapa")) return "mapa";
     if (p.endsWith("/pool")) return "pool";
     return "overview";

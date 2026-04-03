@@ -17,7 +17,6 @@ import AdminProfile from "./pages/admin/Profile";
 import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
-import CellsPage from "./pages/admin/churches/[churchId]/CellsPage";
 import CuerdasPage from "./pages/admin/churches/[churchId]/CuerdasPage";
 import MapaPage from "./pages/admin/churches/[churchId]/MapaPage";
 import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
@@ -107,7 +106,6 @@ const AppRoutes = () => {
           <Route path="overview" element={<ChurchOverviewPage />} />
           <Route path="database" element={<ChurchDatabasePage />} />
           <Route path="team" element={<ChurchTeamPage />} />
-          <Route path="cells" element={<CellsPage />} />
           <Route path="cuerdas" element={<CuerdasPage />} />
           <Route path="mapa" element={<MapaPage />} />
           <Route path="pool" element={<PoolPage />} />
