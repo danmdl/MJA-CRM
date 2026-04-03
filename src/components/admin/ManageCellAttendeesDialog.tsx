@@ -52,7 +52,7 @@ const ManageCellAttendeesDialog = ({ open, onOpenChange, churchId, cellId }: Man
     const t = normalize(search);
     if (!t) return allContacts;
     return allContacts.filter(c => {
-      const s = `${c.first_name} ${c.last_name || ''} ${c.email || ''}`.toLowerCase();
+      const s = normalize(`${c.first_name} ${c.last_name || ''} ${c.email || ''}`);
       return s.includes(t);
     });
   }, [allContacts, search]);

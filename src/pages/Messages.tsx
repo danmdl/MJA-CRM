@@ -87,9 +87,9 @@ const Messages = () => {
   }, [session?.user.id, profile?.church_id]);
 
   const filteredTeam = useMemo(() => {
-    const q = recipientSearch.trim().toLowerCase();
+    const q = normalize(recipientSearch);
     if (!q) return team;
-    return team.filter(u => normalize(`${u.first_name || ''} ${u.last_name || ''}`).includes(normalize(q)));
+    return team.filter(u => normalize(`${u.first_name || ''} ${u.last_name || ''}`).includes(q));
   }, [team, recipientSearch]);
 
   const toggleRecipient = (id: string) => {
