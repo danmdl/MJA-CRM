@@ -337,37 +337,49 @@ const OverviewPage = () => {
     return <div className="p-6 text-muted-foreground">No se encontraron detalles para esta iglesia.</div>;
   }
 
+  // Resolve pastor name for display
+  const pastorName = church.pastor_id
+    ? ((leaders as any[] || []).find((p: any) => p.id === church.pastor_id)
+      ? `${((leaders as any[]).find((p: any) => p.id === church.pastor_id)).first_name || ''} ${((leaders as any[]).find((p: any) => p.id === church.pastor_id)).last_name || ''}`.trim()
+      : null)
+    : null;
+
   return (
     <div className="space-y-5">
-      {/* Header: church name + pastor controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-3xl font-bold">{church.name}</h1>
-        {isAdminOrGeneral && (
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Pastor:</span>
-              <Select
-                value={church.pastor_id || undefined}
-                onValueChange={async (val) => {
-                  const newVal = val === 'none' ? null : val;
-                  const { error } = await supabase.from('churches').update({ pastor_id: newVal }).eq('id', churchId!);
-                  if (error) showError(error.message);
-                }}
-              >
-                <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder="Sin pastor" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignación</SelectItem>
-                  {(leaders as any[] || []).map(p => (
-                    <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setAddSecondPastorOpen(true)}>
-              <PlusCircle className="h-3.5 w-3.5" /> Pastor 2°
-            </Button>
-          </div>
-        )}
+      {/* Header: church name + pastor name + report button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h1 className="text-3xl font-bold">{church.name}</h1>
+          {pastorName && <p className="text-sm text-muted-foreground">Pastor: {pastorName}</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          <CustomReportBuilder churchId={churchId!} churchName={church.name} inline />
+          {isAdminOrGeneral && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Select
+                  value={church.pastor_id || undefined}
+                  onValueChange={async (val) => {
+                    const newVal = val === 'none' ? null : val;
+                    const { error } = await supabase.from('churches').update({ pastor_id: newVal }).eq('id', churchId!);
+                    if (error) showError(error.message);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue placeholder="Asignar pastor" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignación</SelectItem>
+                    {(leaders as any[] || []).map(p => (
+                      <SelectItem key={p.id} value={p.id}>{`${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setAddSecondPastorOpen(true)}>
+                <PlusCircle className="h-3.5 w-3.5" /> 2°
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Secondary pastors badges (only show if any exist) */}
@@ -470,9 +482,6 @@ const OverviewPage = () => {
 
       {/* Pipeline at the end */}
       <PipelineSummaryCard churchId={churchId!} />
-
-      {/* Custom report builder */}
-      <CustomReportBuilder churchId={churchId!} churchName={church.name} />
     </div>
   );
 };
