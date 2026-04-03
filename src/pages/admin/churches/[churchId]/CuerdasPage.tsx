@@ -9,8 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { showSuccess, showError } from '@/utils/toast';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   ChevronDown, ChevronRight, MapPin, Clock, Users, UserCheck, Home,
   Upload, Search, PlusCircle, MoreHorizontal, Trash2,
@@ -55,6 +62,10 @@ const CuerdasPage = () => {
   const [editingCell, setEditingCell] = useState<Cell | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [attendeesFor, setAttendeesFor] = useState<string | null>(null);
+  const [addCuerdaOpen, setAddCuerdaOpen] = useState(false);
+  const [newCuerdaNumero, setNewCuerdaNumero] = useState('');
+  const [newCuerdaZonaId, setNewCuerdaZonaId] = useState<string | null>(null);
+  const [savingCuerda, setSavingCuerda] = useState(false);
 
   // User's own cuerda (for filtering)
   const userCuerdaNumero = profile?.numero_cuerda || null;
@@ -215,9 +226,12 @@ const CuerdasPage = () => {
             {canSeeAll ? 'Todas las cuerdas de la iglesia' : `Cuerda ${userCuerdaNumero || '—'}`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(isAdminOrPastor || canAddUsers()) && (
             <>
+              <Button variant="outline" size="sm" onClick={() => setAddCuerdaOpen(true)}>
+                <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Cuerda
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
                 <Upload className="mr-1.5 h-4 w-4" /> Importar Células
               </Button>
@@ -467,6 +481,47 @@ const CuerdasPage = () => {
         leaders={leadersList}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['cells', churchId] })}
       />
+
+      {/* Add Cuerda Dialog */}
+      <Dialog open={addCuerdaOpen} onOpenChange={(o) => { if (!o) { setAddCuerdaOpen(false); setNewCuerdaNumero(''); setNewCuerdaZonaId(null); } else setAddCuerdaOpen(true); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Nueva Cuerda</DialogTitle>
+            <DialogDescription>Asigná un número y una zona para la nueva cuerda.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label>Número de Cuerda <span className="text-red-500">*</span></Label>
+              <Input value={newCuerdaNumero} onChange={e => setNewCuerdaNumero(e.target.value)} placeholder="Ej: 301" />
+            </div>
+            <div className="space-y-2">
+              <Label>Zona <span className="text-red-500">*</span></Label>
+              <Select value={newCuerdaZonaId || undefined} onValueChange={setNewCuerdaZonaId}>
+                <SelectTrigger><SelectValue placeholder="Seleccioná una zona" /></SelectTrigger>
+                <SelectContent>
+                  {(zonas || []).map(z => <SelectItem key={z.id} value={z.id}>{z.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAddCuerdaOpen(false)}>Cancelar</Button>
+            <Button disabled={savingCuerda} onClick={async () => {
+              if (!newCuerdaNumero.trim()) { showError('Ingresá un número de cuerda.'); return; }
+              if (!newCuerdaZonaId) { showError('Seleccioná una zona.'); return; }
+              setSavingCuerda(true);
+              const { error } = await supabase.from('cuerdas').insert({ numero: newCuerdaNumero.trim(), zona_id: newCuerdaZonaId });
+              setSavingCuerda(false);
+              if (error) { showError(error.message); return; }
+              showSuccess(`Cuerda #${newCuerdaNumero.trim()} creada.`);
+              setAddCuerdaOpen(false); setNewCuerdaNumero(''); setNewCuerdaZonaId(null);
+              queryClient.invalidateQueries({ queryKey: ['cuerdas', churchId] });
+            }}>
+              {savingCuerda ? 'Creando...' : 'Crear'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
