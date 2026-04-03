@@ -182,7 +182,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { data: createdContact, error } = await supabase
         .from('contacts')
         .insert({
           first_name: firstName,
@@ -206,7 +206,9 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           lat: contactLat,
           lng: contactLng,
           estado_seguimiento: 'nuevo',
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         showError(`Error: ${error.message}`);
@@ -231,8 +233,21 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           context: { church_id: churchId },
         });
       } else {
+        // Log contact creation to activity_logs
+        if (createdContact) {
+          await supabase.from('activity_logs').insert({
+            user_id: session?.user?.id,
+            church_id: churchId,
+            action: 'create',
+            entity_type: 'contact',
+            entity_id: createdContact.id,
+            before_data: null,
+            after_data: createdContact,
+          });
+        }
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+        queryClient.invalidateQueries({ queryKey: ['historial'] });
         if (keepOpen) {
           resetForm();
           setTimeout(() => firstNameRef.current?.focus(), 50);
