@@ -106,7 +106,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    nombre: 150, apellido: 130, edad: 55, direccion: 200, estado: 100, asignar: 130, celulaSug: 160, zonaSug: 120, cuerda: 90,
+    cuerda: 80, conector: 130, nombre: 140, apellido: 120, edad: 55, direccion: 200, estado: 100, fechaContacto: 100, asignar: 130, celulaSug: 160, zonaSug: 120,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -515,10 +515,12 @@ const PoolPage = () => {
                 <thead>
                   <tr className="border-b">
                     <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
+                    <ResizableHeader width={colWidths.conector} onResize={resizeCol('conector')}>Conector</ResizableHeader>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
                     <ResizableHeader width={colWidths.apellido} onResize={resizeCol('apellido')}>Apellido</ResizableHeader>
                     <ResizableHeader width={colWidths.edad} onResize={resizeCol('edad')} className="text-center">Edad</ResizableHeader>
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
+                    <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>Fecha</ResizableHeader>
                     <ResizableHeader width={colWidths.estado} onResize={resizeCol('estado')}>Estado</ResizableHeader>
                     {isUnassignedView && isAdminOrPastor && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                     {isUnassignedView && <ResizableHeader width={colWidths.celulaSug} onResize={resizeCol('celulaSug')}>Célula sug.</ResizableHeader>}
@@ -538,6 +540,9 @@ const PoolPage = () => {
                       <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
                         <td className="px-3 py-2.5 text-sm font-mono text-muted-foreground" style={{ width: colWidths.cuerda }}>
                           {c.numero_cuerda || '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" style={{ width: colWidths.conector }}>
+                          {c.conector || '—'}
                         </td>
                         <td className="px-3 py-2.5 text-sm font-medium" style={{ width: colWidths.nombre }}>
                           <button className="hover:underline text-left" onClick={() => setSelectedContactId(c.id)}>{c.first_name}</button>
@@ -564,6 +569,11 @@ const PoolPage = () => {
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
+                        </td>
+
+                        {/* Fecha de contacto */}
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums" style={{ width: colWidths.fechaContacto }}>
+                          {c.fecha_contacto ? new Date(c.fecha_contacto).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                         </td>
 
                         {/* Estado seguimiento */}

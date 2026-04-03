@@ -421,10 +421,16 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
           <div className="flex h-full max-h-[88vh]">
             {/* LEFT: Form fields */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Row 0: Conector (readonly) */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conector</label>
-                <input readOnly value={contact.conector || '—'} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
+              {/* Row 0: Conector + Fecha de contacto (readonly) */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conector</label>
+                  <input readOnly value={contact.conector || '—'} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha de contacto</label>
+                  <input readOnly value={contact.fecha_contacto ? new Date(contact.fecha_contacto).toLocaleDateString('es-AR') : '—'} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
+                </div>
               </div>
 
               {/* Row 1: Nombre / Apellido */}

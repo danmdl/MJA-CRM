@@ -289,14 +289,19 @@ const DynamicContactTable = ({
   const extendedContactFields = useMemo(() => [
     ...CONTACT_FIELDS,
     { key: 'cell.name', label: 'Célula', type: 'text' },
-    { key: 'leader.first_name', label: 'Referente', type: 'text' },
+    { key: 'leader.first_name', label: 'Líder de Célula', type: 'text' },
     { key: 'last_contact_date', label: 'Último Contacto', type: 'date' },
-    { key: 'created_by_profile', label: 'Creado por', type: 'text' }
+    { key: 'created_by_profile', label: 'Creado por', type: 'text' },
+    { key: 'created_at', label: 'Fecha de Creación', type: 'date' },
   ], []);
 
+  // Default columns: N° Cuerda, Conector, Nombre, Apellido, Dirección, Teléfono, Célula, Líder, Último Contacto, Fecha Creación
   const defaultVisibleColumns: ContactField[] = useMemo(() => [
+    extendedContactFields.find(f => f.key === 'numero_cuerda')!,
+    extendedContactFields.find(f => f.key === 'conector')!,
     extendedContactFields.find(f => f.key === 'first_name')!,
     extendedContactFields.find(f => f.key === 'last_name')!,
+    extendedContactFields.find(f => f.key === 'address')!,
     extendedContactFields.find(f => f.key === 'phone')!,
     extendedContactFields.find(f => f.key === 'cell.name')!,
     extendedContactFields.find(f => f.key === 'leader.first_name')!,
