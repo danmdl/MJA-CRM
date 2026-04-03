@@ -250,18 +250,6 @@ const PoolPage = () => {
   }, [allContacts, zonas]);
 
   // ─── Pool counts ───────────────────────────────────────────────
-  const poolCounts = useMemo(() => {
-    let unassigned = 0;
-    allContacts?.forEach(c => {
-      if (!c.zona_id && !c.cell_id) {
-        // Apply cuerda filter for non-global users
-        if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return;
-        unassigned++;
-      }
-    });
-    return { unassigned };
-  }, [allContacts, canSeeAllCuerdas, userCuerdaNumero]);
-
   const externalContacts = useMemo(() => {
     if (!allContacts || !homeZonaId) return [];
     return allContacts.filter(c => {
@@ -273,11 +261,27 @@ const PoolPage = () => {
     });
   }, [allContacts, homeZonaId, suggestions, canSeeAllCuerdas, userCuerdaNumero]);
 
+    // External IDs set - used to exclude from "Sin asignar"
+  const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
+
+  const poolCounts = useMemo(() => {
+    let unassigned = 0;
+    allContacts?.forEach(c => {
+      if (!c.zona_id && !c.cell_id) {
+        if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return;
+        if (externalIds.has(c.id)) return;
+        unassigned++;
+      }
+    });
+    return { unassigned };
+  }, [allContacts, canSeeAllCuerdas, userCuerdaNumero, externalIds]);
+
+
   // ─── Filtered contacts ─────────────────────────────────────────
   const filteredContacts = useMemo(() => {
     if (!allContacts) return [];
     let filtered: Contact[];
-    if (activePool === 'unassigned') filtered = allContacts.filter(c => !c.zona_id && !c.cell_id);
+    if (activePool === 'unassigned') filtered = allContacts.filter(c => !c.zona_id && !c.cell_id && !externalIds.has(c.id));
     else if (activePool === 'external') filtered = externalContacts;
     else filtered = [];
     // Cuerda filter: non-global users only see contacts with their cuerda
@@ -292,7 +296,7 @@ const PoolPage = () => {
       );
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, externalContacts, canSeeAllCuerdas, userCuerdaNumero]);
+  }, [allContacts, activePool, searchTerm, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero]);
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
