@@ -31,7 +31,7 @@ const exportContactsToCSV = async (churchId: string) => {
 
   const headers = [
     'Nombre', 'Apellido', 'Teléfono', 'Dirección',
-    'Departamento', 'Barrio', 'N° Cuerda', 'Zona', 'Referente asignado', 'Conector',
+    'Departamento', 'Barrio', 'N° Cuerda', 'Zona', 'Líder de Célula', 'Conector',
     'Fecha de Contacto', 'Fecha de nacimiento', 'Edad', 'Sexo',
     'Estado Civil', 'Observaciones', 'Pedido de Oración', 'Creado en'
   ];

@@ -417,9 +417,9 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               />
             </div>
 
-{/* Referente */}
+{/* Líder de Célula */}
             <SelectField
-              label="Referente asignado"
+              label="Líder de Célula"
               value={leaderAssigned}
               onChange={(value) => setLeaderAssigned(value === "none" ? null : value)}
               options={(leaders || []).map(leader => ({
@@ -427,7 +427,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 name: `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre'
               }))}
               loading={isLoadingLeaders}
-              placeholder="Selecciona un referente (opcional)"
+              placeholder="Sin líder asignado"
             />
 
             {/* Observaciones - spans full row */}

@@ -192,7 +192,7 @@ const CellsPage = () => {
                           {c.name}
                         </button>
                       </TableCell>
-                      <TableCell>{c.leader_name || 'Sin referente'}</TableCell>
+                      <TableCell>{c.leader_name || 'Sin líder'}</TableCell>
                       <TableCell><div className="flex items-center gap-2"><Users className="h-4 w-4" /> {c.attendee_count}</div></TableCell>
                       <TableCell>{c.address || '-'}</TableCell>
                       <TableCell>{[c.meeting_day, c.meeting_time].filter(Boolean).join(' · ') || '-'}</TableCell>
