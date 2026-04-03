@@ -33,35 +33,37 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
       setNeedsPasswordSetup(true);
     }
 
-    const getSessionAndProfile = async () => {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
+    let isInitialLoad = true;
 
-      if (session) {
+    const fetchProfile = async (currentSession: Session | null) => {
+      if (currentSession) {
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, role, church_id')
-          .eq('id', session.user.id)
+          .select('id, first_name, last_name, email, role, church_id, numero_cuerda')
+          .eq('id', currentSession.user.id)
           .single();
 
-        if (error) {
-          console.error('Error fetching profile:', error);
-          setProfile(null);
-        } else {
-          // Merge email from the auth session
+        if (!error && profileData) {
           const fullProfile = {
             ...profileData,
-            email: session.user.email ?? null,
+            email: currentSession.user.email ?? null,
           } as UserProfile;
-          
-          console.log('[DEBUG] loaded profile from DB:', fullProfile);
           setProfile(fullProfile);
+        } else {
+          console.error('Error fetching profile:', error);
+          if (isInitialLoad) setProfile(null);
         }
       } else {
         setProfile(null);
       }
+    };
+
+    const getSessionAndProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      await fetchProfile(session);
       setLoading(false);
+      isInitialLoad = false;
     };
 
     getSessionAndProfile();
@@ -69,11 +71,11 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        // Re-fetch profile on auth state change (e.g., sign in/out, user update)
-        getSessionAndProfile();
+        // Silently refresh profile without showing loading screen
+        fetchProfile(session);
       } else {
         setProfile(null);
-        setLoading(false); // Important: if session is null, loading should also be false
+        setLoading(false);
       }
     });
 
