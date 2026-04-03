@@ -104,11 +104,18 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
     };
 
     const getSessionAndProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      await fetchProfile(session);
-      setLoading(false);
-      isInitialLoad = false;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        await fetchProfile(session);
+      } catch (err) {
+        console.error('Error initializing session:', err);
+        setSession(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+        isInitialLoad = false;
+      }
     };
 
     getSessionAndProfile();

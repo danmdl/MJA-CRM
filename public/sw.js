@@ -1,10 +1,6 @@
-const CACHE_NAME = 'mja-crm-v1';
-const STATIC_ASSETS = ['/', '/logo.png'];
+const CACHE_NAME = 'mja-crm-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
-  );
   self.skipWaiting();
 });
 
@@ -19,21 +15,38 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  // Skip non-GET requests
+
   if (request.method !== 'GET') return;
-  // Skip Supabase API calls and Google Maps
-  if (request.url.includes('supabase.co') || request.url.includes('googleapis.com') || request.url.includes('maps.google')) return;
+
+  const url = request.url;
+  // NEVER intercept: navigations, auth, APIs
+  if (
+    request.mode === 'navigate' ||
+    url.includes('supabase.co') ||
+    url.includes('googleapis.com') ||
+    url.includes('maps.google') ||
+    url.includes('/login') ||
+    url.includes('type=invite') ||
+    url.includes('type=signup') ||
+    url.includes('type=recovery') ||
+    url.includes('access_token') ||
+    url.includes('refresh_token')
+  ) return;
+
+  // Only cache static assets
+  const isStaticAsset = url.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)(\?.*)?$/);
+  if (!isStaticAsset) return;
 
   event.respondWith(
     caches.match(request).then(cached => {
-      const fetchPromise = fetch(request).then(response => {
-        if (response.ok && request.url.startsWith(self.location.origin)) {
+      if (cached) return cached;
+      return fetch(request).then(response => {
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
         }
         return response;
-      }).catch(() => cached);
-      return cached || fetchPromise;
+      });
     })
   );
 });
