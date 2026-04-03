@@ -17,7 +17,7 @@ interface ChurchDetailsLayoutProps {
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile, loading: sessionLoading } = useSession();
-  const { canAccessAllChurches } = usePermissions();
+  const { canAccessAllChurches, canSeeBaseDatos, canSeePool } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const [accessChecked, setAccessChecked] = useState(false);
@@ -122,13 +122,11 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
           >
             <TabsList className="mb-0 w-max">
               <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>
-              <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Base de Datos</TabsTrigger>
+              {canSeeBaseDatos() && <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Base de Datos</TabsTrigger>}
               <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>
               <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>
               <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>
-              {(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor') && (
-                <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🏊 Pool</TabsTrigger>
-              )}
+              {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🏊 Pool</TabsTrigger>}
             </TabsList>
           </Tabs>
         </div>
