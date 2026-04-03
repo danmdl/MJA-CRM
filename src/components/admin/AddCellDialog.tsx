@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -93,22 +92,20 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
     staleTime: 60_000,
   });
 
-  // Auto-generate name when cuerda is selected (only for new cells)
-  useEffect(() => {
-    if (!isEdit && cuerdaId && cuerdas) {
-      const cuerda = cuerdas.find(c => c.id === cuerdaId);
-      if (cuerda) setName(`Célula Cuerda ${cuerda.numero}`);
-    }
-  }, [cuerdaId, cuerdas, isEdit]);
+  // Name is auto-generated at save time from cuerda number
 
   const handleSave = async () => {
     if (!cuerdaId) { showError('Seleccioná una cuerda.'); return; }
-    if (!name.trim()) { showError('El nombre es obligatorio.'); return; }
+    if (!address.trim()) { showError('La dirección es obligatoria.'); return; }
+
+    // Auto-generate name from cuerda number
+    const cuerda = cuerdas?.find(c => c.id === cuerdaId);
+    const autoName = name.trim() || (cuerda ? `Célula Cuerda ${cuerda.numero}` : 'Célula');
 
     setSaving(true);
     const payload = {
-      name: name.trim(), cuerda_id: cuerdaId, encargado_id: encargado,
-      address: address || null, lat: lat ?? null, lng: lng ?? null,
+      name: autoName, cuerda_id: cuerdaId, encargado_id: encargado,
+      address: address.trim(), lat: lat ?? null, lng: lng ?? null,
       meeting_day: meetingDay || null, meeting_time: meetingTime || null,
     };
 
@@ -150,10 +147,13 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
             </Select>
           </div>
 
-          {/* Name (auto-generated but editable) */}
+          {/* Dirección (mandatory) */}
           <div className="space-y-2">
-            <Label>Nombre</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Se genera automáticamente" />
+            <Label>Dirección <span className="text-red-500">*</span></Label>
+            <AddressAutocomplete
+              value={address}
+              onChange={(addr, alat, alng) => { setAddress(addr); if (alat !== undefined) setLat(alat); if (alng !== undefined) setLng(alng); }}
+            />
           </div>
 
           {/* Líder de Célula */}
@@ -170,15 +170,6 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* Dirección */}
-          <div className="space-y-2">
-            <Label>Dirección</Label>
-            <AddressAutocomplete
-              value={address}
-              onChange={(addr, alat, alng) => { setAddress(addr); if (alat !== undefined) setLat(alat); if (alng !== undefined) setLng(alng); }}
-            />
           </div>
 
           {/* Día y Hora dropdowns */}
