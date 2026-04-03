@@ -483,11 +483,11 @@ const DynamicContactTable = ({
 
   const getAgeGroup = (age: number | null): string | null => {
     if (age === null) return null;
-    if (age < 13) return 'Niño';
-    if (age < 17) return 'Adolescente';
-    if (age < 27) return 'Joven';
-    if (age < 45) return 'Joven Adulto';
-    if (age < 60) return 'Adulto';
+    if (age <= 12) return 'Niño';
+    if (age <= 17) return 'Adolescente';
+    if (age <= 25) return 'Joven';
+    if (age <= 35) return 'Joven Adulto';
+    if (age <= 59) return 'Adulto';
     return 'Crecer';
   };
 
@@ -499,11 +499,12 @@ const DynamicContactTable = ({
   const handleViewProfile = (contactId: string) => setProfileContactId(contactId);
 
   const AGE_GROUPS: Record<string, [number, number]> = {
-    crecer:       [0,  12],
+    nino:         [0,  12],
     adolescente:  [13, 17],
     joven:        [18, 25],
     joven_adulto: [26, 35],
-    adulto_mayor: [36, 999],
+    adulto:       [36, 59],
+    crecer:       [60, 999],
   };
 
   const getContactAge = (c: any): number | null => {

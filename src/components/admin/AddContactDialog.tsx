@@ -340,8 +340,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                       else if (age <= 17) setRangoEtario('Adolescente (13-17)');
                       else if (age <= 25) setRangoEtario('Joven (18-25)');
                       else if (age <= 35) setRangoEtario('Adulto joven (26-35)');
-                      else if (age <= 55) setRangoEtario('Adulto (36-55)');
-                      else setRangoEtario('Adulto mayor (56+)');
+                      else if (age <= 59) setRangoEtario('Adulto (36-59)');
+                      else setRangoEtario('Crecer (60+)');
                     }
                   }
                 }}
@@ -369,8 +369,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                     else if (n <= 17) setRangoEtario('Adolescente (13-17)');
                     else if (n <= 25) setRangoEtario('Joven (18-25)');
                     else if (n <= 35) setRangoEtario('Adulto joven (26-35)');
-                    else if (n <= 55) setRangoEtario('Adulto (36-55)');
-                    else setRangoEtario('Adulto mayor (56+)');
+                    else if (n <= 59) setRangoEtario('Adulto (36-59)');
+                    else setRangoEtario('Crecer (60+)');
                   } else {
                     setRangoEtario('');
                   }
@@ -396,8 +396,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 <option value="Adolescente (13-17)">Adolescente (13-17)</option>
                 <option value="Joven (18-25)">Joven (18-25)</option>
                 <option value="Adulto joven (26-35)">Adulto joven (26-35)</option>
-                <option value="Adulto (36-55)">Adulto (36-55)</option>
-                <option value="Adulto mayor (56+)">Adulto mayor (56+)</option>
+                <option value="Adulto (36-59)">Adulto (36-59)</option>
+                <option value="Crecer (60+)">Crecer (60+)</option>
               </select>
             </div>
 
@@ -433,7 +433,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               <AddressAutocomplete
                 value={address}
                 onChange={(addr, lat, lng) => { setAddress(addr || ''); if (lat !== undefined) setContactLat(lat); if (lng !== undefined) setContactLng(lng); }}
-                placeholder="Ej: Av. Corrientes 1234"
+                placeholder="Ej: Av Corrientes 4000, CABA"
                 disabled={loading}
               />
             </div>
