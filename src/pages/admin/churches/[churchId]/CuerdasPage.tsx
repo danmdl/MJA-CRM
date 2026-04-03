@@ -433,6 +433,7 @@ const CuerdasPage = () => {
         initial={editingCell ? {
           id: editingCell.id, name: editingCell.name,
           encargado_id: editingCell.encargado_id,
+          cuerda_id: editingCell.cuerda_id,
           address: editingCell.address,
           meeting_day: editingCell.meeting_day,
           meeting_time: editingCell.meeting_time,
