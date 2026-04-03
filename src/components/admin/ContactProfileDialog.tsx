@@ -452,43 +452,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cuerda</label>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={contact.numero_cuerda || ''}
-                    disabled={!canEditCuerda()}
-                    onChange={(e) => {
-                      const newCuerda = e.target.value;
-                      if (contact.cell_id || contact.zona_id) {
-                        // Contact is assigned — show warning
-                        setPendingCuerdaChange(newCuerda);
-                      } else {
-                        // Not assigned — change directly
-                        const zonaMap: Record<string, string> = {
-                          '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
-                          '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
-                          '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
-                          '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
-                          '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
-                          '301': 'Bonich', '302': 'Bonich',
-                        };
-                        setContact({ ...contact, numero_cuerda: newCuerda || null, zona: zonaMap[newCuerda] || null });
-                      }
-                    }}
-                  >
-                    <option value="">Sin cuerda</option>
-                    <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
-                    <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
-                    <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
-                    <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
-                    <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
-                    <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
-                    <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
-                    <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
-                    <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
-                    <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
-                    <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
-                  </select>
-                  {!canEditCuerda() && <p className="text-[10px] text-muted-foreground">No tenés permiso para editar la cuerda</p>}
+                  <div className="flex items-center gap-2">
+                    <input readOnly value={contact.numero_cuerda || 'Sin cuerda'} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
+                    {canEditCuerda() && (
+                      <Button type="button" variant="outline" size="sm" className="h-9 text-xs shrink-0" onClick={() => setPendingCuerdaChange('__open__')}>
+                        Editar
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Zona</label>
@@ -579,42 +550,77 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               <AddContactLogDialog open={addLogOpen} onOpenChange={setAddLogOpen} churchId={churchId} contactId={contact.id} onAdded={() => { setLogOpen(true); setHistorySignal(s => s + 1); }} />
               <ContactLogDialog open={logOpen} onOpenChange={setLogOpen} churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
 
-              {/* Cuerda change confirmation dialog */}
+              {/* Cuerda change dialog */}
               <Dialog open={!!pendingCuerdaChange} onOpenChange={(o) => { if (!o) setPendingCuerdaChange(null); }}>
                 <DialogContent className="sm:max-w-[450px]">
                   <DialogHeader>
                     <DialogTitle>Cambiar número de cuerda</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-3 py-2">
+                  <div className="space-y-4 py-2">
                     <p className="text-sm text-muted-foreground">
-                      Para editar el número de cuerda, devolveremos el contacto al <strong>Pool Sin Asignar</strong> desde donde podrás asignarle una nueva cuerda o célula.
+                      Cuerda actual: <strong>{contact.numero_cuerda || 'Sin cuerda'}</strong>
+                      {contact.zona && <> · Zona {contact.zona}</>}
                     </p>
-                    <p className="text-sm">
-                      El contacto será desvinculado de su célula y zona actual.
-                    </p>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Nueva cuerda</label>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                        value={pendingCuerdaChange === '__open__' ? '' : (pendingCuerdaChange || '')}
+                        onChange={(e) => setPendingCuerdaChange(e.target.value || '__open__')}
+                      >
+                        <option value="">Seleccionar cuerda...</option>
+                        <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
+                        <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
+                        <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
+                        <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
+                        <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
+                        <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
+                        <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
+                        <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
+                        <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
+                        <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
+                        <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
+                      </select>
+                    </div>
+
+                    {/* Warning: non-privileged roles return contact to Pool */}
+                    {!(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor') && (contact.cell_id || (contact as any).zona_id) && (
+                      <div className="p-3 rounded border border-yellow-500/30 bg-yellow-500/5 text-sm">
+                        <p>Para editar el número de cuerda, este contacto se devolverá al <strong>Pool Sin Asignar</strong> de la cuerda original ({contact.numero_cuerda}).</p>
+                        <p className="text-xs text-muted-foreground mt-1">Desde ahí podrás asignarle una nueva cuerda o célula.</p>
+                      </div>
+                    )}
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setPendingCuerdaChange(null)}>Cancelar</Button>
-                    <Button size="sm" variant="destructive" onClick={() => {
-                      const newCuerda = pendingCuerdaChange!;
-                      const zonaMap: Record<string, string> = {
-                        '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
-                        '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
-                        '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
-                        '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
-                        '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
-                        '301': 'Bonich', '302': 'Bonich',
-                      };
-                      setContact({
-                        ...contact,
-                        numero_cuerda: newCuerda || null,
-                        zona: zonaMap[newCuerda] || null,
-                        cell_id: null,
-                        zona_id: undefined,
-                      } as any);
-                      setPendingCuerdaChange(null);
-                    }}>
-                      Devolver al Pool y cambiar cuerda
+                    <Button
+                      size="sm"
+                      disabled={!pendingCuerdaChange || pendingCuerdaChange === '__open__'}
+                      onClick={() => {
+                        const newCuerda = pendingCuerdaChange!;
+                        const zonaMap: Record<string, string> = {
+                          '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
+                          '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
+                          '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
+                          '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
+                          '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
+                          '301': 'Bonich', '302': 'Bonich',
+                        };
+                        const isPrivileged = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
+                        if (isPrivileged) {
+                          // Privileged: change cuerda directly without returning to Pool
+                          setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null });
+                        } else {
+                          // Non-privileged: clear cell/zona, return to Pool
+                          setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null, cell_id: null } as any);
+                        }
+                        setPendingCuerdaChange(null);
+                      }}
+                    >
+                      {(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor')
+                        ? 'Cambiar cuerda'
+                        : 'Devolver al Pool y cambiar'}
                     </Button>
                   </div>
                 </DialogContent>

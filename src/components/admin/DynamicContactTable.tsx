@@ -330,7 +330,7 @@ const DynamicContactTable = ({
     extendedContactFields.find(f => f.key === 'created_at')!,
   ].filter(Boolean), [extendedContactFields]);
 
-  const storageKey = useMemo(() => `contacts_visible_columns_${churchId || 'global'}`, [churchId]);
+  const storageKey = useMemo(() => `contacts_visible_columns_v2_${churchId || 'global'}`, [churchId]);
   const [visibleColumns, setVisibleColumns] = useState<ContactField[]>(() => {
     try {
       const raw = localStorage.getItem(storageKey);
