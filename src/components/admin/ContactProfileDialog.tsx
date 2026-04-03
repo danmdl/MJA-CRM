@@ -492,47 +492,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                         {cells.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0 gap-1 text-xs"
-                      onClick={suggestCells}
-                      disabled={suggesting}
-                      title="Sugerir las 3 células más cercanas"
-                    >
-                      <Navigation className="h-3.5 w-3.5" />
-                      {suggesting ? 'Buscando...' : 'Sugerir 3'}
-                    </Button>
                   </div>
-
-                  {/* Suggestions list */}
-                  {suggestions && suggestions.length > 0 && (
-                    <div className="border rounded-lg overflow-hidden mt-1">
-                      <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted border-b">
-                        3 células más cercanas — selecciona una para asignar
-                      </div>
-                      {suggestions.map((cell, i) => (
-                        <button
-                          key={cell.id}
-                          type="button"
-                          onClick={() => assignCell(cell)}
-                          className="w-full flex items-center justify-between px-3 py-2.5 text-sm hover:bg-muted transition-colors border-b last:border-b-0 text-left"
-                        >
-                          <div>
-                            <span className="font-medium">{i + 1}. {cell.name}</span>
-                            {cell.meeting_day && <span className="ml-2 text-muted-foreground text-xs">{cell.meeting_day} {cell.meeting_time}</span>}
-                          </div>
-                          <span className="text-xs text-primary font-medium shrink-0 ml-3">
-                            {cell.distanceKm < 1 ? `${Math.round(cell.distanceKm * 1000)}m` : `${cell.distanceKm.toFixed(1)}km`}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {suggestions && suggestions.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No se encontraron células con coordenadas.</p>
-                  )}
 
                   {/* WhatsApp invite after assignment */}
                   {whatsappCell && contact.cell_id === whatsappCell.id && (
@@ -589,11 +549,11 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   )}
                 </div>
                   <SelectField
-                    label="Referente asignado"
+                    label="Líder de Célula"
                     value={contact.leader_assigned}
                     onChange={(v) => setContact({ ...contact, leader_assigned: v })}
                     options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))}
-                    placeholder="Sin referente asignado"
+                    placeholder="Sin líder asignado"
                   />
                 </div>
                 {/* Full name in one line just below the selects */}
