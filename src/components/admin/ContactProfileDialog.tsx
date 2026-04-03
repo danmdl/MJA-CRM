@@ -22,6 +22,7 @@ import CountryPhoneInput from '@/components/CountryPhoneInput';
 import ContactLogDialog from './ContactLogDialog';
 import AddContactLogDialog from './AddContactLogDialog';
 import UnifiedTimeline from './UnifiedTimeline';
+import ContactLogInline from './ContactLogInline';
 import { PIPELINE_STAGES } from './ContactPipelineBadge';
 import AddressAutocomplete from './AddressAutocomplete';
 
@@ -406,223 +407,150 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
-        <DialogHeader>
-          <DialogTitle className="text-xl">Perfil del Contacto</DialogTitle>
-          {contact && (contact.numero_cuerda || contact.zona) && (
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {contact.numero_cuerda && `Cuerda ${contact.numero_cuerda}`}
-              {contact.numero_cuerda && contact.zona && ' · '}
-              {contact.zona && `Zona ${contact.zona}`}
-            </p>
-          )}
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[1100px] max-h-[90vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
         {contact && (
-          <div className="space-y-5 mt-1">
-            {/* Divider */}
-            <div className="border-t border-border" />
-
-            {/* Row 1: Nombre / Apellido */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
-              <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
-            </div>
-
-            {/* Row 2: Teléfono */}
-            <CountryPhoneInput label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} />
-
-            {/* Row 3: Dirección (full width) */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Dirección</label>
-              <AddressAutocomplete
-                value={contact.address || ''}
-                onChange={(addr, lat, lng, barrio) => setContact(prev => ({ ...prev!, address: addr || null, ...(barrio ? { barrio } : {}) }))}
-                placeholder="Escribe la dirección para buscar y confirmar..."
-              />
-            </div>
-
-            {/* Row 4: Apartamento / Barrio */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
-              <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
-            </div>
-
-            {/* Row 5: Cuerda / Zona / Fecha nacimiento */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Número de Cuerda</label>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                  value={contact.numero_cuerda || ''}
-                  onChange={(e) => {
-                    const cuerda = e.target.value;
-                    const zonaMap: Record<string, string> = {
-                      '101': 'San Martín', '201': 'San Martín',
-                      '102': 'Villa Lynch', '202': 'Villa Lynch',
-                      '103': 'Ballester', '203': 'Ballester',
-                      '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
-                      '104': 'Villa Maipú', '204': 'Villa Maipú',
-                      '105': 'Loma Hermosa', '205': 'Loma Hermosa',
-                      '106': 'Jose L. Suarez', '206': 'Jose L. Suarez',
-                      '107': 'Santos Lugares', '207': 'Santos Lugares',
-                      '108': 'Billinghurst', '208': 'Billinghurst',
-                      '109': 'Caseros', '209': 'Caseros',
-                      '301': 'Bonich', '302': 'Bonich',
-                    };
-                    setContact({ ...contact, numero_cuerda: cuerda || null, zona: zonaMap[cuerda] || contact.zona || null });
-                  }}
-                >
-                  <option value="">Sin cuerda</option>
-                  <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
-                  <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
-                  <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
-                  <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
-                  <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
-                  <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
-                  <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
-                  <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
-                  <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
-                  <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
-                  <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
-                </select>
+          <div className="flex h-full max-h-[88vh]">
+            {/* LEFT: Form fields */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Row 1: Nombre / Apellido */}
+              <div className="grid grid-cols-2 gap-4">
+                <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
+                <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
               </div>
+
+              {/* Row 2: Teléfono */}
+              <CountryPhoneInput label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} />
+
+              {/* Row 3: Dirección */}
               <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Zona</label>
-                <input
-                  readOnly
-                  value={contact.zona || ''}
-                  className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default"
-                  placeholder="Se completa al elegir cuerda"
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Dirección</label>
+                <AddressAutocomplete
+                  value={contact.address || ''}
+                  onChange={(addr, lat, lng, barrio) => setContact(prev => ({ ...prev!, address: addr || null, ...(barrio ? { barrio } : {}) }))}
+                  placeholder="Escribe la dirección..."
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha de nacimiento</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="date"
-                    value={contact.date_of_birth || ''}
-                    onChange={(e) => setContact({ ...contact, date_of_birth: e.target.value || null })}
-                    className="flex-1"
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {(() => {
-                      if (!contact.date_of_birth) return '';
-                      const d = new Date(contact.date_of_birth!);
-                      const diff = Date.now() - d.getTime();
-                      const age = Math.abs(new Date(diff).getUTCFullYear() - 1970);
-                      return Number.isFinite(age) ? `${age} años` : '';
-                    })()}
-                  </span>
+
+              {/* Row 4: Apartamento / Barrio */}
+              <div className="grid grid-cols-2 gap-4">
+                <ContactInfoField label="Número de Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
+                <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
+              </div>
+
+              {/* Row 5: Cuerda / Zona / Fecha nacimiento */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Número de Cuerda</label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    value={contact.numero_cuerda || ''}
+                    onChange={(e) => {
+                      const cuerda = e.target.value;
+                      const zonaMap: Record<string, string> = {
+                        '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
+                        '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
+                        '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
+                        '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
+                        '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
+                        '301': 'Bonich', '302': 'Bonich',
+                      };
+                      setContact({ ...contact, numero_cuerda: cuerda || null, zona: zonaMap[cuerda] || contact.zona || null });
+                    }}
+                  >
+                    <option value="">Sin cuerda</option>
+                    <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
+                    <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
+                    <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
+                    <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
+                    <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
+                    <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
+                    <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
+                    <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
+                    <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
+                    <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
+                    <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Zona</label>
+                  <input readOnly value={contact.zona || ''} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" placeholder="Se completa al elegir cuerda" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha de nacimiento</label>
+                  <div className="flex items-center gap-2">
+                    <Input type="date" value={contact.date_of_birth || ''} onChange={(e) => setContact({ ...contact, date_of_birth: e.target.value || null })} className="flex-1" />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {(() => { if (!contact.date_of_birth) return ''; const d = new Date(contact.date_of_birth!); const age = Math.abs(new Date(Date.now() - d.getTime()).getUTCFullYear() - 1970); return Number.isFinite(age) ? `${age}a` : ''; })()}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Row 6: Estado / Célula / Líder */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estado de seguimiento</label>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                  value={contact.estado_seguimiento || 'nuevo'}
-                  onChange={(e) => setContact({ ...contact, estado_seguimiento: e.target.value })}
-                >
-                  {PIPELINE_STAGES.map(s => (
-                    <option key={s.key} value={s.key}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Célula</label>
-                <Select
-                  value={contact.cell_id || undefined}
-                  onValueChange={(v) => {
+              {/* Row 6: Estado / Célula / Líder */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estado</label>
+                  <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={contact.estado_seguimiento || 'nuevo'} onChange={(e) => setContact({ ...contact, estado_seguimiento: e.target.value })}>
+                    {PIPELINE_STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Célula</label>
+                  <Select value={contact.cell_id || undefined} onValueChange={(v) => {
                     const cell = cells.find(c => c.id === v);
                     setContact({ ...contact, cell_id: v });
-                    if (cell) {
-                      const name = `${contact.first_name} ${contact.last_name || ''}`.trim();
-                      setWhatsappMsg(DEFAULT_WHATSAPP_TEMPLATE(name, cell.name, cell.meeting_day || 'TBD', cell.meeting_time || 'TBD', cell.address || ''));
-                      setWhatsappCell(cell);
-                    }
-                  }}
-                >
-                  <SelectTrigger><SelectValue placeholder="Sin célula" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin célula</SelectItem>
-                    {cells.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                    if (cell) { setWhatsappMsg(DEFAULT_WHATSAPP_TEMPLATE(`${contact.first_name} ${contact.last_name || ''}`.trim(), cell.name, cell.meeting_day || 'TBD', cell.meeting_time || 'TBD', cell.address || '')); setWhatsappCell(cell); }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Sin célula" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin célula</SelectItem>
+                      {cells.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <SelectField label="Líder de Célula" value={contact.leader_assigned} onChange={(v) => setContact({ ...contact, leader_assigned: v })} options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))} placeholder="Sin líder" />
               </div>
-              <SelectField
-                label="Líder de Célula"
-                value={contact.leader_assigned}
-                onChange={(v) => setContact({ ...contact, leader_assigned: v })}
-                options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))}
-                placeholder="Sin líder asignado"
-              />
-            </div>
 
-            {/* WhatsApp invite after assignment */}
-            {whatsappCell && contact.cell_id === whatsappCell.id && (
-              <div className="border border-green-500/30 bg-green-500/5 rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-medium text-green-400">
-                    <Send className="h-4 w-4" />
-                    ¿Avisar a {contact.first_name} por WhatsApp?
+              {/* WhatsApp invite */}
+              {whatsappCell && contact.cell_id === whatsappCell.id && (
+                <div className="border border-green-500/30 bg-green-500/5 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium text-green-400"><Send className="h-4 w-4" /> ¿Avisar a {contact.first_name} por WhatsApp?</div>
+                    <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setEditingTemplate(v => !v)}>{editingTemplate ? 'Cerrar' : 'Editar'}</button>
                   </div>
-                  <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setEditingTemplate(v => !v)}>
-                    {editingTemplate ? 'Cerrar edición' : 'Editar mensaje'}
-                  </button>
+                  {editingTemplate && <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[80px] font-mono" />}
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" className="gap-1.5 text-xs" onClick={() => { window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }} disabled={!contact.phone}><MessageSquare className="h-3.5 w-3.5" /> Enviar</Button>
+                    <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setWhatsappCell(null)}>No ahora</Button>
+                  </div>
                 </div>
-                {editingTemplate && (
-                  <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[100px] font-mono" />
-                )}
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" className="gap-1.5 text-xs" onClick={() => { const phone = (contact.phone || '').replace(/[^\d]/g, ''); window.open(`https://wa.me/${phone}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }} disabled={!contact.phone}>
-                    <MessageSquare className="h-3.5 w-3.5" /> Enviar WhatsApp
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setWhatsappCell(null)}>No por ahora</Button>
-                </div>
-                {!contact.phone && <p className="text-xs text-amber-400">El contacto no tiene teléfono registrado.</p>}
-              </div>
-            )}
+              )}
 
-            {/* Buttons row */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <Button size="sm" variant="outline" onClick={() => setAddLogOpen(true)}>
-                <MessageSquare className="mr-1.5 h-4 w-4" /> Agregar Registro
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setLogOpen(true)}>
-                <ClipboardList className="mr-1.5 h-4 w-4" /> Ver Historial
-              </Button>
-              <div className="flex-1" />
-              <Button variant="ghost" onClick={() => safeClose()} disabled={saving}>Cancelar</Button>
-              {(canEditDeleteContacts() || profile?.role === 'conector') && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
+              {/* Buttons */}
+              <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border">
+                <Button size="sm" variant="outline" onClick={() => setAddLogOpen(true)}><MessageSquare className="mr-1.5 h-4 w-4" /> Agregar Registro</Button>
+                <div className="flex-1" />
+                <Button variant="ghost" size="sm" onClick={() => safeClose()} disabled={saving}>Cancelar</Button>
+                {(canEditDeleteContacts() || profile?.role === 'conector') && <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
+              </div>
+
+              {/* Hidden dialogs */}
+              <AddContactLogDialog open={addLogOpen} onOpenChange={setAddLogOpen} churchId={churchId} contactId={contact.id} onAdded={() => { setLogOpen(true); setHistorySignal(s => s + 1); }} />
+              <ContactLogDialog open={logOpen} onOpenChange={setLogOpen} churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
             </div>
 
-            <AddContactLogDialog
-              open={addLogOpen}
-              onOpenChange={(o) => {
-                setAddLogOpen(o);
-              }}
-              churchId={churchId}
-              contactId={contact.id}
-              onAdded={() => {
-                setLogOpen(true);
-                setHistorySignal((s) => s + 1);
-              }}
-            />
-            <ContactLogDialog
-              open={logOpen}
-              onOpenChange={setLogOpen}
-              churchId={churchId}
-              contactId={contact.id}
-              refreshSignal={historySignal}
-            />
-
-            {/* Unified Timeline */}
-            {(transfers.length > 0 || true) && (
-              <UnifiedTimeline contactId={contact.id} churchId={churchId} transfers={transfers} />
-            )}
+            {/* RIGHT: Sidebar — Registros (top) + Historial (bottom) */}
+            <div className="w-[320px] flex-shrink-0 border-l border-border bg-muted/30 flex flex-col overflow-hidden">
+              {/* Top half: Contact logs */}
+              <div className="flex-1 overflow-y-auto p-4 border-b border-border">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Registros de contacto</p>
+                <ContactLogInline churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
+              </div>
+              {/* Bottom half: Timeline */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <UnifiedTimeline contactId={contact.id} churchId={churchId} transfers={transfers} />
+              </div>
+            </div>
           </div>
         )}
       </DialogContent>

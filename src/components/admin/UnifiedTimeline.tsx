@@ -2,7 +2,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -96,30 +95,28 @@ const UnifiedTimeline = ({ contactId, churchId, transfers }: Props) => {
   // Sort by date descending
   events.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  if (events.length === 0) return null;
+  if (events.length === 0) return <p className="text-xs text-muted-foreground italic">Sin historial aún.</p>;
 
   return (
-    <Card className="mt-2">
-      <CardContent className="pt-4 pb-3">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Historial del contacto</p>
-        <div className="space-y-2">
-          {events.map(e => (
-            <div key={e.id} className="flex items-start gap-3 text-xs">
-              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${e.color}`} />
-              <div className="flex-1">
-                <p className="text-foreground">
-                  <span className="font-medium">{e.description}</span>
-                  {e.detail && <span className="text-muted-foreground ml-1">— {e.detail}</span>}
-                </p>
-                <p className="text-muted-foreground">
-                  {format(e.date, "d 'de' MMM yyyy, HH:mm", { locale: es })}
-                </p>
-              </div>
+    <div>
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Historial</p>
+      <div className="space-y-2">
+        {events.map(e => (
+          <div key={e.id} className="flex items-start gap-2 text-xs">
+            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${e.color}`} />
+            <div className="flex-1 min-w-0">
+              <p className="text-foreground">
+                <span className="font-medium">{e.description}</span>
+                {e.detail && <span className="text-muted-foreground ml-1 block text-[11px]">{e.detail}</span>}
+              </p>
+              <p className="text-muted-foreground text-[10px]">
+                {format(e.date, "d MMM yy, HH:mm", { locale: es })}
+              </p>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
