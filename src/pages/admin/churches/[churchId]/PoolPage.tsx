@@ -652,12 +652,9 @@ const PoolPage = () => {
                           <>
                             <td className="px-3 py-2.5" style={{ width: colWidths.celulaSug }}>
                               {sugCell ? (
-                                <div>
-                                  <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
-                                    {sugCell.name}
-                                  </Badge>
-                                  {sugCuerda && <span className="text-[10px] text-muted-foreground ml-1 font-mono">#{sugCuerda.numero}</span>}
-                                </div>
+                                <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
+                                  {sugCell.name}
+                                </Badge>
                               ) : <span className="text-xs text-muted-foreground">—</span>}
                             </td>
                             <td className="px-3 py-2.5" style={{ width: colWidths.zonaSug }}>
