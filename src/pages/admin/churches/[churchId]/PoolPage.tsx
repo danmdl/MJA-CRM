@@ -521,6 +521,7 @@ const PoolPage = () => {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b">
+                    <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
                     <ResizableHeader width={colWidths.apellido} onResize={resizeCol('apellido')}>Apellido</ResizableHeader>
                     <ResizableHeader width={colWidths.edad} onResize={resizeCol('edad')} className="text-center">Edad</ResizableHeader>
@@ -528,7 +529,6 @@ const PoolPage = () => {
                     {isUnassignedView && isAdminOrPastor && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                     {isUnassignedView && <ResizableHeader width={colWidths.celulaSug} onResize={resizeCol('celulaSug')}>Célula sug.</ResizableHeader>}
                     {isUnassignedView && <ResizableHeader width={colWidths.zonaSug} onResize={resizeCol('zonaSug')}>Zona sug.</ResizableHeader>}
-                    {!isUnassignedView && <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>}
                   </tr>
                 </thead>
                 <tbody>
@@ -542,6 +542,9 @@ const PoolPage = () => {
 
                     return (
                       <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
+                        <td className="px-3 py-2.5 text-sm font-mono text-muted-foreground" style={{ width: colWidths.cuerda }}>
+                          {c.numero_cuerda || '—'}
+                        </td>
                         <td className="px-3 py-2.5 text-sm font-medium" style={{ width: colWidths.nombre }}>
                           <button className="hover:underline text-left" onClick={() => setSelectedContactId(c.id)}>{c.first_name}</button>
                         </td>
