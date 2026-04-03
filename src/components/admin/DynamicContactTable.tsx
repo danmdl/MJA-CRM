@@ -276,11 +276,12 @@ const DynamicContactTable = ({
   searchTerm = '', 
   filterField = null as string | null,
   ageGroup = null as string | null,
+  cuerdaFilter = null as string | null,
   useExternalToolbarContainer = false,
   canEdit: canEditProp = true,
   canDelete: canDeleteProp = true,
   canAdd: canAddProp = true,
-}: { churchId?: string; searchTerm?: string; filterField?: string | null; ageGroup?: string | null; useExternalToolbarContainer?: boolean }) => {
+}: { churchId?: string; searchTerm?: string; filterField?: string | null; ageGroup?: string | null; cuerdaFilter?: string | null; useExternalToolbarContainer?: boolean; canEdit?: boolean; canDelete?: boolean; canAdd?: boolean }) => {
   logger.log('[DynamicContactTable] Component rendered', { churchId, searchTerm, filterField });
 
   const extendedContactFields = useMemo(() => [
@@ -537,9 +538,14 @@ const DynamicContactTable = ({
         if (getAgeGroup(effectiveAge) !== ageGroup) return false;
       }
 
+      // Cuerda filter
+      if (cuerdaFilter) {
+        if ((c as any).numero_cuerda !== cuerdaFilter) return false;
+      }
+
       return true;
     });
-  }, [contacts, searchTerm, filterField, columnFilters, ageGroup]);
+  }, [contacts, searchTerm, filterField, columnFilters, ageGroup, cuerdaFilter]);
 
   const visibleIds = filteredContacts.map(c => c.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedContacts.includes(id));

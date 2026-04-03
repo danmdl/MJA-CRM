@@ -11,8 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePermissions } from '@/lib/permissions';
+import { useSession } from '@/hooks/use-session';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { useQuery } from '@tanstack/react-query';
 
 const exportContactsToCSV = async (churchId: string) => {
   const { data, error } = await supabase
@@ -82,7 +86,24 @@ const ChurchDatabasePage = () => {
   const [exporting, setExporting] = useState(false);
   const [ageGroupFilter, setAgeGroupFilter] = useState<string | null>(null);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
-  const { canAddContacts, canEditDeleteContacts } = usePermissions();
+  const { canAddContacts, canEditDeleteContacts, canSeeBaseDatosTotal } = usePermissions();
+  const { profile } = useSession();
+
+  // Cuerda filter
+  const userCuerdaNumero = profile?.numero_cuerda || null;
+  const canSeeAll = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  const [cuerdaFilter, setCuerdaFilter] = useState<string | null>(canSeeAll ? null : userCuerdaNumero);
+
+  // Fetch available cuerdas for the filter dropdown
+  const { data: availableCuerdas } = useQuery<string[]>({
+    queryKey: ['cuerda-numbers', churchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('contacts').select('numero_cuerda').eq('church_id', churchId!).not('numero_cuerda', 'is', null);
+      const unique = [...new Set((data || []).map((c: any) => c.numero_cuerda).filter(Boolean))].sort();
+      return unique as string[];
+    },
+    enabled: !!churchId && canSeeAll,
+  });
 
   if (!churchId) {
     return <div className="p-6 text-red-500">Error: No se encontró el ID de la iglesia.</div>;
@@ -143,6 +164,24 @@ const ChurchDatabasePage = () => {
       </div>
 
       <div className="flex items-center space-x-4 mb-0">
+        {/* Cuerda filter */}
+        {!canSeeAll && userCuerdaNumero ? (
+          <Badge className="bg-primary/15 text-primary text-sm px-3 py-1.5 flex-shrink-0">
+            Cuerda {userCuerdaNumero}
+          </Badge>
+        ) : canSeeAll ? (
+          <Select value={cuerdaFilter || '__all__'} onValueChange={v => setCuerdaFilter(v === '__all__' ? null : v)}>
+            <SelectTrigger className="w-[140px] h-9 flex-shrink-0">
+              <SelectValue placeholder="Todas las cuerdas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas las cuerdas</SelectItem>
+              {(availableCuerdas || []).map(num => (
+                <SelectItem key={num} value={num}>Cuerda {num}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -182,8 +221,8 @@ const ChurchDatabasePage = () => {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        {(searchTerm || filterField || ageGroup) && (
-          <Button variant="ghost" onClick={() => { setSearchTerm(''); setFilterField(null); setAgeGroup(null); }}>
+        {(searchTerm || filterField || ageGroup || cuerdaFilter) && (
+          <Button variant="ghost" onClick={() => { setSearchTerm(''); setFilterField(null); setAgeGroup(null); if (canSeeAll) setCuerdaFilter(null); }}>
             <X className="mr-2 h-4 w-4" />
             Limpiar Filtros
           </Button>
@@ -195,6 +234,7 @@ const ChurchDatabasePage = () => {
         searchTerm={searchTerm}
         filterField={filterField}
         ageGroup={ageGroup}
+        cuerdaFilter={canSeeAll ? cuerdaFilter : userCuerdaNumero}
         useExternalToolbarContainer={true}
         canEdit={canEditDeleteContacts()}
         canDelete={canEditDeleteContacts()}
