@@ -31,6 +31,7 @@ interface User {
   invited_at: string | null;
   confirmed_at: string | null;
   church_id: string | null;
+  numero_cuerda: string | null;
 }
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
@@ -62,11 +63,21 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editCuerda, setEditCuerda] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   const { data: users, isLoading, isError, error } = useQuery<User[]>({
     queryKey: ['churchUsers', churchId],
-    queryFn: () => fetchChurchUsers(session?.access_token || '', churchId),
+    queryFn: async () => {
+      const edgeUsers = await fetchChurchUsers(session?.access_token || '', churchId);
+      // Fetch numero_cuerda directly from profiles (edge function may not return it)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, numero_cuerda')
+        .eq('church_id', churchId);
+      const cuerdaMap = new Map((profiles || []).map(p => [p.id, p.numero_cuerda]));
+      return edgeUsers.map(u => ({ ...u, numero_cuerda: u.numero_cuerda ?? cuerdaMap.get(u.id) ?? null }));
+    },
     enabled: !!session?.access_token && !!churchId,
   });
 
@@ -75,7 +86,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     const term = norm(searchTerm);
     if (!term) return users;
     return users.filter(u =>
-      norm([u.first_name, u.last_name, u.email, u.role].join(' ')).includes(term)
+      norm([u.first_name, u.last_name, u.email, u.role, u.numero_cuerda].join(' ')).includes(term)
     );
   }, [users, searchTerm]);
 
@@ -119,8 +130,14 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   });
 
   const updateUserProfileMutation = useMutation({
-    mutationFn: ({ userId, first_name, last_name, phone }: { userId: string; first_name: string; last_name: string; phone: string }) =>
-      callEdge({ action: 'updateUserProfile', userId, first_name, last_name, phone }),
+    mutationFn: async ({ userId, first_name, last_name, phone, numero_cuerda }: { userId: string; first_name: string; last_name: string; phone: string; numero_cuerda?: string | null }) => {
+      // Update name/phone via edge function
+      await callEdge({ action: 'updateUserProfile', userId, first_name, last_name, phone, numero_cuerda });
+      // Also update numero_cuerda directly (in case edge function doesn't support it yet)
+      if (numero_cuerda !== undefined) {
+        await supabase.from('profiles').update({ numero_cuerda: numero_cuerda || null }).eq('id', userId);
+      }
+    },
     onSuccess: () => { showSuccess('Perfil actualizado.'); queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] }); },
     onError: (err: any) => showError(err.message || 'Error al actualizar perfil.'),
   });
@@ -168,6 +185,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         <TableHeader>
           <TableRow>
             <TableHead>Nombre</TableHead>
+            <TableHead>Cuerda</TableHead>
             <TableHead>Correo Electrónico</TableHead>
             <TableHead>Rol</TableHead>
             <TableHead>Estado</TableHead>
@@ -185,6 +203,9 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
             return (
               <TableRow key={user.id}>
                 <TableCell>{user.first_name || '-'} {user.last_name || ''}</TableCell>
+                <TableCell>
+                  <span className="font-mono text-sm">{user.numero_cuerda || '—'}</span>
+                </TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
                   {canChangeUserRole() && canManageThisUser ? (
@@ -238,6 +259,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                             setEditFirstName(user.first_name || '');
                             setEditLastName(user.last_name || '');
                             setEditPhone('');
+                            setEditCuerda(user.numero_cuerda || '');
                           }}>
                             <UserPen className="mr-2 h-4 w-4" /> Editar Usuario
                           </DropdownMenuItem>
@@ -297,6 +319,27 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
             <Label>Teléfono</Label>
             <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Ej: 5491122334455" />
           </div>
+          <div className="space-y-1">
+            <Label>Número de Cuerda</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              value={editCuerda}
+              onChange={e => setEditCuerda(e.target.value)}
+            >
+              <option value="">Sin cuerda</option>
+              <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
+              <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
+              <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
+              <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
+              <optgroup label="Chilavert"><option value="104">104</option><option value="204">204</option></optgroup>
+              <optgroup label="San Andrés"><option value="105">105</option><option value="205">205</option></optgroup>
+              <optgroup label="Migueletes"><option value="106">106</option><option value="206">206</option></optgroup>
+              <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
+              <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
+              <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
+              <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
+            </select>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setTimeout(() => setEditDialogUser(null), 50)}>Cancelar</Button>
@@ -311,6 +354,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                   first_name: editFirstName.trim(),
                   last_name: editLastName.trim(),
                   phone: editPhone.trim(),
+                  numero_cuerda: editCuerda || null,
                 });
                 setTimeout(() => setEditDialogUser(null), 50);
               } finally {
