@@ -237,7 +237,10 @@ const MapaPage = () => {
       {!isLoading && !geocoding && noAddress.length > 0 && (
         <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm text-amber-400">
           <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>{noAddress.length} célula(s) sin dirección — no aparecen en el mapa.</span>
+          <div>
+            <p>{noAddress.length} célula(s) sin dirección — no aparecen en el mapa:</p>
+            {noAddress.map((c: any) => <p key={c.id} className="text-xs mt-0.5">• {c.name || `Célula ${c.id.slice(0,6)}`}</p>)}
+          </div>
         </div>
       )}
 
