@@ -172,6 +172,19 @@ const CuerdasPage = () => {
     }
   };
 
+  const deleteCuerda = async (id: string, numero: string) => {
+    if (!window.confirm(`¿Eliminar la cuerda #${numero}? Las células vinculadas quedarán sin cuerda.`)) return;
+    // Unlink cells from this cuerda first
+    await supabase.from('cells').update({ cuerda_id: null }).eq('cuerda_id', id);
+    const { error } = await supabase.from('cuerdas').delete().eq('id', id);
+    if (error) showError(error.message);
+    else {
+      showSuccess(`Cuerda #${numero} eliminada.`);
+      queryClient.invalidateQueries({ queryKey: ['cuerdas', churchId] });
+      queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
+    }
+  };
+
   const isLoading = cuerdasLoading;
 
   // ─── Render ────────────────────────────────────────────────────
@@ -233,43 +246,57 @@ const CuerdasPage = () => {
           {cuerdaTree.map(({ cuerda, zona, cells: cuerdaCells }) => (
             <Card key={cuerda.id}>
               <Collapsible open={expandedCuerda === cuerda.id} onOpenChange={(open) => setExpandedCuerda(open ? cuerda.id : null)}>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="py-3 px-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {expandedCuerda === cuerda.id ? <ChevronDown className="h-4 w-4 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 flex-shrink-0" />}
-                        <div className="min-w-0">
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-2">
+                    {/* Left: clickable expand area */}
+                    <CollapsibleTrigger asChild>
+                      <button className="flex items-start gap-3 flex-1 min-w-0 text-left hover:bg-muted/30 rounded-md -m-1 p-1 transition-colors">
+                        {expandedCuerda === cuerda.id ? <ChevronDown className="h-4 w-4 flex-shrink-0 mt-1" /> : <ChevronRight className="h-4 w-4 flex-shrink-0 mt-1" />}
+                        <div className="min-w-0 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-lg text-primary">#{cuerda.numero}</span>
                             {zona && <Badge variant="secondary" className="text-[10px]">{zona.nombre}</Badge>}
                             <Badge variant="outline" className="text-[10px]">{cuerdaCells.length} célula{cuerdaCells.length !== 1 ? 's' : ''}</Badge>
                           </div>
                           {cuerda.referente_name && (
-                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
                               <UserCheck className="h-3 w-3" /> {cuerda.referente_name}
                             </p>
                           )}
+                          {cuerda.address && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3 w-3" /> {cuerda.address}
+                            </p>
+                          )}
+                          {(cuerda.meeting_day || cuerda.meeting_time) && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {[cuerda.meeting_day, cuerda.meeting_time].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
                         </div>
-                      </div>
-                      {(cuerda.meeting_day || cuerda.meeting_time) && (
-                        <div className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
-                          <Clock className="h-3 w-3" />
-                          {[cuerda.meeting_day, cuerda.meeting_time].filter(Boolean).join(' · ')}
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
+                      </button>
+                    </CollapsibleTrigger>
+
+                    {/* Right: actions dropdown */}
+                    {isAdminOrPastor && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0 flex-shrink-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="text-red-600" onClick={() => deleteCuerda(cuerda.id, cuerda.numero)}>
+                            <Trash2 className="h-4 w-4 mr-1.5" /> Eliminar cuerda
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                </CardHeader>
 
                 <CollapsibleContent>
                   <CardContent className="pt-0 pb-4 px-4">
-                    {/* Cuerda address */}
-                    {cuerda.address && (
-                      <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1 ml-7">
-                        <MapPin className="h-3 w-3" /> {cuerda.address}
-                      </p>
-                    )}
-
                     {/* Cells inside this cuerda */}
                     {cuerdaCells.length === 0 ? (
                       <p className="text-sm text-muted-foreground ml-7 py-2">No hay células en esta cuerda.</p>
@@ -303,7 +330,7 @@ const CuerdasPage = () => {
                                 </div>
                               </div>
 
-                              {canEditDeleteUsers() && (
+                              {isAdminOrPastor && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100">
@@ -362,7 +389,7 @@ const CuerdasPage = () => {
                                 {cell.address && <span><MapPin className="h-3 w-3 inline mr-0.5" />{cell.address}</span>}
                               </div>
                             </div>
-                            {canEditDeleteUsers() && (
+                            {isAdminOrPastor && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-4 w-4" /></Button>
