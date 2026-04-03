@@ -13,6 +13,8 @@ interface ContactMapDialogProps {
     lat: number | null;
     lng: number | null;
     cuerdaNumero?: string;
+    meetingDay?: string | null;
+    meetingTime?: string | null;
   } | null;
 }
 
@@ -95,8 +97,8 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
           // Force resize after creation
           gmaps.event.trigger(map, 'resize');
 
-          // Blue pin for contact
-          const contactMarker = new gmaps.Marker({
+          // Blue pin for contact (no info window - just the pin)
+          new gmaps.Marker({
             position: contactPos,
             map,
             icon: {
@@ -111,17 +113,7 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
             title: contactName,
           });
 
-          const contactInfo = new gmaps.InfoWindow({
-            content: `
-              <div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
-                <div style="font-size:13px;font-weight:700;color:#3B82F6;">📍 ${contactName}</div>
-                <div style="font-size:11px;color:#555;margin-top:2px;">${contactAddress}</div>
-              </div>
-            `,
-          });
-          contactInfo.open(map, contactMarker);
-
-          // Gold pin for suggested cell
+          // Gold pin for suggested cell with info window
           if (suggestedCell?.lat && suggestedCell?.lng) {
             const cellPos = { lat: suggestedCell.lat, lng: suggestedCell.lng };
 
@@ -140,12 +132,13 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
               title: suggestedCell.name,
             });
 
+            const schedule = [suggestedCell.meetingDay, suggestedCell.meetingTime].filter(Boolean).join(' · ');
             const cellInfo = new gmaps.InfoWindow({
               content: `
                 <div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
-                  <div style="font-size:13px;font-weight:700;color:#B8720A;">🏠 Célula sugerida</div>
-                  <div style="font-size:12px;font-weight:600;margin-top:2px;">${suggestedCell.name}${suggestedCell.cuerdaNumero ? ` · #${suggestedCell.cuerdaNumero}` : ''}</div>
-                  ${suggestedCell.address ? `<div style="font-size:11px;color:#555;margin-top:2px;">${suggestedCell.address}</div>` : ''}
+                  <div style="font-size:13px;font-weight:700;color:#B8720A;">${suggestedCell.name}${suggestedCell.cuerdaNumero ? ` · #${suggestedCell.cuerdaNumero}` : ''}</div>
+                  ${schedule ? `<div style="font-size:12px;color:#555;margin-top:2px;">🕐 ${schedule}</div>` : ''}
+                  ${suggestedCell.address ? `<div style="font-size:11px;color:#777;margin-top:2px;">📍 ${suggestedCell.address}</div>` : ''}
                 </div>
               `,
             });

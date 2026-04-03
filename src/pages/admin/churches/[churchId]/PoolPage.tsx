@@ -88,7 +88,7 @@ const PoolPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string } | null } | null>(null);
+  const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'auto' | 'manual';
@@ -266,10 +266,12 @@ const PoolPage = () => {
     if (!allContacts || !homeZonaId) return [];
     return allContacts.filter(c => {
       if (c.zona_id || c.cell_id) return false;
+      // Apply cuerda filter for non-global users
+      if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return false;
       const sug = suggestions[c.id];
       return sug?.zona && sug.zona.id !== homeZonaId;
     });
-  }, [allContacts, homeZonaId, suggestions]);
+  }, [allContacts, homeZonaId, suggestions, canSeeAllCuerdas, userCuerdaNumero]);
 
   // ─── Filtered contacts ─────────────────────────────────────────
   const filteredContacts = useMemo(() => {
@@ -552,7 +554,7 @@ const PoolPage = () => {
                               setMapContact({
                                 name: `${c.first_name} ${c.last_name || ''}`.trim(),
                                 address: c.address!,
-                                sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined } : null,
+                                sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined, meetingDay: sugCell.meeting_day, meetingTime: sugCell.meeting_time } : null,
                               });
                             }}>
                               <span className="text-xs block truncate">{c.address}</span>
