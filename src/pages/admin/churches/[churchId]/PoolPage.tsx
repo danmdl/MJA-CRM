@@ -113,7 +113,7 @@ const PoolPage = () => {
   };
 
   const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
-  const { canSeeBaseDatosTotal } = usePermissions();
+  const { canSeeBaseDatosTotal, canAddContacts } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
@@ -482,7 +482,7 @@ const PoolPage = () => {
             <Upload className="h-4 w-4" /> Importar Contactos
           </Button>
         )}
-        {isAdminOrPastor && (
+        {canAddContacts() && (
           <Button size="sm" variant="outline" onClick={() => setAddContactOpen(true)} className="gap-1.5">
             <PlusCircle className="h-4 w-4" /> Crear Contacto
           </Button>

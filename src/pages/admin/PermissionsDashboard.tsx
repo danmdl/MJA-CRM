@@ -177,20 +177,24 @@ const PermissionsDashboard = () => {
   };
 
   const permissionColumns = [
+    // Solapas visibles
+    { key: 'canSeePool', label: 'Ver solapa Pool', icon: Eye },
+    { key: 'canSeeBaseDatos', label: 'Ver solapa Base de Datos', icon: Eye },
+    { key: 'seeOwnChurchAnalytics', label: 'Ver Resumen / Equipo / Cuerdas / Mapa', icon: BarChart },
+    // Contactos
+    { key: 'addContacts', label: 'Crear contactos (en Pool)', icon: UserPlus },
+    { key: 'editDeleteContacts', label: 'Editar/eliminar contactos', icon: Edit },
+    { key: 'baseDatosTotal', label: 'Ver todas las cuerdas en Base de Datos', icon: Eye },
+    // Equipo
+    { key: 'addMembers', label: 'Agregar miembro al equipo', icon: UserPlus },
+    { key: 'editDeleteMembers', label: 'Editar/eliminar miembro del equipo', icon: Edit },
+    { key: 'changeUserRole', label: 'Cambiar rol de miembro', icon: UserCog },
+    // Global (admin)
     { key: 'seeAllChurches', label: 'Ver todas las iglesias', icon: Eye },
     { key: 'accessAllChurches', label: 'Acceder a todas las iglesias', icon: Building },
-    { key: 'addUsers', label: 'Agregar usuarios', icon: UserPlus },
-    { key: 'editDeleteUsers', label: 'Editar/eliminar usuarios', icon: Edit },
-    { key: 'seeAllAnalytics', label: 'Ver todas las analíticas', icon: BarChart },
-    { key: 'seeOwnChurchAnalytics', label: 'Ver analíticas de mi iglesia', icon: BarChart },
-    { key: 'changeUserRole', label: 'Cambiar rol de usuario', icon: UserCog },
-    { key: 'addMembers', label: 'Agregar miembro', icon: UserPlus },
-    { key: 'editDeleteMembers', label: 'Editar/eliminar miembro', icon: Edit },
-    { key: 'addContacts', label: 'Agregar contacto', icon: UserPlus },
-    { key: 'editDeleteContacts', label: 'Editar/eliminar contacto', icon: Edit },
-    { key: 'baseDatosTotal', label: 'Base de datos total', icon: Eye },
-    { key: 'canSeeBaseDatos', label: 'Ver solapa Base de Datos', icon: Eye },
-    { key: 'canSeePool', label: 'Ver solapa Pool', icon: Eye },
+    { key: 'seeAllAnalytics', label: 'Ver analíticas globales', icon: BarChart },
+    { key: 'addUsers', label: 'Invitar miembros al equipo', icon: UserPlus },
+    { key: 'editDeleteUsers', label: 'Eliminar miembros del equipo', icon: Edit },
   ] as const;
 
   if (isLoading) {

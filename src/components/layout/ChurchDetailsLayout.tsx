@@ -17,7 +17,8 @@ interface ChurchDetailsLayoutProps {
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile, loading: sessionLoading } = useSession();
-  const { canAccessAllChurches, canSeeBaseDatos, canSeePool } = usePermissions();
+  const { canAccessAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics } = usePermissions();
+  const canSeeOverview = canAccessAllChurches() || canSeeOwnChurchAnalytics();
   const navigate = useNavigate();
   const location = useLocation();
   const [accessChecked, setAccessChecked] = useState(false);
@@ -89,6 +90,15 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     return "overview";
   })();
 
+  // Redirect if user lands on a tab they can't access
+  React.useEffect(() => {
+    if (!accessChecked || sessionLoading) return;
+    const p = location.pathname;
+    if (p.endsWith('/overview') && !canSeeOverview) {
+      navigate(`/admin/churches/${churchId}/pool`, { replace: true });
+    }
+  }, [accessChecked, sessionLoading, location.pathname, canSeeOverview, churchId, navigate]);
+
   if (!accessChecked || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -121,11 +131,11 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
             className="w-full px-3"
           >
             <TabsList className="mb-0 w-max">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>
+              {canSeeOverview && <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>}
               {canSeeBaseDatos() && <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Base de Datos</TabsTrigger>}
-              <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>
-              <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>
-              <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>
+              {canSeeOverview && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
+              {canSeeOverview && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
+              {canSeeOverview && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
               {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🏊 Pool</TabsTrigger>}
             </TabsList>
           </Tabs>
