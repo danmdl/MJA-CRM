@@ -10,6 +10,7 @@ import { normalize } from '@/lib/normalize';
 import { showSuccess, showError } from '@/utils/toast';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { usePermissions } from '@/lib/permissions';
+import { useSession } from '@/hooks/use-session';
 
 interface CellRow {
   id: string;
@@ -29,6 +30,7 @@ const CelulasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const queryClient = useQueryClient();
   const { canEditCelulas } = usePermissions();
+  const { session } = useSession();
   const [search, setSearch] = useState('');
   const [zonaFilter, setZonaFilter] = useState<string>('all');
   const [editCell, setEditCell] = useState<CellRow | null>(null);
@@ -101,7 +103,10 @@ const CelulasPage = () => {
     if (!editCell) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('cells').update({
+      // Get before state for activity log
+      const { data: beforeData } = await supabase.from('cells').select('*').eq('id', editCell.id).single();
+
+      const updatePayload = {
         address: editCell.address || null,
         lat: editCell.lat || null,
         lng: editCell.lng || null,
@@ -109,17 +114,31 @@ const CelulasPage = () => {
         meeting_time: editCell.meeting_time || null,
         leader_name: editCell.leader_name || null,
         anfitrion_name: editCell.anfitrion_name || null,
-      }).eq('id', editCell.id);
+      };
+      const { error } = await supabase.from('cells').update(updatePayload).eq('id', editCell.id);
 
       if (error) { showError(error.message); return; }
+
+      // Log the edit to activity_logs
+      const { data: afterData } = await supabase.from('cells').select('*').eq('id', editCell.id).single();
+      await supabase.from('activity_logs').insert({
+        user_id: session?.user?.id,
+        church_id: churchId,
+        action: 'update',
+        entity_type: 'cell',
+        entity_id: editCell.id,
+        before_data: beforeData,
+        after_data: afterData,
+      });
+
       showSuccess('Célula actualizada. Los cambios se reflejan en todas las solapas.');
       setEditCell(null);
-      // Invalidate ALL cell-related queries so every page sees the update
       queryClient.invalidateQueries({ queryKey: ['celulas-page'] });
       queryClient.invalidateQueries({ queryKey: ['overviewCells'] });
       queryClient.invalidateQueries({ queryKey: ['cells-pool'] });
       queryClient.invalidateQueries({ queryKey: ['cells'] });
       queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+      queryClient.invalidateQueries({ queryKey: ['historial'] });
     } catch { showError('Error inesperado.'); } finally { setSaving(false); }
   };
 

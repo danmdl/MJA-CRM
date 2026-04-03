@@ -17,7 +17,7 @@ interface ChurchDetailsLayoutProps {
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile, loading: sessionLoading } = useSession();
-  const { canAccessAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas } = usePermissions();
+  const { canAccessAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial } = usePermissions();
   const canSeeOverview = canAccessAllChurches() || canSeeOwnChurchAnalytics();
   const navigate = useNavigate();
   const location = useLocation();
@@ -88,6 +88,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/celulas")) return "celulas";
     if (p.endsWith("/mapa")) return "mapa";
     if (p.endsWith("/pool")) return "pool";
+    if (p.endsWith("/historial")) return "historial";
     return "overview";
   })();
 
@@ -139,6 +140,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
               {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
               {canSeeOverview && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
               {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🏊 Pool</TabsTrigger>}
+              {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
             </TabsList>
           </Tabs>
         </div>
