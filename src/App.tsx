@@ -34,7 +34,14 @@ import Messages from "./pages/Messages";
 import PermissionsDashboard from "./pages/admin/PermissionsDashboard";
 import PasswordChangeForm from "./components/auth/PasswordChangeForm";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,  // Prevents re-fetching (and re-rendering) when user switches back to the tab
+      staleTime: 30_000,            // Data stays fresh for 30s
+    },
+  },
+});
 
 // Guard component: only admin can access permissions page
 const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {

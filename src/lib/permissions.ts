@@ -56,8 +56,7 @@ export const usePermissions = () => {
       return data || [];
     },
     staleTime: 0,              // Always re-fetch permissions (no cache)
-    refetchOnWindowFocus: true, // Refresh when user switches back to this tab
-    refetchInterval: 30_000,   // Also poll every 30s to catch admin changes
+    refetchInterval: 30_000,   // Poll every 30s to catch admin changes
   });
 
   const getPermissionForRole = (role: string): PermissionData | undefined => {
