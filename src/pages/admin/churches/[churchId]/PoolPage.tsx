@@ -250,18 +250,10 @@ const PoolPage = () => {
   }, [allContacts, zonas]);
 
   // ─── Pool counts ───────────────────────────────────────────────
-  const externalContacts = useMemo(() => {
-    if (!allContacts || !homeZonaId) return [];
-    return allContacts.filter(c => {
-      if (c.zona_id || c.cell_id) return false;
-      // Apply cuerda filter for non-global users
-      if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return false;
-      const sug = suggestions[c.id];
-      return sug?.zona && sug.zona.id !== homeZonaId;
-    });
-  }, [allContacts, homeZonaId, suggestions, canSeeAllCuerdas, userCuerdaNumero]);
+  // Pool externo: only contacts explicitly marked as external (future feature)
+  // For now, all unassigned contacts go to "Sin asignar"
+  const externalContacts: Contact[] = [];
 
-    // External IDs set - used to exclude from "Sin asignar"
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
 
   const poolCounts = useMemo(() => {
