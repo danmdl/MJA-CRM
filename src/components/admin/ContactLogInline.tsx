@@ -17,7 +17,7 @@ const ContactLogInline = ({ churchId, contactId, refreshSignal }: Props) => {
     queryFn: async () => {
       const { data } = await supabase
         .from('contact_logs')
-        .select('id, contact_date, notes, contacted_by, method, profiles:contacted_by(first_name, last_name)')
+        .select('id, contact_date, notes, contacted_by, method')
         .eq('contact_id', contactId)
         .order('contact_date', { ascending: false })
         .limit(15);
@@ -33,7 +33,6 @@ const ContactLogInline = ({ churchId, contactId, refreshSignal }: Props) => {
   return (
     <div className="space-y-3">
       {logs.map((log: any) => {
-        const by = log.profiles ? `${log.profiles.first_name || ''} ${log.profiles.last_name || ''}`.trim() : null;
         return (
           <div key={log.id} className="text-xs space-y-0.5">
             <div className="flex justify-between items-start">
@@ -43,7 +42,6 @@ const ContactLogInline = ({ churchId, contactId, refreshSignal }: Props) => {
               </span>
             </div>
             {log.notes && <p className="text-muted-foreground leading-snug">{log.notes}</p>}
-            {by && <p className="text-muted-foreground/60 text-[10px]">por {by}</p>}
           </div>
         );
       })}

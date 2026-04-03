@@ -43,6 +43,13 @@ interface Contact {
   numero_cuerda?: string | null;
   zona?: string | null;
   estado_seguimiento?: string | null;
+  conector?: string | null;
+  observaciones?: string | null;
+  pedido_de_oracion?: string | null;
+  sexo?: string | null;
+  estado_civil?: string | null;
+  edad?: string | null;
+  fecha_contacto?: string | null;
 }
 
 interface ContactLog {
@@ -346,6 +353,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             numero_cuerda: contact.numero_cuerda || null,
             zona: contact.zona || null,
             estado_seguimiento: contact.estado_seguimiento || 'nuevo',
+            observaciones: contact.observaciones || null,
+            pedido_de_oracion: contact.pedido_de_oracion || null,
           }
         }),
       });
@@ -412,6 +421,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
           <div className="flex h-full max-h-[88vh]">
             {/* LEFT: Form fields */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Row 0: Conector (readonly) */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conector</label>
+                <input readOnly value={contact.conector || '—'} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
+              </div>
+
               {/* Row 1: Nombre / Apellido */}
               <div className="grid grid-cols-2 gap-4">
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
@@ -509,6 +524,28 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   </Select>
                 </div>
                 <SelectField label="Líder de Célula" value={contact.leader_assigned} onChange={(v) => setContact({ ...contact, leader_assigned: v })} options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))} placeholder="Sin líder" />
+              </div>
+
+              {/* Observaciones / Pedido de oración */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observaciones</label>
+                  <textarea
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
+                    value={contact.observaciones || ''}
+                    onChange={(e) => setContact({ ...contact, observaciones: e.target.value || null })}
+                    placeholder="Notas adicionales..."
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pedido de Oración</label>
+                  <textarea
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
+                    value={contact.pedido_de_oracion || ''}
+                    onChange={(e) => setContact({ ...contact, pedido_de_oracion: e.target.value || null })}
+                    placeholder="¿Tiene algún pedido de oración?"
+                  />
+                </div>
               </div>
 
               {/* WhatsApp invite */}
