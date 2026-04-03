@@ -487,8 +487,8 @@ const PoolPage = () => {
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={() => {
-          queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
-          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          queryClient.refetchQueries({ queryKey: ['cells-pool', churchId] });
+          queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
         }} className="gap-1.5" title="Actualizar datos (células y contactos)">
           <RefreshCw className="h-4 w-4" />
         </Button>
@@ -738,7 +738,7 @@ const PoolPage = () => {
         onOpenChange={(o) => {
           if (!o) {
             setSelectedContactId(null);
-            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
           }
         }}
         contactId={selectedContactId || ''}
@@ -750,7 +750,7 @@ const PoolPage = () => {
         open={addContactOpen}
         onOpenChange={(o) => {
           setAddContactOpen(o);
-          if (!o) queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          if (!o) queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
         }}
         churchId={churchId!}
       />
