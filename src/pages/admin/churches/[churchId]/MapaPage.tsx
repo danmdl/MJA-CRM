@@ -41,12 +41,25 @@ const loadGoogleMaps = (): Promise<any> => {
 };
 
 // Geocode a single address using Google Maps Geocoding API
+// Gran Buenos Aires bounding box for validation
+const GBA_BOUNDS = { latMin: -34.85, latMax: -34.25, lngMin: -58.85, lngMax: -58.15 };
+
 const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
   try {
-    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_KEY}`);
+    // Add Buenos Aires bias to avoid geocoding "Tucumán 2590" to Tucumán province
+    const biasedAddress = address.includes('Buenos Aires') ? address : `${address}, Buenos Aires, Argentina`;
+    const bounds = `${GBA_BOUNDS.latMin},${GBA_BOUNDS.lngMin}|${GBA_BOUNDS.latMax},${GBA_BOUNDS.lngMax}`;
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(biasedAddress)}&bounds=${bounds}&region=ar&key=${GOOGLE_KEY}`;
+    const res = await fetch(url);
     const data = await res.json();
     if (data.status === 'OK' && data.results?.[0]?.geometry?.location) {
-      return data.results[0].geometry.location;
+      const { lat, lng } = data.results[0].geometry.location;
+      // Validate: must be within Gran Buenos Aires area
+      if (lat >= GBA_BOUNDS.latMin && lat <= GBA_BOUNDS.latMax && lng >= GBA_BOUNDS.lngMin && lng <= GBA_BOUNDS.lngMax) {
+        return { lat, lng };
+      }
+      console.warn(`Geocode out of GBA bounds: "${address}" → ${lat}, ${lng}`);
+      return null; // Outside GBA — likely wrong match
     }
   } catch (e) {
     console.error('Geocode error:', e);
@@ -79,23 +92,28 @@ const MapaPage = () => {
   const needsGeocode = (cells || []).filter(c => c.address && (!c.lat || !c.lng));
   const noAddress = (cells || []).filter(c => !c.address);
 
+  const [geocodeFailed, setGeocodeFailed] = useState<string[]>([]);
+
   // Auto-geocode cells that have address but no coordinates
   const runGeocode = async () => {
     if (needsGeocode.length === 0) return;
     setGeocoding(true);
     setGeocodeProgress({ done: 0, total: needsGeocode.length });
+    const failed: string[] = [];
 
     for (let i = 0; i < needsGeocode.length; i++) {
       const cell = needsGeocode[i];
       const coords = await geocodeAddress(cell.address!);
       if (coords) {
         await supabase.from('cells').update({ lat: coords.lat, lng: coords.lng }).eq('id', cell.id);
+      } else {
+        failed.push(`${cell.name} — "${cell.address}"`);
       }
       setGeocodeProgress({ done: i + 1, total: needsGeocode.length });
-      // Small delay to avoid hitting rate limits
       if (i < needsGeocode.length - 1) await new Promise(r => setTimeout(r, 150));
     }
 
+    setGeocodeFailed(failed);
     setGeocoding(false);
     queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
   };
@@ -219,9 +237,17 @@ const MapaPage = () => {
       {!isLoading && !geocoding && noAddress.length > 0 && (
         <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm text-amber-400">
           <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>
-            {noAddress.length} célula(s) sin dirección — no aparecen en el mapa.
-          </span>
+          <span>{noAddress.length} célula(s) sin dirección — no aparecen en el mapa.</span>
+        </div>
+      )}
+
+      {!isLoading && !geocoding && geocodeFailed.length > 0 && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-400">
+          <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">{geocodeFailed.length} dirección(es) no se pudieron ubicar en el mapa (fuera de Buenos Aires o dirección inválida):</p>
+            {geocodeFailed.map((f, i) => <p key={i} className="text-xs mt-0.5">{f}</p>)}
+          </div>
         </div>
       )}
 
