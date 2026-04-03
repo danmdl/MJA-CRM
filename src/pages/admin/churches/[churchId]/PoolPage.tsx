@@ -27,6 +27,7 @@ import { normalize } from '@/lib/normalize';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
+import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ const PoolPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string } | null } | null>(null);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'auto' | 'manual';
@@ -542,8 +544,23 @@ const PoolPage = () => {
                         </td>
                         <td className="px-3 py-2.5 text-sm text-center text-muted-foreground tabular-nums" style={{ width: colWidths.edad }}>{c.edad || '—'}</td>
                         <td className="px-3 py-2.5" style={{ width: colWidths.direccion }}>
-                          <span className="text-xs block truncate">{c.address || '—'}</span>
-                          {c.barrio && <span className="text-[11px] text-muted-foreground">{c.barrio}</span>}
+                          {c.address ? (
+                            <button className="text-left hover:underline" onClick={() => {
+                              const sug = suggestions[c.id];
+                              const sugCell = sug?.cell;
+                              const sugCuerdaNum = sug?.cuerda?.numero;
+                              setMapContact({
+                                name: `${c.first_name} ${c.last_name || ''}`.trim(),
+                                address: c.address!,
+                                sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined } : null,
+                              });
+                            }}>
+                              <span className="text-xs block truncate">{c.address}</span>
+                              {c.barrio && <span className="text-[11px] text-muted-foreground">{c.barrio}</span>}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </td>
 
                         {/* Assign button */}
@@ -753,6 +770,15 @@ const PoolPage = () => {
           if (!o) queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
         }}
         churchId={churchId!}
+      />
+
+      {/* Contact Map Dialog */}
+      <ContactMapDialog
+        open={!!mapContact}
+        onOpenChange={(o) => { if (!o) setMapContact(null); }}
+        contactName={mapContact?.name || ''}
+        contactAddress={mapContact?.address || ''}
+        suggestedCell={mapContact?.sugCell || null}
       />
     </div>
   );
