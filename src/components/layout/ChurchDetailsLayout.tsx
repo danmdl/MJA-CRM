@@ -84,6 +84,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/overview")) return "overview";
     if (p.endsWith("/database")) return "database";
     if (p.endsWith("/team")) return "team";
+    if (p.endsWith("/cuerdas")) return "cuerdas";
     if (p.endsWith("/cells")) return "cells";
     if (p.endsWith("/mapa")) return "mapa";
     if (p.endsWith("/pool")) return "pool";
@@ -125,7 +126,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
               <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>
               <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Base de Datos</TabsTrigger>
               <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>
-              <TabsTrigger value="cells" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>
+              <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>
               <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>
               {(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor') && (
                 <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🏊 Pool</TabsTrigger>
