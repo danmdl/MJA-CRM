@@ -258,10 +258,11 @@ const CuerdasPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {/* ─── Zona groups ───────────────────────────────── */}
           {zonaGroups.map(({ zona, cuerdas: zonaCuerdas }) => (
-            <Card key={zona.id}>
+            <Card key={zona.id} className="flex flex-col">
               <CardHeader className="py-2.5 px-4 border-b">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-sm">{zona.nombre}</h3>
@@ -358,10 +359,11 @@ const CuerdasPage = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
 
-          {/* ─── Unassigned cells ────────────────────────────── */}
+          {/* ─── Unassigned cells (outside grid, full width) ─── */}
           {unassignedCells.length > 0 && canSeeAll && (
-            <Card>
+            <Card className="mt-3">
               <Collapsible>
                 <CollapsibleTrigger asChild>
                   <CardHeader className="py-2.5 px-4 cursor-pointer hover:bg-muted/50 transition-colors">
@@ -410,7 +412,7 @@ const CuerdasPage = () => {
               </Collapsible>
             </Card>
           )}
-        </div>
+        </>
       )}
 
       {/* Summary */}
