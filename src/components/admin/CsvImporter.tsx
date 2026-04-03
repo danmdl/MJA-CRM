@@ -30,7 +30,7 @@ interface CsvImporterProps {
 }
 
 const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: CsvImporterProps) => {
-  const { session } = useSession();
+  const { session, profile } = useSession();
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [dataToImport, setDataToImport] = useState<Record<string, string>[]>([]);
@@ -173,6 +173,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         if (churchId) {
           newRecord.church_id = churchId;
           newRecord.created_by = session?.user?.id || null;
+          // If contact doesn't have a cuerda from CSV, inherit from creator
+          if (!newRecord.numero_cuerda && profile?.numero_cuerda) {
+            newRecord.numero_cuerda = profile.numero_cuerda;
+          }
         }
         return newRecord;
       });

@@ -22,6 +22,7 @@ import {
   Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
+import { usePermissions } from '@/lib/permissions';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
@@ -110,6 +111,9 @@ const PoolPage = () => {
   };
 
   const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  const { canSeeBaseDatosTotal } = usePermissions();
+  const userCuerdaNumero = profile?.numero_cuerda || null;
+  const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
   // ─── Data Fetching ─────────────────────────────────────────────
   const { data: zonas } = useQuery<Zona[]>({
@@ -248,10 +252,14 @@ const PoolPage = () => {
   const poolCounts = useMemo(() => {
     let unassigned = 0;
     allContacts?.forEach(c => {
-      if (!c.zona_id && !c.cell_id) unassigned++;
+      if (!c.zona_id && !c.cell_id) {
+        // Apply cuerda filter for non-global users
+        if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return;
+        unassigned++;
+      }
     });
     return { unassigned };
-  }, [allContacts]);
+  }, [allContacts, canSeeAllCuerdas, userCuerdaNumero]);
 
   const externalContacts = useMemo(() => {
     if (!allContacts || !homeZonaId) return [];
@@ -268,6 +276,11 @@ const PoolPage = () => {
     let filtered: Contact[];
     if (activePool === 'unassigned') filtered = allContacts.filter(c => !c.zona_id && !c.cell_id);
     else if (activePool === 'external') filtered = externalContacts;
+    else filtered = [];
+    // Cuerda filter: non-global users only see contacts with their cuerda
+    if (!canSeeAllCuerdas && userCuerdaNumero) {
+      filtered = filtered.filter(c => c.numero_cuerda === userCuerdaNumero);
+    }
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       filtered = filtered.filter(c =>
@@ -276,7 +289,7 @@ const PoolPage = () => {
       );
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, externalContacts]);
+  }, [allContacts, activePool, searchTerm, externalContacts, canSeeAllCuerdas, userCuerdaNumero]);
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;

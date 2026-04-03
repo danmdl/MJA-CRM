@@ -199,6 +199,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           estado_civil: estadoCivil || null,
           observaciones: observaciones || null,
           pedido_de_oracion: pedidoDeOracion || null,
+          numero_cuerda: profile?.numero_cuerda || null,
         });
 
       if (error) {
