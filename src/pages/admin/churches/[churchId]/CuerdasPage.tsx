@@ -59,6 +59,7 @@ const CuerdasPage = () => {
   // User's own cuerda (for filtering)
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAll = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
   // ─── Data fetching ─────────────────────────────────────────────
   const { data: zonas } = useQuery<Zona[]>({
@@ -185,7 +186,7 @@ const CuerdasPage = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          {canAddUsers() && (
+          {(isAdminOrPastor || canAddUsers()) && (
             <>
               <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
                 <Upload className="mr-1.5 h-4 w-4" /> Importar Células CSV
