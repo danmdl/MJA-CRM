@@ -127,9 +127,9 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     setObservaciones(''); setPedidoDeOracion('');
     setConector('');
     setLeaderAssigned(null); setCellId(null);
+    setContactLat(null); setContactLng(null);
   };
 
-  logger.log('AddContactDialog rendered', { open, churchId });
 
   const { data: cells, isLoading: isLoadingCells } = useQuery<Cell[]>({
     queryKey: ['cells', churchId],
