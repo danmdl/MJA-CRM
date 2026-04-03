@@ -15,10 +15,11 @@ export interface PermissionData {
   add_contacts: boolean;
   edit_delete_contacts: boolean;
   edit_delete_members: boolean;
+  base_datos_total: boolean;
 }
 
 // Role hierarchy: higher index = higher privilege
-const ROLE_HIERARCHY: string[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
+const ROLE_HIERARCHY: string[] = ['anfitrion', 'conector', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
 
 export const getRoleLevel = (role: string): number => {
   const idx = ROLE_HIERARCHY.indexOf(role);
@@ -32,7 +33,9 @@ export const ROLE_LABELS: Record<string, string> = {
   pastor: 'Pastor',
   referente: 'Referente',
   encargado_de_celula: 'Líder de Célula',
-  user: 'Conector',
+  conector: 'Conector',
+  supervisor: 'Supervisor',
+  anfitrion: 'Anfitrión',
 };
 
 export const usePermissions = () => {
@@ -80,6 +83,7 @@ export const usePermissions = () => {
   const canAddContacts = () => hasPermission('add_contacts');
   const canEditDeleteContacts = () => hasPermission('edit_delete_contacts');
   const canEditDeleteMembers = () => hasPermission('edit_delete_members');
+  const canSeeBaseDatosTotal = () => hasPermission('base_datos_total');
 
   // Only admin can access permissions management
   const canAccessPermissions = () => profile?.role === 'admin';
@@ -107,6 +111,7 @@ export const usePermissions = () => {
     canAddContacts,
     canEditDeleteContacts,
     canEditDeleteMembers,
+    canSeeBaseDatosTotal,
     canAccessPermissions,
     canManageUser,
   };

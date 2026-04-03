@@ -11,7 +11,7 @@ import { useSession } from '@/hooks/use-session';
 import { getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
 
 // DB enum values for user_role
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'supervisor' | 'anfitrion';
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -20,12 +20,12 @@ interface InviteUserDialogProps {
 }
 
 // All roles in hierarchy order (lowest to highest)
-const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
+const ALL_ROLES: UserRole[] = ['anfitrion', 'conector', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
 
 const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<UserRole>('user');
+  const [role, setRole] = useState<UserRole>('conector');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -62,7 +62,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
         showError(data.error || 'Error al enviar invitación.');
       } else {
         showSuccess('¡Invitación enviada con éxito!');
-        setEmail(''); setRole('user'); setFirstName(''); setLastName(''); setPhone(''); setNumeroCuerda('');
+        setEmail(''); setRole('conector'); setFirstName(''); setLastName(''); setPhone(''); setNumeroCuerda('');
         queryClient.invalidateQueries({ queryKey: ['users'] });
         if (churchId) queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
         setTimeout(() => onOpenChange(false), 50);

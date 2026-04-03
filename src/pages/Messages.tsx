@@ -30,7 +30,7 @@ const Messages = () => {
 
   useEffect(() => {
     const loadTeam = async () => {
-      const assignableRoles = ['user', 'encargado_de_celula', 'referente', 'pastor'];
+      const assignableRoles = ['conector', 'encargado_de_celula', 'referente', 'supervisor', 'pastor'];
       let query = supabase.from('profiles')
         .select('id, first_name, last_name, role, church_id')
         .in('role', assignableRoles);

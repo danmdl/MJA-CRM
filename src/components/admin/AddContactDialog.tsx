@@ -408,11 +408,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               <Input
                 id="conector"
                 value={conector}
-                onChange={(e) => { if (profile?.role !== 'user') setConector(e.target.value); }}
+                onChange={(e) => { if (profile?.role !== 'conector') setConector(e.target.value); }}
                 disabled={loading}
-                readOnly={profile?.role === 'user'}
+                readOnly={profile?.role === 'conector'}
                 placeholder="Nombre de quien conectó"
-                className={profile?.role === 'user' ? 'bg-muted text-muted-foreground cursor-default' : ''}
+                className={profile?.role === 'conector' ? 'bg-muted text-muted-foreground cursor-default' : ''}
               />
             </div>
 

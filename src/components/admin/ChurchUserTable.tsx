@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'supervisor' | 'anfitrion';
 
 interface User {
   id: string;
@@ -45,7 +45,7 @@ const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<
   return response.json();
 };
 
-const ALL_ROLES: UserRole[] = ['user', 'encargado_de_celula', 'referente', 'pastor', 'general', 'admin'];
+const ALL_ROLES: UserRole[] = ['anfitrion', 'conector', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
 
 const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { session, profile } = useSession();

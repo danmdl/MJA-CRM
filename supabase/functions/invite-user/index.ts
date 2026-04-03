@@ -71,7 +71,7 @@ serve(async (req) => {
 
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${siteUrl}/login`,
-      data: { role: role || 'user', church_id: churchId || null }
+      data: { role: role || 'conector', church_id: churchId || null }
     });
 
     if (error) {

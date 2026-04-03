@@ -42,10 +42,10 @@ const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
   }
 
   // For admin routes: any authenticated user with ANY permission can access admin section.
-  // Users with zero permissions (role = 'user') are redirected.
+  // Users with zero permissions are redirected.
   if (location.pathname.startsWith('/admin')) {
     const userRole = profile?.role;
-    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'user'].includes(userRole || '');
+    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'conector', 'supervisor', 'anfitrion'].includes(userRole || '');
     const hasBroadAccess = canSeeAllChurches();
 
     if (!hasBroadAccess && !isChurchRole) {

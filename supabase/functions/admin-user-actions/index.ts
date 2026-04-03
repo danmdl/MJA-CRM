@@ -72,7 +72,7 @@ serve(async (req) => {
 
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'user', church_id: churchId || null, first_name: first_name || null, last_name: last_name || null, phone: phone || null, numero_cuerda: numero_cuerda || null }
+          data: { role: role || 'conector', church_id: churchId || null, first_name: first_name || null, last_name: last_name || null, phone: phone || null, numero_cuerda: numero_cuerda || null }
         });
 
         if (error) {

@@ -715,7 +715,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => safeClose()} disabled={saving}>Cancelar</Button>
-              {(canEditDeleteContacts() || profile?.role === 'user') && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
+              {(canEditDeleteContacts() || profile?.role === 'conector') && <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
             </div>
           </div>
         )}

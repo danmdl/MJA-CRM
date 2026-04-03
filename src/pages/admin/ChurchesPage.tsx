@@ -46,7 +46,7 @@ const ChurchesPage = () => {
   const { canSeeAllChurches, canAddUsers, canEditDeleteUsers } = usePermissions();
 
   const canSeeAll = canSeeAllChurches();
-  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'user'].includes(profile?.role || '');
+  const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'conector', 'supervisor', 'anfitrion'].includes(profile?.role || '');
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

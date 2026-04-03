@@ -135,7 +135,7 @@ const PoolPage = () => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
   };
 
-  const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
+  const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
   // ─── Data Fetching ───────────────────────────────────────────
   const { data: zonas } = useQuery<Zona[]>({
@@ -176,7 +176,7 @@ const PoolPage = () => {
       let q = supabase.from('contacts')
         .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad')
         .eq('church_id', churchId!);
-      if (profile?.role === 'user') {
+      if (profile?.role === 'conector') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) q = q.eq('created_by', user.id);
       }

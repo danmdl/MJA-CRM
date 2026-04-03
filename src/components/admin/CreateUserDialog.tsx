@@ -33,7 +33,7 @@ const fetchChurches = async (): Promise<Church[]> => {
   return data || [];
 };
 
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'user';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'supervisor' | 'anfitrion';
 
 const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState<UserRole>('user');
+  const [role, setRole] = useState<UserRole>('conector');
   const [churchId, setChurchId] = useState('');
 
   // Cargar iglesias para el selector
@@ -122,7 +122,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
       setPassword('');
       setFirstName('');
       setLastName('');
-      setRole('user');
+      setRole('conector');
       setChurchId('');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['churchUsers'] });
@@ -138,7 +138,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const isAdmin = profile?.role === 'admin';
 
   // Roles permitidos para la creación de usuarios
-  const allowedRolesForCreation: UserRole[] = ['admin', 'general', 'pastor', 'referente', 'encargado_de_celula', 'user'];
+  const allowedRolesForCreation: UserRole[] = ['admin', 'general', 'pastor', 'supervisor', 'referente', 'encargado_de_celula', 'conector', 'anfitrion'];
 
   // Filtrar roles disponibles para el selector en la UI
   const availableRoles = allowedRolesForCreation.filter(roleOption => {
