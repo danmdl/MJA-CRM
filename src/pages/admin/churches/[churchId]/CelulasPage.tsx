@@ -9,6 +9,7 @@ import { Search, MapPin, Pencil } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError } from '@/utils/toast';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
+import { usePermissions } from '@/lib/permissions';
 
 interface CellRow {
   id: string;
@@ -27,6 +28,7 @@ interface CellRow {
 const CelulasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const queryClient = useQueryClient();
+  const { canEditCelulas } = usePermissions();
   const [search, setSearch] = useState('');
   const [zonaFilter, setZonaFilter] = useState<string>('all');
   const [editCell, setEditCell] = useState<CellRow | null>(null);
@@ -156,14 +158,14 @@ const CelulasPage = () => {
               <th className="text-left px-3 py-2 font-medium text-xs w-[70px]">Hora</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Líder</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Anfitrión</th>
-              <th className="w-[40px]"></th>
+              {canEditCelulas() && <th className="w-[40px]"></th>}
             </tr>
           </thead>
           <tbody>
             {grouped.map(([zona, rows]) => (
               <React.Fragment key={zona}>
                 <tr className="bg-muted/30">
-                  <td colSpan={7} className="px-3 py-1.5 font-semibold text-xs uppercase tracking-wide text-muted-foreground">{zona} ({rows.length})</td>
+                  <td colSpan={canEditCelulas() ? 7 : 6} className="px-3 py-1.5 font-semibold text-xs uppercase tracking-wide text-muted-foreground">{zona} ({rows.length})</td>
                 </tr>
                 {rows.map(cell => {
                   const noAddr = !cell.address;
@@ -177,15 +179,17 @@ const CelulasPage = () => {
                       <td className="px-3 py-2 text-muted-foreground">{cell.meeting_time || '—'}</td>
                       <td className="px-3 py-2">{cell.leader_name || '—'}</td>
                       <td className="px-3 py-2">{cell.anfitrion_name || '—'}</td>
-                      <td className="px-3 py-1">
-                        <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
-                      </td>
+                      {canEditCelulas() && (
+                        <td className="px-3 py-1">
+                          <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
               </React.Fragment>
             ))}
-            {grouped.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No se encontraron células.</td></tr>}
+            {grouped.length === 0 && <tr><td colSpan={canEditCelulas() ? 7 : 6} className="text-center py-8 text-muted-foreground">No se encontraron células.</td></tr>}
           </tbody>
         </table>
       </div>

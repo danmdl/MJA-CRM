@@ -28,41 +28,43 @@ interface PermissionConfig {
     canSeeBaseDatos: boolean;
     canSeePool: boolean;
     canEditCuerda: boolean;
+    canSeeCelulas: boolean;
+    canEditCelulas: boolean;
   };
 }
 
 const defaultPermissions: PermissionConfig[] = [
   {
     role: 'admin', label: 'Admin',
-    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true },
+    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true },
   },
   {
     role: 'general', label: 'General',
-    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true },
+    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true },
   },
   {
     role: 'pastor', label: 'Pastor',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true },
   },
   {
     role: 'supervisor', label: 'Supervisor',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: true, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: true, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: true },
   },
   {
     role: 'referente', label: 'Referente',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: false },
   },
   {
     role: 'encargado_de_celula', label: 'Líder de Célula',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: false },
   },
   {
     role: 'conector', label: 'Conector',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: true, canEditCuerda: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: true, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false },
   },
   {
     role: 'anfitrion', label: 'Anfitrión',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: false, canEditCuerda: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: false, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false },
   },
 ];
 
@@ -113,6 +115,8 @@ const PermissionsDashboard = () => {
               canSeeBaseDatos: savedConfig.can_see_base_datos ?? true,
               canSeePool: savedConfig.can_see_pool ?? true,
               canEditCuerda: savedConfig.can_edit_cuerda ?? false,
+              canSeeCelulas: savedConfig.can_see_celulas ?? false,
+              canEditCelulas: savedConfig.can_edit_celulas ?? false,
             },
           };
         }
@@ -161,6 +165,8 @@ const PermissionsDashboard = () => {
             can_see_base_datos: config.permissions.canSeeBaseDatos,
             can_see_pool: config.permissions.canSeePool,
             can_edit_cuerda: config.permissions.canEditCuerda,
+            can_see_celulas: config.permissions.canSeeCelulas,
+            can_edit_celulas: config.permissions.canEditCelulas,
           })),
           { onConflict: 'role' }
         );
@@ -183,6 +189,8 @@ const PermissionsDashboard = () => {
     // Solapas visibles
     { key: 'canSeePool', label: 'Ver solapa Pool', icon: Eye },
     { key: 'canSeeBaseDatos', label: 'Ver solapa Base de Datos', icon: Eye },
+    { key: 'canSeeCelulas', label: 'Ver solapa Células', icon: Eye },
+    { key: 'canEditCelulas', label: 'Editar células', icon: Edit },
     { key: 'seeOwnChurchAnalytics', label: 'Ver Resumen / Equipo / Cuerdas / Mapa', icon: BarChart },
     // Contactos
     { key: 'addContacts', label: 'Crear contactos (en Pool)', icon: UserPlus },

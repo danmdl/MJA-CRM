@@ -16,7 +16,7 @@ interface NavItemConfig {
 const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas } = usePermissions();
 
   // Detect if we're inside a specific church
   const churchMatch = useMatch('/admin/churches/:churchId/*');
@@ -59,7 +59,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
         ...(canSeeBaseDatos() ? [{ to: `/admin/churches/${currentChurchId}/database`, emoji: '👥', label: 'Base de Datos' }] : []),
         ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/team`, emoji: '🤝', label: 'Equipo' }] : []),
         ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/cuerdas`, emoji: '🏘️', label: 'Cuerdas' }] : []),
-        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/celulas`, emoji: '🏠', label: 'Células' }] : []),
+        ...(canSeeCelulas() ? [{ to: `/admin/churches/${currentChurchId}/celulas`, emoji: '🏠', label: 'Células' }] : []),
         ...(canSeePool() ? [{ to: `/admin/churches/${currentChurchId}/pool`, emoji: '🏊', label: 'Pool' }] : []),
         ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/mapa`, emoji: '🗺️', label: 'Mapa' }] : []),
       ],

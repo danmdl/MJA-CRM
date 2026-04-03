@@ -19,6 +19,8 @@ export interface PermissionData {
   can_see_base_datos: boolean;
   can_see_pool: boolean;
   can_edit_cuerda: boolean;
+  can_see_celulas: boolean;
+  can_edit_celulas: boolean;
 }
 
 // Role hierarchy: higher index = higher privilege
@@ -89,6 +91,8 @@ export const usePermissions = () => {
   const canSeeBaseDatos = () => hasPermission('can_see_base_datos');
   const canSeePool = () => hasPermission('can_see_pool');
   const canEditCuerda = () => hasPermission('can_edit_cuerda');
+  const canSeeCelulas = () => hasPermission('can_see_celulas');
+  const canEditCelulas = () => hasPermission('can_edit_celulas');
 
   // Only admin can access permissions management
   const canAccessPermissions = () => profile?.role === 'admin';
@@ -120,6 +124,8 @@ export const usePermissions = () => {
     canSeeBaseDatos,
     canSeePool,
     canEditCuerda,
+    canSeeCelulas,
+    canEditCelulas,
     canAccessPermissions,
     canManageUser,
   };

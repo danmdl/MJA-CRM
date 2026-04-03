@@ -17,7 +17,7 @@ interface ChurchDetailsLayoutProps {
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile, loading: sessionLoading } = useSession();
-  const { canAccessAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics } = usePermissions();
+  const { canAccessAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas } = usePermissions();
   const canSeeOverview = canAccessAllChurches() || canSeeOwnChurchAnalytics();
   const navigate = useNavigate();
   const location = useLocation();
@@ -136,7 +136,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
               {canSeeBaseDatos() && <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Base de Datos</TabsTrigger>}
               {canSeeOverview && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
               {canSeeOverview && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
-              {canSeeOverview && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
+              {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
               {canSeeOverview && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
               {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🏊 Pool</TabsTrigger>}
             </TabsList>
