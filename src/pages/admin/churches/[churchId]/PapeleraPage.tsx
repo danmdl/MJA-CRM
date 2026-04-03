@@ -9,6 +9,7 @@ import { Trash2, RotateCcw, Clock } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { usePermissions } from '@/lib/permissions';
 
 interface DeletedItem {
   id: string;
@@ -25,6 +26,7 @@ const GRACE_DAYS = 7;
 const PapeleraPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const queryClient = useQueryClient();
+  const { canRestoreDeleted } = usePermissions();
   const [confirmAction, setConfirmAction] = useState<{ type: 'restore' | 'purge'; item: DeletedItem } | null>(null);
 
   const { data: items, isLoading } = useQuery<DeletedItem[]>({
@@ -146,12 +148,16 @@ const PapeleraPage = () => {
                 <Clock className="h-3 w-3" />
                 {item.days_left > 0 ? <span>{item.days_left}d</span> : <span className="text-red-400">Expirado</span>}
               </div>
-              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setConfirmAction({ type: 'restore', item })}>
-                <RotateCcw className="h-3 w-3" /> Restaurar
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400 hover:text-red-300 gap-1" onClick={() => setConfirmAction({ type: 'purge', item })}>
-                <Trash2 className="h-3 w-3" /> Eliminar
-              </Button>
+              {canRestoreDeleted() && (
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setConfirmAction({ type: 'restore', item })}>
+                  <RotateCcw className="h-3 w-3" /> Restaurar
+                </Button>
+              )}
+              {canRestoreDeleted() && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400 hover:text-red-300 gap-1" onClick={() => setConfirmAction({ type: 'purge', item })}>
+                  <Trash2 className="h-3 w-3" /> Eliminar
+                </Button>
+              )}
             </div>
           </div>
         ))}

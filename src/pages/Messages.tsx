@@ -13,6 +13,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { Send, Mail, MailOpen, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { usePermissions } from '@/lib/permissions';
 
 interface TeamUser { id: string; first_name: string | null; last_name: string | null; role: string | null; }
 interface Msg { id: string; body: string; created_at: string; sender_id: string; sender_name?: string; recipients?: string[]; recipient_names?: string[]; read_at?: string | null; }
@@ -32,6 +33,7 @@ const Messages = () => {
   const [search, setSearch] = useState('');
 
   const userId = session?.user?.id;
+  const { canSendMessages } = usePermissions();
 
   // Load team + name map
   useEffect(() => {
@@ -141,9 +143,11 @@ const Messages = () => {
     <div className="p-6 space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Mensajes</h1>
-        <Button size="sm" className="gap-1.5" onClick={() => setComposeOpen(true)}>
-          <Send className="h-4 w-4" /> Nuevo mensaje
-        </Button>
+        {canSendMessages() && (
+          <Button size="sm" className="gap-1.5" onClick={() => setComposeOpen(true)}>
+            <Send className="h-4 w-4" /> Nuevo mensaje
+          </Button>
+        )}
       </div>
 
       <div className="relative w-64">
