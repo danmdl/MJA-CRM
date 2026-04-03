@@ -217,7 +217,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { canEditDeleteContacts } = usePermissions();
+  const { canEditDeleteContacts, canEditCuerda } = usePermissions();
   const { profile } = useSession();
   const [newLog, setNewLog] = useState({ date: '', method: '', notes: '' });
   const [leaders, setLeaders] = useState<Leader[]>([]);
@@ -231,6 +231,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
   // Cell suggestion state
   const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
+  const [pendingCuerdaChange, setPendingCuerdaChange] = useState<string | null>(null);
   const [whatsappMsg, setWhatsappMsg] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(false);
 
@@ -349,6 +350,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             barrio: contact.barrio,
             leader_assigned: contact.leader_assigned,
             cell_id: contact.cell_id,
+            zona_id: (contact as any).zona_id || null,
             date_of_birth: contact.date_of_birth || null,
             numero_cuerda: contact.numero_cuerda || null,
             zona: contact.zona || null,
@@ -449,21 +451,28 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               {/* Row 5: Cuerda / Zona / Fecha nacimiento */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Número de Cuerda</label>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cuerda</label>
                   <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     value={contact.numero_cuerda || ''}
+                    disabled={!canEditCuerda()}
                     onChange={(e) => {
-                      const cuerda = e.target.value;
-                      const zonaMap: Record<string, string> = {
-                        '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
-                        '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
-                        '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
-                        '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
-                        '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
-                        '301': 'Bonich', '302': 'Bonich',
-                      };
-                      setContact({ ...contact, numero_cuerda: cuerda || null, zona: zonaMap[cuerda] || contact.zona || null });
+                      const newCuerda = e.target.value;
+                      if (contact.cell_id || contact.zona_id) {
+                        // Contact is assigned — show warning
+                        setPendingCuerdaChange(newCuerda);
+                      } else {
+                        // Not assigned — change directly
+                        const zonaMap: Record<string, string> = {
+                          '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
+                          '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
+                          '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
+                          '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
+                          '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
+                          '301': 'Bonich', '302': 'Bonich',
+                        };
+                        setContact({ ...contact, numero_cuerda: newCuerda || null, zona: zonaMap[newCuerda] || null });
+                      }
                     }}
                   >
                     <option value="">Sin cuerda</option>
@@ -479,6 +488,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
                     <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
                   </select>
+                  {!canEditCuerda() && <p className="text-[10px] text-muted-foreground">No tenés permiso para editar la cuerda</p>}
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Zona</label>
@@ -568,6 +578,47 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               {/* Hidden dialogs */}
               <AddContactLogDialog open={addLogOpen} onOpenChange={setAddLogOpen} churchId={churchId} contactId={contact.id} onAdded={() => { setLogOpen(true); setHistorySignal(s => s + 1); }} />
               <ContactLogDialog open={logOpen} onOpenChange={setLogOpen} churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
+
+              {/* Cuerda change confirmation dialog */}
+              <Dialog open={!!pendingCuerdaChange} onOpenChange={(o) => { if (!o) setPendingCuerdaChange(null); }}>
+                <DialogContent className="sm:max-w-[450px]">
+                  <DialogHeader>
+                    <DialogTitle>Cambiar número de cuerda</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3 py-2">
+                    <p className="text-sm text-muted-foreground">
+                      Para editar el número de cuerda, devolveremos el contacto al <strong>Pool Sin Asignar</strong> desde donde podrás asignarle una nueva cuerda o célula.
+                    </p>
+                    <p className="text-sm">
+                      El contacto será desvinculado de su célula y zona actual.
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setPendingCuerdaChange(null)}>Cancelar</Button>
+                    <Button size="sm" variant="destructive" onClick={() => {
+                      const newCuerda = pendingCuerdaChange!;
+                      const zonaMap: Record<string, string> = {
+                        '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
+                        '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
+                        '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
+                        '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
+                        '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
+                        '301': 'Bonich', '302': 'Bonich',
+                      };
+                      setContact({
+                        ...contact,
+                        numero_cuerda: newCuerda || null,
+                        zona: zonaMap[newCuerda] || null,
+                        cell_id: null,
+                        zona_id: undefined,
+                      } as any);
+                      setPendingCuerdaChange(null);
+                    }}>
+                      Devolver al Pool y cambiar cuerda
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             {/* RIGHT: Sidebar — Registros (top) + Historial (bottom) */}

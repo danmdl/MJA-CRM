@@ -5,7 +5,7 @@ export const CONTACT_FIELDS = [
   { key: 'address', label: 'Dirección', type: 'text' },
   { key: 'apartment_number', label: 'Departamento', type: 'text' },
   { key: 'barrio', label: 'Barrio', type: 'text' },
-  { key: 'numero_cuerda', label: 'N° Cuerda', type: 'text' },
+  { key: 'numero_cuerda', label: 'Cuerda', type: 'text' },
   { key: 'zona', label: 'Zona', type: 'text' },
   { key: 'leader_assigned', label: 'Líder de Célula', type: 'text' },
   { key: 'conector', label: 'Conector', type: 'text' },

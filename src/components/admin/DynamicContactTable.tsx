@@ -186,23 +186,26 @@ const TableCellContent = ({
       );
     }
     if (column.key === 'cell.name') {
-      if (!contact.cell?.name) return '-';
+      if (!contact.cell) return '-';
       return (
-        <div className="space-y-1">
-          <span className="text-sm">{contact.cell.name}</span>
+        <div className="flex gap-1">
           {contact.cell.address && (
-            <p className="text-[10px] text-muted-foreground truncate max-w-[180px]" title={contact.cell.address}>{contact.cell.address}</p>
+            <button
+              className="text-[10px] px-1.5 py-0.5 rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps/search/${encodeURIComponent(contact.cell!.address!)}`, '_blank'); }}
+              title={contact.cell.address}
+            >
+              Ver Dirección
+            </button>
           )}
-          <div className="flex gap-1">
-            {contact.cell.lat && contact.cell.lng && (
-              <button
-                className="text-[10px] px-1.5 py-0.5 rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps?q=${contact.cell!.lat},${contact.cell!.lng}`, '_blank'); }}
-              >
-                Ver en Mapa
-              </button>
-            )}
-          </div>
+          {contact.cell.lat && contact.cell.lng && (
+            <button
+              className="text-[10px] px-1.5 py-0.5 rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps?q=${contact.cell!.lat},${contact.cell!.lng}`, '_blank'); }}
+            >
+              Ver Mapa
+            </button>
+          )}
         </div>
       );
     }
