@@ -39,14 +39,21 @@ const Messages = () => {
   useEffect(() => {
     if (!userId) return;
     const load = async () => {
+      // Fetch ALL profiles (not filtered by church) to resolve sender names
       const { data } = await supabase.from('profiles').select('id, first_name, last_name, role, church_id');
       const all = data || [];
       const map = new Map<string, string>();
-      all.forEach(p => map.set(p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre'));
+      all.forEach(p => {
+        if (p.role === 'admin') {
+          map.set(p.id, 'Administrador');
+        } else {
+          map.set(p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre');
+        }
+      });
       setNameMap(map);
-      // Team = same church, exclude self
-      const churchMembers = profile?.church_id ? all.filter(p => p.church_id === profile.church_id && p.id !== userId) : all.filter(p => p.id !== userId);
-      setTeam(churchMembers.map(p => ({ id: p.id, first_name: p.first_name, last_name: p.last_name, role: p.role })));
+      // Team = same church + admins (so anyone can message admin), exclude self
+      const relevant = all.filter(p => p.id !== userId && (p.church_id === profile?.church_id || p.role === 'admin' || !profile?.church_id));
+      setTeam(relevant.map(p => ({ id: p.id, first_name: p.role === 'admin' ? 'Administrador' : p.first_name, last_name: p.role === 'admin' ? '' : p.last_name, role: p.role })));
     };
     load();
   }, [userId, profile?.church_id]);
