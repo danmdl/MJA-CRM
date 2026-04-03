@@ -87,9 +87,11 @@ const ChurchDatabasePage = () => {
   const { canAddContacts, canEditDeleteContacts, canSeeBaseDatosTotal } = usePermissions();
   const { profile } = useSession();
 
+  const isGlobalRole = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
+
   // Cuerda filter
   const userCuerdaNumero = profile?.numero_cuerda || null;
-  const canSeeAll = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  const canSeeAll = canSeeBaseDatosTotal() || isGlobalRole || profile?.role === 'supervisor';
   const [cuerdaFilter, setCuerdaFilter] = useState<string | null>(canSeeAll ? null : userCuerdaNumero);
 
   // Fetch available cuerdas for the filter dropdown
@@ -117,7 +119,9 @@ const ChurchDatabasePage = () => {
     <div className="flex flex-col h-full w-full">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold">Contactos de la Iglesia</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">
+            {canSeeAll ? 'Base de Datos' : `Base de Datos — Cuerda ${userCuerdaNumero || ''}`}
+          </h1>
           <div id="selection-toolbar-slot" />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -126,7 +130,7 @@ const ChurchDatabasePage = () => {
             {exporting ? 'Exportando...' : 'Exportar CSV'}
           </Button>
           <DuplicateDetectorPanel churchId={churchId!} />
-          {canAddContacts() && (
+          {isGlobalRole && (
             <Button onClick={() => setIsAddContactDialogOpen(true)} size="sm">
               <PlusCircle className="mr-1.5 h-4 w-4" />
               Crear Contacto
