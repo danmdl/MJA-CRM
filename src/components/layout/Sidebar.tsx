@@ -56,7 +56,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
         { to: `/admin/churches/${currentChurchId}/overview`, emoji: '📋', label: 'Resumen' },
         { to: `/admin/churches/${currentChurchId}/database`, emoji: '👥', label: 'Base de Datos' },
         { to: `/admin/churches/${currentChurchId}/team`, emoji: '🤝', label: 'Equipo' },
-        { to: `/admin/churches/${currentChurchId}/cells`, emoji: '🏘️', label: 'Células' },
+        { to: `/admin/churches/${currentChurchId}/cuerdas`, emoji: '🏘️', label: 'Cuerdas' },
         { to: `/admin/churches/${currentChurchId}/pool`, emoji: '🏊', label: 'Pool' },
         { to: `/admin/churches/${currentChurchId}/mapa`, emoji: '🗺️', label: 'Mapa' },
       ],
