@@ -20,7 +20,7 @@ import AddressAutocomplete from './AddressAutocomplete';
 
 const CELL_FIELDS = [
   { key: 'cuerda_numero', label: 'Número de Cuerda', required: true },
-  { key: 'address', label: 'Dirección', required: true },
+  { key: 'address', label: 'Dirección', required: false },
   { key: 'leader_name', label: 'Líder de Célula', required: false },
   { key: 'anfitrion_name', label: 'Anfitrión', required: false },
   { key: 'meeting_day', label: 'Día de reunión', required: false },
@@ -147,7 +147,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
         name, cuerda_numero: cuerdaNum, cuerda_id: matchedCuerda?.id || null,
         address, lat: null, lng: null, leader_name: leaderName, anfitrion_name: anfitrionName,
         meeting_day: day, meeting_time: time, addressResolved: false,
-        error: !cuerdaNum ? 'Falta número de cuerda' : !address ? 'Falta dirección' : undefined,
+        error: !cuerdaNum ? 'Falta número de cuerda' : undefined,
       };
     }).filter(r => r.cuerda_numero);
 

@@ -96,7 +96,6 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
 
   const handleSave = async () => {
     if (!cuerdaId) { showError('Seleccioná una cuerda.'); return; }
-    if (!address.trim()) { showError('La dirección es obligatoria.'); return; }
 
     // Auto-generate name from cuerda number
     const cuerda = cuerdas?.find(c => c.id === cuerdaId);
@@ -149,7 +148,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
 
           {/* Dirección (mandatory) */}
           <div className="space-y-2">
-            <Label>Dirección <span className="text-red-500">*</span></Label>
+            <Label>Dirección</Label>
             <AddressAutocomplete
               value={address}
               onChange={(addr, alat, alng) => { setAddress(addr); if (alat !== undefined) setLat(alat); if (alng !== undefined) setLng(alng); }}
