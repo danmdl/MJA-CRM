@@ -21,6 +21,7 @@ import { useSession } from '@/hooks/use-session';
 import CountryPhoneInput from '@/components/CountryPhoneInput';
 import ContactLogDialog from './ContactLogDialog';
 import AddContactLogDialog from './AddContactLogDialog';
+import UnifiedTimeline from './UnifiedTimeline';
 import { PIPELINE_STAGES } from './ContactPipelineBadge';
 import AddressAutocomplete from './AddressAutocomplete';
 
@@ -644,33 +645,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               refreshSignal={historySignal}
             />
 
-            {/* Transfer History Timeline */}
-            {transfers.length > 0 && (
-              <Card className="mt-2">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Historial de asignaciones</p>
-                  <div className="space-y-2">
-                    {transfers.map((t: any) => (
-                      <div key={t.id} className="flex items-start gap-3 text-xs">
-                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-foreground">
-                            {t.transfer_type === 'auto_assignment' ? 'Autoasignado' : 'Asignado'}
-                            {t.to_zona && <> a <span className="font-medium">{t.to_zona}</span></>}
-                            {t.to_cuerda && <> · Cuerda <span className="font-mono font-medium">{t.to_cuerda}</span></>}
-                            {t.from_zona && t.from_zona !== t.to_zona && (
-                              <span className="text-muted-foreground"> (desde {t.from_zona}{t.from_cuerda ? ` · Cuerda ${t.from_cuerda}` : ''})</span>
-                            )}
-                          </p>
-                          <p className="text-muted-foreground">
-                            {format(new Date(t.created_at), "d 'de' MMM yyyy, HH:mm", { locale: es })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Unified Timeline */}
+            {(transfers.length > 0 || true) && (
+              <UnifiedTimeline contactId={contact.id} churchId={churchId} transfers={transfers} />
             )}
 
             <div className="flex justify-end space-x-2">

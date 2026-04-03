@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { SessionContext } from '@/hooks/use-session';
 import { RoleKey } from '@/lib/roles';
+import { normalize } from '@/lib/normalize';
 
 // Definir la interfaz para el perfil del usuario
 interface UserProfile {
@@ -25,6 +26,45 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
   const clearPasswordSetup = () => setNeedsPasswordSetup(false);
+
+  // Check if any cell's leader_name matches this profile's name
+  const checkLeaderMatches = async (profileId: string, firstName: string, lastName: string | null, churchId: string) => {
+    try {
+      // Get cells with leader_name for this church that don't have an encargado yet
+      const { data: cells } = await supabase
+        .from('cells')
+        .select('id, leader_name')
+        .eq('church_id', churchId)
+        .is('encargado_id', null)
+        .not('leader_name', 'is', null);
+
+      if (!cells?.length) return;
+
+      const profileName = normalize(`${firstName} ${lastName || ''}`);
+      const profileFirst = normalize(firstName);
+
+      // Check for existing pending matches to avoid duplicates
+      const { data: existing } = await supabase
+        .from('pending_leader_matches')
+        .select('cell_id')
+        .eq('profile_id', profileId);
+      const existingCellIds = new Set((existing || []).map(e => e.cell_id));
+
+      for (const cell of cells) {
+        if (!cell.leader_name || existingCellIds.has(cell.id)) continue;
+        const cellLeader = normalize(cell.leader_name);
+        // Match: full name matches, or first name matches when leader_name is a single word
+        if (cellLeader === profileName || (cellLeader === profileFirst && !cellLeader.includes(' '))) {
+          await supabase.from('pending_leader_matches').insert({
+            profile_id: profileId,
+            cell_id: cell.id,
+            matched_name: cell.leader_name,
+            status: 'pending',
+          });
+        }
+      }
+    } catch { /* silent — don't break login flow */ }
+  };
 
   useEffect(() => {
     // Detect invite link: Supabase puts type=invite in the URL hash
@@ -49,6 +89,11 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
             email: currentSession.user.email ?? null,
           } as UserProfile;
           setProfile(fullProfile);
+
+          // Check for leader name matches (runs silently in background)
+          if (profileData.first_name && profileData.church_id) {
+            checkLeaderMatches(profileData.id, profileData.first_name, profileData.last_name, profileData.church_id);
+          }
         } else {
           console.error('Error fetching profile:', error);
           if (isInitialLoad) setProfile(null);
