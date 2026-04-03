@@ -145,7 +145,9 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       const sanitizeValue = (key: string, val: string): any => {
         if (val === '' || val === null || val === undefined) return null;
         const trimmed = String(val).trim();
-        if (trimmed === '' || trimmed === '.' || trimmed === '-' || trimmed === ',' || trimmed === '...' || trimmed === 'N/A' || trimmed === 'n/a') return null;
+        // Junk-only values → null for ALL fields
+        if (/^[.\-,…]+$/.test(trimmed) || trimmed === 'N/A' || trimmed === 'n/a' || trimmed === '') return null;
+
         if (DATE_FIELDS.has(key)) {
           // Strip time part from timestamps like "2026-02-06 00:00:00"
           const dateOnly = trimmed.split(' ')[0];
@@ -154,22 +156,16 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           const d = new Date(dateOnly);
           return isNaN(d.getTime()) ? null : dateOnly;
         }
+
         if (NUMBER_FIELDS.has(key)) {
-          // Extract leading number, ignore text like "16 años", "30 aprox"
+          // Extract leading number: "16 años" → 16, "30 aprox" → 30
           const match = trimmed.match(/^(\d+)/);
           if (!match) return null;
           const n = parseInt(match[1]);
           return isNaN(n) ? null : n;
         }
-        // Lowercase sexo to match DB check constraint
-        if (key === 'sexo') {
-          const lower = trimmed.toLowerCase();
-          if (['masculino', 'femenino', 'otro', 'no especificado'].includes(lower)) return lower;
-          // Map common variants
-          if (lower === 'f' || lower === 'fem' || lower === 'mujer') return 'femenino';
-          if (lower === 'm' || lower === 'masc' || lower === 'hombre' || lower === 'varón' || lower === 'varon') return 'masculino';
-          return null; // Unknown value, skip
-        }
+
+        // Everything else: pass through as-is (text fields accept anything)
         return trimmed;
       };
 
