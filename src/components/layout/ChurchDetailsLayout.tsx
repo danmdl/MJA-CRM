@@ -36,7 +36,6 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     const canAccessAll = canAccessAllChurches();
     const isAssignedToChurch = profile?.church_id === churchId;
 
-    console.log('[DEBUG ChurchDetailsLayout] profile.role:', profile?.role, 'canAccessAll:', canAccessAll, 'requested churchId:', churchId);
 
     if (!canAccessAll && !isAssignedToChurch) {
       showError("No tienes permiso para acceder a los detalles de esta iglesia.");

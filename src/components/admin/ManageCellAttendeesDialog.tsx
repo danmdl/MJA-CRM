@@ -1,3 +1,4 @@
+import { normalize } from '@/lib/normalize';
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -48,7 +49,7 @@ const ManageCellAttendeesDialog = ({ open, onOpenChange, churchId, cellId }: Man
   }, [open, churchId, cellId]);
 
   const filtered = useMemo(() => {
-    const t = search.trim().toLowerCase();
+    const t = normalize(search);
     if (!t) return allContacts;
     return allContacts.filter(c => {
       const s = `${c.first_name} ${c.last_name || ''} ${c.email || ''}`.toLowerCase();

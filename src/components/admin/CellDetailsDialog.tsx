@@ -9,6 +9,7 @@ import { MapPin, Clock, Users, UserRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import ContactProfileDialog from './ContactProfileDialog';
+import { normalize } from '@/lib/normalize';
 
 interface CellDetailsDialogProps {
   open: boolean;
@@ -104,10 +105,10 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
   }, [open, cellId, churchId]);
 
   const filteredAttendees = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalize(search);
     if (!q) return attendees;
     return attendees.filter(a => {
-      const s = `${a.first_name} ${a.last_name || ''} ${a.phone || ''} ${a.address || ''}`.toLowerCase();
+      const s = normalize(`${a.first_name} ${a.last_name || ''} ${a.phone || ''} ${a.address || ''}`);
       return s.includes(q);
     });
   }, [attendees, search]);

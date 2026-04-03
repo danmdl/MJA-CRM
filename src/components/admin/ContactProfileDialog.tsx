@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Navigation, Send } from 'lucide-react';
+import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Send } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -225,8 +225,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const { session } = useSession();
 
   // Cell suggestion state
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestions, setSuggestions] = useState<(Cell & { distanceKm: number })[] | null>(null);
   const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
   const [whatsappMsg, setWhatsappMsg] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(false);
@@ -330,7 +328,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       return;
     }
     setSuggesting(true);
-    setSuggestions(null);
+   
     try {
       // Geocode contact's address
       const res = await fetch(
@@ -361,7 +359,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const assignCell = async (cell: Cell) => {
     if (!contact) return;
     setContact({ ...contact, cell_id: cell.id });
-    setSuggestions(null);
+   
     // Build WhatsApp message
     const name = `${contact.first_name} ${contact.last_name || ''}`.trim();
     const day = cell.meeting_day || 'TBD';
@@ -537,7 +535,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                           variant="ghost"
                           size="sm"
                           className="text-xs"
-                          onClick={() => { setWhatsappCell(null); setSuggestions(null); }}
+                          onClick={() => { setWhatsappCell(null); }}
                         >
                           No por ahora
                         </Button>

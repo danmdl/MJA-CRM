@@ -53,7 +53,7 @@ interface ParsedCell {
   warning?: string;
 }
 
-const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+import { normalize } from '@/lib/normalize';
 
 const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuccess }: CellCsvImporterProps) => {
   const [step, setStep] = useState<'upload' | 'map' | 'review'>('upload');

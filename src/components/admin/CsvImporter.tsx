@@ -64,7 +64,6 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   };
 
   const parseFile = (selectedFile: File) => {
-    console.log("[CsvImporter] parseFile triggered:", selectedFile.name);
     setFile(selectedFile);
     setImportSuccess(false);
     setImportErrors([]);
@@ -159,7 +158,6 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   };
 
   const handleImportData = async () => {
-    console.log("[CsvImporter] handleImportData triggered.");
     if (!file || dataToImport.length === 0) {
       showError('Por favor, sube un archivo CSV con datos.');
       return;

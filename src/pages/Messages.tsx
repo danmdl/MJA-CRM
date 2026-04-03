@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
+import { normalize } from '@/lib/normalize';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -88,7 +89,7 @@ const Messages = () => {
   const filteredTeam = useMemo(() => {
     const q = recipientSearch.trim().toLowerCase();
     if (!q) return team;
-    return team.filter(u => (`${u.first_name || ''} ${u.last_name || ''}`).toLowerCase().includes(q));
+    return team.filter(u => normalize(`${u.first_name || ''} ${u.last_name || ''}`).includes(normalize(q)));
   }, [team, recipientSearch]);
 
   const toggleRecipient = (id: string) => {

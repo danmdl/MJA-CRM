@@ -133,9 +133,9 @@ const LogsPage = () => {
   const filtered = (logs || []).filter(log => {
     if (levelFilter !== 'all' && log.level !== levelFilter) return false;
     if (search) {
-      const s = search.toLowerCase();
-      return [log.user_email, log.action, log.error_message, log.context?.url]
-        .join(' ').toLowerCase().includes(s);
+      const s = normalize(search);
+      return normalize([log.user_email, log.action, log.error_message, log.context?.url]
+        .join(' ')).includes(s);
     }
     return true;
   });
