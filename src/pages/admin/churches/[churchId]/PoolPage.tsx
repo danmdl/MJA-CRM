@@ -29,6 +29,7 @@ import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
+import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface Zona { id: string; nombre: string; }
@@ -46,7 +47,7 @@ interface Contact {
   zona_id: string | null; zona?: string | null;
   conector: string | null; fecha_contacto: string | null;
   numero_cuerda: string | null; edad: string | null;
-  cell_id: string | null;
+  cell_id: string | null; estado_seguimiento?: string | null;
   lat?: number | null; lng?: number | null;
 }
 
@@ -105,7 +106,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    nombre: 150, apellido: 130, edad: 55, direccion: 200, asignar: 130, celulaSug: 160, zonaSug: 120, cuerda: 90,
+    nombre: 150, apellido: 130, edad: 55, direccion: 200, estado: 100, asignar: 130, celulaSug: 160, zonaSug: 120, cuerda: 90,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -156,7 +157,7 @@ const PoolPage = () => {
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
       let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id')
+        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento')
         .eq('church_id', churchId!);
       if (profile?.role === 'conector') {
         const { data: { user } } = await supabase.auth.getUser();
@@ -518,6 +519,7 @@ const PoolPage = () => {
                     <ResizableHeader width={colWidths.apellido} onResize={resizeCol('apellido')}>Apellido</ResizableHeader>
                     <ResizableHeader width={colWidths.edad} onResize={resizeCol('edad')} className="text-center">Edad</ResizableHeader>
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
+                    <ResizableHeader width={colWidths.estado} onResize={resizeCol('estado')}>Estado</ResizableHeader>
                     {isUnassignedView && isAdminOrPastor && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                     {isUnassignedView && <ResizableHeader width={colWidths.celulaSug} onResize={resizeCol('celulaSug')}>Célula sug.</ResizableHeader>}
                     {isUnassignedView && <ResizableHeader width={colWidths.zonaSug} onResize={resizeCol('zonaSug')}>Zona sug.</ResizableHeader>}
@@ -562,6 +564,18 @@ const PoolPage = () => {
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
+                        </td>
+
+                        {/* Estado seguimiento */}
+                        <td className="px-3 py-2.5" style={{ width: colWidths.estado }}>
+                          <ContactPipelineBadge
+                            status={c.estado_seguimiento || 'nuevo'}
+                            editable={isAdminOrPastor}
+                            onChange={async (newStatus) => {
+                              await supabase.from('contacts').update({ estado_seguimiento: newStatus, ultimo_seguimiento: new Date().toISOString() }).eq('id', c.id);
+                              queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
+                            }}
+                          />
                         </td>
 
                         {/* Assign button */}

@@ -4,6 +4,8 @@ import { useSession } from '@/hooks/use-session';
 import { usePermissions, ROLE_LABELS } from '@/lib/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import NotificationBell from '@/components/admin/NotificationBell';
+import PendingLeaderMatches from '@/components/admin/PendingLeaderMatches';
 
 interface NavItemConfig {
   to: string;
@@ -118,6 +120,9 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa' }}>MJA CRM</div>
           <div style={{ fontSize: 11, color: '#a1a1aa' }}>Panel de administración</div>
         </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <NotificationBell />
+        </div>
       </div>
 
       {/* Back to churches button — only for multi-church users inside a church */}
@@ -145,6 +150,9 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
           <span>Todas las iglesias</span>
         </button>
       )}
+
+      {/* Pending leader matches */}
+      <PendingLeaderMatches />
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>

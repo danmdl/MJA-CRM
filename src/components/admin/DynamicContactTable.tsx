@@ -35,6 +35,7 @@ interface Contact {
   cell_id: string | null;
   last_contact_date?: string | null;
   created_by: string | null;
+  estado_seguimiento?: string | null;
   cell?: { name: string } | null;
   leader?: { first_name: string; last_name: string } | null;
   created_by_profile?: { first_name: string | null; last_name: string | null } | null;
