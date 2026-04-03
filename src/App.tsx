@@ -1,4 +1,5 @@
 import './setupReactGlobal';
+import React, { Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,21 +18,23 @@ import AdminProfile from "./pages/admin/Profile";
 import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
-import CuerdasPage from "./pages/admin/churches/[churchId]/CuerdasPage";
-import MapaPage from "./pages/admin/churches/[churchId]/MapaPage";
-import ChurchDatabasePage from "./pages/admin/churches/[churchId]/DatabasePage";
-import ChurchTeamPage from "./pages/admin/churches/[churchId]/TeamPage";
-import PoolPage from "./pages/admin/churches/[churchId]/PoolPage";
-import LoginManagementPage from "./pages/admin/LoginManagementPage";
-import LogsPage from "./pages/admin/LogsPage";
-import ZonasPage from "./pages/admin/ZonasPage";
+import PasswordChangeForm from "./components/auth/PasswordChangeForm";
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
 import Profile from "./pages/Profile";
-import Messages from "./pages/Messages";
-import PermissionsDashboard from "./pages/admin/PermissionsDashboard";
-import PasswordChangeForm from "./components/auth/PasswordChangeForm";
+
+// Lazy-loaded pages (heavy components, loaded on demand)
+const CuerdasPage = React.lazy(() => import("./pages/admin/churches/[churchId]/CuerdasPage"));
+const MapaPage = React.lazy(() => import("./pages/admin/churches/[churchId]/MapaPage"));
+const ChurchDatabasePage = React.lazy(() => import("./pages/admin/churches/[churchId]/DatabasePage"));
+const ChurchTeamPage = React.lazy(() => import("./pages/admin/churches/[churchId]/TeamPage"));
+const PoolPage = React.lazy(() => import("./pages/admin/churches/[churchId]/PoolPage"));
+const LoginManagementPage = React.lazy(() => import("./pages/admin/LoginManagementPage"));
+const LogsPage = React.lazy(() => import("./pages/admin/LogsPage"));
+const ZonasPage = React.lazy(() => import("./pages/admin/ZonasPage"));
+const Messages = React.lazy(() => import("./pages/Messages"));
+const PermissionsDashboard = React.lazy(() => import("./pages/admin/PermissionsDashboard"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +66,7 @@ const AppRoutes = () => {
   }
 
   return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-muted-foreground">Cargando...</div></div>}>
     <Routes>
       <Route path="/login" element={<Login />} />
 
@@ -115,6 +119,7 @@ const AppRoutes = () => {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </Suspense>
   );
 };
 
