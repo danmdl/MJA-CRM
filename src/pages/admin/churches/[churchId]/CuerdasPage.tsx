@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
+import { normalize as norm } from '@/lib/normalize';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +67,8 @@ const CuerdasPage = () => {
   const [newCuerdaNumero, setNewCuerdaNumero] = useState('');
   const [newCuerdaZonaId, setNewCuerdaZonaId] = useState<string | null>(null);
   const [savingCuerda, setSavingCuerda] = useState(false);
+  const [creatingZona, setCreatingZona] = useState(false);
+  const [newZonaNombre, setNewZonaNombre] = useState('');
 
   // User's own cuerda (for filtering)
   const userCuerdaNumero = profile?.numero_cuerda || null;
@@ -141,14 +144,14 @@ const CuerdasPage = () => {
     }
 
     if (search) {
-      const s = search.toLowerCase();
+      const s = norm(search);
       filtered = filtered.filter(c => {
         const zona = zonas.find(z => z.id === c.zona_id);
         const cuerdaCells = (cells || []).filter(cell => cell.cuerda_id === c.id);
-        return c.numero.toLowerCase().includes(s) ||
-          (c.referente_name || '').toLowerCase().includes(s) ||
-          (zona?.nombre || '').toLowerCase().includes(s) ||
-          cuerdaCells.some(cell => cell.name.toLowerCase().includes(s));
+        return norm(c.numero).includes(s) ||
+          norm(c.referente_name || '').includes(s) ||
+          norm(zona?.nombre || '').includes(s) ||
+          cuerdaCells.some(cell => norm(cell.name || '').includes(s));
       });
     }
 
@@ -486,7 +489,7 @@ const CuerdasPage = () => {
       />
 
       {/* Add Cuerda Dialog */}
-      <Dialog open={addCuerdaOpen} onOpenChange={(o) => { if (!o) { setAddCuerdaOpen(false); setNewCuerdaNumero(''); setNewCuerdaZonaId(null); } else setAddCuerdaOpen(true); }}>
+      <Dialog open={addCuerdaOpen} onOpenChange={(o) => { if (!o) { setAddCuerdaOpen(false); setNewCuerdaNumero(''); setNewCuerdaZonaId(null); setCreatingZona(false); setNewZonaNombre(''); } else setAddCuerdaOpen(true); }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Nueva Cuerda</DialogTitle>
@@ -499,12 +502,31 @@ const CuerdasPage = () => {
             </div>
             <div className="space-y-2">
               <Label>Zona <span className="text-red-500">*</span></Label>
-              <Select value={newCuerdaZonaId || undefined} onValueChange={setNewCuerdaZonaId}>
-                <SelectTrigger><SelectValue placeholder="Seleccioná una zona" /></SelectTrigger>
-                <SelectContent>
-                  {(zonas || []).map(z => <SelectItem key={z.id} value={z.id}>{z.nombre}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {creatingZona ? (
+                <div className="flex gap-2">
+                  <Input value={newZonaNombre} onChange={e => setNewZonaNombre(e.target.value)} placeholder="Nombre de la nueva zona" className="flex-1" />
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    if (!newZonaNombre.trim()) { showError('Ingresá un nombre.'); return; }
+                    const { data, error } = await supabase.from('zonas').insert({ nombre: newZonaNombre.trim(), church_id: churchId }).select('id').single();
+                    if (error) { showError(error.message); return; }
+                    showSuccess(`Zona "${newZonaNombre.trim()}" creada.`);
+                    setNewCuerdaZonaId(data.id);
+                    setCreatingZona(false); setNewZonaNombre('');
+                    queryClient.invalidateQueries({ queryKey: ['zonas', churchId] });
+                  }}>Crear</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setCreatingZona(false); setNewZonaNombre(''); }}>Cancelar</Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Select value={newCuerdaZonaId || undefined} onValueChange={setNewCuerdaZonaId}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Seleccioná una zona" /></SelectTrigger>
+                    <SelectContent>
+                      {(zonas || []).map(z => <SelectItem key={z.id} value={z.id}>{z.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="outline" onClick={() => setCreatingZona(true)}>+ Zona</Button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

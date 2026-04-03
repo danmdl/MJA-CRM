@@ -211,7 +211,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetState(); onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[950px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Importar Células desde CSV o Excel</DialogTitle>
           <DialogDescription>
@@ -270,10 +270,22 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
 
         {step === 'review' && (
           <div className="space-y-4 py-2">
-            <div className="flex gap-3 text-xs">
+            <div className="flex gap-3 text-xs flex-wrap">
               <Badge variant="secondary">{parsedCells.length} filas</Badge>
               <Badge className="bg-green-500/15 text-green-500">{parsedCells.filter(c => !c.error).length} válidas</Badge>
+              {parsedCells.filter(c => c.error).length > 0 && (
+                <Badge className="bg-red-500/15 text-red-500">{parsedCells.filter(c => c.error).length} inválida(s)</Badge>
+              )}
             </div>
+            {/* Show invalid rows first */}
+            {parsedCells.filter(c => c.error).length > 0 && (
+              <div className="border border-red-500/30 rounded-md p-3 bg-red-500/5 text-xs space-y-1">
+                <p className="font-medium text-red-400">Filas con errores (no se importarán):</p>
+                {parsedCells.map((c, i) => c.error ? (
+                  <p key={i} className="text-red-300">Fila {i + 1}: {c.error} — Cuerda: {c.cuerda_numero || '(vacío)'}, Dir: {c.address || '(vacío)'}</p>
+                ) : null)}
+              </div>
+            )}
             <div className="overflow-x-auto max-h-[380px] overflow-y-auto border rounded-md">
               <Table>
                 <TableHeader>
@@ -321,9 +333,9 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
                 {importResult.errors.map((err, i) => <p key={i} className="text-xs text-red-500 mt-1">{err}</p>)}
               </div>
             )}
-            <div className="flex justify-between pt-2">
+            <div className="flex justify-between pt-3 border-t mt-2">
               <Button variant="ghost" size="sm" onClick={() => setStep('map')}>Volver</Button>
-              <Button size="sm" onClick={handleImport} disabled={importing || parsedCells.filter(c => !c.error).length === 0}>
+              <Button onClick={handleImport} disabled={importing || parsedCells.filter(c => !c.error).length === 0}>
                 {importing ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Importando...</> : <><Upload className="h-4 w-4 mr-1.5" /> Importar {parsedCells.filter(c => !c.error).length} célula(s)</>}
               </Button>
             </div>

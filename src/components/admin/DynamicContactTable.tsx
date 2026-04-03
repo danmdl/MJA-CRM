@@ -18,6 +18,7 @@ import { logger } from '@/utils/logger';
 import ContactProfileDialog from './ContactProfileDialog';
 import { logEvent } from '@/utils/clientLogger';
 import { createPortal } from 'react-dom';
+import { normalize as norm } from '@/lib/normalize';
 
 interface Contact {
   id: string;
@@ -496,7 +497,7 @@ const DynamicContactTable = ({
   };
 
   const filteredContacts = useMemo(() => {
-    const term = (searchTerm || '').trim().toLowerCase();
+    const term = norm((searchTerm || '').trim());
     if (!contacts) return [];
 
     return contacts.filter(c => {
@@ -504,19 +505,19 @@ const DynamicContactTable = ({
       if (term) {
         const match = (key?: string | null): boolean => {
           if (!key) {
-            const haystack = [
+            const haystack = norm([
               c.first_name, c.last_name, c.email, c.phone, c.address, c.barrio,
               c.cell?.name || '',
               c.leader ? `${c.leader.first_name} ${c.leader.last_name}` : ''
-            ].join(' ').toLowerCase();
+            ].join(' '));
             return haystack.includes(term);
           }
           if (key === 'leader_assigned') {
-            const leaderName = c.leader ? `${c.leader.first_name} ${c.leader.last_name}`.toLowerCase() : '';
+            const leaderName = c.leader ? norm(`${c.leader.first_name} ${c.leader.last_name}`) : '';
             return leaderName.includes(term);
           }
           const value = (c as any)[key];
-          if (typeof value === 'string') return value.toLowerCase().includes(term);
+          if (typeof value === 'string') return norm(value).includes(term);
           return false;
         };
         if (!match(filterField)) return false;

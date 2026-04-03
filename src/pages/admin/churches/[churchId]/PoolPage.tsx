@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
+import { normalize } from '@/lib/normalize';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
@@ -47,8 +48,6 @@ interface Contact {
   cell_id: string | null;
   lat?: number | null; lng?: number | null;
 }
-
-const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 // Haversine distance in km
 const haversine = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -282,10 +281,10 @@ const PoolPage = () => {
       filtered = filtered.filter(c => c.numero_cuerda === userCuerdaNumero);
     }
     if (searchTerm) {
-      const s = searchTerm.toLowerCase();
+      const s = normalize(searchTerm);
       filtered = filtered.filter(c =>
-        (c.first_name || '').toLowerCase().includes(s) || (c.last_name || '').toLowerCase().includes(s) ||
-        (c.address || '').toLowerCase().includes(s) || (c.barrio || '').toLowerCase().includes(s)
+        normalize(c.first_name || '').includes(s) || normalize(c.last_name || '').includes(s) ||
+        normalize(c.address || '').includes(s) || normalize(c.barrio || '').includes(s)
       );
     }
     return filtered;

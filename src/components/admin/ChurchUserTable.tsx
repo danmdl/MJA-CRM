@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff, UserPen } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
+import { normalize as norm } from '@/lib/normalize';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 import { Search } from 'lucide-react';
@@ -71,10 +72,10 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
 
   const filteredUsers = React.useMemo(() => {
     if (!users) return [];
-    const term = searchTerm.toLowerCase().trim();
+    const term = norm(searchTerm);
     if (!term) return users;
     return users.filter(u =>
-      [u.first_name, u.last_name, u.email, u.role].join(' ').toLowerCase().includes(term)
+      norm([u.first_name, u.last_name, u.email, u.role].join(' ')).includes(term)
     );
   }, [users, searchTerm]);
 
