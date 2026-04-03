@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import PipelineSummaryCard from '@/components/admin/PipelineSummaryCard';
+import CustomReportBuilder from '@/components/admin/CustomReportBuilder';
 
 interface Church {
   id: string;
@@ -446,6 +447,9 @@ const OverviewPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Custom report builder */}
+      <CustomReportBuilder churchId={churchId!} churchName={church.name} />
     </div>
   );
 };
