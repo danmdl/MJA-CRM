@@ -71,6 +71,7 @@ const CuerdasPage = () => {
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAll = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
   const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  const canManageCuerdas = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
 
   // ─── Data fetching ─────────────────────────────────────────────
   const { data: zonas } = useQuery<Zona[]>({
@@ -227,11 +228,13 @@ const CuerdasPage = () => {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {canManageCuerdas && (
+            <Button variant="outline" size="sm" onClick={() => setAddCuerdaOpen(true)}>
+              <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Cuerda
+            </Button>
+          )}
           {(isAdminOrPastor || canAddUsers()) && (
             <>
-              <Button variant="outline" size="sm" onClick={() => setAddCuerdaOpen(true)}>
-                <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Cuerda
-              </Button>
               <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
                 <Upload className="mr-1.5 h-4 w-4" /> Importar Células
               </Button>
@@ -303,7 +306,7 @@ const CuerdasPage = () => {
                             <Badge variant="outline" className="text-[10px] ml-auto mr-2">{cuerdaCells.length} cél.</Badge>
                           </button>
                         </CollapsibleTrigger>
-                        {isAdminOrPastor && (
+                        {canManageCuerdas && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" className="h-7 w-7 p-0 flex-shrink-0">

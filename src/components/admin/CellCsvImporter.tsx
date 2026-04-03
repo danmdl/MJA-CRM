@@ -19,9 +19,8 @@ import { supabase } from '@/integrations/supabase/client';
 import AddressAutocomplete from './AddressAutocomplete';
 
 const CELL_FIELDS = [
-  { key: 'name', label: 'Nombre de Célula', required: true },
-  { key: 'cuerda_numero', label: 'Número de Cuerda', required: false },
-  { key: 'address', label: 'Dirección', required: false },
+  { key: 'cuerda_numero', label: 'Número de Cuerda', required: true },
+  { key: 'address', label: 'Dirección', required: true },
   { key: 'leader_name', label: 'Líder de Célula', required: false },
   { key: 'anfitrion_name', label: 'Anfitrión', required: false },
   { key: 'meeting_day', label: 'Día de reunión', required: false },
@@ -84,7 +83,6 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
         const match = headers.find(h =>
           normalize(h).includes(normalize(field.label)) ||
           normalize(h).includes(normalize(field.key)) ||
-          (field.key === 'name' && (normalize(h).includes('nombre') || normalize(h).includes('celula'))) ||
           (field.key === 'cuerda_numero' && normalize(h).includes('cuerda')) ||
           (field.key === 'address' && (normalize(h).includes('direcc') || normalize(h).includes('address'))) ||
           (field.key === 'leader_name' && (normalize(h).includes('lider') || normalize(h).includes('líder') || normalize(h).includes('leader'))) ||
@@ -135,7 +133,6 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
 
   const processMapping = () => {
     const rows: ParsedCell[] = csvData.map(row => {
-      const name = (columnMapping.name ? row[columnMapping.name] : '').trim();
       const cuerdaNum = (columnMapping.cuerda_numero ? row[columnMapping.cuerda_numero] : '').trim();
       const address = (columnMapping.address ? row[columnMapping.address] : '').trim();
       const leaderName = (columnMapping.leader_name ? row[columnMapping.leader_name] : '').trim();
@@ -144,14 +141,15 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
       const time = (columnMapping.meeting_time ? row[columnMapping.meeting_time] : '').trim();
 
       const matchedCuerda = cuerdas.find(c => c.numero === cuerdaNum);
+      const name = cuerdaNum ? `Célula Cuerda ${cuerdaNum}` : '';
 
       return {
         name, cuerda_numero: cuerdaNum, cuerda_id: matchedCuerda?.id || null,
         address, lat: null, lng: null, leader_name: leaderName, anfitrion_name: anfitrionName,
         meeting_day: day, meeting_time: time, addressResolved: false,
-        error: !name ? 'Falta nombre' : undefined,
+        error: !cuerdaNum ? 'Falta número de cuerda' : !address ? 'Falta dirección' : undefined,
       };
-    }).filter(r => r.name);
+    }).filter(r => r.cuerda_numero);
 
     setParsedCells(rows);
     setStep('review');
@@ -170,7 +168,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
   };
 
   const handleImport = async () => {
-    const validRows = parsedCells.filter(c => !c.error && c.name);
+    const validRows = parsedCells.filter(c => !c.error && c.cuerda_numero);
     if (validRows.length === 0) { showError('No hay filas válidas.'); return; }
 
     setImporting(true);
@@ -240,7 +238,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
             </div>
             <Input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} className="hidden" />
             <div className="text-xs text-muted-foreground">
-              <p className="font-medium">Campos: Nombre de Célula (obligatorio), N° Cuerda, Dirección, Líder, Anfitrión, Día, Hora</p>
+              <p className="font-medium">Campos: N° Cuerda (obligatorio), Dirección (obligatorio), Líder, Anfitrión, Día, Hora</p>
             </div>
           </div>
         )}
@@ -280,7 +278,6 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
                     <TableHead className="w-20">Cuerda</TableHead>
                     <TableHead className="min-w-[200px]">Dirección</TableHead>
                     <TableHead>Líder</TableHead>
@@ -293,7 +290,6 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
                 <TableBody>
                   {parsedCells.map((c, i) => (
                     <TableRow key={i} className={c.error ? 'bg-red-500/5' : ''}>
-                      <TableCell className="font-medium text-sm">{c.name}</TableCell>
                       <TableCell className="font-mono text-xs">{c.cuerda_numero || '—'}</TableCell>
                       <TableCell>
                         {editingAddress === i ? (
