@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mja-crm-v2';
+const CACHE_NAME = 'mja-crm-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -33,9 +33,9 @@ self.addEventListener('fetch', (event) => {
     url.includes('refresh_token')
   ) return;
 
-  // Only cache static assets
-  const isStaticAsset = url.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)(\?.*)?$/);
-  if (!isStaticAsset) return;
+  // Only cache images, fonts, icons — NEVER cache JS or CSS (they have hashed filenames that change per deploy)
+  const isSafeAsset = url.match(/\.(png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)(\?.*)?$/);
+  if (!isSafeAsset) return;
 
   event.respondWith(
     caches.match(request).then(cached => {
