@@ -151,7 +151,14 @@ const CuerdasPage = () => {
         return norm(c.numero).includes(s) ||
           norm(c.referente_name || '').includes(s) ||
           norm(zona?.nombre || '').includes(s) ||
-          cuerdaCells.some(cell => norm(cell.name || '').includes(s));
+          cuerdaCells.some(cell => {
+            const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] || '' : '';
+            const anfitrionName = cell.anfitrion_id ? profilesMap?.[cell.anfitrion_id] || '' : '';
+            return norm(cell.name || '').includes(s) ||
+              norm(cell.address || '').includes(s) ||
+              norm(leaderName).includes(s) ||
+              norm(anfitrionName).includes(s);
+          });
       });
     }
 

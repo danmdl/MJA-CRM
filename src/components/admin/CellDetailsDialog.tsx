@@ -21,6 +21,7 @@ interface CellItem {
   id: string;
   name: string;
   encargado_id: string | null;
+  anfitrion_id: string | null;
   address: string | null;
   meeting_day: string | null;
   meeting_time: string | null;
@@ -44,6 +45,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
   const [loading, setLoading] = useState(false);
   const [cell, setCell] = useState<CellItem | null>(null);
   const [leader, setLeader] = useState<Profile | null>(null);
+  const [anfitrion, setAnfitrion] = useState<Profile | null>(null);
   const [attendees, setAttendees] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
@@ -56,7 +58,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
       // Load cell
       const { data: cellData } = await supabase
         .from('cells')
-        .select('id, name, encargado_id, address, meeting_day, meeting_time')
+        .select('id, name, encargado_id, anfitrion_id, address, meeting_day, meeting_time')
         .eq('id', cellId)
         .single();
       setCell(cellData as CellItem);
@@ -71,6 +73,18 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
         setLeader(leaderData as Profile);
       } else {
         setLeader(null);
+      }
+
+      // Load anfitrion if any
+      if (cellData?.anfitrion_id) {
+        const { data: anfitrionData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .eq('id', cellData.anfitrion_id)
+          .single();
+        setAnfitrion(anfitrionData as Profile);
+      } else {
+        setAnfitrion(null);
       }
 
       // Load attendees
@@ -103,6 +117,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
           setSearch('');
           setCell(null);
           setLeader(null);
+          setAnfitrion(null);
           setAttendees([]);
         }
         onOpenChange(o);
@@ -129,8 +144,12 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="text-sm">
-                    <div className="text-muted-foreground">Referente</div>
-                    <div>{leader ? `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre' : 'Sin referente'}</div>
+                    <div className="text-muted-foreground">Líder de Célula</div>
+                    <div>{leader ? `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre' : 'Sin asignar'}</div>
+                  </div>
+                  <div className="text-sm">
+                    <div className="text-muted-foreground">Anfitrión</div>
+                    <div>{anfitrion ? `${anfitrion.first_name || ''} ${anfitrion.last_name || ''}`.trim() || 'Sin nombre' : 'Sin asignar'}</div>
                   </div>
                   <div className="text-sm flex items-start gap-2">
                     <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
