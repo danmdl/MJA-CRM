@@ -207,7 +207,7 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
 );
 
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
-  const safeClose = () => setTimeout(() => safeClose(), 50);
+  const safeClose = () => setTimeout(() => onOpenChange(false), 50);
   const [contact, setContact] = useState<Contact | null>(null);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(false);
