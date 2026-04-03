@@ -21,6 +21,7 @@ import { useSession } from '@/hooks/use-session';
 import CountryPhoneInput from '@/components/CountryPhoneInput';
 import ContactLogDialog from './ContactLogDialog';
 import AddContactLogDialog from './AddContactLogDialog';
+import { PIPELINE_STAGES } from './ContactPipelineBadge';
 import AddressAutocomplete from './AddressAutocomplete';
 
 interface Contact {
@@ -39,6 +40,7 @@ interface Contact {
   date_of_birth?: string | null;
   numero_cuerda?: string | null;
   zona?: string | null;
+  estado_seguimiento?: string | null;
 }
 
 interface ContactLog {
@@ -341,6 +343,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             date_of_birth: contact.date_of_birth || null,
             numero_cuerda: contact.numero_cuerda || null,
             zona: contact.zona || null,
+            estado_seguimiento: contact.estado_seguimiento || 'nuevo',
           }
         }),
       });
@@ -594,6 +597,19 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     </span>
                   </div>
                 </div>
+              </div>
+              {/* Pipeline status */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-muted-foreground">Estado de seguimiento</label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  value={contact.estado_seguimiento || 'nuevo'}
+                  onChange={(e) => setContact({ ...contact, estado_seguimiento: e.target.value })}
+                >
+                  {PIPELINE_STAGES.map(s => (
+                    <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 

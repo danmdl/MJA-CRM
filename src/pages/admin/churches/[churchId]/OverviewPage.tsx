@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import PipelineSummaryCard from '@/components/admin/PipelineSummaryCard';
 
 interface Church {
   id: string;
@@ -371,6 +372,7 @@ const OverviewPage = () => {
 
           {/* Fixed weekday headers */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <PipelineSummaryCard churchId={churchId!} />
             <div className="p-3 rounded border">
               <div className="font-medium mb-2">Células por Día</div>
               <div className="grid grid-cols-2 gap-2 text-sm">

@@ -20,7 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 const exportContactsToCSV = async (churchId: string) => {
   const { data, error } = await supabase
     .from('contacts')
-    .select('first_name, last_name, phone, address, apartment_number, barrio, numero_cuerda, zona, leader_assigned, conector, fecha_contacto, date_of_birth, edad, sexo, estado_civil, observaciones, pedido_de_oracion, created_at')
+    .select('first_name, last_name, phone, address, apartment_number, barrio, numero_cuerda, zona, leader_assigned, conector, fecha_contacto, date_of_birth, edad, sexo, estado_civil, estado_seguimiento, observaciones, pedido_de_oracion, created_at')
     .eq('church_id', churchId)
     .order('first_name', { ascending: true });
 
@@ -33,7 +33,7 @@ const exportContactsToCSV = async (churchId: string) => {
     'Nombre', 'Apellido', 'Teléfono', 'Dirección',
     'Departamento', 'Barrio', 'N° Cuerda', 'Zona', 'Líder de Célula', 'Conector',
     'Fecha de Contacto', 'Fecha de nacimiento', 'Edad', 'Sexo',
-    'Estado Civil', 'Observaciones', 'Pedido de Oración', 'Creado en'
+    'Estado Civil', 'Seguimiento', 'Observaciones', 'Pedido de Oración', 'Creado en'
   ];
 
   const escape = (val: any) => {
