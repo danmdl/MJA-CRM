@@ -20,42 +20,48 @@ interface PermissionConfig {
     seeAllAnalytics: boolean;
     seeOwnChurchAnalytics: boolean;
     changeUserRole: boolean;
+    addMembers: boolean;
+    addContacts: boolean;
+    editDeleteContacts: boolean;
+    editDeleteMembers: boolean;
     baseDatosTotal: boolean;
+    canSeeBaseDatos: boolean;
+    canSeePool: boolean;
   };
 }
 
 const defaultPermissions: PermissionConfig[] = [
   {
     role: 'admin', label: 'Admin',
-    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true },
+    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true },
   },
   {
     role: 'general', label: 'General',
-    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true },
+    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true },
   },
   {
     role: 'pastor', label: 'Pastor',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: true },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true },
   },
   {
     role: 'supervisor', label: 'Supervisor',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: true, editDeleteMembers: false, baseDatosTotal: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: true, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true },
   },
   {
     role: 'referente', label: 'Referente',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true },
   },
   {
     role: 'encargado_de_celula', label: 'Líder de Célula',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true },
   },
   {
     role: 'conector', label: 'Conector',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: true },
   },
   {
     role: 'anfitrion', label: 'Anfitrión',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: false },
   },
 ];
 
@@ -103,6 +109,8 @@ const PermissionsDashboard = () => {
               editDeleteContacts: savedConfig.edit_delete_contacts ?? false,
               editDeleteMembers: savedConfig.edit_delete_members ?? false,
               baseDatosTotal: savedConfig.base_datos_total ?? false,
+              canSeeBaseDatos: savedConfig.can_see_base_datos ?? true,
+              canSeePool: savedConfig.can_see_pool ?? true,
             },
           };
         }
@@ -148,6 +156,8 @@ const PermissionsDashboard = () => {
             edit_delete_contacts: config.permissions.editDeleteContacts,
             edit_delete_members: config.permissions.editDeleteMembers,
             base_datos_total: config.permissions.baseDatosTotal,
+            can_see_base_datos: config.permissions.canSeeBaseDatos,
+            can_see_pool: config.permissions.canSeePool,
           })),
           { onConflict: 'role' }
         );
@@ -179,6 +189,8 @@ const PermissionsDashboard = () => {
     { key: 'addContacts', label: 'Agregar contacto', icon: UserPlus },
     { key: 'editDeleteContacts', label: 'Editar/eliminar contacto', icon: Edit },
     { key: 'baseDatosTotal', label: 'Base de datos total', icon: Eye },
+    { key: 'canSeeBaseDatos', label: 'Ver solapa Base de Datos', icon: Eye },
+    { key: 'canSeePool', label: 'Ver solapa Pool', icon: Eye },
   ] as const;
 
   if (isLoading) {
