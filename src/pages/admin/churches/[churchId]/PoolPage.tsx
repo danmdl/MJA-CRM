@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -486,6 +486,12 @@ const PoolPage = () => {
             <PlusCircle className="h-4 w-4" /> Crear Contacto
           </Button>
         )}
+        <Button size="sm" variant="ghost" onClick={() => {
+          queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+        }} className="gap-1.5" title="Actualizar datos (células y contactos)">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
         <div className="flex-1" />
         <div className="relative w-64 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
