@@ -14,10 +14,7 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
-import AdminProfile from "./pages/admin/Profile";
-import ChurchesPage from "./pages/admin/ChurchesPage";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
-import ChurchOverviewPage from "./pages/admin/churches/[churchId]/OverviewPage";
 import PasswordChangeForm from "./components/auth/PasswordChangeForm";
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
@@ -55,6 +52,9 @@ const lazyRetry = (fn: () => Promise<any>) => React.lazy(() =>
 );
 
 // Lazy-loaded pages (heavy components, loaded on demand)
+const AdminProfile = lazyRetry(() => import("./pages/admin/Profile"));
+const ChurchesPage = lazyRetry(() => import("./pages/admin/ChurchesPage"));
+const ChurchOverviewPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/OverviewPage"));
 const CuerdasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CuerdasPage"));
 const MapaPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/MapaPage"));
 const ChurchDatabasePage = lazyRetry(() => import("./pages/admin/churches/[churchId]/DatabasePage"));
