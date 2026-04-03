@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface ContactMapDialogProps {
@@ -51,102 +51,121 @@ const darkStyles = [
 
 const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, suggestedCell }: ContactMapDialogProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open || !mapRef.current || !contactAddress) return;
+    if (!open || !contactAddress) return;
+    setMapError(null);
+    setLoading(true);
 
-    const initMap = async () => {
-      const gmaps = await loadGoogleMaps();
-      const geocoder = new gmaps.Geocoder();
+    // Wait for dialog to fully render and be visible
+    const timer = setTimeout(async () => {
+      if (!mapRef.current) { setLoading(false); return; }
 
-      // Geocode the contact address
-      const biasedAddress = contactAddress.includes('Buenos Aires') ? contactAddress : `${contactAddress}, Buenos Aires, Argentina`;
-      
-      geocoder.geocode({ address: biasedAddress, region: 'ar' }, (results: any, status: string) => {
-        if (status !== 'OK' || !results?.[0]) return;
+      try {
+        const gmaps = await loadGoogleMaps();
+        const geocoder = new gmaps.Geocoder();
 
-        const contactPos = results[0].geometry.location;
+        const biasedAddress = contactAddress.includes('Buenos Aires') ? contactAddress : `${contactAddress}, Buenos Aires, Argentina`;
 
-        const map = new gmaps.Map(mapRef.current, {
-          center: contactPos,
-          zoom: 15,
-          mapTypeId: 'roadmap',
-          styles: darkStyles,
-          disableDefaultUI: true,
-          zoomControl: true,
-          fullscreenControl: false,
-        });
+        geocoder.geocode({ address: biasedAddress, region: 'ar' }, (results: any, status: string) => {
+          setLoading(false);
+          if (status !== 'OK' || !results?.[0]) {
+            setMapError(`No se pudo geocodificar: "${contactAddress}" (${status})`);
+            return;
+          }
+          if (!mapRef.current) return;
 
-        // Blue pin for contact
-        const contactMarker = new gmaps.Marker({
-          position: contactPos,
-          map,
-          icon: {
-            path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
-            fillColor: '#3B82F6',
-            fillOpacity: 1,
-            strokeColor: '#1E40AF',
-            strokeWeight: 1.5,
-            scale: 1.8,
-            anchor: new gmaps.Point(12, 24),
-          },
-          title: contactName,
-        });
+          const contactPos = results[0].geometry.location;
 
-        // Info window for contact (open by default)
-        const contactInfo = new gmaps.InfoWindow({
-          content: `
-            <div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
-              <div style="font-size:13px;font-weight:700;color:#3B82F6;">📍 ${contactName}</div>
-              <div style="font-size:11px;color:#555;margin-top:2px;">${contactAddress}</div>
-            </div>
-          `,
-        });
-        contactInfo.open(map, contactMarker);
+          // Clear previous map content
+          mapRef.current.innerHTML = '';
 
-        // Gold pin for suggested cell
-        if (suggestedCell?.lat && suggestedCell?.lng) {
-          const cellPos = { lat: suggestedCell.lat, lng: suggestedCell.lng };
-          
-          const cellMarker = new gmaps.Marker({
-            position: cellPos,
+          const map = new gmaps.Map(mapRef.current, {
+            center: contactPos,
+            zoom: 15,
+            mapTypeId: 'roadmap',
+            styles: darkStyles,
+            disableDefaultUI: true,
+            zoomControl: true,
+            fullscreenControl: false,
+          });
+
+          // Force resize after creation
+          gmaps.event.trigger(map, 'resize');
+
+          // Blue pin for contact
+          const contactMarker = new gmaps.Marker({
+            position: contactPos,
             map,
             icon: {
               path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
-              fillColor: '#FFC233',
+              fillColor: '#3B82F6',
               fillOpacity: 1,
-              strokeColor: '#B8720A',
+              strokeColor: '#1E40AF',
               strokeWeight: 1.5,
               scale: 1.8,
               anchor: new gmaps.Point(12, 24),
             },
-            title: suggestedCell.name,
+            title: contactName,
           });
 
-          const cellInfo = new gmaps.InfoWindow({
+          const contactInfo = new gmaps.InfoWindow({
             content: `
               <div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
-                <div style="font-size:13px;font-weight:700;color:#B8720A;">🏠 Célula sugerida</div>
-                <div style="font-size:12px;font-weight:600;margin-top:2px;">${suggestedCell.name}${suggestedCell.cuerdaNumero ? ` · #${suggestedCell.cuerdaNumero}` : ''}</div>
-                ${suggestedCell.address ? `<div style="font-size:11px;color:#555;margin-top:2px;">${suggestedCell.address}</div>` : ''}
+                <div style="font-size:13px;font-weight:700;color:#3B82F6;">📍 ${contactName}</div>
+                <div style="font-size:11px;color:#555;margin-top:2px;">${contactAddress}</div>
               </div>
             `,
           });
-          cellInfo.open(map, cellMarker);
+          contactInfo.open(map, contactMarker);
 
-          // Fit bounds to show both markers
-          const bounds = new gmaps.LatLngBounds();
-          bounds.extend(contactPos);
-          bounds.extend(cellPos);
-          map.fitBounds(bounds, { top: 60, right: 40, bottom: 40, left: 40 });
-        }
-      });
-    };
+          // Gold pin for suggested cell
+          if (suggestedCell?.lat && suggestedCell?.lng) {
+            const cellPos = { lat: suggestedCell.lat, lng: suggestedCell.lng };
 
-    // Small delay to let dialog render
-    const timer = setTimeout(initMap, 200);
+            const cellMarker = new gmaps.Marker({
+              position: cellPos,
+              map,
+              icon: {
+                path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
+                fillColor: '#FFC233',
+                fillOpacity: 1,
+                strokeColor: '#B8720A',
+                strokeWeight: 1.5,
+                scale: 1.8,
+                anchor: new gmaps.Point(12, 24),
+              },
+              title: suggestedCell.name,
+            });
+
+            const cellInfo = new gmaps.InfoWindow({
+              content: `
+                <div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
+                  <div style="font-size:13px;font-weight:700;color:#B8720A;">🏠 Célula sugerida</div>
+                  <div style="font-size:12px;font-weight:600;margin-top:2px;">${suggestedCell.name}${suggestedCell.cuerdaNumero ? ` · #${suggestedCell.cuerdaNumero}` : ''}</div>
+                  ${suggestedCell.address ? `<div style="font-size:11px;color:#555;margin-top:2px;">${suggestedCell.address}</div>` : ''}
+                </div>
+              `,
+            });
+            cellInfo.open(map, cellMarker);
+
+            // Fit bounds to show both markers
+            const bounds = new gmaps.LatLngBounds();
+            bounds.extend(contactPos);
+            bounds.extend(cellPos);
+            map.fitBounds(bounds, { top: 60, right: 40, bottom: 40, left: 40 });
+          }
+        });
+      } catch (e) {
+        setLoading(false);
+        setMapError(`Error al cargar el mapa: ${e}`);
+      }
+    }, 500); // Wait 500ms for dialog animation to complete
+
     return () => clearTimeout(timer);
-  }, [open, contactAddress, suggestedCell]);
+  }, [open, contactAddress, suggestedCell, contactName]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,7 +174,19 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
           <DialogTitle className="text-base">{contactName}</DialogTitle>
           <DialogDescription className="text-xs">{contactAddress}</DialogDescription>
         </DialogHeader>
-        <div ref={mapRef} className="w-full rounded-lg overflow-hidden border" style={{ height: '400px' }} />
+        <div className="relative">
+          <div ref={mapRef} className="w-full rounded-lg overflow-hidden border" style={{ height: '400px' }} />
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
+              <p className="text-sm text-muted-foreground">Cargando mapa...</p>
+            </div>
+          )}
+          {mapError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
+              <p className="text-sm text-red-400 text-center px-4">{mapError}</p>
+            </div>
+          )}
+        </div>
         <div className="flex gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> Contacto
