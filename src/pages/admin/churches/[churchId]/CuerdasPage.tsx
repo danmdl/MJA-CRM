@@ -119,11 +119,11 @@ const CuerdasPage = () => {
   });
 
   // ─── Computed data ─────────────────────────────────────────────
-  const cuerdaTree = useMemo(() => {
+  // Group cuerdas by zona for a more compact layout
+  const zonaGroups = useMemo(() => {
     if (!cuerdas || !zonas) return [];
 
     let filtered = cuerdas;
-    // If user can't see all, filter to their cuerda only
     if (!canSeeAll && userCuerdaNumero) {
       filtered = cuerdas.filter(c => c.numero === userCuerdaNumero);
     }
@@ -140,13 +140,30 @@ const CuerdasPage = () => {
       });
     }
 
-    return filtered.map(cuerda => {
+    // Group by zona
+    const groups: { zona: Zona; cuerdas: { cuerda: Cuerda; cells: Cell[] }[] }[] = [];
+    const zonaMap = new Map<string, { zona: Zona; cuerdas: { cuerda: Cuerda; cells: Cell[] }[] }>();
+
+    filtered.forEach(cuerda => {
       const zona = zonas.find(z => z.id === cuerda.zona_id);
+      if (!zona) return;
+      if (!zonaMap.has(zona.id)) {
+        const group = { zona, cuerdas: [] as { cuerda: Cuerda; cells: Cell[] }[] };
+        zonaMap.set(zona.id, group);
+        groups.push(group);
+      }
       const cuerdaCells = (cells || []).filter(c => c.cuerda_id === cuerda.id);
-      // Also include cells that don't have cuerda_id but might match by name pattern
-      return { cuerda, zona, cells: cuerdaCells };
+      zonaMap.get(zona.id)!.cuerdas.push({ cuerda, cells: cuerdaCells });
     });
+
+    // Sort cuerdas within each zona
+    groups.forEach(g => g.cuerdas.sort((a, b) => a.cuerda.numero.localeCompare(b.cuerda.numero)));
+
+    return groups;
   }, [cuerdas, zonas, cells, search, canSeeAll, userCuerdaNumero]);
+
+  // Flat list for backward compat
+  const cuerdaTree = useMemo(() => zonaGroups.flatMap(g => g.cuerdas), [zonaGroups]);
 
   // Cells without a cuerda assigned
   const unassignedCells = useMemo(() => {
@@ -234,125 +251,111 @@ const CuerdasPage = () => {
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
-      ) : cuerdaTree.length === 0 && unassignedCells.length === 0 ? (
+      ) : zonaGroups.length === 0 && unassignedCells.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground text-sm">
             {search ? 'Sin resultados.' : 'No hay cuerdas configuradas para esta iglesia.'}
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {/* ─── Cuerda cards ───────────────────────────────── */}
-          {cuerdaTree.map(({ cuerda, zona, cells: cuerdaCells }) => (
-            <Card key={cuerda.id}>
-              <Collapsible open={expandedCuerda === cuerda.id} onOpenChange={(open) => setExpandedCuerda(open ? cuerda.id : null)}>
-                <CardHeader className="py-3 px-4">
-                  <div className="flex items-start justify-between gap-2">
-                    {/* Left: clickable expand area */}
-                    <CollapsibleTrigger asChild>
-                      <button className="flex items-start gap-3 flex-1 min-w-0 text-left hover:bg-muted/30 rounded-md -m-1 p-1 transition-colors">
-                        {expandedCuerda === cuerda.id ? <ChevronDown className="h-4 w-4 flex-shrink-0 mt-1" /> : <ChevronRight className="h-4 w-4 flex-shrink-0 mt-1" />}
-                        <div className="min-w-0 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-lg text-primary">#{cuerda.numero}</span>
-                            {zona && <Badge variant="secondary" className="text-[10px]">{zona.nombre}</Badge>}
-                            <Badge variant="outline" className="text-[10px]">{cuerdaCells.length} célula{cuerdaCells.length !== 1 ? 's' : ''}</Badge>
-                          </div>
-                          {cuerda.referente_name && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <UserCheck className="h-3 w-3" /> {cuerda.referente_name}
-                            </p>
-                          )}
+        <div className="space-y-4">
+          {/* ─── Zona groups ───────────────────────────────── */}
+          {zonaGroups.map(({ zona, cuerdas: zonaCuerdas }) => (
+            <Card key={zona.id}>
+              <CardHeader className="py-2.5 px-4 border-b">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">{zona.nombre}</h3>
+                  <Badge variant="outline" className="text-[10px]">
+                    {zonaCuerdas.length} cuerda{zonaCuerdas.length !== 1 ? 's' : ''} · {zonaCuerdas.reduce((s, c) => s + c.cells.length, 0)} célula{zonaCuerdas.reduce((s, c) => s + c.cells.length, 0) !== 1 ? 's' : ''}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {zonaCuerdas.map(({ cuerda, cells: cuerdaCells }) => (
+                  <Collapsible key={cuerda.id} open={expandedCuerda === cuerda.id} onOpenChange={(open) => setExpandedCuerda(open ? cuerda.id : null)}>
+                    <div className="border-b last:border-b-0">
+                      <div className="flex items-center justify-between px-4 py-2 hover:bg-muted/30 transition-colors">
+                        <CollapsibleTrigger asChild>
+                          <button className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                            {expandedCuerda === cuerda.id ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />}
+                            <span className="font-mono font-bold text-primary">#{cuerda.numero}</span>
+                            {cuerda.referente_name && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1"><UserCheck className="h-3 w-3" /> {cuerda.referente_name}</span>
+                            )}
+                            {(cuerda.meeting_day || cuerda.meeting_time) && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> {[cuerda.meeting_day, cuerda.meeting_time].filter(Boolean).join(' · ')}</span>
+                            )}
+                            <Badge variant="outline" className="text-[10px] ml-auto mr-2">{cuerdaCells.length} cél.</Badge>
+                          </button>
+                        </CollapsibleTrigger>
+                        {isAdminOrPastor && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-7 w-7 p-0 flex-shrink-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem className="text-red-600" onClick={() => deleteCuerda(cuerda.id, cuerda.numero)}>
+                                <Trash2 className="h-4 w-4 mr-1.5" /> Eliminar cuerda
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+
+                      <CollapsibleContent>
+                        <div className="px-4 pb-3 pt-1 bg-muted/20">
                           {cuerda.address && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <p className="text-[11px] text-muted-foreground mb-2 flex items-center gap-1 ml-6">
                               <MapPin className="h-3 w-3" /> {cuerda.address}
                             </p>
                           )}
-                          {(cuerda.meeting_day || cuerda.meeting_time) && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" /> {[cuerda.meeting_day, cuerda.meeting_time].filter(Boolean).join(' · ')}
-                            </p>
+                          {cuerdaCells.length === 0 ? (
+                            <p className="text-xs text-muted-foreground ml-6 py-1">No hay células en esta cuerda.</p>
+                          ) : (
+                            <div className="ml-4 space-y-1">
+                              {cuerdaCells.map(cell => {
+                                const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] : null;
+                                const anfitrionName = cell.anfitrion_id ? profilesMap?.[cell.anfitrion_id] : null;
+                                const count = attendeeCounts?.[cell.id] || 0;
+                                return (
+                                  <div key={cell.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <button className="font-medium text-sm hover:underline text-left" onClick={() => setDetailsFor(cell.id)}>{cell.name}</button>
+                                        <span className="text-[11px] text-muted-foreground flex items-center gap-0.5"><Users className="h-3 w-3" /> {count}</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-x-3 gap-y-0 text-[11px] text-muted-foreground">
+                                        {leaderName && <span className="flex items-center gap-0.5"><UserCheck className="h-3 w-3" /> {leaderName}</span>}
+                                        {anfitrionName && <span className="flex items-center gap-0.5"><Home className="h-3 w-3" /> {anfitrionName}</span>}
+                                        {cell.address && <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" /> {cell.address}</span>}
+                                      </div>
+                                    </div>
+                                    {isAdminOrPastor && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => setDetailsFor(cell.id)}>Ver detalles</DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => setEditingCell(cell)}>Editar</DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => setAttendeesFor(cell.id)}>Gestionar miembros</DropdownMenuItem>
+                                          <DropdownMenuItem className="text-red-600" onClick={() => deleteCell(cell.id)}>Eliminar</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
-                      </button>
-                    </CollapsibleTrigger>
-
-                    {/* Right: actions dropdown */}
-                    {isAdminOrPastor && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0 flex-shrink-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-red-600" onClick={() => deleteCuerda(cuerda.id, cuerda.numero)}>
-                            <Trash2 className="h-4 w-4 mr-1.5" /> Eliminar cuerda
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </CardHeader>
-
-                <CollapsibleContent>
-                  <CardContent className="pt-0 pb-4 px-4">
-                    {/* Cells inside this cuerda */}
-                    {cuerdaCells.length === 0 ? (
-                      <p className="text-sm text-muted-foreground ml-7 py-2">No hay células en esta cuerda.</p>
-                    ) : (
-                      <div className="ml-4 space-y-1.5">
-                        {cuerdaCells.map(cell => {
-                          const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] : null;
-                          const anfitrionName = cell.anfitrion_id ? profilesMap?.[cell.anfitrion_id] : null;
-                          const count = attendeeCounts?.[cell.id] || 0;
-
-                          return (
-                            <div key={cell.id} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50 group border border-transparent hover:border-border transition-colors">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <button className="font-medium text-sm hover:underline text-left" onClick={() => setDetailsFor(cell.id)}>
-                                    {cell.name}
-                                  </button>
-                                  <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                                    <Users className="h-3 w-3" /> {count}
-                                  </span>
-                                </div>
-                                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
-                                  {leaderName && <span className="flex items-center gap-0.5"><UserCheck className="h-3 w-3" /> {leaderName}</span>}
-                                  {anfitrionName && <span className="flex items-center gap-0.5"><Home className="h-3 w-3" /> {anfitrionName}</span>}
-                                  {cell.address && <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" /> {cell.address}</span>}
-                                  {(cell.meeting_day || cell.meeting_time) && (
-                                    <span className="flex items-center gap-0.5">
-                                      <Clock className="h-3 w-3" /> {[cell.meeting_day, cell.meeting_time].filter(Boolean).join(' · ')}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {isAdminOrPastor && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setDetailsFor(cell.id)}>Ver detalles</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setEditingCell(cell)}>Editar</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setAttendeesFor(cell.id)}>Gestionar miembros</DropdownMenuItem>
-                                    <DropdownMenuItem className="text-red-600" onClick={() => deleteCell(cell.id)}>Eliminar</DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                ))}
+              </CardContent>
             </Card>
           ))}
 
@@ -361,30 +364,28 @@ const CuerdasPage = () => {
             <Card>
               <Collapsible>
                 <CollapsibleTrigger asChild>
-                  <CardHeader className="py-3 px-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                  <CardHeader className="py-2.5 px-4 cursor-pointer hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <ChevronRight className="h-4 w-4" />
-                      <div>
-                        <span className="font-medium text-yellow-500">Células sin cuerda asignada</span>
-                        <Badge variant="outline" className="ml-2 text-[10px]">{unassignedCells.length}</Badge>
-                      </div>
+                      <span className="font-medium text-yellow-500 text-sm">Células sin cuerda asignada</span>
+                      <Badge variant="outline" className="text-[10px]">{unassignedCells.length}</Badge>
                     </div>
                   </CardHeader>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <CardContent className="pt-0 pb-4 px-4">
-                    <div className="ml-4 space-y-1.5">
+                  <CardContent className="pt-0 pb-3 px-4">
+                    <div className="ml-4 space-y-1">
                       {unassignedCells.map(cell => {
                         const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] : null;
                         const count = attendeeCounts?.[cell.id] || 0;
                         return (
-                          <div key={cell.id} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50 group">
+                          <div key={cell.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <button className="font-medium text-sm hover:underline" onClick={() => setDetailsFor(cell.id)}>{cell.name}</button>
-                                <span className="text-xs text-muted-foreground flex items-center gap-0.5"><Users className="h-3 w-3" /> {count}</span>
+                                <span className="text-[11px] text-muted-foreground flex items-center gap-0.5"><Users className="h-3 w-3" /> {count}</span>
                               </div>
-                              <div className="flex gap-3 mt-0.5 text-[11px] text-muted-foreground">
+                              <div className="flex gap-3 text-[11px] text-muted-foreground">
                                 {leaderName && <span><UserCheck className="h-3 w-3 inline mr-0.5" />{leaderName}</span>}
                                 {cell.address && <span><MapPin className="h-3 w-3 inline mr-0.5" />{cell.address}</span>}
                               </div>
@@ -392,7 +393,7 @@ const CuerdasPage = () => {
                             {isAdminOrPastor && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-4 w-4" /></Button>
+                                  <Button variant="ghost" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => setEditingCell(cell)}>Editar</DropdownMenuItem>
