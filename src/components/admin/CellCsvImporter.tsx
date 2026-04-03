@@ -48,6 +48,7 @@ interface ParsedCell {
   meeting_day: string;
   meeting_time: string;
   addressResolved: boolean;
+  originalRow: number;
   error?: string;
 }
 
@@ -132,7 +133,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
     CELL_FIELDS.filter(f => f.required && !columnMapping[f.key]), [columnMapping]);
 
   const processMapping = () => {
-    const rows: ParsedCell[] = csvData.map(row => {
+    const rows: ParsedCell[] = csvData.map((row, idx) => {
       const cuerdaNum = (columnMapping.cuerda_numero ? row[columnMapping.cuerda_numero] : '').trim();
       const address = (columnMapping.address ? row[columnMapping.address] : '').trim();
       const leaderName = (columnMapping.leader_name ? row[columnMapping.leader_name] : '').trim();
@@ -147,6 +148,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
         name, cuerda_numero: cuerdaNum, cuerda_id: matchedCuerda?.id || null,
         address, lat: null, lng: null, leader_name: leaderName, anfitrion_name: anfitrionName,
         meeting_day: day, meeting_time: time, addressResolved: false,
+        originalRow: idx + 2, // +2: 1 for header row, 1 for 0-based to 1-based
         error: !cuerdaNum ? 'Falta número de cuerda' : undefined,
       };
     }).filter(r => r.cuerda_numero);
@@ -282,7 +284,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
               <div className="border border-red-500/30 rounded-md p-3 bg-red-500/5 text-xs space-y-1">
                 <p className="font-medium text-red-400">Filas con errores (no se importarán):</p>
                 {parsedCells.map((c, i) => c.error ? (
-                  <p key={i} className="text-red-300">Fila {i + 1}: {c.error} — Cuerda: {c.cuerda_numero || '(vacío)'}, Dir: {c.address || '(vacío)'}</p>
+                  <p key={i} className="text-red-300">Fila {c.originalRow} del archivo: {c.error} — Cuerda: {c.cuerda_numero || '(vacío)'}, Líder: {c.leader_name || '—'}</p>
                 ) : null)}
               </div>
             )}
