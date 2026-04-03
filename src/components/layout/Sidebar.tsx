@@ -73,6 +73,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
+        { to: '/admin/info', emoji: 'ℹ️', label: 'Información' },
       ],
     },
   ];
