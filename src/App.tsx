@@ -24,17 +24,47 @@ import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 
+// Error boundary: catches chunk load failures and auto-reloads
+class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: any) {
+    // If it's a chunk load error, reload the page
+    if (error?.message?.includes('Loading chunk') || error?.message?.includes('Failed to fetch') || error?.name === 'ChunkLoadError') {
+      window.location.reload();
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-3">
+            <p className="text-muted-foreground">Error al cargar la página.</p>
+            <button className="text-primary hover:underline text-sm" onClick={() => window.location.reload()}>Recargar</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Lazy import with retry on failure (handles stale chunk hashes after deploys)
+const lazyRetry = (fn: () => Promise<any>) => React.lazy(() =>
+  fn().catch(() => { window.location.reload(); return fn(); })
+);
+
 // Lazy-loaded pages (heavy components, loaded on demand)
-const CuerdasPage = React.lazy(() => import("./pages/admin/churches/[churchId]/CuerdasPage"));
-const MapaPage = React.lazy(() => import("./pages/admin/churches/[churchId]/MapaPage"));
-const ChurchDatabasePage = React.lazy(() => import("./pages/admin/churches/[churchId]/DatabasePage"));
-const ChurchTeamPage = React.lazy(() => import("./pages/admin/churches/[churchId]/TeamPage"));
-const PoolPage = React.lazy(() => import("./pages/admin/churches/[churchId]/PoolPage"));
-const LoginManagementPage = React.lazy(() => import("./pages/admin/LoginManagementPage"));
-const LogsPage = React.lazy(() => import("./pages/admin/LogsPage"));
-const ZonasPage = React.lazy(() => import("./pages/admin/ZonasPage"));
-const Messages = React.lazy(() => import("./pages/Messages"));
-const PermissionsDashboard = React.lazy(() => import("./pages/admin/PermissionsDashboard"));
+const CuerdasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CuerdasPage"));
+const MapaPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/MapaPage"));
+const ChurchDatabasePage = lazyRetry(() => import("./pages/admin/churches/[churchId]/DatabasePage"));
+const ChurchTeamPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/TeamPage"));
+const PoolPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/PoolPage"));
+const LoginManagementPage = lazyRetry(() => import("./pages/admin/LoginManagementPage"));
+const LogsPage = lazyRetry(() => import("./pages/admin/LogsPage"));
+const ZonasPage = lazyRetry(() => import("./pages/admin/ZonasPage"));
+const Messages = lazyRetry(() => import("./pages/Messages"));
+const PermissionsDashboard = lazyRetry(() => import("./pages/admin/PermissionsDashboard"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +96,7 @@ const AppRoutes = () => {
   }
 
   return (
+    <ChunkErrorBoundary>
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-muted-foreground">Cargando...</div></div>}>
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -120,6 +151,7 @@ const AppRoutes = () => {
       <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>
+    </ChunkErrorBoundary>
   );
 };
 
