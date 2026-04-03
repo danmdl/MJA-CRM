@@ -255,17 +255,25 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     }
   `;
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!open) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onOpenChange(false); };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [open, onOpenChange]);
+
   return (
     <>
     <style>{formStyles}</style>
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: open ? 'flex' : 'none', alignItems: 'flex-start', justifyContent: 'center', padding: '0' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, display: open ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
       onClick={(e) => { if (e.target === e.currentTarget) { onOpenChange(false); } }}
     >
       {/* Backdrop */}
       <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: -1 }} />
       {/* Modal */}
-      <div className="w-full lg:max-w-5xl lg:my-4 lg:rounded-xl lg:border lg:border-[hsl(240,3.7%,15.9%)] lg:shadow-2xl" style={{ backgroundColor: 'hsl(240,10%,3.9%)', display: 'flex', flexDirection: 'column', height: '100dvh', maxHeight: '100dvh' }}>
+      <div className="w-full lg:max-w-3xl lg:rounded-xl lg:border lg:border-[hsl(240,3.7%,15.9%)] lg:shadow-2xl" style={{ backgroundColor: 'hsl(240,10%,3.9%)', display: 'flex', flexDirection: 'column', maxHeight: '90dvh' }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid hsl(240,3.7%,15.9%)', flexShrink: 0 }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'hsl(0,0%,98%)' }}>Crear Nuevo Contacto</h2>
