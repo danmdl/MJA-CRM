@@ -50,6 +50,7 @@ interface ParsedCell {
   addressResolved: boolean;
   originalRow: number;
   error?: string;
+  warning?: string;
 }
 
 const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -148,8 +149,9 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
         name, cuerda_numero: cuerdaNum, cuerda_id: matchedCuerda?.id || null,
         address, lat: null, lng: null, leader_name: leaderName, anfitrion_name: anfitrionName,
         meeting_day: day, meeting_time: time, addressResolved: false,
-        originalRow: idx + 2, // +2: 1 for header row, 1 for 0-based to 1-based
+        originalRow: idx + 2,
         error: !cuerdaNum ? 'Falta número de cuerda' : undefined,
+        warning: cuerdaNum && !address ? 'Sin dirección' : undefined,
       };
     }).filter(r => r.cuerda_numero);
 
@@ -284,17 +286,29 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
           <div className="space-y-4 py-2">
             <div className="flex gap-3 text-xs flex-wrap">
               <Badge variant="secondary">{parsedCells.length} filas</Badge>
-              <Badge className="bg-green-500/15 text-green-500">{parsedCells.filter(c => !c.error).length} válidas</Badge>
+              <Badge className="bg-green-500/15 text-green-500">{parsedCells.filter(c => !c.error && !c.warning).length} válidas</Badge>
+              {parsedCells.filter(c => c.warning).length > 0 && (
+                <Badge className="bg-yellow-500/15 text-yellow-500">{parsedCells.filter(c => c.warning).length} con advertencias</Badge>
+              )}
               {parsedCells.filter(c => c.error).length > 0 && (
                 <Badge className="bg-red-500/15 text-red-500">{parsedCells.filter(c => c.error).length} inválida(s)</Badge>
               )}
             </div>
-            {/* Show invalid rows first */}
+            {/* Show invalid rows */}
             {parsedCells.filter(c => c.error).length > 0 && (
               <div className="border border-red-500/30 rounded-md p-3 bg-red-500/5 text-xs space-y-1">
                 <p className="font-medium text-red-400">Filas con errores (no se importarán):</p>
                 {parsedCells.map((c, i) => c.error ? (
                   <p key={i} className="text-red-300">Fila {c.originalRow} del archivo: {c.error} — Cuerda: {c.cuerda_numero || '(vacío)'}, Líder: {c.leader_name || '—'}</p>
+                ) : null)}
+              </div>
+            )}
+            {/* Show warnings */}
+            {parsedCells.filter(c => c.warning).length > 0 && (
+              <div className="border border-yellow-500/30 rounded-md p-3 bg-yellow-500/5 text-xs space-y-1">
+                <p className="font-medium text-yellow-400">⚠️ Advertencias (se importarán pero con datos incompletos):</p>
+                {parsedCells.map((c, i) => c.warning ? (
+                  <p key={i} className="text-yellow-300">Fila {c.originalRow} del archivo: {c.warning} — Cuerda: {c.cuerda_numero}, Líder: {c.leader_name || '—'}</p>
                 ) : null)}
               </div>
             )}
@@ -313,7 +327,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
                 </TableHeader>
                 <TableBody>
                   {parsedCells.map((c, i) => (
-                    <TableRow key={i} className={c.error ? 'bg-red-500/5' : ''}>
+                    <TableRow key={i} className={c.error ? 'bg-red-500/5' : c.warning ? 'bg-yellow-500/5' : ''}>
                       <TableCell className="font-mono text-xs">{c.cuerda_numero || '—'}</TableCell>
                       <TableCell>
                         {editingAddress === i ? (
