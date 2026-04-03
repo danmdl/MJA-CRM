@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle2, X, MapPin, Loader2 } from 'lucide-react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -73,38 +74,60 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
 
   const handleFile = (f: File) => {
     setFile(f); setImportResult(null);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      let text = e.target?.result as string;
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-      Papa.parse(text, {
-        header: true, skipEmptyLines: 'greedy',
-        complete: (results) => {
-        const headers = (results.meta.fields || []).filter(h => h && h.trim() !== '');
-        setCsvHeaders(headers);
-        setCsvData(results.data as Record<string, string>[]);
-        const mapping: Record<string, string | null> = {};
-        CELL_FIELDS.forEach(field => {
-          const match = headers.find(h =>
-            normalize(h).includes(normalize(field.label)) ||
-            normalize(h).includes(normalize(field.key)) ||
-            (field.key === 'name' && (normalize(h).includes('nombre') || normalize(h).includes('celula'))) ||
-            (field.key === 'cuerda_numero' && normalize(h).includes('cuerda')) ||
-            (field.key === 'address' && (normalize(h).includes('direcc') || normalize(h).includes('address'))) ||
-            (field.key === 'leader_name' && (normalize(h).includes('lider') || normalize(h).includes('líder') || normalize(h).includes('leader'))) ||
-            (field.key === 'anfitrion_name' && (normalize(h).includes('anfitr') || normalize(h).includes('host'))) ||
-            (field.key === 'meeting_day' && (normalize(h).includes('dia') || normalize(h).includes('día'))) ||
-            (field.key === 'meeting_time' && (normalize(h).includes('hora') || normalize(h).includes('time')))
-          );
-          mapping[field.key] = match || null;
-        });
-        setColumnMapping(mapping);
-        setStep('map');
-      },
-      error: () => showError('Error al leer el archivo CSV.'),
-    });
+    const isXlsx = /\.xlsx?$/i.test(f.name);
+
+    const processData = (headers: string[], data: Record<string, string>[]) => {
+      setCsvHeaders(headers);
+      setCsvData(data);
+      const mapping: Record<string, string | null> = {};
+      CELL_FIELDS.forEach(field => {
+        const match = headers.find(h =>
+          normalize(h).includes(normalize(field.label)) ||
+          normalize(h).includes(normalize(field.key)) ||
+          (field.key === 'name' && (normalize(h).includes('nombre') || normalize(h).includes('celula'))) ||
+          (field.key === 'cuerda_numero' && normalize(h).includes('cuerda')) ||
+          (field.key === 'address' && (normalize(h).includes('direcc') || normalize(h).includes('address'))) ||
+          (field.key === 'leader_name' && (normalize(h).includes('lider') || normalize(h).includes('líder') || normalize(h).includes('leader'))) ||
+          (field.key === 'anfitrion_name' && (normalize(h).includes('anfitr') || normalize(h).includes('host'))) ||
+          (field.key === 'meeting_day' && (normalize(h).includes('dia') || normalize(h).includes('día'))) ||
+          (field.key === 'meeting_time' && (normalize(h).includes('hora') || normalize(h).includes('time')))
+        );
+        mapping[field.key] = match || null;
+      });
+      setColumnMapping(mapping);
+      setStep('map');
     };
-    reader.readAsText(f, 'UTF-8');
+
+    if (isXlsx) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: 'array' });
+          const json = XLSX.utils.sheet_to_json<Record<string, any>>(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+          if (!json.length) { showError('El archivo está vacío.'); return; }
+          const headers = Object.keys(json[0]).filter(h => h && h.trim() !== '');
+          const strData = json.map(row => { const o: Record<string, string> = {}; headers.forEach(h => { o[h] = row[h] != null ? String(row[h]) : ''; }); return o; });
+          processData(headers, strData);
+        } catch { showError('Error al leer el archivo Excel.'); }
+      };
+      reader.readAsArrayBuffer(f);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let text = e.target?.result as string;
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        Papa.parse(text, {
+          header: true, skipEmptyLines: 'greedy',
+          complete: (results) => {
+            const headers = (results.meta.fields || []).filter(h => h && h.trim() !== '');
+            processData(headers, results.data as Record<string, string>[]);
+          },
+          error: () => showError('Error al leer el archivo.'),
+        });
+      };
+      reader.readAsText(f, 'UTF-8');
+    }
   };
 
   const requiredMissing = useMemo(() =>
@@ -192,10 +215,10 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetState(); onOpenChange(o); }}>
       <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Importar Células desde CSV</DialogTitle>
+          <DialogTitle>Importar Células desde CSV o Excel</DialogTitle>
           <DialogDescription>
-            {step === 'upload' && 'Seleccioná un archivo CSV con los datos de las células.'}
-            {step === 'map' && 'Mapeá las columnas del CSV a los campos.'}
+            {step === 'upload' && 'Seleccioná un archivo CSV o Excel con los datos de las células.'}
+            {step === 'map' && 'Mapeá las columnas del archivo a los campos.'}
             {step === 'review' && 'Revisá y corregí las direcciones antes de importar.'}
           </DialogDescription>
         </DialogHeader>
@@ -212,10 +235,10 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
                 onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                Arrastrá el archivo CSV acá
+                Arrastrá el archivo CSV o Excel acá
               </div>
             </div>
-            <Input ref={fileInputRef} type="file" accept=".csv" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} className="hidden" />
+            <Input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} className="hidden" />
             <div className="text-xs text-muted-foreground">
               <p className="font-medium">Campos: Nombre de Célula (obligatorio), N° Cuerda, Dirección, Líder, Anfitrión, Día, Hora</p>
             </div>

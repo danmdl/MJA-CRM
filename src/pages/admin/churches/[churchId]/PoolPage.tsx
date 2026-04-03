@@ -479,7 +479,7 @@ const PoolPage = () => {
         )}
         {isAdminOrPastor && (
           <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)} className="gap-1.5">
-            <Upload className="h-4 w-4" /> Importar CSV
+            <Upload className="h-4 w-4" /> Importar Contactos
           </Button>
         )}
         {isAdminOrPastor && (
@@ -713,7 +713,7 @@ const PoolPage = () => {
       <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
         <DialogContent className="sm:max-w-[1200px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Importar Contactos desde CSV</DialogTitle>
+            <DialogTitle>Importar Contactos desde CSV o Excel</DialogTitle>
             <DialogDescription>
               Los contactos importados aparecerán en el pool "Sin asignar" para que puedas verificar sus direcciones y asignarles una célula.
             </DialogDescription>

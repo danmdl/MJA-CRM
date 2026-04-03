@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Upload, CheckCircle2 } from 'lucide-react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
   Select,
@@ -63,52 +64,81 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
   };
 
   const parseFile = (selectedFile: File) => {
-    console.log("[CsvImporter] parseFile triggered.");
+    console.log("[CsvImporter] parseFile triggered:", selectedFile.name);
     setFile(selectedFile);
     setImportSuccess(false);
     setImportErrors([]);
     setFailedContacts([]);
     setColumnMapping({});
     setIgnoreMap({});
-    
-    // Read file as UTF-8 text first to handle BOM and encoding
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      let text = e.target?.result as string;
-      // Strip UTF-8 BOM if present
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-      
-      Papa.parse(text, {
-        header: true,
-        skipEmptyLines: 'greedy',
-        complete: (results) => {
-        if (results.meta.fields) {
-          const validHeaders = results.meta.fields.filter(h => h && h.trim() !== '');
-          setCsvHeaders(validHeaders);
-          const initialMapping: Record<string, string | null> = {};
-          allTargetFields.forEach(targetField => {
-            const matchingCsvHeader = results.meta.fields?.find(csvHeader =>
-              csvHeader.toLowerCase().includes(targetField.label.toLowerCase().replace(/\s/g, '_')) ||
-              csvHeader.toLowerCase().includes(targetField.key.toLowerCase())
-            );
-            initialMapping[targetField.key] = matchingCsvHeader || null;
+
+    const isXlsx = /\.xlsx?$/i.test(selectedFile.name);
+
+    if (isXlsx) {
+      // Parse XLSX with SheetJS
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
+          if (jsonData.length === 0) { showError('El archivo está vacío.'); return; }
+          // Convert all values to strings for consistency with CSV flow
+          const headers = Object.keys(jsonData[0]).filter(h => h && h.trim() !== '');
+          const stringData = jsonData.map(row => {
+            const out: Record<string, string> = {};
+            headers.forEach(h => { out[h] = row[h] != null ? String(row[h]) : ''; });
+            return out;
           });
-          setColumnMapping(initialMapping);
-          setDataToImport(results.data as Record<string, string>[]);
-        } else {
-          setCsvHeaders([]);
-          setDataToImport([]);
+          processHeaders(headers, stringData);
+        } catch (err) {
+          console.error('Error parsing XLSX:', err);
+          showError('Error al leer el archivo Excel.');
         }
-      },
-      error: (error) => {
-        console.error("Error parsing CSV:", error);
-        showError("Error al leer el archivo CSV.");
-        setCsvHeaders([]);
-        setDataToImport([]);
-      }
+      };
+      reader.readAsArrayBuffer(selectedFile);
+    } else {
+      // Parse CSV with PapaParse
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let text = e.target?.result as string;
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: 'greedy',
+          complete: (results) => {
+            if (results.meta.fields) {
+              const validHeaders = results.meta.fields.filter(h => h && h.trim() !== '');
+              processHeaders(validHeaders, results.data as Record<string, string>[]);
+            } else {
+              setCsvHeaders([]); setDataToImport([]);
+            }
+          },
+          error: (error) => {
+            console.error("Error parsing CSV:", error);
+            showError("Error al leer el archivo CSV.");
+            setCsvHeaders([]); setDataToImport([]);
+          }
+        });
+      };
+      reader.readAsText(selectedFile, 'UTF-8');
+    }
+  };
+
+  // Shared logic for both CSV and XLSX after parsing headers + data
+  const processHeaders = (headers: string[], data: Record<string, string>[]) => {
+    setCsvHeaders(headers);
+    const initialMapping: Record<string, string | null> = {};
+    allTargetFields.forEach(targetField => {
+      const matchingCsvHeader = headers.find(csvHeader =>
+        csvHeader.toLowerCase().includes(targetField.label.toLowerCase().replace(/\s/g, '_')) ||
+        csvHeader.toLowerCase().includes(targetField.key.toLowerCase())
+      );
+      initialMapping[targetField.key] = matchingCsvHeader || null;
     });
-    };
-    reader.readAsText(selectedFile, 'UTF-8');
+    setColumnMapping(initialMapping);
+    setDataToImport(data);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -294,14 +324,14 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
             >
-              Arrastrar el archivo CSV acá
+              Arrastrar el archivo CSV o Excel acá
             </div>
           </div>
           <Input
             ref={fileInputRef}
             id="csv-file"
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             onChange={handleFileChange}
             disabled={loading}
             className="hidden"

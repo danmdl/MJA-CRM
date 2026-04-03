@@ -219,7 +219,7 @@ const CuerdasPage = () => {
           {(isAdminOrPastor || canAddUsers()) && (
             <>
               <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
-                <Upload className="mr-1.5 h-4 w-4" /> Importar Células CSV
+                <Upload className="mr-1.5 h-4 w-4" /> Importar Células
               </Button>
               <Button size="sm" onClick={() => setAddCellOpen(true)}>
                 <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Célula
