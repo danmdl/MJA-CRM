@@ -84,6 +84,53 @@ const fetchContacts = async (churchId: string): Promise<Contact[]> => {
   return data || [];
 };
 
+// Compact list: shows first 5 items, then "Ver más" opens a dialog with full list
+const CompactList = ({ title, items, columns = 1 }: { title: string; items: { label: string; value: number; sub?: string }[]; columns?: number }) => {
+  const [expanded, setExpanded] = useState(false);
+  const LIMIT = 5;
+  const visible = items.slice(0, LIMIT);
+  const hasMore = items.length > LIMIT;
+
+  const renderItem = (item: { label: string; value: number; sub?: string }) => (
+    <div key={item.label} className="flex justify-between items-baseline text-sm py-0.5">
+      <span className="truncate mr-2">{item.label}</span>
+      <span className="tabular-nums shrink-0">
+        <span className="font-bold">{item.value}</span>
+        {item.sub && <span className="text-[10px] text-muted-foreground ml-1">({item.sub})</span>}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="p-4 rounded border">
+      <div className="font-medium mb-2">{title}</div>
+      {items.length === 0 ? (
+        <span className="text-sm text-muted-foreground">Sin datos</span>
+      ) : (
+        <>
+          <div style={columns > 1 ? { display: 'grid', gridTemplateColumns: `repeat(${Math.min(columns, 5)}, 1fr)`, columnGap: '1rem' } : undefined} className={columns <= 1 ? 'space-y-0' : ''}>
+            {visible.map(renderItem)}
+          </div>
+          {hasMore && (
+            <button className="text-xs text-primary hover:underline mt-2" onClick={() => setExpanded(true)}>
+              Ver más ({items.length - LIMIT} más)
+            </button>
+          )}
+        </>
+      )}
+      {/* Full list dialog */}
+      <Dialog open={expanded} onOpenChange={setExpanded}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-6 gap-y-1">
+            {items.map(renderItem)}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 const OverviewPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
@@ -382,71 +429,47 @@ const OverviewPage = () => {
         </div>
       </div>
 
-      {/* Pipeline + Células por Día */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <PipelineSummaryCard churchId={churchId!} />
-        <div className="p-4 rounded border">
-          <div className="font-medium mb-3">Células por Día</div>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d => (
-              <div key={d} className="flex justify-between"><span>{d}</span><span className="font-bold tabular-nums">{analytics.perDay[d]}</span></div>
-            ))}
-          </div>
+      {/* Células por Día — compact grid */}
+      <div className="p-4 rounded border">
+        <div className="font-medium mb-3">Células por Día</div>
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-3 text-sm">
+          {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d => (
+            <div key={d} className="text-center">
+              <div className="text-muted-foreground text-xs">{d.slice(0,3)}</div>
+              <div className="text-lg font-bold tabular-nums">{analytics.perDay[d]}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Células por Localidad + Células por Cuerda */}
+      {/* Células por Localidad + Células por Cuerda — 5 cols, show 5 + Ver más */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 rounded border">
-          <div className="font-medium mb-3">Células por Localidad</div>
-          <div className="space-y-1 text-sm">
-            {analytics.perZona && Object.entries(analytics.perZona).length > 0 ? (
-              Object.entries(analytics.perZona).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([zona, count]) => (
-                <div key={zona} className="flex justify-between"><span>{zona}</span><span className="font-bold tabular-nums">{count as number}</span></div>
-              ))
-            ) : <span className="text-muted-foreground">Sin datos</span>}
-          </div>
-        </div>
-        <div className="p-4 rounded border">
-          <div className="font-medium mb-3">Células por Cuerda</div>
-          <div className="space-y-1 text-sm">
-            {analytics.perCuerda && Object.entries(analytics.perCuerda).length > 0 ? (
-              Object.entries(analytics.perCuerda).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([cuerda, count]) => (
-                <div key={cuerda} className="flex justify-between"><span>Cuerda {cuerda}</span><span className="font-bold tabular-nums">{count as number}</span></div>
-              ))
-            ) : <span className="text-muted-foreground">Sin datos</span>}
-          </div>
-        </div>
+        <CompactList
+          title="Células por Localidad"
+          items={Object.entries(analytics.perZona || {}).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([k, v]) => ({ label: k, value: v as number }))}
+        />
+        <CompactList
+          title="Células por Cuerda"
+          items={Object.entries(analytics.perCuerda || {}).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([k, v]) => ({ label: `Cuerda ${k}`, value: v as number }))}
+          columns={5}
+        />
       </div>
 
       {/* Personas por Cuerda + Top cells */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 rounded border">
-          <div className="font-medium mb-3">Personas por Cuerda</div>
-          <div className="space-y-1 text-sm">
-            {analytics.personasPorCuerda && Object.entries(analytics.personasPorCuerda).length > 0 ? (
-              Object.entries(analytics.personasPorCuerda).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([cuerda, data]: [string, any]) => (
-                <div key={cuerda} className="flex justify-between">
-                  <span>Cuerda {cuerda}</span>
-                  <span className="tabular-nums"><span className="font-bold">{data.conPiloto}</span> <span className="text-muted-foreground text-xs">(sin piloto: {data.sinPiloto})</span></span>
-                </div>
-              ))
-            ) : <span className="text-muted-foreground">Sin datos</span>}
-          </div>
-        </div>
-        <div className="p-4 rounded border">
-          <div className="font-medium mb-3">Células con más Miembros</div>
-          <div className="space-y-1 text-sm">
-            {analytics.topCells.length === 0 ? (
-              <span className="text-muted-foreground">Sin datos</span>
-            ) : (
-              analytics.topCells.map((c) => (
-                <div key={c.name} className="flex justify-between"><span>{c.name}</span><span className="font-bold tabular-nums">{c.count}</span></div>
-              ))
-            )}
-          </div>
-        </div>
+        <CompactList
+          title="Personas por Cuerda"
+          items={Object.entries(analytics.personasPorCuerda || {}).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([k, d]: [string, any]) => ({ label: `Cuerda ${k}`, value: d.conPiloto, sub: `sin piloto: ${d.sinPiloto}` }))}
+          columns={5}
+        />
+        <CompactList
+          title="Células con más Miembros"
+          items={analytics.topCells.map(c => ({ label: c.name, value: c.count }))}
+        />
       </div>
+
+      {/* Pipeline at the end */}
+      <PipelineSummaryCard churchId={churchId!} />
 
       {/* Custom report builder */}
       <CustomReportBuilder churchId={churchId!} churchName={church.name} />
