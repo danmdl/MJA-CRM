@@ -22,6 +22,8 @@ interface CellItem {
   name: string;
   encargado_id: string | null;
   anfitrion_id: string | null;
+  leader_name: string | null;
+  anfitrion_name: string | null;
   address: string | null;
   meeting_day: string | null;
   meeting_time: string | null;
@@ -58,7 +60,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
       // Load cell
       const { data: cellData } = await supabase
         .from('cells')
-        .select('id, name, encargado_id, anfitrion_id, address, meeting_day, meeting_time')
+        .select('id, name, encargado_id, anfitrion_id, leader_name, anfitrion_name, address, meeting_day, meeting_time')
         .eq('id', cellId)
         .single();
       setCell(cellData as CellItem);
@@ -145,11 +147,11 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
                 <CardContent className="space-y-3">
                   <div className="text-sm">
                     <div className="text-muted-foreground">Líder de Célula</div>
-                    <div>{leader ? `${leader.first_name || ''} ${leader.last_name || ''}`.trim() || 'Sin nombre' : 'Sin asignar'}</div>
+                    <div>{leader ? `${leader.first_name || ''} ${leader.last_name || ''}`.trim() : cell?.leader_name || 'Sin asignar'}</div>
                   </div>
                   <div className="text-sm">
                     <div className="text-muted-foreground">Anfitrión</div>
-                    <div>{anfitrion ? `${anfitrion.first_name || ''} ${anfitrion.last_name || ''}`.trim() || 'Sin nombre' : 'Sin asignar'}</div>
+                    <div>{anfitrion ? `${anfitrion.first_name || ''} ${anfitrion.last_name || ''}`.trim() : cell?.anfitrion_name || 'Sin asignar'}</div>
                   </div>
                   <div className="text-sm flex items-start gap-2">
                     <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />

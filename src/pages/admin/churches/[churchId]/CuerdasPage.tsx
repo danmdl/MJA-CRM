@@ -44,6 +44,7 @@ interface Zona { id: string; nombre: string; }
 interface Cell {
   id: string; name: string; church_id: string;
   encargado_id: string | null; anfitrion_id: string | null;
+  leader_name: string | null; anfitrion_name: string | null;
   cuerda_id: string | null;
   address: string | null; meeting_day: string | null; meeting_time: string | null;
   lat: number | null; lng: number | null;
@@ -152,8 +153,8 @@ const CuerdasPage = () => {
           norm(c.referente_name || '').includes(s) ||
           norm(zona?.nombre || '').includes(s) ||
           cuerdaCells.some(cell => {
-            const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] || '' : '';
-            const anfitrionName = cell.anfitrion_id ? profilesMap?.[cell.anfitrion_id] || '' : '';
+            const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] || cell.leader_name || '' : cell.leader_name || '';
+            const anfitrionName = cell.anfitrion_id ? profilesMap?.[cell.anfitrion_id] || cell.anfitrion_name || '' : cell.anfitrion_name || '';
             return norm(cell.name || '').includes(s) ||
               norm(cell.address || '').includes(s) ||
               norm(leaderName).includes(s) ||
@@ -398,8 +399,8 @@ const CuerdasPage = () => {
                           ) : (
                             <div className="ml-4 space-y-1">
                               {cuerdaCells.map(cell => {
-                                const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] : null;
-                                const anfitrionName = cell.anfitrion_id ? profilesMap?.[cell.anfitrion_id] : null;
+                                const leaderName = (cell.encargado_id && profilesMap?.[cell.encargado_id]) || cell.leader_name || null;
+                                const anfitrionName = (cell.anfitrion_id && profilesMap?.[cell.anfitrion_id]) || cell.anfitrion_name || null;
                                 const count = attendeeCounts?.[cell.id] || 0;
                                 return (
                                   <div key={cell.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group">
@@ -459,7 +460,7 @@ const CuerdasPage = () => {
                   <CardContent className="pt-0 pb-3 px-4">
                     <div className="ml-4 space-y-1">
                       {unassignedCells.map(cell => {
-                        const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] : null;
+                        const leaderName = (cell.encargado_id && profilesMap?.[cell.encargado_id]) || cell.leader_name || null;
                         const count = attendeeCounts?.[cell.id] || 0;
                         return (
                           <div key={cell.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group">

@@ -186,11 +186,21 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
         if (match) encargadoId = match.id;
       }
 
+      // Try to match anfitrion by name
+      let anfitrionId: string | null = null;
+      if (cell.anfitrion_name) {
+        const match = leaders.find(l => normalize(l.name).includes(normalize(cell.anfitrion_name)));
+        if (match) anfitrionId = match.id;
+      }
+
       const { error } = await supabase.from('cells').insert({
         name: cell.name,
         church_id: churchId,
         cuerda_id: cell.cuerda_id || null,
         encargado_id: encargadoId,
+        leader_name: cell.leader_name || null,
+        anfitrion_id: anfitrionId,
+        anfitrion_name: cell.anfitrion_name || null,
         address: cell.address || null,
         lat: cell.lat, lng: cell.lng,
         meeting_day: cell.meeting_day || null,
