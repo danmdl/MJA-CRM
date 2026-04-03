@@ -9,7 +9,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.includes('/overview')) return 'Vista General';
   if (pathname.includes('/database')) return 'Contactos';
   if (pathname.includes('/team')) return 'Equipo';
-  if (pathname.includes('/cells')) return 'Células';
+  if (pathname.includes('/cuerdas')) return 'Cuerdas';
   if (pathname.includes('/pool')) return 'Pool de Contactos';
   if (pathname.includes('/zonas')) return 'Zonas y Barrios';
   if (pathname.includes('/mapa')) return 'Mapa';
