@@ -161,6 +161,15 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           const n = parseInt(match[1]);
           return isNaN(n) ? null : n;
         }
+        // Lowercase sexo to match DB check constraint
+        if (key === 'sexo') {
+          const lower = trimmed.toLowerCase();
+          if (['masculino', 'femenino', 'otro', 'no especificado'].includes(lower)) return lower;
+          // Map common variants
+          if (lower === 'f' || lower === 'fem' || lower === 'mujer') return 'femenino';
+          if (lower === 'm' || lower === 'masc' || lower === 'hombre' || lower === 'varón' || lower === 'varon') return 'masculino';
+          return null; // Unknown value, skip
+        }
         return trimmed;
       };
 
