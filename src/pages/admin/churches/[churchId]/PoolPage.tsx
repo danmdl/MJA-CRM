@@ -19,9 +19,11 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
+import CsvImporter from '@/components/admin/CsvImporter';
+import { CONTACT_FIELDS } from '@/lib/contact-fields';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface Zona { id: string; nombre: string; }
@@ -81,6 +83,7 @@ const PoolPage = () => {
 
   const [activePool, setActivePool] = useState<string>('unassigned');
   const [searchTerm, setSearchTerm] = useState('');
+  const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'auto' | 'manual';
     contactId?: string;
@@ -457,6 +460,11 @@ const PoolPage = () => {
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
           </Button>
         )}
+        {isAdminOrPastor && (
+          <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)} className="gap-1.5">
+            <Upload className="h-4 w-4" /> Importar CSV
+          </Button>
+        )}
         <div className="flex-1" />
         <div className="relative w-64 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -672,6 +680,24 @@ const PoolPage = () => {
               {(autoAssignMutation.isPending || assignSingleMutation.isPending) ? 'Asignando...' : 'Confirmar'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Import Dialog */}
+      <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
+        <DialogContent className="sm:max-w-[1200px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar Contactos desde CSV</DialogTitle>
+            <DialogDescription>
+              Los contactos importados aparecerán en el pool "Sin asignar" para que puedas verificar sus direcciones y asignarles una célula.
+            </DialogDescription>
+          </DialogHeader>
+          <CsvImporter
+            tableName="contacts"
+            requiredFields={CONTACT_FIELDS.filter(f => f.key === 'first_name')}
+            optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name')}
+            churchId={churchId}
+          />
         </DialogContent>
       </Dialog>
     </div>

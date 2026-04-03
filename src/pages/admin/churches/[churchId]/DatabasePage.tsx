@@ -2,12 +2,11 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import DynamicContactTable from '@/components/admin/DynamicContactTable';
-import CsvImporter from '@/components/admin/CsvImporter';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, PlusCircle, Upload, Filter, X, Download, Users } from 'lucide-react';
+import { Search, PlusCircle, Filter, X, Download, Users } from 'lucide-react';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePermissions } from '@/lib/permissions';
@@ -84,8 +83,6 @@ const ChurchDatabasePage = () => {
   const [filterField, setFilterField] = useState<string | null>(null);
   const [ageGroup, setAgeGroup] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [ageGroupFilter, setAgeGroupFilter] = useState<string | null>(null);
-  const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { canAddContacts, canEditDeleteContacts, canSeeBaseDatosTotal } = usePermissions();
   const { profile } = useSession();
 
@@ -115,9 +112,6 @@ const ChurchDatabasePage = () => {
     setExporting(false);
   };
 
-  const requiredContactFields = CONTACT_FIELDS.filter(f => f.key === 'first_name');
-  const optionalContactFields = CONTACT_FIELDS.filter(f => f.key !== 'first_name');
-
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3">
@@ -130,30 +124,6 @@ const ChurchDatabasePage = () => {
             <Download className="mr-1.5 h-4 w-4" />
             {exporting ? 'Exportando...' : 'Exportar CSV'}
           </Button>
-          {canAddContacts() && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setIsCsvDialogOpen(true)}>
-                <Upload className="mr-1.5 h-4 w-4" />
-                Importar CSV
-              </Button>
-              <Dialog open={isCsvDialogOpen} onOpenChange={setIsCsvDialogOpen}>
-                <DialogContent className="sm:max-w-[1200px] max-h-[85vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Importar Contactos desde CSV</DialogTitle>
-                    <DialogDescription>
-                      Sube un archivo CSV para añadir nuevos contactos a la base de datos de esta iglesia.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <CsvImporter
-                    tableName="contacts"
-                    requiredFields={requiredContactFields}
-                    optionalFields={optionalContactFields}
-                    churchId={churchId}
-                  />
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
           {canAddContacts() && (
             <Button onClick={() => setIsAddContactDialogOpen(true)} size="sm">
               <PlusCircle className="mr-1.5 h-4 w-4" />
