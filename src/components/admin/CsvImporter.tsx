@@ -70,10 +70,18 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     setFailedContacts([]);
     setColumnMapping({});
     setIgnoreMap({});
-    Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: 'greedy',
-      complete: (results) => {
+    
+    // Read file as UTF-8 text first to handle BOM and encoding
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let text = e.target?.result as string;
+      // Strip UTF-8 BOM if present
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      
+      Papa.parse(text, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        complete: (results) => {
         if (results.meta.fields) {
           const validHeaders = results.meta.fields.filter(h => h && h.trim() !== '');
           setCsvHeaders(validHeaders);
@@ -99,6 +107,8 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         setDataToImport([]);
       }
     });
+    };
+    reader.readAsText(selectedFile, 'UTF-8');
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {

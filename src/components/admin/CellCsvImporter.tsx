@@ -73,9 +73,13 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
 
   const handleFile = (f: File) => {
     setFile(f); setImportResult(null);
-    Papa.parse(f, {
-      header: true, skipEmptyLines: 'greedy',
-      complete: (results) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let text = e.target?.result as string;
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      Papa.parse(text, {
+        header: true, skipEmptyLines: 'greedy',
+        complete: (results) => {
         const headers = (results.meta.fields || []).filter(h => h && h.trim() !== '');
         setCsvHeaders(headers);
         setCsvData(results.data as Record<string, string>[]);
@@ -99,6 +103,8 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
       },
       error: () => showError('Error al leer el archivo CSV.'),
     });
+    };
+    reader.readAsText(f, 'UTF-8');
   };
 
   const requiredMissing = useMemo(() =>
