@@ -213,13 +213,48 @@ const CuerdasPage = () => {
 
   const deleteCuerda = async (id: string, numero: string) => {
     if (!window.confirm(`¿Eliminar la cuerda #${numero}? Las células vinculadas quedarán sin cuerda.`)) return;
-    // Unlink cells from this cuerda first
     await supabase.from('cells').update({ cuerda_id: null }).eq('cuerda_id', id);
     const { error } = await supabase.from('cuerdas').delete().eq('id', id);
     if (error) showError(error.message);
     else {
       showSuccess(`Cuerda #${numero} eliminada.`);
       queryClient.invalidateQueries({ queryKey: ['cuerdas', churchId] });
+      queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
+    }
+  };
+
+  // Admin only: delete all cells in the church
+  const deleteAllCells = async () => {
+    const count = cells?.length || 0;
+    if (!window.confirm(`¿BORRAR TODAS las ${count} células de esta iglesia? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`CONFIRMACIÓN FINAL: ¿Estás seguro de borrar las ${count} células? Los contactos asignados quedarán sin célula.`)) return;
+    // Unlink contacts first
+    await supabase.from('contacts').update({ cell_id: null }).eq('church_id', churchId!).not('cell_id', 'is', null);
+    const { error } = await supabase.from('cells').delete().eq('church_id', churchId!);
+    if (error) showError(error.message);
+    else {
+      showSuccess(`${count} células eliminadas.`);
+      queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
+    }
+  };
+
+  // Admin only: delete all cells in a specific zona
+  const deleteZonaCells = async (zonaId: string, zonaNombre: string) => {
+    if (!cuerdas) return;
+    const zonaCuerdaIds = cuerdas.filter(c => c.zona_id === zonaId).map(c => c.id);
+    const zonaCells = (cells || []).filter(c => c.cuerda_id && zonaCuerdaIds.includes(c.cuerda_id));
+    if (zonaCells.length === 0) { showError('No hay células en esta zona.'); return; }
+    if (!window.confirm(`¿Borrar las ${zonaCells.length} células de ${zonaNombre}? Los contactos asignados quedarán sin célula.`)) return;
+    // Unlink contacts
+    for (const cell of zonaCells) {
+      await supabase.from('contacts').update({ cell_id: null }).eq('cell_id', cell.id);
+    }
+    // Delete cells
+    const cellIds = zonaCells.map(c => c.id);
+    const { error } = await supabase.from('cells').delete().in('id', cellIds);
+    if (error) showError(error.message);
+    else {
+      showSuccess(`${zonaCells.length} células de ${zonaNombre} eliminadas.`);
       queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
     }
   };
@@ -238,6 +273,11 @@ const CuerdasPage = () => {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {profile?.role === 'admin' && (cells?.length || 0) > 0 && (
+            <Button variant="outline" size="sm" className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={deleteAllCells}>
+              <Trash2 className="mr-1.5 h-4 w-4" /> Borrar todas las células
+            </Button>
+          )}
           {canManageCuerdas && (
             <Button variant="outline" size="sm" onClick={() => setAddCuerdaOpen(true)}>
               <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Cuerda
@@ -293,9 +333,23 @@ const CuerdasPage = () => {
               <CardHeader className="py-2.5 px-4 border-b">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-sm">{zona.nombre}</h3>
-                  <Badge variant="outline" className="text-[10px]">
-                    {zonaCuerdas.length} cuerda{zonaCuerdas.length !== 1 ? 's' : ''} · {zonaCuerdas.reduce((s, c) => s + c.cells.length, 0)} célula{zonaCuerdas.reduce((s, c) => s + c.cells.length, 0) !== 1 ? 's' : ''}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px]">
+                      {zonaCuerdas.length} cuerda{zonaCuerdas.length !== 1 ? 's' : ''} · {zonaCuerdas.reduce((s, c) => s + c.cells.length, 0)} célula{zonaCuerdas.reduce((s, c) => s + c.cells.length, 0) !== 1 ? 's' : ''}
+                    </Badge>
+                    {profile?.role === 'admin' && zonaCuerdas.reduce((s, c) => s + c.cells.length, 0) > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="text-red-600 text-xs" onClick={() => deleteZonaCells(zona.id, zona.nombre)}>
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Borrar células de {zona.nombre}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
