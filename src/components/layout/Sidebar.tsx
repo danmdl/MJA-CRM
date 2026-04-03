@@ -63,6 +63,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
         ...(canSeePool() ? [{ to: `/admin/churches/${currentChurchId}/pool`, emoji: '🏊', label: 'Pool' }] : []),
         ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/mapa`, emoji: '🗺️', label: 'Mapa' }] : []),
         ...(canSeeHistorial() ? [{ to: `/admin/churches/${currentChurchId}/historial`, emoji: '📋', label: 'Historial' }] : []),
+        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/papelera`, emoji: '🗑️', label: 'Papelera' }] : []),
       ],
     },
     {

@@ -158,7 +158,8 @@ const PoolPage = () => {
     queryFn: async () => {
       let q = supabase.from('contacts')
         .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento')
-        .eq('church_id', churchId!);
+        .eq('church_id', churchId!)
+        .is('deleted_at', null);
       if (profile?.role === 'conector') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) q = q.eq('created_by', user.id);

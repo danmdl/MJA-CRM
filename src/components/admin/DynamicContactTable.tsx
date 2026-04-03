@@ -388,6 +388,7 @@ const DynamicContactTable = ({
       .order('created_at', { ascending: false });
 
     if (churchId) contactQuery = contactQuery.eq('church_id', churchId);
+    contactQuery = contactQuery.is('deleted_at', null);
 
     const { data: contactsData, error: contactsError } = await contactQuery;
     if (contactsError) throw new Error('No se pudieron cargar los contactos.');
@@ -438,12 +439,15 @@ const DynamicContactTable = ({
 
   const deleteContactMutation = useMutation({
     mutationFn: async (contactId: string) => {
-      const { error } = await supabase.from('contacts').delete().eq('id', contactId);
+      // Soft delete: set deleted_at instead of removing from DB
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('contacts').update({ deleted_at: new Date().toISOString(), deleted_by: user?.id || null }).eq('id', contactId);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      showSuccess('Contacto(s) eliminado(s) con éxito.');
+      showSuccess('Contacto(s) movido(s) a la papelera. Podés restaurarlos en los próximos 7 días.');
       queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+      queryClient.invalidateQueries({ queryKey: ['papelera'] });
       setSelectedContacts([]);
     },
     onError: (err: any) => {

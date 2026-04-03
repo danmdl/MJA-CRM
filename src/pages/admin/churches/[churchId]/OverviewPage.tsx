@@ -79,7 +79,8 @@ const fetchContacts = async (churchId: string): Promise<Contact[]> => {
   const { data, error } = await supabase
     .from('contacts')
     .select('*')
-    .eq('church_id', churchId);
+    .eq('church_id', churchId)
+    .is('deleted_at', null);
   if (error) throw new Error('No se pudieron cargar los contactos.');
   return data || [];
 };

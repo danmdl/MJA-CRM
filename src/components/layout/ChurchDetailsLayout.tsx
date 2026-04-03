@@ -89,6 +89,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/mapa")) return "mapa";
     if (p.endsWith("/pool")) return "pool";
     if (p.endsWith("/historial")) return "historial";
+    if (p.endsWith("/papelera")) return "papelera";
     return "overview";
   })();
 
@@ -141,6 +142,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
               {canSeeOverview && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
               {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🏊 Pool</TabsTrigger>}
               {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
+              {canSeeOverview && <TabsTrigger value="papelera" className="text-xs sm:text-sm px-2 sm:px-3">🗑️ Papelera</TabsTrigger>}
             </TabsList>
           </Tabs>
         </div>
