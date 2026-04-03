@@ -145,16 +145,20 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       const sanitizeValue = (key: string, val: string): any => {
         if (val === '' || val === null || val === undefined) return null;
         const trimmed = String(val).trim();
-        if (trimmed === '' || trimmed === '.' || trimmed === '-' || trimmed === 'N/A' || trimmed === 'n/a') return null;
+        if (trimmed === '' || trimmed === '.' || trimmed === '-' || trimmed === ',' || trimmed === '...' || trimmed === 'N/A' || trimmed === 'n/a') return null;
         if (DATE_FIELDS.has(key)) {
-          // Strict date validation: must match YYYY-MM-DD, DD/MM/YYYY, or MM/DD/YYYY
+          // Strip time part from timestamps like "2026-02-06 00:00:00"
+          const dateOnly = trimmed.split(' ')[0];
           const dateRegex = /^(\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{2}[\/\-]\d{2}[\/\-]\d{2})$/;
-          if (!dateRegex.test(trimmed)) return null;
-          const d = new Date(trimmed);
-          return isNaN(d.getTime()) ? null : trimmed;
+          if (!dateRegex.test(dateOnly)) return null;
+          const d = new Date(dateOnly);
+          return isNaN(d.getTime()) ? null : dateOnly;
         }
         if (NUMBER_FIELDS.has(key)) {
-          const n = parseInt(trimmed);
+          // Extract leading number, ignore text like "16 años", "30 aprox"
+          const match = trimmed.match(/^(\d+)/);
+          if (!match) return null;
+          const n = parseInt(match[1]);
           return isNaN(n) ? null : n;
         }
         return trimmed;
@@ -187,10 +191,11 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         allTargetFields.forEach(f => {
           if (DATE_FIELDS.has(f.key) && record[f.key] !== null && record[f.key] !== undefined) {
             const raw = dataToImport[idx][columnMapping[f.key] || ''] || '';
+            const dateOnly = String(raw).trim().split(' ')[0];
             const dateRegex = /^(\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{2}[\/\-]\d{2}[\/\-]\d{2})$/;
-            if (raw && !dateRegex.test(String(raw).trim())) {
+            if (raw && !dateRegex.test(dateOnly)) {
               validationErrors.push({ row: idx + 1, field: f.label, value: String(raw), message: 'Formato de fecha inválido (use AAAA-MM-DD)' });
-              record[f.key] = null; // sanitize to null
+              record[f.key] = null;
             }
           }
         });
