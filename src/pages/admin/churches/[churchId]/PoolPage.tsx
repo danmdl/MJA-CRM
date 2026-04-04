@@ -49,6 +49,7 @@ interface Contact {
   numero_cuerda: string | null; edad: string | null;
   cell_id: string | null; estado_seguimiento?: string | null;
   lat?: number | null; lng?: number | null;
+  sexo?: string | null;
 }
 
 // Haversine distance in km
@@ -157,7 +158,7 @@ const PoolPage = () => {
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
       let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng')
+        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
       if (profile?.role === 'conector') {
@@ -213,13 +214,41 @@ const PoolPage = () => {
     return zonas.find(z => text.includes(normalize(z.nombre))) || null;
   }, [zonas, barrios]);
 
-  // Get cells sorted by distance to a contact
+  // Get the cuerda number for a cell
+  const getCuerdaNumero = useCallback((cell: Cell): string | null => {
+    if (!cell.cuerda_id || !cuerdas?.length) return null;
+    const cuerda = cuerdas.find(c => c.id === cell.cuerda_id);
+    return cuerda?.numero || null;
+  }, [cuerdas]);
+
+  // Filter cells by gender: 1xx = Masculino, 2xx = Femenino, 3xx = either
+  const filterCellsByGender = useCallback((allCells: Cell[], sexo: string | null | undefined): Cell[] => {
+    if (!sexo) return allCells; // Unknown gender → show all cells
+    const isFemale = sexo.toLowerCase() === 'femenino';
+    const isMale = sexo.toLowerCase() === 'masculino';
+    if (!isFemale && !isMale) return allCells;
+
+    return allCells.filter(cell => {
+      const num = getCuerdaNumero(cell);
+      if (!num) return true; // No cuerda → include
+      const prefix = parseInt(num.charAt(0));
+      if (prefix === 3) return true; // 3xx → gender-neutral
+      if (isFemale) return prefix === 2; // Women → 2xx only
+      if (isMale) return prefix === 1; // Men → 1xx only
+      return true;
+    });
+  }, [getCuerdaNumero]);
+
+  // Get cells sorted by distance to a contact (filtered by gender)
   const getCellsByDistance = useCallback((contact: Contact, filterZona?: Zona | null): Cell[] => {
     if (!cells?.length) return [];
 
-    // If contact has coordinates, use PURE distance on ALL cells — ignore zona filtering
+    // FIRST: filter by gender — 1xx for men, 2xx for women
+    const genderFiltered = filterCellsByGender(cells, contact.sexo);
+
+    // If contact has coordinates, use PURE distance on gender-filtered cells
     if (contact.lat != null && contact.lng != null) {
-      const cellsWithDist = cells
+      const cellsWithDist = genderFiltered
         .filter(c => c.lat != null && c.lng != null)
         .map(cell => ({
           cell,
@@ -229,10 +258,10 @@ const PoolPage = () => {
     }
 
     // No coordinates — use zona filtering + text matching as fallback
-    let candidates = cells;
+    let candidates = genderFiltered;
     if (filterZona && cuerdas?.length) {
       const zonaCuerdaIds = cuerdas.filter(c => c.zona_id === filterZona.id).map(c => c.id);
-      const zonaCells = cells.filter(c => c.cuerda_id && zonaCuerdaIds.includes(c.cuerda_id));
+      const zonaCells = genderFiltered.filter(c => c.cuerda_id && zonaCuerdaIds.includes(c.cuerda_id));
       if (zonaCells.length > 0) candidates = zonaCells;
     }
 
@@ -250,7 +279,7 @@ const PoolPage = () => {
     });
 
     return cellsWithScore.sort((a, b) => a.score - b.score).map(x => x.cell);
-  }, [cells, cuerdas]);
+  }, [cells, cuerdas, filterCellsByGender]);
 
   // Compute suggestion: closest cell + its cuerda + zona
   const suggestions = useMemo(() => {
