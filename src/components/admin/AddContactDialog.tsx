@@ -11,6 +11,7 @@ import { logger } from '@/utils/logger';
 import { useSession } from '@/hooks/use-session';
 import { logEvent } from '@/utils/clientLogger';
 import AddressAutocomplete from './AddressAutocomplete';
+import { isWithinGBA as isWithinGBACheck } from '@/lib/geo-validation';
 
 interface Cell {
   id: string;
@@ -447,7 +448,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               <label className="text-sm font-medium">Dirección</label>
               <AddressAutocomplete
                 value={address}
-                onChange={(addr, lat, lng) => { setAddress(addr || ''); if (lat !== undefined) setContactLat(lat); if (lng !== undefined) setContactLng(lng); }}
+                onChange={(addr, lat, lng) => { setAddress(addr || ''); if (lat != null && lng != null && isWithinGBACheck(lat, lng)) { setContactLat(lat); setContactLng(lng); } else if (lat != null) { setContactLat(null); setContactLng(null); } }}
                 placeholder="Ej: Av Corrientes 4000, CABA"
                 disabled={loading}
               />

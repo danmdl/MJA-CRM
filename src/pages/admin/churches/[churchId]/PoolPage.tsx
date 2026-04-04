@@ -24,6 +24,7 @@ import {
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { normalize } from '@/lib/normalize';
+import { isWithinGBA, getDistanceColor, getDistanceWarning } from '@/lib/geo-validation';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
@@ -176,23 +177,29 @@ const PoolPage = () => {
   // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────
   const geocodedRef = useRef(false);
   useEffect(() => {
-    if (geocodedRef.current) return; // Already ran
+    if (geocodedRef.current) return;
     if (!allContacts?.length) return;
     const toGeocode = allContacts.filter(c => c.address && (c.lat == null || c.lng == null));
     if (toGeocode.length === 0) return;
     if (!(window as any).google?.maps) return;
 
-    geocodedRef.current = true; // Mark as done — never run again
+    geocodedRef.current = true;
     const geocoder = new (window as any).google.maps.Geocoder();
     let processed = 0;
 
     toGeocode.forEach((contact, i) => {
       setTimeout(() => {
-        geocoder.geocode({ address: contact.address }, async (results: any[], status: string) => {
+        // Append ", Buenos Aires, Argentina" to improve geocode accuracy
+        const searchAddr = `${contact.address}, Buenos Aires, Argentina`;
+        geocoder.geocode({ address: searchAddr }, async (results: any[], status: string) => {
           if (status === 'OK' && results?.[0]?.geometry?.location) {
             const lat = results[0].geometry.location.lat();
             const lng = results[0].geometry.location.lng();
-            await supabase.from('contacts').update({ lat, lng }).eq('id', contact.id);
+            // VALIDATE: only save if within Greater Buenos Aires area
+            if (isWithinGBA(lat, lng)) {
+              await supabase.from('contacts').update({ lat, lng }).eq('id', contact.id);
+            }
+            // If outside GBA, coordinates are wrong — don't save them
           }
           processed++;
           if (processed >= toGeocode.length) {
@@ -249,10 +256,10 @@ const PoolPage = () => {
     // FIRST: filter by gender — 1xx for men, 2xx for women
     const genderFiltered = filterCellsByGender(cells, contact.sexo);
 
-    // If contact has coordinates, use PURE distance on gender-filtered cells
-    if (contact.lat != null && contact.lng != null) {
+    // If contact has VALID coordinates, use PURE distance on gender-filtered cells
+    if (contact.lat != null && contact.lng != null && isWithinGBA(contact.lat, contact.lng)) {
       const cellsWithDist = genderFiltered
-        .filter(c => c.lat != null && c.lng != null)
+        .filter(c => c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng))
         .map(cell => ({
           cell,
           dist: haversine(contact.lat!, contact.lng!, cell.lat!, cell.lng!),
@@ -786,10 +793,20 @@ const PoolPage = () => {
                                   <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
                                     {sugCell.name}
                                   </Badge>
-                                  {c.lat != null && c.lng != null && sugCell.lat != null && sugCell.lng != null && (
-                                    <span className="text-[10px] text-muted-foreground ml-1">
-                                      {haversine(c.lat, c.lng, sugCell.lat, sugCell.lng).toFixed(1)} km
-                                    </span>
+                                  {c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null && (() => {
+                                    const dist = haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!);
+                                    const warning = getDistanceWarning(dist);
+                                    return (
+                                      <div>
+                                        <span className={`text-[10px] font-medium ${getDistanceColor(dist)}`}>
+                                          {dist.toFixed(1)} km
+                                        </span>
+                                        {warning && <span className="text-[9px] text-red-400 block">{warning}</span>}
+                                      </div>
+                                    );
+                                  })()}
+                                  {c.lat != null && c.lng != null && !isWithinGBA(c.lat, c.lng) && (
+                                    <span className="text-[9px] text-red-400 block">⚠️ Coordenadas fuera de zona</span>
                                   )}
                                 </div>
                               ) : <span className="text-xs text-muted-foreground">—</span>}
