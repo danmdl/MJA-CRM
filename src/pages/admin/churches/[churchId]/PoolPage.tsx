@@ -157,7 +157,7 @@ const PoolPage = () => {
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
       let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento')
+        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
       if (profile?.role === 'conector') {
@@ -187,6 +187,19 @@ const PoolPage = () => {
   // Get cells sorted by distance to a contact
   const getCellsByDistance = useCallback((contact: Contact, filterZona?: Zona | null): Cell[] => {
     if (!cells?.length) return [];
+
+    // If contact has coordinates, use PURE distance on ALL cells — ignore zona filtering
+    if (contact.lat && contact.lng) {
+      const cellsWithDist = cells
+        .filter(c => c.lat && c.lng)
+        .map(cell => ({
+          cell,
+          dist: haversine(contact.lat!, contact.lng!, cell.lat!, cell.lng!),
+        }));
+      return cellsWithDist.sort((a, b) => a.dist - b.dist).map(x => x.cell);
+    }
+
+    // No coordinates — use zona filtering + text matching as fallback
     let candidates = cells;
     if (filterZona && cuerdas?.length) {
       const zonaCuerdaIds = cuerdas.filter(c => c.zona_id === filterZona.id).map(c => c.id);
@@ -194,25 +207,15 @@ const PoolPage = () => {
       if (zonaCells.length > 0) candidates = zonaCells;
     }
 
-    // If contact has no lat/lng, just return candidates as-is
-    // For now we use barrio/address text matching as the "distance" proxy
-    // Real distance would require geocoding the contact address
     const cellsWithScore = candidates.map(cell => {
       let score = 999;
-      // If both have coordinates, use real distance
-      if (contact.lat && contact.lng && cell.lat && cell.lng) {
-        score = haversine(contact.lat, contact.lng, cell.lat, cell.lng);
-      } else {
-        // Text-based proximity: check if contact address/barrio matches cell address
-        const contactText = normalize((contact.address || '') + ' ' + (contact.barrio || ''));
-        const cellText = normalize(cell.address || '');
-        if (cellText && contactText) {
-          // Simple heuristic: shared words
-          const contactWords = new Set(contactText.split(/\s+/).filter(w => w.length > 2));
-          const cellWords = cellText.split(/\s+/).filter(w => w.length > 2);
-          const shared = cellWords.filter(w => contactWords.has(w)).length;
-          score = shared > 0 ? (100 - shared * 10) : 500;
-        }
+      const contactText = normalize((contact.address || '') + ' ' + (contact.barrio || ''));
+      const cellText = normalize(cell.address || '');
+      if (cellText && contactText) {
+        const contactWords = new Set(contactText.split(/\s+/).filter(w => w.length > 2));
+        const cellWords = cellText.split(/\s+/).filter(w => w.length > 2);
+        const shared = cellWords.filter(w => contactWords.has(w)).length;
+        score = shared > 0 ? (100 - shared * 10) : 500;
       }
       return { cell, score };
     });
@@ -669,9 +672,16 @@ const PoolPage = () => {
                           <>
                             <td className="px-3 py-2.5" style={{ width: colWidths.celulaSug }}>
                               {sugCell ? (
-                                <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
-                                  {sugCell.name}
-                                </Badge>
+                                <div>
+                                  <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
+                                    {sugCell.name}
+                                  </Badge>
+                                  {c.lat && c.lng && sugCell.lat && sugCell.lng && (
+                                    <span className="text-[10px] text-muted-foreground ml-1">
+                                      {haversine(c.lat, c.lng, sugCell.lat, sugCell.lng).toFixed(1)} km
+                                    </span>
+                                  )}
+                                </div>
                               ) : <span className="text-xs text-muted-foreground">—</span>}
                             </td>
                             <td className="px-3 py-2.5" style={{ width: colWidths.zonaSug }}>
