@@ -171,32 +171,33 @@ const PoolPage = () => {
     enabled: !!churchId,
   });
 
-  // ─── Auto-geocode contacts with address but no lat/lng ──────────
+  // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────
+  const geocodedRef = useRef(false);
   useEffect(() => {
+    if (geocodedRef.current) return; // Already ran
     if (!allContacts?.length) return;
     const toGeocode = allContacts.filter(c => c.address && (c.lat == null || c.lng == null));
     if (toGeocode.length === 0) return;
     if (!(window as any).google?.maps) return;
 
+    geocodedRef.current = true; // Mark as done — never run again
     const geocoder = new (window as any).google.maps.Geocoder();
     let processed = 0;
 
     toGeocode.forEach((contact, i) => {
-      // Throttle: 1 request per 200ms to avoid rate limits
       setTimeout(() => {
         geocoder.geocode({ address: contact.address }, async (results: any[], status: string) => {
           if (status === 'OK' && results?.[0]?.geometry?.location) {
             const lat = results[0].geometry.location.lat();
             const lng = results[0].geometry.location.lng();
             await supabase.from('contacts').update({ lat, lng }).eq('id', contact.id);
-            processed++;
-            // After all geocoded, refetch contacts
-            if (processed >= toGeocode.length) {
-              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-            }
+          }
+          processed++;
+          if (processed >= toGeocode.length) {
+            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
           }
         });
-      }, i * 200);
+      }, i * 300);
     });
   }, [allContacts, churchId, queryClient]);
 
