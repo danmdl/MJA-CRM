@@ -13,6 +13,7 @@ interface UserProfile {
   email: string | null;
   role: RoleKey;
   church_id: string | null;
+  numero_cuerda: string | null;
 }
 
 interface SessionProviderProps {

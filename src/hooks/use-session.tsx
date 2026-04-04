@@ -9,9 +9,10 @@ interface UserProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null; // Added email to UserProfile
+  email: string | null;
   role: UserRole;
   church_id: string | null;
+  numero_cuerda: string | null;
 }
 
 interface SessionContextType {

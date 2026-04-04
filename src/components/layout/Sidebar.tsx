@@ -215,6 +215,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
               <div style={{ fontSize: 12.5, fontWeight: 500, color: '#fafafa' }}>{fullName}</div>
               <div style={{ fontSize: 10.5, color: '#a1a1aa' }}>
                 {ROLE_LABELS[profile?.role || ''] || 'Usuario'}
+                {profile?.numero_cuerda && <span style={{ marginLeft: 6, color: '#FFC233' }}>Cuerda {profile.numero_cuerda}</span>}
               </div>
             </div>
           </NavLink>
