@@ -116,8 +116,8 @@ const PoolPage = () => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
   };
 
-  const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
-  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv } = usePermissions();
+  // Assignment permission comes from canAssignContacts() via usePermissions
+  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
@@ -543,7 +543,7 @@ const PoolPage = () => {
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2.5">
-        {activePool === 'unassigned' && isAdminOrPastor && poolCounts.unassigned > 0 && (
+        {activePool === 'unassigned' && canAssignContacts() && poolCounts.unassigned > 0 && (
           <Button size="sm" onClick={() => setConfirmDialog({ type: 'auto', preview: autoAssignPreview })} className="gap-1.5">
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
           </Button>
@@ -601,7 +601,7 @@ const PoolPage = () => {
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>Fecha</ResizableHeader>
                     <ResizableHeader width={colWidths.estado} onResize={resizeCol('estado')}>Estado</ResizableHeader>
-                    {isUnassignedView && isAdminOrPastor && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
+                    {isUnassignedView && canAssignContacts() && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                     {isUnassignedView && <ResizableHeader width={colWidths.celulaSug} onResize={resizeCol('celulaSug')}>Célula sug.</ResizableHeader>}
                     {isUnassignedView && <ResizableHeader width={colWidths.zonaSug} onResize={resizeCol('zonaSug')}>Zona sug.</ResizableHeader>}
                   </tr>
@@ -659,7 +659,7 @@ const PoolPage = () => {
                         <td className="px-3 py-2.5" style={{ width: colWidths.estado }}>
                           <ContactPipelineBadge
                             status={c.estado_seguimiento || 'nuevo'}
-                            editable={isAdminOrPastor}
+                            editable={canAssignContacts()}
                             onChange={async (newStatus) => {
                               await supabase.from('contacts').update({ estado_seguimiento: newStatus, ultimo_seguimiento: new Date().toISOString() }).eq('id', c.id);
                               queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
@@ -668,7 +668,7 @@ const PoolPage = () => {
                         </td>
 
                         {/* Assign button */}
-                        {isUnassignedView && isAdminOrPastor && (
+                        {isUnassignedView && canAssignContacts() && (
                           <td className="px-3 py-2.5" style={{ width: colWidths.asignar }}>
                             {/* If contact is in external pool, show Devolver button */}
                             {(c as any).is_external && activePool === 'external' ? (
