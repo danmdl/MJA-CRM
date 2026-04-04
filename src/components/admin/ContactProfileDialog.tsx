@@ -662,10 +662,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                       </select>
                     </div>
 
-                    {/* Warning: non-privileged roles return contact to Pool */}
+                    {/* Warning: non-privileged roles return contact to Semillero */}
                     {!(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor') && (contact.cell_id || (contact as any).zona_id) && (
                       <div className="p-3 rounded border border-yellow-500/30 bg-yellow-500/5 text-sm">
-                        <p>Para editar el número de cuerda, este contacto se devolverá al <strong>Pool Sin Asignar</strong> de la cuerda original ({contact.numero_cuerda}).</p>
+                        <p>Para editar el número de cuerda, este contacto se devolverá al <strong>Semillero Sin Asignar</strong> de la cuerda original ({contact.numero_cuerda}).</p>
                         <p className="text-xs text-muted-foreground mt-1">Desde ahí podrás asignarle una nueva cuerda o célula.</p>
                       </div>
                     )}
@@ -687,10 +687,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                         };
                         const isPrivileged = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
                         if (isPrivileged) {
-                          // Privileged: change cuerda directly without returning to Pool
+                          // Privileged: change cuerda directly without returning to Semillero
                           setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null });
                         } else {
-                          // Non-privileged: clear cell/zona, return to Pool
+                          // Non-privileged: clear cell/zona, return to Semillero
                           setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null, cell_id: null } as any);
                         }
                         setPendingCuerdaChange(null);
@@ -698,7 +698,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     >
                       {(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor')
                         ? 'Cambiar cuerda'
-                        : 'Devolver al Pool y cambiar'}
+                        : 'Devolver al Semillero y cambiar'}
                     </Button>
                   </div>
                 </DialogContent>

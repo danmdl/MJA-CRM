@@ -117,7 +117,7 @@ const PoolPage = () => {
   };
 
   const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
-  const { canSeeBaseDatosTotal, canAddContacts } = usePermissions();
+  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
@@ -323,7 +323,7 @@ const PoolPage = () => {
   }, [allContacts, zonas]);
 
   // ─── Pool counts ───────────────────────────────────────────────
-  // Pool externo: contacts flagged as external (nearest cell is in a different zona)
+  // Semillero Externo: contacts flagged as external (nearest cell is in a different zona)
   const externalContacts = useMemo(() => (allContacts || []).filter(c => (c as any).is_external === true && !c.cell_id), [allContacts]);
 
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
@@ -505,7 +505,7 @@ const PoolPage = () => {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2"><Users className="h-5 w-5" /> Pool de Contactos</h1>
+          <h1 className="text-xl font-bold flex items-center gap-2"><Users className="h-5 w-5" /> Semillero</h1>
           <p className="text-muted-foreground text-xs mt-1">Asignación de contactos a células por cercanía</p>
         </div>
         {undoData && (
@@ -515,7 +515,7 @@ const PoolPage = () => {
         )}
       </div>
 
-      {/* Pool Cards — only Sin asignar + Pool externo */}
+      {/* Pool Cards — only Sin asignar + Semillero Externo */}
       <div className="grid grid-cols-2 gap-3 max-w-md">
         <Card className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'unassigned' ? 'ring-2 ring-primary' : ''}`} onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}>
           <CardContent className="pt-3 pb-3 px-4">
@@ -532,7 +532,7 @@ const PoolPage = () => {
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-orange-400">Pool externo</p>
+                <p className="text-[11px] text-orange-400">Semillero Externo</p>
                 <p className={`text-2xl font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : externalContacts.length}</p>
               </div>
               {externalContacts.length > 0 && <ExternalLink className="h-5 w-5 text-orange-400 opacity-70" />}
@@ -548,7 +548,7 @@ const PoolPage = () => {
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
           </Button>
         )}
-        {isAdminOrPastor && (
+        {canImportCsv() && (
           <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)} className="gap-1.5">
             <Upload className="h-4 w-4" /> Importar Contactos
           </Button>
@@ -586,7 +586,7 @@ const PoolPage = () => {
             <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : !filteredContacts.length ? (
             <p className="text-sm text-muted-foreground py-10 text-center">
-              {searchTerm ? 'Sin resultados.' : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Pool externo vacío.'}
+              {searchTerm ? 'Sin resultados.' : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Semillero Externo vacío.'}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -674,7 +674,7 @@ const PoolPage = () => {
                             {(c as any).is_external && activePool === 'external' ? (
                               <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
                                 await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
-                                showSuccess('Contacto devuelto al Pool Sin Asignar.');
+                                showSuccess('Contacto devuelto al Semillero Sin Asignar.');
                                 queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                               }}>
                                 <Undo2 className="h-3 w-3 mr-1" /> Devolver
@@ -693,11 +693,11 @@ const PoolPage = () => {
                                     <Zap className="h-3 w-3 mr-1" /> Asignar
                                   </Button>
                                 )}
-                                {/* External zona — move to Pool Externo */}
+                                {/* External zona — move to Semillero Externo */}
                                 {sugCell && isExternal && (
                                   <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
                                     await supabase.from('contacts').update({ is_external: true }).eq('id', c.id);
-                                    showSuccess('Contacto movido al Pool Externo para revisión.');
+                                    showSuccess('Contacto movido al Semillero Externo para revisión.');
                                     queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                                   }}>
                                     <ExternalLink className="h-3 w-3 mr-1" /> Externo

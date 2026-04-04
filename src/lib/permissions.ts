@@ -24,6 +24,7 @@ export interface PermissionData {
   can_see_historial: boolean;
   can_send_messages: boolean;
   can_restore_deleted: boolean;
+  can_import_csv: boolean;
 }
 
 // Role hierarchy: higher index = higher privilege
@@ -99,6 +100,7 @@ export const usePermissions = () => {
   const canSeeHistorial = () => hasPermission('can_see_historial');
   const canSendMessages = () => hasPermission('can_send_messages');
   const canRestoreDeleted = () => hasPermission('can_restore_deleted');
+  const canImportCsv = () => hasPermission('can_import_csv');
 
   // Only admin can access permissions management
   const canAccessPermissions = () => profile?.role === 'admin';
@@ -135,6 +137,7 @@ export const usePermissions = () => {
     canSeeHistorial,
     canSendMessages,
     canRestoreDeleted,
+    canImportCsv,
     canAccessPermissions,
     canManageUser,
   };

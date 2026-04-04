@@ -33,41 +33,42 @@ interface PermissionConfig {
     canSeeHistorial: boolean;
     canSendMessages: boolean;
     canRestoreDeleted: boolean;
+    canImportCsv: boolean;
   };
 }
 
 const defaultPermissions: PermissionConfig[] = [
   {
     role: 'admin', label: 'Admin',
-    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: true },
+    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: true, canImportCsv: true },
   },
   {
     role: 'general', label: 'General',
-    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: true },
+    permissions: { seeAllChurches: true, accessAllChurches: true, addUsers: true, editDeleteUsers: true, addMembers: true, addContacts: true, editDeleteContacts: true, editDeleteMembers: true, seeAllAnalytics: true, seeOwnChurchAnalytics: true, changeUserRole: true, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: true, canImportCsv: true },
   },
   {
     role: 'pastor', label: 'Pastor',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: true },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: true, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: true, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: true, canImportCsv: true },
   },
   {
     role: 'supervisor', label: 'Supervisor',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: true, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: true, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: true, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false },
   },
   {
     role: 'referente', label: 'Referente',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: false, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: false, canSeeHistorial: true, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false },
   },
   {
     role: 'encargado_de_celula', label: 'Líder de Célula',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false },
   },
   {
     role: 'conector', label: 'Conector',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: true, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: true, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false },
   },
   {
     role: 'anfitrion', label: 'Anfitrión',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: false, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false },
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: false, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false },
   },
 ];
 
@@ -123,6 +124,7 @@ const PermissionsDashboard = () => {
               canSeeHistorial: savedConfig.can_see_historial ?? false,
               canSendMessages: savedConfig.can_send_messages ?? true,
               canRestoreDeleted: savedConfig.can_restore_deleted ?? false,
+              canImportCsv: savedConfig.can_import_csv ?? false,
             },
           };
         }
@@ -176,6 +178,7 @@ const PermissionsDashboard = () => {
             can_see_historial: config.permissions.canSeeHistorial,
             can_send_messages: config.permissions.canSendMessages,
             can_restore_deleted: config.permissions.canRestoreDeleted,
+            can_import_csv: config.permissions.canImportCsv,
           })),
           { onConflict: 'role' }
         );
@@ -196,19 +199,20 @@ const PermissionsDashboard = () => {
 
   const permissionColumns = [
     // Solapas visibles
-    { key: 'canSeePool', label: 'Ver solapa Pool', icon: Eye },
-    { key: 'canSeeBaseDatos', label: 'Ver solapa Base de Datos', icon: Eye },
+    { key: 'canSeePool', label: 'Ver solapa Semillero', icon: Eye },
+    { key: 'canSeeBaseDatos', label: 'Ver solapa Datos Globales', icon: Eye },
     { key: 'canSeeCelulas', label: 'Ver solapa Células', icon: Eye },
     { key: 'canEditCelulas', label: 'Editar células', icon: Edit },
     { key: 'canSeeHistorial', label: 'Ver Historial de actividad', icon: Eye },
     { key: 'canSendMessages', label: 'Enviar mensajes internos', icon: Edit },
     { key: 'canRestoreDeleted', label: 'Restaurar de la Papelera', icon: Edit },
+    { key: 'canImportCsv', label: 'Importar contactos por CSV', icon: Edit },
     { key: 'seeOwnChurchAnalytics', label: 'Ver Resumen / Equipo / Cuerdas / Mapa', icon: BarChart },
     // Contactos
-    { key: 'addContacts', label: 'Crear contactos (en Pool)', icon: UserPlus },
+    { key: 'addContacts', label: 'Crear contactos (en Semillero)', icon: UserPlus },
     { key: 'editDeleteContacts', label: 'Editar/eliminar contactos', icon: Edit },
     { key: 'canEditCuerda', label: 'Editar número de cuerda', icon: Edit },
-    { key: 'baseDatosTotal', label: 'Ver todas las cuerdas en Base de Datos', icon: Eye },
+    { key: 'baseDatosTotal', label: 'Ver todas las cuerdas en Datos Globales', icon: Eye },
     // Equipo
     { key: 'addMembers', label: 'Agregar miembro al equipo', icon: UserPlus },
     { key: 'editDeleteMembers', label: 'Editar/eliminar miembro del equipo', icon: Edit },

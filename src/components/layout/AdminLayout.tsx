@@ -7,10 +7,12 @@ import { Menu, X } from 'lucide-react';
 function getPageTitle(pathname: string): string {
   if (pathname === '/admin/dashboard') return 'Dashboard';
   if (pathname.includes('/overview')) return 'Vista General';
-  if (pathname.includes('/database')) return 'Contactos';
+  if (pathname.includes('/database')) return 'Datos Globales';
   if (pathname.includes('/team')) return 'Equipo';
   if (pathname.includes('/cuerdas')) return 'Cuerdas';
-  if (pathname.includes('/pool')) return 'Pool de Contactos';
+  if (pathname.includes('/pool')) return 'Semillero';
+  if (pathname.includes('/hogares')) return 'Hogares de Paz';
+  if (pathname.includes('/validator')) return 'Validador de Datos';
   if (pathname.includes('/zonas')) return 'Zonas y Barrios';
   if (pathname.includes('/mapa')) return 'Mapa';
   if (pathname.startsWith('/admin/churches')) return 'Ministerio';

@@ -120,7 +120,7 @@ const ChurchDatabasePage = () => {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl sm:text-3xl font-bold">
-            {canSeeAll ? 'Base de Datos' : `Base de Datos — Cuerda ${userCuerdaNumero || ''}`}
+            {canSeeAll ? 'Datos Globales' : `Datos Globales — Cuerda ${userCuerdaNumero || ''}`}
           </h1>
           <div id="selection-toolbar-slot" />
         </div>

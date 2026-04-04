@@ -53,7 +53,7 @@ const InfoPage = () => {
           <div className="p-2.5 rounded border">4. Supervisor — Ve analíticas y datos de su iglesia</div>
           <div className="p-2.5 rounded border">5. Referente — Ve los datos de su cuerda y analíticas</div>
           <div className="p-2.5 rounded border">6. Encargado de Célula — Gestiona su célula asignada</div>
-          <div className="p-2.5 rounded border">7. Conector — Solo puede crear contactos en el Pool</div>
+          <div className="p-2.5 rounded border">7. Conector — Solo puede crear contactos en el Semillero</div>
           <div className="p-2.5 rounded border text-muted-foreground">8. Anfitrión — Acceso mínimo, solo su perfil</div>
         </div>
       </section>
@@ -69,14 +69,14 @@ const InfoPage = () => {
         </div>
       </section>
 
-      {/* Pool logic */}
+      {/* Semillero logic */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">¿Cómo funciona el Pool?</h2>
+        <h2 className="text-lg font-semibold">¿Cómo funciona el Semillero?</h2>
         <div className="text-sm space-y-2 text-muted-foreground">
-          <p>El <span className="text-foreground font-medium">Pool</span> es la bandeja de entrada de contactos nuevos. Cuando un conector sale a la calle y conoce a alguien, crea el contacto ahí.</p>
-          <p>Los contactos en el Pool están <span className="text-foreground font-medium">Sin Asignar</span> — no tienen célula ni cuerda todavía.</p>
-          <p>Un pastor, general o admin puede <span className="text-foreground font-medium">asignar</span> un contacto del Pool a una célula específica. Al hacerlo, el contacto se mueve automáticamente a la <span className="text-foreground font-medium">Base de Datos</span>.</p>
-          <p>La Base de Datos muestra todos los contactos que ya fueron procesados y asignados a una cuerda/célula.</p>
+          <p>El <span className="text-foreground font-medium">Semillero</span> es la bandeja de entrada de contactos nuevos. Cuando un conector sale a la calle y conoce a alguien, crea el contacto ahí.</p>
+          <p>Los contactos en el Semillero están <span className="text-foreground font-medium">Sin Asignar</span> — no tienen célula ni cuerda todavía.</p>
+          <p>Un pastor, general o admin puede <span className="text-foreground font-medium">asignar</span> un contacto del Semillero a una célula específica. Al hacerlo, el contacto se mueve automáticamente a la <span className="text-foreground font-medium">Datos Globales</span>.</p>
+          <p>La Datos Globales muestra todos los contactos que ya fueron procesados y asignados a una cuerda/célula.</p>
         </div>
       </section>
 
@@ -86,7 +86,7 @@ const InfoPage = () => {
         <div className="text-sm space-y-2 text-muted-foreground">
           <p>Cada cuerda tiene un <span className="text-foreground font-medium">número</span> (ej: 101, 202, 301) que identifica a qué zona pertenece.</p>
           <p>Las cuerdas que empiezan con <span className="text-foreground font-medium">1xx</span> y <span className="text-foreground font-medium">2xx</span> corresponden a la misma zona (ej: 101 y 201 son ambas de San Martín).</p>
-          <p>Cambiar el número de cuerda de un contacto es una acción <span className="text-foreground font-medium">delicada</span> — para la mayoría de los roles, el contacto se devuelve al Pool para ser reasignado.</p>
+          <p>Cambiar el número de cuerda de un contacto es una acción <span className="text-foreground font-medium">delicada</span> — para la mayoría de los roles, el contacto se devuelve al Semillero para ser reasignado.</p>
         </div>
       </section>
 
