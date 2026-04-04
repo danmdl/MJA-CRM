@@ -93,12 +93,13 @@ const PoolPage = () => {
   const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
-    type: 'auto' | 'manual';
+    type: 'auto' | 'manual' | 'cuerda_only';
     contactId?: string;
     cellId?: string;
     cellName?: string;
     cuerdaNum?: string;
     zonaName?: string;
+    cuerdaZonaId?: string;
     preview?: { label: string; count: number }[];
   } | null>(null);
   const [undoData, setUndoData] = useState<{
@@ -653,7 +654,16 @@ const PoolPage = () => {
                         {/* Assign button */}
                         {isUnassignedView && isAdminOrPastor && (
                           <td className="px-3 py-2.5" style={{ width: colWidths.asignar }}>
-                            {!hasAddress ? (
+                            {/* If contact is in external pool, show Devolver button */}
+                            {(c as any).is_external && activePool === 'external' ? (
+                              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
+                                await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
+                                showSuccess('Contacto devuelto al Pool Sin Asignar.');
+                                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                              }}>
+                                <Undo2 className="h-3 w-3 mr-1" /> Devolver
+                              </Button>
+                            ) : !hasAddress ? (
                               <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help">Sin dirección</Badge></TooltipTrigger>
                                 <TooltipContent><p className="text-xs">Completá la dirección para asignar.</p></TooltipContent></Tooltip>
                             ) : (
@@ -683,6 +693,29 @@ const PoolPage = () => {
                                     <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-64 max-h-[340px] overflow-y-auto">
+                                    {/* Cuerda-only assignment */}
+                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
+                                    {(cuerdas || []).filter(cr => {
+                                      // Gender filter: 1xx male, 2xx female, 3xx both
+                                      const prefix = parseInt(cr.numero.charAt(0));
+                                      const sexo = c.sexo?.toLowerCase();
+                                      if (sexo === 'femenino' && prefix === 1) return false;
+                                      if (sexo === 'masculino' && prefix === 2) return false;
+                                      return true;
+                                    }).map(cr => {
+                                      const zona = zonas?.find(z => z.id === cr.zona_id);
+                                      return (
+                                        <DropdownMenuItem key={`cuerda-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
+                                          type: 'cuerda_only', contactId: c.id, cellId: '', cellName: `Cuerda ${cr.numero}`,
+                                          cuerdaNum: cr.numero, zonaName: zona?.nombre, cuerdaZonaId: zona?.id,
+                                        })}>
+                                          <span className="font-mono font-medium">{cr.numero}</span>
+                                          {zona && <span className="text-[10px] text-muted-foreground ml-1.5">{zona.nombre}</span>}
+                                        </DropdownMenuItem>
+                                      );
+                                    })}
+                                    <DropdownMenuSeparator />
+                                    {/* Cell assignment */}
                                     {(() => {
                                       const { inZone, otherZone } = getCellDropdownItems(c);
                                       return (
@@ -820,8 +853,25 @@ const PoolPage = () => {
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (confirmDialog?.type === 'auto') autoAssignMutation.mutate();
+                else if (confirmDialog?.type === 'cuerda_only' && confirmDialog?.contactId && confirmDialog?.cuerdaNum) {
+                  // Assign to cuerda only (no cell)
+                  const zona = zonas?.find(z => z.id === confirmDialog.cuerdaZonaId);
+                  const { error } = await supabase.from('contacts').update({
+                    numero_cuerda: confirmDialog.cuerdaNum,
+                    zona_id: zona?.id || null,
+                    zona: zona?.nombre || null,
+                    cell_id: null,
+                  }).eq('id', confirmDialog.contactId);
+                  if (error) showError(error.message);
+                  else {
+                    showSuccess(`Contacto asignado a Cuerda ${confirmDialog.cuerdaNum}.`);
+                    queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                    queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+                  }
+                  setConfirmDialog(null);
+                }
                 else if (confirmDialog?.contactId && confirmDialog?.cellId) assignSingleMutation.mutate({ contactId: confirmDialog.contactId, cellId: confirmDialog.cellId });
               }}
               disabled={autoAssignMutation.isPending || assignSingleMutation.isPending}

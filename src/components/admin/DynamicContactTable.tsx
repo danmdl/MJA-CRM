@@ -389,6 +389,9 @@ const DynamicContactTable = ({
 
     if (churchId) contactQuery = contactQuery.eq('church_id', churchId);
     contactQuery = contactQuery.is('deleted_at', null);
+    // CRITICAL: Base de Datos only shows contacts that have been assigned to a cuerda
+    // Pool contacts (no cuerda) should NOT appear here
+    contactQuery = contactQuery.not('numero_cuerda', 'is', null);
 
     const { data: contactsData, error: contactsError } = await contactQuery;
     if (contactsError) throw new Error('No se pudieron cargar los contactos.');
