@@ -551,8 +551,12 @@ const PoolPage = () => {
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={() => {
-          queryClient.refetchQueries({ queryKey: ['cells-pool', churchId] });
-          queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['cuerdas-pool', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['zonas', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['barrios', churchId] });
+          geocodedRef.current = false; // Allow auto-geocode to run again for new contacts
         }} className="gap-1.5" title="Actualizar datos (células y contactos)">
           <RefreshCw className="h-4 w-4" />
         </Button>
