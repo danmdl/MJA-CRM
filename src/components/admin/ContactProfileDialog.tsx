@@ -212,7 +212,7 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
 );
 
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
-  const safeClose = () => setTimeout(() => onOpenChange(false), 50);
+  const safeClose = () => { setShowContactMap(false); setTimeout(() => onOpenChange(false), 50); };
   const [contact, setContact] = useState<Contact | null>(null);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -232,6 +232,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   // Cell suggestion state
   const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
   const [pendingCuerdaChange, setPendingCuerdaChange] = useState<string | null>(null);
+  const [showContactMap, setShowContactMap] = useState(false);
   const [whatsappMsg, setWhatsappMsg] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(false);
 
@@ -357,6 +358,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             estado_seguimiento: contact.estado_seguimiento || 'nuevo',
             observaciones: contact.observaciones || null,
             pedido_de_oracion: contact.pedido_de_oracion || null,
+            lat: (contact as any).lat || null,
+            lng: (contact as any).lng || null,
           }
         }),
       });
@@ -437,9 +440,66 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Dirección</label>
                 <AddressAutocomplete
                   value={contact.address || ''}
-                  onChange={(addr, lat, lng, barrio) => setContact(prev => ({ ...prev!, address: addr || null, ...(barrio ? { barrio } : {}) }))}
+                  onChange={(addr, lat, lng, barrio) => {
+                    setContact(prev => ({
+                      ...prev!,
+                      address: addr || null,
+                      ...(lat != null ? { lat } : {}),
+                      ...(lng != null ? { lng } : {}),
+                      ...(barrio ? { barrio } : {}),
+                    } as any));
+                  }}
                   placeholder="Escribe la dirección..."
                 />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="text-[10px] text-primary hover:underline flex items-center gap-1"
+                    onClick={() => setShowContactMap(!showContactMap)}
+                  >
+                    <MapPin className="h-3 w-3" /> {showContactMap ? 'Ocultar mapa' : 'Ubicar en Mapa'}
+                  </button>
+                  {(contact as any).lat != null && (contact as any).lng != null && (
+                    <span className="text-[10px] text-muted-foreground">({(contact as any).lat.toFixed(4)}, {(contact as any).lng.toFixed(4)})</span>
+                  )}
+                </div>
+                {showContactMap && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground">Hacé clic en el mapa o arrastrá el pin para ubicar al contacto.</p>
+                    <div
+                      ref={(el) => {
+                        if (!el || !(window as any).google) return;
+                        const google = (window as any).google;
+                        const cLat = (contact as any).lat;
+                        const cLng = (contact as any).lng;
+                        const center = cLat != null && cLng != null
+                          ? { lat: cLat, lng: cLng }
+                          : { lat: -34.58, lng: -58.52 };
+                        const map = new google.maps.Map(el, {
+                          center, zoom: cLat != null ? 16 : 13,
+                          mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+                        });
+                        const marker = new google.maps.Marker({ position: center, map, draggable: true });
+                        const updateFromLatLng = (lat: number, lng: number) => {
+                          const geocoder = new google.maps.Geocoder();
+                          geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
+                            const addr = status === 'OK' && results?.[0] ? results[0].formatted_address : contact.address;
+                            setContact(prev => ({ ...prev!, address: addr, lat, lng } as any));
+                          });
+                        };
+                        map.addListener('click', (e: any) => {
+                          marker.setPosition(e.latLng);
+                          updateFromLatLng(e.latLng.lat(), e.latLng.lng());
+                        });
+                        marker.addListener('dragend', () => {
+                          const pos = marker.getPosition();
+                          updateFromLatLng(pos.lat(), pos.lng());
+                        });
+                      }}
+                      className="w-full h-[200px] rounded border"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Row 4: Apartamento / Barrio */}
