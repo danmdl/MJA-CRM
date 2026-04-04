@@ -67,6 +67,8 @@ interface Leader {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  role?: string | null;
+  numero_cuerda?: string | null;
 }
 
 interface Cell {
@@ -301,10 +303,16 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         });
         if (resp.ok) {
           const data = await resp.json();
-          const leaderRoles = ['pastor', 'referente', 'encargado_de_celula', 'general'];
+          const leaderRoles = ['pastor', 'referente', 'encargado_de_celula', 'general', 'supervisor'];
+          // Edge function doesn't return numero_cuerda, fetch it directly
+          const { data: profilesData } = await supabase.from('profiles').select('id, role, numero_cuerda').eq('church_id', churchId);
+          const cuerdaMap = new Map((profilesData || []).map((p: any) => [p.id, { role: p.role, numero_cuerda: p.numero_cuerda }]));
           const mapped: Leader[] = (data || [])
             .filter((u: any) => leaderRoles.includes(u.role))
-            .map((u: any) => ({ id: u.id, first_name: u.first_name, last_name: u.last_name }));
+            .map((u: any) => {
+              const extra = cuerdaMap.get(u.id);
+              return { id: u.id, first_name: u.first_name, last_name: u.last_name, role: extra?.role || u.role, numero_cuerda: extra?.numero_cuerda || null };
+            });
           setLeaders(mapped);
         } else {
           setLeaders([]);
@@ -559,6 +567,16 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   </Select>
                 </div>
                 <SelectField label="Líder de Célula" value={contact.leader_assigned} onChange={(v) => setContact({ ...contact, leader_assigned: v })} options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))} placeholder="Sin líder" />
+              </div>
+
+              {/* Referente (readonly — resolved from cuerda) */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Referente de Cuerda</label>
+                <input readOnly value={(() => {
+                  if (!contact.numero_cuerda || !leaders?.length) return '—';
+                  const ref = leaders.find(l => l.numero_cuerda === contact.numero_cuerda && (l.role === 'referente' || l.role === 'supervisor'));
+                  return ref ? `${ref.first_name || ''} ${ref.last_name || ''}`.trim() || '—' : '—';
+                })()} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
               </div>
 
               {/* Observaciones / Pedido de oración */}
