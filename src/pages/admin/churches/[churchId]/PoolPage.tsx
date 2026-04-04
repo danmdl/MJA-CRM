@@ -92,6 +92,7 @@ const PoolPage = () => {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
   const [addContactOpen, setAddContactOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'auto' | 'manual' | 'cuerda_only';
     contactId?: string;
@@ -550,15 +551,19 @@ const PoolPage = () => {
             <PlusCircle className="h-4 w-4" /> Crear Contacto
           </Button>
         )}
-        <Button size="sm" variant="ghost" onClick={() => {
-          queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
-          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-          queryClient.invalidateQueries({ queryKey: ['cuerdas-pool', churchId] });
-          queryClient.invalidateQueries({ queryKey: ['zonas', churchId] });
-          queryClient.invalidateQueries({ queryKey: ['barrios', churchId] });
-          geocodedRef.current = false; // Allow auto-geocode to run again for new contacts
-        }} className="gap-1.5" title="Actualizar datos (células y contactos)">
-          <RefreshCw className="h-4 w-4" />
+        <Button size="sm" variant="ghost" disabled={refreshing} onClick={async () => {
+          setRefreshing(true);
+          await queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
+          await queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          await queryClient.invalidateQueries({ queryKey: ['cuerdas-pool', churchId] });
+          await queryClient.invalidateQueries({ queryKey: ['zonas', churchId] });
+          await queryClient.invalidateQueries({ queryKey: ['barrios', churchId] });
+          geocodedRef.current = false;
+          showSuccess('Datos actualizados.');
+          setRefreshing(false);
+        }} className="gap-1.5" title="Actualizar datos">
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Actualizando...' : 'Actualizar'}
         </Button>
         <div className="flex-1" />
         <div className="relative w-64 max-w-full">
