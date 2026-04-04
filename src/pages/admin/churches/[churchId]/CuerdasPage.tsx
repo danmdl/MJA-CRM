@@ -54,7 +54,7 @@ interface Cell {
 const CuerdasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
-  const { canAddUsers, canEditDeleteUsers, canSeeBaseDatosTotal } = usePermissions();
+  const { canAddUsers, canEditDeleteUsers, canSeeBaseDatosTotal, canEditCuerdas } = usePermissions();
   const queryClient = useQueryClient();
 
   const [expandedCuerda, setExpandedCuerda] = useState<string | null>(null);
@@ -74,7 +74,7 @@ const CuerdasPage = () => {
   // User's own cuerda (for filtering)
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAll = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
-  const isAdminOrPastor = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  // Edit permission comes from canEditCuerdas() via usePermissions
   const canManageCuerdas = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
 
   // ─── Data fetching ─────────────────────────────────────────────
@@ -284,7 +284,7 @@ const CuerdasPage = () => {
               <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Cuerda
             </Button>
           )}
-          {(isAdminOrPastor || canAddUsers()) && (
+          {(canEditCuerdas() || canAddUsers()) && (
             <>
               <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
                 <Upload className="mr-1.5 h-4 w-4" /> Importar Células
@@ -415,7 +415,7 @@ const CuerdasPage = () => {
                                         {cell.address && <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" /> {cell.address}</span>}
                                       </div>
                                     </div>
-                                    {isAdminOrPastor && (
+                                    {canEditCuerdas() && (
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <Button variant="ghost" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
@@ -474,7 +474,7 @@ const CuerdasPage = () => {
                                 {cell.address && <span><MapPin className="h-3 w-3 inline mr-0.5" />{cell.address}</span>}
                               </div>
                             </div>
-                            {isAdminOrPastor && (
+                            {canEditCuerdas() && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
