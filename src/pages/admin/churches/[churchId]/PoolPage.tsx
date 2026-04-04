@@ -147,7 +147,7 @@ const PoolPage = () => {
   const { data: cells } = useQuery<Cell[]>({
     queryKey: ['cells-pool', churchId],
     queryFn: async () => {
-      const { data } = await supabase.from('cells').select('id, name, church_id, cuerda_id, address, lat, lng, meeting_day, meeting_time').eq('church_id', churchId!);
+      const { data } = await supabase.from('cells').select('id, name, church_id, cuerda_id, address, lat, lng, meeting_day, meeting_time').eq('church_id', churchId!).is('deleted_at', null);
       return (data || []) as Cell[];
     },
     enabled: !!churchId,
@@ -189,9 +189,9 @@ const PoolPage = () => {
     if (!cells?.length) return [];
 
     // If contact has coordinates, use PURE distance on ALL cells — ignore zona filtering
-    if (contact.lat && contact.lng) {
+    if (contact.lat != null && contact.lng != null) {
       const cellsWithDist = cells
-        .filter(c => c.lat && c.lng)
+        .filter(c => c.lat != null && c.lng != null)
         .map(cell => ({
           cell,
           dist: haversine(contact.lat!, contact.lng!, cell.lat!, cell.lng!),
@@ -676,7 +676,7 @@ const PoolPage = () => {
                                   <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
                                     {sugCell.name}
                                   </Badge>
-                                  {c.lat && c.lng && sugCell.lat && sugCell.lng && (
+                                  {c.lat != null && c.lng != null && sugCell.lat != null && sugCell.lng != null && (
                                     <span className="text-[10px] text-muted-foreground ml-1">
                                       {haversine(c.lat, c.lng, sugCell.lat, sugCell.lng).toFixed(1)} km
                                     </span>
