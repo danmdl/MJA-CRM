@@ -170,6 +170,35 @@ const PoolPage = () => {
     enabled: !!churchId,
   });
 
+  // ─── Auto-geocode contacts with address but no lat/lng ──────────
+  useEffect(() => {
+    if (!allContacts?.length) return;
+    const toGeocode = allContacts.filter(c => c.address && (c.lat == null || c.lng == null));
+    if (toGeocode.length === 0) return;
+    if (!(window as any).google?.maps) return;
+
+    const geocoder = new (window as any).google.maps.Geocoder();
+    let processed = 0;
+
+    toGeocode.forEach((contact, i) => {
+      // Throttle: 1 request per 200ms to avoid rate limits
+      setTimeout(() => {
+        geocoder.geocode({ address: contact.address }, async (results: any[], status: string) => {
+          if (status === 'OK' && results?.[0]?.geometry?.location) {
+            const lat = results[0].geometry.location.lat();
+            const lng = results[0].geometry.location.lng();
+            await supabase.from('contacts').update({ lat, lng }).eq('id', contact.id);
+            processed++;
+            // After all geocoded, refetch contacts
+            if (processed >= toGeocode.length) {
+              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            }
+          }
+        });
+      }, i * 200);
+    });
+  }, [allContacts, churchId, queryClient]);
+
   // ─── Cell suggestion by distance ───────────────────────────────
   // First detect zona from barrio/address text, then find cells in that zona sorted by distance
   const detectZonaForContact = useCallback((contact: Contact): Zona | null => {
