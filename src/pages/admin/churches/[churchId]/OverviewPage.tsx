@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import PipelineSummaryCard from '@/components/admin/PipelineSummaryCard';
+import MetricsCharts from '@/components/admin/MetricsCharts';
 import CustomReportBuilder from '@/components/admin/CustomReportBuilder';
 
 interface Church {
@@ -474,6 +475,9 @@ const OverviewPage = () => {
           items={analytics.topCells.map(c => ({ label: c.name, value: c.count }))}
         />
       </div>
+
+      {/* Metrics charts */}
+      <MetricsCharts churchId={churchId!} />
 
       {/* Pipeline at the end */}
       <PipelineSummaryCard churchId={churchId!} />
