@@ -154,9 +154,44 @@ const ValidatorPage = () => {
   const infoCount = issues.filter(i => i.severity === 'info').length;
   const totalIssues = issues.length;
 
-  const fixBadCoords = async (contactId: string) => {
+  const [geocodePreview, setGeocodePreview] = useState<{ contactId: string; address: string; lat: number; lng: number; valid: boolean } | null>(null);
+  const [geocoding, setGeocoding] = useState<string | null>(null);
+
+  const tryReGeocode = async (contactId: string, address: string) => {
+    if (!(window as any).google?.maps) { showError('Google Maps no cargado. Recargá la página.'); return; }
+    setGeocoding(contactId);
+    setGeocodePreview(null);
+    const geocoder = new (window as any).google.maps.Geocoder();
+    const searchAddr = `${address}, Buenos Aires, Argentina`;
+    geocoder.geocode({ address: searchAddr }, (results: any[], status: string) => {
+      setGeocoding(null);
+      if (status === 'OK' && results?.[0]?.geometry?.location) {
+        const lat = results[0].geometry.location.lat();
+        const lng = results[0].geometry.location.lng();
+        const valid = isWithinGBA(lat, lng);
+        setGeocodePreview({ contactId, address: results[0].formatted_address, lat, lng, valid });
+      } else {
+        showError('No se pudo geocodear esta dirección.');
+      }
+    });
+  };
+
+  const confirmGeocode = async () => {
+    if (!geocodePreview) return;
+    if (geocodePreview.valid) {
+      await supabase.from('contacts').update({ lat: geocodePreview.lat, lng: geocodePreview.lng, address: geocodePreview.address }).eq('id', geocodePreview.contactId);
+      showSuccess(`Coordenadas corregidas: ${geocodePreview.address}`);
+    } else {
+      await supabase.from('contacts').update({ lat: null, lng: null }).eq('id', geocodePreview.contactId);
+      showSuccess('Coordenadas eliminadas (fuera de zona). Corregí la dirección manualmente.');
+    }
+    setGeocodePreview(null);
+    runValidation();
+  };
+
+  const clearCoords = async (contactId: string) => {
     await supabase.from('contacts').update({ lat: null, lng: null }).eq('id', contactId);
-    showSuccess('Coordenadas limpiadas. Se re-geocodearán automáticamente.');
+    showSuccess('Coordenadas eliminadas. Editá la dirección manualmente desde el Semillero.');
     runValidation();
   };
 
@@ -264,8 +299,23 @@ const ValidatorPage = () => {
                       </Button>
                     )}
                     {item.type === 'contacts_bad_coords' && (
-                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => fixBadCoords(item.entityId)}>
-                        Limpiar coords
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" disabled={geocoding === item.entityId}
+                          onClick={() => tryReGeocode(item.entityId, item.detail.split('fuera')[0].replace('Coordenadas (', '').trim())}>
+                          {geocoding === item.entityId ? '...' : 'Re-geocodear'}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-red-400" onClick={() => clearCoords(item.entityId)}>
+                          Borrar
+                        </Button>
+                      </div>
+                    )}
+                    {item.type === 'contacts_no_coords' && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" disabled={geocoding === item.entityId}
+                        onClick={() => {
+                          const addr = item.detail.replace('Dirección: ', '').replace(' — sin geolocalización', '');
+                          tryReGeocode(item.entityId, addr);
+                        }}>
+                        {geocoding === item.entityId ? '...' : 'Geocodear'}
                       </Button>
                     )}
                   </div>
@@ -275,6 +325,36 @@ const ValidatorPage = () => {
           </div>
         );
       })}
+      {/* Geocode preview */}
+      {geocodePreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setGeocodePreview(null)}>
+          <div className="bg-background border rounded-lg p-5 max-w-md w-full mx-4 space-y-3" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-sm">Resultado del geocodeo</h3>
+            <div className="space-y-2 text-sm">
+              <p><span className="text-muted-foreground">Dirección encontrada:</span> {geocodePreview.address}</p>
+              <p><span className="text-muted-foreground">Coordenadas:</span> {geocodePreview.lat.toFixed(5)}, {geocodePreview.lng.toFixed(5)}</p>
+              <p>
+                <span className="text-muted-foreground">Dentro de Buenos Aires:</span>{' '}
+                {geocodePreview.valid
+                  ? <span className="text-green-500 font-medium">✅ Sí — coordenadas correctas</span>
+                  : <span className="text-red-500 font-medium">❌ No — fuera de zona (se borrarán las coordenadas)</span>
+                }
+              </p>
+            </div>
+            {geocodePreview.valid && (
+              <a href={`https://www.google.com/maps?q=${geocodePreview.lat},${geocodePreview.lng}`} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                Ver en Google Maps ↗
+              </a>
+            )}
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button size="sm" variant="ghost" onClick={() => setGeocodePreview(null)}>Cancelar</Button>
+              <Button size="sm" onClick={confirmGeocode}>
+                {geocodePreview.valid ? 'Guardar coordenadas' : 'Borrar coordenadas'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
