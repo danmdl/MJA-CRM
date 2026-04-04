@@ -237,7 +237,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [showContactMap, setShowContactMap] = useState(false);
   const [whatsappMsg, setWhatsappMsg] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(false);
-  const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; body: string }[]>([]);
+  const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; body: string; is_default?: boolean }[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateBody, setNewTemplateBody] = useState('');
@@ -249,9 +249,29 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       fetchLeadersAndCells();
       fetchTransfers();
       // Load user's WhatsApp templates
-      supabase.from('whatsapp_templates').select('id, name, body').then(({ data }) => setSavedTemplates(data || []));
+      supabase.from('whatsapp_templates').select('id, name, body, is_default').then(({ data }) => {
+        const templates = data || [];
+        setSavedTemplates(templates);
+        // Auto-load default template
+        const defaultTpl = templates.find((t: any) => t.is_default);
+        if (defaultTpl) {
+          setWhatsappMsg(defaultTpl.body);
+        }
+      });
     }
   }, [open, contactId]);
+
+  // Apply variable replacement to default template when contact data is available
+  useEffect(() => {
+    if (!contact || !whatsappMsg) return;
+    let msg = whatsappMsg;
+    if (msg.includes('{nombre}') || msg.includes('{apellido}') || msg.includes('{telefono}')) {
+      msg = msg.replace(/\{nombre\}/gi, contact.first_name || '');
+      msg = msg.replace(/\{apellido\}/gi, contact.last_name || '');
+      msg = msg.replace(/\{telefono\}/gi, contact.phone || '');
+      setWhatsappMsg(msg);
+    }
+  }, [contact?.first_name]);
 
   const fetchTransfers = async () => {
     if (!contactId) return;
@@ -626,11 +646,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               {contact.phone && !whatsappCell && (
                 <div className="border border-green-500/20 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-medium text-green-400"><MessageSquare className="h-4 w-4" /> Enviar WhatsApp</div>
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-green-400" />
+                      <span className="text-sm font-medium text-green-400">Enviar WhatsApp</span>
+                      {(() => { const def = savedTemplates.find(t => t.is_default); return def ? <span className="text-[9px] text-muted-foreground">· {def.name}</span> : null; })()}
+                    </div>
                     <div className="flex items-center gap-1">
                       <select className="text-[10px] bg-background border rounded px-1.5 py-0.5"
                         onChange={async (e) => {
-                          if (e.target.value === '_new') { setEditingTemplate(true); return; }
                           if (e.target.value === '_manage') { setShowTemplates(true); return; }
                           if (e.target.value) {
                             const { data } = await supabase.from('whatsapp_templates').select('body').eq('id', e.target.value).single();
@@ -640,24 +663,20 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                               msg = msg.replace(/\{apellido\}/gi, contact.last_name || '');
                               msg = msg.replace(/\{telefono\}/gi, contact.phone || '');
                               setWhatsappMsg(msg);
-                              setEditingTemplate(true);
                             }
                           }
                         }}
                         defaultValue="">
-                        <option value="">Usar plantilla...</option>
-                        {(savedTemplates || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        <option value="">Cambiar plantilla...</option>
+                        {(savedTemplates || []).map(t => <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' ★' : ''}</option>)}
                         <option value="_manage">⚙️ Administrar plantillas</option>
                       </select>
                     </div>
                   </div>
-                  {editingTemplate && <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[60px]" placeholder="Escribí tu mensaje o elegí una plantilla..." />}
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700" onClick={() => { window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }}>
-                      <MessageSquare className="h-3.5 w-3.5" /> Enviar por WhatsApp
-                    </Button>
-                    {!editingTemplate && <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setEditingTemplate(true)}>Escribir mensaje</Button>}
-                  </div>
+                  <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[60px]" placeholder="Escribí tu mensaje o elegí una plantilla..." />
+                  <Button type="button" size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 w-full" onClick={() => { window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }}>
+                    <MessageSquare className="h-3.5 w-3.5" /> Enviar por WhatsApp
+                  </Button>
                 </div>
               )}
 
@@ -762,13 +781,30 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     {savedTemplates.length > 0 && (
                       <div className="space-y-2">
                         {savedTemplates.map(t => (
-                          <div key={t.id} className="border rounded p-2.5 space-y-1">
+                          <div key={t.id} className={`border rounded p-2.5 space-y-1 ${t.is_default ? 'border-green-500/50 bg-green-500/5' : ''}`}>
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">{t.name}</span>
-                              <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-red-400" onClick={async () => {
-                                await supabase.from('whatsapp_templates').delete().eq('id', t.id);
-                                setSavedTemplates(prev => prev.filter(x => x.id !== t.id));
-                              }}>Eliminar</Button>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{t.name}</span>
+                                {t.is_default && <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">DEFAULT</span>}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button size="sm" variant="ghost" className={`h-6 text-[10px] px-2 ${t.is_default ? 'text-muted-foreground' : 'text-green-400'}`} onClick={async () => {
+                                  // Unset all defaults first, then set this one
+                                  await supabase.from('whatsapp_templates').update({ is_default: false }).eq('user_id', session?.user?.id!);
+                                  if (!t.is_default) {
+                                    await supabase.from('whatsapp_templates').update({ is_default: true }).eq('id', t.id);
+                                  }
+                                  const { data } = await supabase.from('whatsapp_templates').select('id, name, body, is_default');
+                                  setSavedTemplates(data || []);
+                                  showSuccess(t.is_default ? 'Default removido.' : `"${t.name}" es ahora la plantilla por defecto.`);
+                                }}>
+                                  {t.is_default ? 'Quitar default' : 'Hacer default'}
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-red-400" onClick={async () => {
+                                  await supabase.from('whatsapp_templates').delete().eq('id', t.id);
+                                  setSavedTemplates(prev => prev.filter(x => x.id !== t.id));
+                                }}>Eliminar</Button>
+                              </div>
                             </div>
                             <p className="text-xs text-muted-foreground whitespace-pre-wrap">{t.body}</p>
                           </div>
