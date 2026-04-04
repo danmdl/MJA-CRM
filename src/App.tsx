@@ -22,17 +22,21 @@ import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 
 // Error boundary: catches chunk load failures and auto-reloads
-class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  constructor(props: any) { super(props); this.state = { hasError: false }; }
+class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; isRetrying: boolean }> {
+  constructor(props: any) { super(props); this.state = { hasError: false, isRetrying: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(error: any) {
-    // If it's a chunk load error, reload the page
+    // If it's a chunk load error, reload silently
     if (error?.message?.includes('Loading chunk') || error?.message?.includes('Failed to fetch') || error?.name === 'ChunkLoadError') {
+      this.setState({ isRetrying: true });
       window.location.reload();
+      return;
     }
   }
   render() {
     if (this.state.hasError) {
+      // While retrying (chunk reload), show nothing — the page is about to reload
+      if (this.state.isRetrying) return null;
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center space-y-3">
@@ -46,9 +50,12 @@ class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, 
   }
 }
 
-// Lazy import with retry on failure (handles stale chunk hashes after deploys)
+// Lazy import with retry — returns a promise that resolves after retry, never calls reload()
 const lazyRetry = (fn: () => Promise<any>) => React.lazy(() =>
-  fn().catch(() => { window.location.reload(); return fn(); })
+  fn().catch(() => new Promise<any>((resolve) => {
+    // Wait a beat then retry once (handles stale chunks after deploy)
+    setTimeout(() => resolve(fn()), 500);
+  }))
 );
 
 // Lazy-loaded pages (heavy components, loaded on demand)
@@ -103,7 +110,7 @@ const AppRoutes = () => {
 
   return (
     <ChunkErrorBoundary>
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-muted-foreground">Cargando...</div></div>}>
+    <Suspense fallback={null}>
     <Routes>
       <Route path="/login" element={<Login />} />
 
