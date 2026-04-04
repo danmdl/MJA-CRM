@@ -158,7 +158,7 @@ const PoolPage = () => {
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
       let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo')
+        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, is_external')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
       if (profile?.role === 'conector') {
@@ -314,9 +314,8 @@ const PoolPage = () => {
   }, [allContacts, zonas]);
 
   // ─── Pool counts ───────────────────────────────────────────────
-  // Pool externo: only contacts explicitly marked as external (future feature)
-  // For now, all unassigned contacts go to "Sin asignar"
-  const externalContacts: Contact[] = [];
+  // Pool externo: contacts flagged as external (nearest cell is in a different zona)
+  const externalContacts = useMemo(() => (allContacts || []).filter(c => (c as any).is_external === true && !c.cell_id), [allContacts]);
 
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
 
@@ -660,12 +659,22 @@ const PoolPage = () => {
                             ) : (
                               <div className="flex items-center gap-1">
                                 {/* Quick auto-assign button */}
-                                {sugCell && (
+                                {sugCell && !isExternal && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
                                     type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
                                   })}>
                                     <Zap className="h-3 w-3 mr-1" /> Asignar
+                                  </Button>
+                                )}
+                                {/* External zona — move to Pool Externo */}
+                                {sugCell && isExternal && (
+                                  <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
+                                    await supabase.from('contacts').update({ is_external: true }).eq('id', c.id);
+                                    showSuccess('Contacto movido al Pool Externo para revisión.');
+                                    queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                  }}>
+                                    <ExternalLink className="h-3 w-3 mr-1" /> Externo
                                   </Button>
                                 )}
                                 {/* Dropdown for manual selection */}
