@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, Shield, Users, Building, BarChart, UserPlus, Edit, Eye, UserCog } from 'lucide-react'; // Added UserCog icon
+import { Check, X, Shield, Users, Building, BarChart, UserPlus, Edit, Eye, UserCog, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -78,6 +79,7 @@ const defaultPermissions: PermissionConfig[] = [
 const PermissionsDashboard = () => {
   const [permissions, setPermissions] = useState<PermissionConfig[]>(defaultPermissions);
   const [isSaving, setIsSaving] = useState(false);
+  const [permSearch, setPermSearch] = useState('');
   const queryClient = useQueryClient();
 
   // Load permissions from database
@@ -274,12 +276,16 @@ const PermissionsDashboard = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 relative max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-8 h-9 text-sm" placeholder="Buscar permisos..." value={permSearch} onChange={e => setPermSearch(e.target.value)} />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr>
                   <th className="text-left font-medium text-muted-foreground pb-4 pr-4 min-w-[120px]">Rol</th>
-                  {permissionColumns.map((column) => (
+                  {permissionColumns.filter(c => !permSearch || c.label.toLowerCase().includes(permSearch.toLowerCase())).map((column) => (
                     <th key={column.key} className="text-center font-medium text-muted-foreground pb-4 px-2 min-w-[90px]">
                       <column.icon className="h-4 w-4 mx-auto mb-1" />
                       <span className="block leading-tight">{column.label}</span>
@@ -296,7 +302,7 @@ const PermissionsDashboard = () => {
                     {config.label}
                   </Badge>
                 </td>
-                {permissionColumns.map((column) => (
+                {permissionColumns.filter(c => !permSearch || c.label.toLowerCase().includes(permSearch.toLowerCase())).map((column) => (
                   <td key={column.key} className="text-center py-3 px-2">
                     <Button
                       variant="outline"

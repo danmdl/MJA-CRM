@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ const CHECKS = [
 
 const ValidatorPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [lastRun, setLastRun] = useState<Date | null>(null);
@@ -239,15 +240,35 @@ const ValidatorPage = () => {
             <div className="space-y-1.5">
               {group.items.map(item => (
                 <div key={item.id} className="flex items-center justify-between rounded px-3 py-2 bg-background/50 border border-border/50">
-                  <div>
-                    <span className="text-sm font-medium">{item.name}</span>
+                  <div className="min-w-0">
+                    <button
+                      className="text-sm font-medium text-primary hover:underline text-left"
+                      onClick={() => {
+                        if (item.entity === 'contact') navigate(`/admin/churches/${churchId}/pool`);
+                        else if (item.entity === 'cell') navigate(`/admin/churches/${churchId}/celulas`);
+                      }}
+                    >
+                      {item.name}
+                    </button>
                     <span className="text-[10px] text-muted-foreground ml-2">{item.detail}</span>
                   </div>
-                  {item.type === 'contacts_bad_coords' && (
-                    <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => fixBadCoords(item.entityId)}>
-                      Limpiar coords
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {item.entity === 'contact' && (
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => navigate(`/admin/churches/${churchId}/pool`)}>
+                        Ir al Semillero
+                      </Button>
+                    )}
+                    {item.entity === 'cell' && (
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => navigate(`/admin/churches/${churchId}/celulas`)}>
+                        Ir a Células
+                      </Button>
+                    )}
+                    {item.type === 'contacts_bad_coords' && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => fixBadCoords(item.entityId)}>
+                        Limpiar coords
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
