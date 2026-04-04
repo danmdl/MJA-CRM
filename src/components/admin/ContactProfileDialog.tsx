@@ -237,6 +237,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [showContactMap, setShowContactMap] = useState(false);
   const [whatsappMsg, setWhatsappMsg] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(false);
+  const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; body: string }[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateBody, setNewTemplateBody] = useState('');
 
   useEffect(() => {
     if (open && contactId) {
@@ -244,6 +248,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       fetchContactLogs();
       fetchLeadersAndCells();
       fetchTransfers();
+      // Load user's WhatsApp templates
+      supabase.from('whatsapp_templates').select('id, name, body').then(({ data }) => setSavedTemplates(data || []));
     }
   }, [open, contactId]);
 
@@ -601,7 +607,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 </div>
               </div>
 
-              {/* WhatsApp invite */}
+              {/* WhatsApp invite (when cell just assigned) */}
               {whatsappCell && contact.cell_id === whatsappCell.id && (
                 <div className="border border-green-500/30 bg-green-500/5 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
@@ -612,6 +618,45 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   <div className="flex gap-2">
                     <Button type="button" size="sm" className="gap-1.5 text-xs" onClick={() => { window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }} disabled={!contact.phone}><MessageSquare className="h-3.5 w-3.5" /> Enviar</Button>
                     <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setWhatsappCell(null)}>No ahora</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* WhatsApp send — always available when contact has phone */}
+              {contact.phone && !whatsappCell && (
+                <div className="border border-green-500/20 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium text-green-400"><MessageSquare className="h-4 w-4" /> Enviar WhatsApp</div>
+                    <div className="flex items-center gap-1">
+                      <select className="text-[10px] bg-background border rounded px-1.5 py-0.5"
+                        onChange={async (e) => {
+                          if (e.target.value === '_new') { setEditingTemplate(true); return; }
+                          if (e.target.value === '_manage') { setShowTemplates(true); return; }
+                          if (e.target.value) {
+                            const { data } = await supabase.from('whatsapp_templates').select('body').eq('id', e.target.value).single();
+                            if (data) {
+                              let msg = data.body;
+                              msg = msg.replace(/\{nombre\}/gi, contact.first_name || '');
+                              msg = msg.replace(/\{apellido\}/gi, contact.last_name || '');
+                              msg = msg.replace(/\{telefono\}/gi, contact.phone || '');
+                              setWhatsappMsg(msg);
+                              setEditingTemplate(true);
+                            }
+                          }
+                        }}
+                        defaultValue="">
+                        <option value="">Usar plantilla...</option>
+                        {(savedTemplates || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        <option value="_manage">⚙️ Administrar plantillas</option>
+                      </select>
+                    </div>
+                  </div>
+                  {editingTemplate && <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[60px]" placeholder="Escribí tu mensaje o elegí una plantilla..." />}
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700" onClick={() => { window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }}>
+                      <MessageSquare className="h-3.5 w-3.5" /> Enviar por WhatsApp
+                    </Button>
+                    {!editingTemplate && <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setEditingTemplate(true)}>Escribir mensaje</Button>}
                   </div>
                 </div>
               )}
@@ -700,6 +745,58 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                         ? 'Cambiar cuerda'
                         : 'Devolver al Semillero y cambiar'}
                     </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* WhatsApp Templates Manager */}
+              <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+                <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Plantillas de WhatsApp</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <p className="text-xs text-muted-foreground">Tus plantillas personales. Usá {'{nombre}'}, {'{apellido}'}, {'{telefono}'} como variables.</p>
+                    
+                    {/* Existing templates */}
+                    {savedTemplates.length > 0 && (
+                      <div className="space-y-2">
+                        {savedTemplates.map(t => (
+                          <div key={t.id} className="border rounded p-2.5 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{t.name}</span>
+                              <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-red-400" onClick={async () => {
+                                await supabase.from('whatsapp_templates').delete().eq('id', t.id);
+                                setSavedTemplates(prev => prev.filter(x => x.id !== t.id));
+                              }}>Eliminar</Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground whitespace-pre-wrap">{t.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {savedTemplates.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No tenés plantillas guardadas.</p>}
+
+                    {/* Create new template */}
+                    <div className="border-t pt-3 space-y-2">
+                      <p className="text-xs font-medium">Nueva plantilla</p>
+                      <Input value={newTemplateName} onChange={e => setNewTemplateName(e.target.value)} placeholder="Nombre (ej: Bienvenida a célula)" className="text-sm" />
+                      <Textarea value={newTemplateBody} onChange={e => setNewTemplateBody(e.target.value)} placeholder="Hola {nombre}! Te esperamos en la célula..." className="text-xs min-h-[80px]" />
+                      <Button size="sm" disabled={!newTemplateName.trim() || !newTemplateBody.trim()} onClick={async () => {
+                        const { data } = await supabase.from('whatsapp_templates').insert({
+                          user_id: session?.user?.id,
+                          church_id: churchId,
+                          name: newTemplateName.trim(),
+                          body: newTemplateBody.trim(),
+                        }).select('id, name, body').single();
+                        if (data) {
+                          setSavedTemplates(prev => [...prev, data]);
+                          setNewTemplateName('');
+                          setNewTemplateBody('');
+                          showSuccess('Plantilla guardada.');
+                        }
+                      }}>Guardar plantilla</Button>
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>

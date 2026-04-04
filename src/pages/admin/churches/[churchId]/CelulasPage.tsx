@@ -29,21 +29,26 @@ interface CellRow {
 const CelulasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const queryClient = useQueryClient();
-  const { canEditCelulas } = usePermissions();
-  const { session } = useSession();
+  const { canEditCelulas, canSeeBaseDatosTotal } = usePermissions();
+  const { session, profile } = useSession();
   const [search, setSearch] = useState('');
   const [zonaFilter, setZonaFilter] = useState<string>('all');
   const [editCell, setEditCell] = useState<CellRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [showMap, setShowMap] = useState(false);
 
+  // If user doesn't have "see all" permission, only show their cuerda
+  const userCuerda = profile?.numero_cuerda;
+  const canSeeAll = canSeeBaseDatosTotal() || ['admin', 'general', 'pastor'].includes(profile?.role || '');
+
   const { data: cells, isLoading } = useQuery<CellRow[]>({
-    queryKey: ['celulas-page', churchId],
+    queryKey: ['celulas-page', churchId, userCuerda, canSeeAll],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('cells')
         .select('id, name, address, lat, lng, meeting_day, meeting_time, leader_name, anfitrion_name, cuerda_id')
-        .eq('church_id', churchId!);
+        .eq('church_id', churchId!)
+        .is('deleted_at', null);
       if (error) throw error;
 
       const { data: cuerdas } = await supabase.from('cuerdas').select('id, numero, zona_id');
@@ -52,7 +57,7 @@ const CelulasPage = () => {
       const cuerdaMap = new Map((cuerdas || []).map(c => [c.id, c]));
       const zonaMap = new Map((zonas || []).map(z => [z.id, z]));
 
-      return (data || []).map(cell => {
+      const allCells = (data || []).map(cell => {
         const cuerda = cuerdaMap.get((cell as any).cuerda_id);
         const zona = cuerda ? zonaMap.get(cuerda.zona_id) : null;
         return {
@@ -63,6 +68,12 @@ const CelulasPage = () => {
           cuerda_numero: cuerda?.numero || null, zona_nombre: zona?.nombre || null,
         };
       });
+
+      // Filter by user's cuerda if they don't have "see all" permission
+      if (!canSeeAll && userCuerda) {
+        return allCells.filter(c => c.cuerda_numero === userCuerda);
+      }
+      return allCells;
     },
     enabled: !!churchId,
   });
