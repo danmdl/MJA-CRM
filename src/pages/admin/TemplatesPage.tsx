@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { usePermissions } from '@/lib/permissions';
 import { showSuccess, showError } from '@/utils/toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,7 @@ interface WhatsAppTemplate {
 
 const TemplatesPage = () => {
   const { session, profile } = useSession();
+  const { canUseTemplates } = usePermissions();
   const userId = session?.user?.id;
   const userName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuario' : 'Usuario';
   const isAdmin = profile?.role === 'admin';
@@ -173,6 +175,21 @@ const TemplatesPage = () => {
   const insertVariable = (variable: string) => {
     setNewBody(prev => prev + `{${variable}}`);
   };
+
+  if (!canUseTemplates()) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">No tenés permisos para acceder a las plantillas.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Contactá a un administrador si creés que esto es un error.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

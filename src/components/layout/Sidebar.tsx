@@ -16,7 +16,7 @@ interface NavItemConfig {
 const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates } = usePermissions();
 
   // Detect if we're inside a specific church
   const churchMatch = useMatch('/admin/churches/:churchId/*');
@@ -71,7 +71,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
       title: 'Cuenta',
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
-        { to: '/admin/templates', emoji: '📝', label: 'Templates' },
+        ...(canUseTemplates() ? [{ to: '/admin/templates', emoji: '📝', label: 'Templates' }] : []),
         { to: '/admin/notifications', emoji: '🔔', label: 'Notificaciones' },
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),

@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { usePermissions } from '@/lib/permissions';
 import { showSuccess, showError } from '@/utils/toast';
 import { Save, Edit3, X, Star, Trash2 } from 'lucide-react';
 
@@ -21,6 +22,7 @@ interface WhatsAppTemplate {
   name: string;
   body: string;
   is_default: boolean;
+  is_system: boolean;
 }
 
 interface Props {
@@ -35,6 +37,7 @@ interface Props {
 
 const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstName, contactLastName, contactPhone, onSent }: Props) => {
   const { session, profile } = useSession();
+  const { canUseTemplates } = usePermissions();
   const userId = session?.user?.id;
   const [message, setMessage] = useState('');
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
@@ -70,17 +73,19 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   // Load templates
   const loadTemplates = async (autoLoadDefault = false) => {
-    if (!userId) return;
+    if (!userId || !canUseTemplates()) return;
     const { data } = await supabase.from('whatsapp_templates')
-      .select('id, name, body, is_default')
-      .eq('user_id', userId)
+      .select('id, name, body, is_default, is_system')
+      .or(`user_id.eq.${userId},is_system.eq.true`)
+      .is('deleted_at', null)
       .order('is_default', { ascending: false })
+      .order('is_system', { ascending: false })
       .order('name');
-    const list = data || [];
+    const list = (data || []) as WhatsAppTemplate[];
     setTemplates(list);
-    // Auto-load default template into composer
+    // Auto-load default template into composer (user's own default takes priority)
     if (autoLoadDefault) {
-      const def = list.find(t => t.is_default);
+      const def = list.find(t => t.is_default && !t.is_system);
       if (def) {
         setMessage(replaceVars(def.body));
       }
@@ -141,7 +146,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
         <div className="flex h-[500px]">
           {/* LEFT: Message composer */}
-          <div className="flex-1 p-4 flex flex-col gap-3 border-r">
+          <div className={`flex-1 p-4 flex flex-col gap-3 ${canUseTemplates() ? 'border-r' : ''}`}>
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mensaje</label>
               <span className="text-[10px] text-muted-foreground">{message.length} caracteres</span>
@@ -149,7 +154,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
             <Textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Escribí tu mensaje o seleccioná una plantilla →"
+              placeholder={canUseTemplates() ? "Escribí tu mensaje o seleccioná una plantilla →" : "Escribí tu mensaje"}
               className="flex-1 text-sm resize-none min-h-[300px]"
             />
 
@@ -181,15 +186,17 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                 </label>
               </div>
             ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs w-full"
-                onClick={() => setSaveMode(true)}
-                disabled={!message.trim()}
-              >
-                <Save className="h-3.5 w-3.5" /> Save as template
-              </Button>
+              canUseTemplates() && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs w-full"
+                  onClick={() => setSaveMode(true)}
+                  disabled={!message.trim()}
+                >
+                  <Save className="h-3.5 w-3.5" /> Save as template
+                </Button>
+              )
             )}
 
             <Button
@@ -202,7 +209,8 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
           </div>
 
           {/* RIGHT: Templates tab */}
-          <div className="w-[320px] flex-shrink-0 bg-muted/20 flex flex-col overflow-hidden">
+          {canUseTemplates() && (
+            <div className="w-[320px] flex-shrink-0 bg-muted/20 flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b bg-muted/30">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">Templates</p>
               <p className="text-[10px] text-muted-foreground mb-1">Insertar variable:</p>
@@ -259,6 +267,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
               ))}
             </div>
           </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
