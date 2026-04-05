@@ -465,8 +465,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
                 <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
                 <CountryPhoneInput label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} />
+              </div>
 
-              {/* Row 3: Dirección */}
+              {/* Row 2: Dirección */}
               <div className="space-y-1">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Dirección</label>
                 <AddressAutocomplete
