@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import UpdateBanner from '@/components/UpdateBanner';
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/admin/dashboard') return 'Dashboard';
@@ -30,6 +31,7 @@ const AdminLayout = () => {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#09090b' }}>
+      <UpdateBanner />
 
       {/* Mobile overlay */}
       {sidebarOpen && (

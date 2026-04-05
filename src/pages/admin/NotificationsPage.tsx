@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, CheckCheck, MessageSquare, UserPlus, ArrowRight, Trash2 } from 'lucide-react';
+import { Bell, CheckCheck, MessageSquare, UserPlus, ArrowRight, Trash2, Sparkles } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 
 interface Notification {
@@ -144,6 +144,64 @@ const NotificationsPage = () => {
           ))}
         </div>
       )}
+      {/* Changelog / Novedades */}
+      <ChangelogSection />
+    </div>
+  );
+};
+
+const ChangelogSection = () => {
+  const { data: entries } = useQuery<{ id: string; title: string; description: string | null; importance: number; published_at: string }[]>({
+    queryKey: ['changelog'],
+    queryFn: async () => {
+      const { data } = await supabase.from('changelog')
+        .select('id, title, description, importance, published_at')
+        .order('published_at', { ascending: false })
+        .order('importance', { ascending: false })
+        .limit(50);
+      return data || [];
+    },
+  });
+
+  if (!entries?.length) return null;
+
+  // Group by date
+  const grouped = entries.reduce((acc, e) => {
+    const date = e.published_at;
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(e);
+    return acc;
+  }, {} as Record<string, typeof entries>);
+
+  const formatDate = (d: string) => {
+    const date = new Date(d + 'T12:00:00');
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Hoy';
+    if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
+    return date.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
+  return (
+    <div className="space-y-4 border-t pt-6 mt-6">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-5 w-5 text-[#FFC233]" />
+        <h2 className="text-lg font-bold">Novedades del sistema</h2>
+      </div>
+      {Object.entries(grouped).map(([date, items]) => (
+        <div key={date} className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{formatDate(date)}</p>
+          <div className="space-y-1.5">
+            {items.map(e => (
+              <div key={e.id} className="rounded-lg border px-3 py-2.5 bg-muted/20">
+                <p className="text-sm font-medium">{e.title}</p>
+                {e.description && <p className="text-xs text-muted-foreground mt-0.5">{e.description}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
