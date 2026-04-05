@@ -97,8 +97,8 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
           // Force resize after creation
           gmaps.event.trigger(map, 'resize');
 
-          // Blue pin for contact (no info window - just the pin)
-          new gmaps.Marker({
+          // Blue pin for contact — rendered AFTER cell pin so it appears on top
+          const contactMarker = new gmaps.Marker({
             position: contactPos,
             map,
             icon: {
@@ -111,7 +111,17 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
               anchor: new gmaps.Point(12, 24),
             },
             title: contactName,
+            zIndex: 10,
           });
+
+          // Blue info window for contact
+          const contactInfo = new gmaps.InfoWindow({
+            content: `<div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
+              <div style="font-size:13px;font-weight:700;color:#1E40AF;">${contactName}</div>
+              <div style="font-size:11px;color:#777;margin-top:2px;">📍 ${contactAddress}</div>
+            </div>`,
+          });
+          contactMarker.addListener('click', () => contactInfo.open(map, contactMarker));
 
           // Gold pin for suggested cell with info window
           if (suggestedCell?.lat && suggestedCell?.lng) {
@@ -130,6 +140,7 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
                 anchor: new gmaps.Point(12, 24),
               },
               title: suggestedCell.name,
+              zIndex: 5,
             });
 
             const schedule = [suggestedCell.meetingDay, suggestedCell.meetingTime].filter(Boolean).join(' · ');
@@ -144,11 +155,16 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
             });
             cellInfo.open(map, cellMarker);
 
-            // Fit bounds to show both markers
+            // Fit bounds to show both markers with max zoom cap
             const bounds = new gmaps.LatLngBounds();
             bounds.extend(contactPos);
             bounds.extend(cellPos);
             map.fitBounds(bounds, { top: 60, right: 40, bottom: 40, left: 40 });
+            // Cap zoom so both pins are always visible even when very close
+            const listener = gmaps.event.addListener(map, 'idle', () => {
+              if (map.getZoom() > 16) map.setZoom(16);
+              gmaps.event.removeListener(listener);
+            });
           }
         });
       } catch (e) {
@@ -162,7 +178,7 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px]">
+      <DialogContent className="sm:max-w-[850px]">
         <DialogHeader>
           <DialogTitle className="text-base">{contactName}</DialogTitle>
           <DialogDescription className="text-xs">{contactAddress}</DialogDescription>
