@@ -34,7 +34,7 @@ interface Props {
   contactLastName: string;
   contactPhone: string;
   churchId?: string;
-  onSent?: (message: string) => void;
+  onSent?: (message: string, templateName: string | null) => void;
 }
 
 const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstName, contactLastName, contactPhone, churchId, onSent }: Props) => {
@@ -42,6 +42,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const { canUseTemplates } = usePermissions();
   const userId = session?.user?.id;
   const [message, setMessage] = useState('');
+  const [selectedTemplateName, setSelectedTemplateName] = useState<string | null>(null);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [saveMode, setSaveMode] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
@@ -116,6 +117,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
       const def = list.find(t => t.is_default && !t.is_system);
       if (def) {
         setMessage(def.body);
+        setSelectedTemplateName(def.name);
       }
     }
   };
@@ -123,6 +125,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   useEffect(() => {
     if (open) {
       setMessage('');
+      setSelectedTemplateName(null);
       setSaveMode(false);
       setSaveAsDefault(false);
       loadTemplates(true); // auto-load default
@@ -131,6 +134,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   const handleSelectTemplate = (t: WhatsAppTemplate) => {
     setMessage(t.body);
+    setSelectedTemplateName(t.name);
   };
 
   const handleSaveAsTemplate = async () => {
@@ -157,8 +161,11 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
     if (!message.trim() || !contactPhone) return;
     const resolvedMessage = replaceVars(message);
     const cleanPhone = contactPhone.replace(/\D/g, '');
+    // If the user has edited the template body, don't claim a template was used
+    const templates_ = templates.find(t => t.name === selectedTemplateName);
+    const templateActuallyUsed = templates_ && templates_.body === message ? selectedTemplateName : null;
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(resolvedMessage)}`, '_blank');
-    if (onSent) onSent(resolvedMessage);
+    if (onSent) onSent(resolvedMessage, templateActuallyUsed);
     onOpenChange(false);
   };
 

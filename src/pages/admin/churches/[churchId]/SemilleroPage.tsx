@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -116,6 +116,8 @@ const SemilleroPage = () => {
     contactIds: string[];
     prevStates: { zona_id: string | null; zona: string | null; numero_cuerda: string | null; cell_id: string | null }[];
   } | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [colWidths, setColWidths] = useState({
     cuerda: 38, nombre: 145, responsable: 115, telefono: 105, direccion: 155, fechaContacto: 62, sugerencia: 165, asignar: 125,
@@ -125,7 +127,7 @@ const SemilleroPage = () => {
   };
 
   // Assignment permission comes from canAssignContacts() via usePermissions
-  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp } = usePermissions();
+  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
@@ -589,6 +591,16 @@ const SemilleroPage = () => {
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
           </Button>
         )}
+        {selectedIds.size > 0 && canEditDeleteContacts() && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBulkDeleteOpen(true)}
+            className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Trash2 className="h-4 w-4" /> Eliminar ({selectedIds.size})
+          </Button>
+        )}
         {canImportCsv() && (
           <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)} className="gap-1.5">
             <Upload className="h-4 w-4" /> Importar Contactos
@@ -1006,6 +1018,40 @@ const SemilleroPage = () => {
         churchId={churchId!}
       />
 
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteOpen} onOpenChange={(o) => { if (!o && !deleting) setBulkDeleteOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar contactos</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de eliminar <strong>{selectedIds.size}</strong> contacto{selectedIds.size === 1 ? '' : 's'}? Los vas a poder restaurar desde la Papelera.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setBulkDeleteOpen(false)} disabled={deleting}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                const ids = Array.from(selectedIds);
+                const { error } = await supabase.from('contacts')
+                  .update({ deleted_at: new Date().toISOString(), deleted_by: session?.user?.id || null })
+                  .in('id', ids);
+                setDeleting(false);
+                if (error) { showError(error.message); return; }
+                showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}.`);
+                setSelectedIds(new Set());
+                setBulkDeleteOpen(false);
+                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" /> Eliminar {selectedIds.size}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Contact Dialog */}
       <AddContactDialog
         open={addContactOpen}
@@ -1032,14 +1078,18 @@ const SemilleroPage = () => {
         contactLastName={whatsappCompose?.lastName || ''}
         contactPhone={whatsappCompose?.phone || ''}
         churchId={churchId}
-        onSent={async (message) => {
+        onSent={async (message, templateName) => {
           // Log WhatsApp send to contact history
           if (!whatsappCompose) return;
           const contactId = whatsappCompose.contactId;
           try {
             const session = (await supabase.auth.getSession()).data.session;
-            const today = new Date().toISOString().split('T')[0];
-            const preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+            const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+            const note = templateName
+              ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}".`
+              : `WhatsApp enviado a las ${time} (sin plantilla).`;
             const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
@@ -1048,7 +1098,7 @@ const SemilleroPage = () => {
                 churchId,
                 contact_date: today,
                 contact_method: 'WhatsApp',
-                notes: `Mensaje enviado: "${preview}"`,
+                notes: note,
               }),
             });
             if (!resp.ok) {
