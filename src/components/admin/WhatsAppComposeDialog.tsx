@@ -257,16 +257,6 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                   </Button>
                 </div>
               ))}
-                          className="w-full h-6 text-[10px]"
-                          onClick={() => handleSelectTemplate(t)}
-                        >
-                          Usar plantilla
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
             </div>
           </div>
         </div>
