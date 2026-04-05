@@ -94,6 +94,11 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
             fullscreenControl: false,
           });
 
+          // Inject CSS to shrink InfoWindow padding
+          const style = document.createElement('style');
+          style.textContent = `.gm-style-iw-c { padding: 8px !important; max-width: 240px !important; } .gm-style-iw-d { overflow: hidden !important; } .gm-style-iw-tc { display: none !important; }`;
+          mapRef.current.appendChild(style);
+
           // Force resize after creation
           gmaps.event.trigger(map, 'resize');
 
