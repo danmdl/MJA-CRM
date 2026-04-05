@@ -29,6 +29,7 @@ import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
+import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsAppComposeDialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 
@@ -98,6 +99,7 @@ const PoolPage = () => {
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
+  const [whatsappCompose, setWhatsappCompose] = useState<{ contactId: string; name: string; firstName: string; lastName: string; phone: string } | null>(null);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -722,16 +724,22 @@ const PoolPage = () => {
                           {c.phone ? (
                             <div className="flex items-center gap-1">
                               <span className="text-[11px] text-muted-foreground tabular-nums">{c.phone}</span>
-                              <a
-                                href={`https://wa.me/${c.phone.replace(/\D/g, '')}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
                                 className="text-green-500 hover:text-green-400 shrink-0"
                                 title="Enviar WhatsApp"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setWhatsappCompose({
+                                    contactId: c.id,
+                                    name: `${c.first_name} ${c.last_name || ''}`.trim(),
+                                    firstName: c.first_name,
+                                    lastName: c.last_name || '',
+                                    phone: c.phone!,
+                                  });
+                                }}
                               >
-                                <MessageSquare className="h-3.5 w-3.5" />
-                              </a>
+                                <WhatsAppIcon className="h-3.5 w-3.5" />
+                              </button>
                             </div>
                           ) : <span className="text-[11px] text-muted-foreground">—</span>}
                         </td>
@@ -1012,6 +1020,34 @@ const PoolPage = () => {
         contactName={mapContact?.name || ''}
         contactAddress={mapContact?.address || ''}
         suggestedCell={mapContact?.sugCell || null}
+      />
+      <WhatsAppComposeDialog
+        open={!!whatsappCompose}
+        onOpenChange={(o) => { if (!o) setWhatsappCompose(null); }}
+        contactName={whatsappCompose?.name || ''}
+        contactFirstName={whatsappCompose?.firstName || ''}
+        contactLastName={whatsappCompose?.lastName || ''}
+        contactPhone={whatsappCompose?.phone || ''}
+        onSent={async (message) => {
+          // Log WhatsApp send to contact history
+          if (!whatsappCompose) return;
+          try {
+            const session = (await supabase.auth.getSession()).data.session;
+            const today = new Date().toISOString().split('T')[0];
+            const preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
+            await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
+              body: JSON.stringify({
+                contactId: whatsappCompose.contactId,
+                churchId,
+                contact_date: today,
+                contact_method: 'WhatsApp',
+                notes: `Mensaje enviado: "${preview}"`,
+              }),
+            });
+          } catch (e) { console.error('Failed to log WhatsApp send:', e); }
+        }}
       />
     </div>
   );

@@ -672,59 +672,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 </div>
               </div>
 
-              {/* WhatsApp invite (when cell just assigned) */}
-              {whatsappCell && contact.cell_id === whatsappCell.id && (
-                <div className="border border-green-500/30 bg-green-500/5 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-medium text-green-400"><Send className="h-4 w-4" /> ¿Avisar a {contact.first_name} por WhatsApp?</div>
-                    <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setEditingTemplate(v => !v)}>{editingTemplate ? 'Cerrar' : 'Editar'}</button>
-                  </div>
-                  {editingTemplate && <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[80px] font-mono" />}
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" className="gap-1.5 text-xs" onClick={() => { logWhatsAppSend(whatsappMsg); window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }} disabled={!contact.phone}><MessageSquare className="h-3.5 w-3.5" /> Enviar</Button>
-                    <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setWhatsappCell(null)}>No ahora</Button>
-                  </div>
-                </div>
-              )}
-
-              {/* WhatsApp send — always available when contact has phone */}
-              {contact.phone && !whatsappCell && (
-                <div className="border border-green-500/20 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4 text-green-400" />
-                      <span className="text-sm font-medium text-green-400">Enviar WhatsApp</span>
-                      {(() => { const def = savedTemplates.find(t => t.is_default); return def ? <span className="text-[9px] text-muted-foreground">· {def.name}</span> : null; })()}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <select className="text-[10px] bg-background border rounded px-1.5 py-0.5"
-                        onChange={async (e) => {
-                          if (e.target.value === '_manage') { setShowTemplates(true); return; }
-                          if (e.target.value) {
-                            const { data } = await supabase.from('whatsapp_templates').select('body').eq('id', e.target.value).single();
-                            if (data) {
-                              let msg = data.body;
-                              msg = msg.replace(/\{nombre\}/gi, contact.first_name || '');
-                              msg = msg.replace(/\{apellido\}/gi, contact.last_name || '');
-                              msg = msg.replace(/\{telefono\}/gi, contact.phone || '');
-                              setWhatsappMsg(msg);
-                            }
-                          }
-                        }}
-                        defaultValue="">
-                        <option value="">Cambiar plantilla...</option>
-                        {(savedTemplates || []).map(t => <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' ★' : ''}</option>)}
-                        <option value="_manage">⚙️ Administrar plantillas</option>
-                      </select>
-                    </div>
-                  </div>
-                  <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[60px]" placeholder="Escribí tu mensaje o elegí una plantilla..." />
-                  <Button type="button" size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 w-full" onClick={() => { logWhatsAppSend(whatsappMsg); window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }}>
-                    <MessageSquare className="h-3.5 w-3.5" /> Enviar por WhatsApp
-                  </Button>
-                </div>
-              )}
-
               {/* Save bar at top of form */}
               {(canEditDeleteContacts() || profile?.role === 'conector') && hasUnsavedChanges && (
                 <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
