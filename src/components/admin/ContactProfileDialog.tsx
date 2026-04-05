@@ -473,6 +473,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
       <DialogContent className="sm:max-w-[1300px] max-h-[90vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
+        {/* Close X button — top right */}
+        <button
+          onClick={() => safeClose()}
+          className="absolute right-3 top-3 z-20 rounded-full p-1.5 hover:bg-muted transition-colors"
+          title="Cerrar"
+        >
+          <X className="h-4 w-4 text-muted-foreground" />
+        </button>
         {contact && (
           <div className="flex h-full max-h-[88vh]">
             {/* LEFT: Form fields */}
@@ -700,13 +708,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 </div>
               )}
 
-              {/* Bottom: red X to close */}
-              <div className="flex items-center justify-end pt-1 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => safeClose()} className="text-red-500 hover:text-red-400 hover:bg-red-500/10 gap-1.5">
-                  <X className="h-3.5 w-3.5" /> Cerrar
-                </Button>
-              </div>
-
               {/* Hidden dialogs */}
               <AddContactLogDialog open={addLogOpen} onOpenChange={setAddLogOpen} churchId={churchId} contactId={contact.id} onAdded={() => { setLogOpen(true); setHistorySignal(s => s + 1); }} />
               <ContactLogDialog open={logOpen} onOpenChange={setLogOpen} churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
@@ -863,7 +864,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               <div className="flex-1 overflow-y-auto p-4 border-b border-border">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Registros de contacto</p>
-                  <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => setAddLogOpen(true)}>+ Agregar</Button>
+                  <Button size="sm" className="h-6 text-[10px] px-2" onClick={() => setAddLogOpen(true)}>+ Agregar</Button>
                 </div>
                 <ContactLogInline churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
               </div>
