@@ -377,6 +377,32 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
 
 
+  const logWhatsAppSend = async (message: string) => {
+    if (!contact) return;
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const today = new Date().toISOString().split('T')[0];
+      const preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
+      await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          contactId: contact.id,
+          churchId,
+          contact_date: today,
+          contact_method: 'WhatsApp',
+          notes: `Mensaje enviado: "${preview}"`,
+        }),
+      });
+      setHistorySignal(s => s + 1);
+    } catch (e) {
+      console.error('Failed to log WhatsApp send:', e);
+    }
+  };
+
   const handleSave = async () => {
     if (!contact) return;
     setSaving(true);
@@ -655,7 +681,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   </div>
                   {editingTemplate && <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[80px] font-mono" />}
                   <div className="flex gap-2">
-                    <Button type="button" size="sm" className="gap-1.5 text-xs" onClick={() => { window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }} disabled={!contact.phone}><MessageSquare className="h-3.5 w-3.5" /> Enviar</Button>
+                    <Button type="button" size="sm" className="gap-1.5 text-xs" onClick={() => { logWhatsAppSend(whatsappMsg); window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }} disabled={!contact.phone}><MessageSquare className="h-3.5 w-3.5" /> Enviar</Button>
                     <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setWhatsappCell(null)}>No ahora</Button>
                   </div>
                 </div>
@@ -693,7 +719,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     </div>
                   </div>
                   <Textarea value={whatsappMsg} onChange={e => setWhatsappMsg(e.target.value)} className="text-xs min-h-[60px]" placeholder="Escribí tu mensaje o elegí una plantilla..." />
-                  <Button type="button" size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 w-full" onClick={() => { window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }}>
+                  <Button type="button" size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 w-full" onClick={() => { logWhatsAppSend(whatsappMsg); window.open(`https://wa.me/${(contact.phone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); }}>
                     <MessageSquare className="h-3.5 w-3.5" /> Enviar por WhatsApp
                   </Button>
                 </div>
