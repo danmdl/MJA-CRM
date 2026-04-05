@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Bell, CheckCheck, MessageSquare, UserPlus, ArrowRight, Trash2, Sparkles } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 
@@ -150,7 +151,7 @@ const NotificationsPage = () => {
       </div>
 
         {/* RIGHT: Novedades del sistema */}
-        <div className="w-[320px] shrink-0 hidden lg:block">
+        <div className="w-[480px] shrink-0 hidden lg:block">
           <ChangelogSection />
         </div>
       </div>
@@ -207,7 +208,7 @@ const ChangelogSection = () => {
       {Object.entries(grouped).map(([date, items]) => (
         <div key={date} className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{formatDate(date)}</p>
-          <div className={`grid gap-1.5 ${showAll ? 'grid-cols-1' : 'md:grid-cols-2'}`}>
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
             {items.map(e => (
               <div key={e.id} className="rounded-lg border px-3 py-2.5 bg-muted/20">
                 <p className="text-sm font-medium">{e.title}</p>
@@ -220,47 +221,79 @@ const ChangelogSection = () => {
     </div>
   );
 
-  if (showAll) {
-    return (
-      <>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-[#FFC233]" />
-              <h2 className="text-lg font-bold">Novedades del sistema</h2>
-            </div>
-            <Button size="sm" variant="ghost" onClick={() => setShowAll(false)} className="text-xs">
-              Cerrar
-            </Button>
-          </div>
-          <div className="max-h-[600px] overflow-y-auto pr-2">
-            {content}
-          </div>
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-[#FFC233]" />
+          <h2 className="text-lg font-bold">Novedades del sistema</h2>
         </div>
-      </>
-    );
-  }
+        <div className="relative">
+          {content}
+          {hasMore && (
+            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background via-background/90 to-transparent flex items-end justify-center pb-2">
+              <Button
+                size="sm"
+                onClick={() => setShowAll(true)}
+                className="gap-1.5 text-xs"
+              >
+                Ver todas ({entries.length})
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={showAll} onOpenChange={setShowAll}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-[#FFC233]" />
+              Novedades del sistema
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto pr-2 flex-1">
+            <AllChangelogContent entries={entries} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+const AllChangelogContent = ({ entries }: { entries: { id: string; title: string; description: string | null; importance: number; published_at: string }[] }) => {
+  const grouped = entries.reduce((acc, e) => {
+    const date = e.published_at;
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(e);
+    return acc;
+  }, {} as Record<string, typeof entries>);
+
+  const formatDate = (d: string) => {
+    const date = new Date(d + 'T12:00:00');
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Hoy';
+    if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
+    return date.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-[#FFC233]" />
-        <h2 className="text-lg font-bold">Novedades del sistema</h2>
-      </div>
-      <div className="relative">
-        {content}
-        {hasMore && (
-          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background via-background/90 to-transparent flex items-end justify-center pb-2">
-            <Button 
-              size="sm" 
-              onClick={() => setShowAll(true)}
-              className="gap-1.5 text-xs"
-            >
-              Ver todas ({entries.length})
-            </Button>
+    <div className="space-y-5 pt-2">
+      {Object.entries(grouped).map(([date, items]) => (
+        <div key={date} className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{formatDate(date)}</p>
+          <div className="space-y-2">
+            {items.map(e => (
+              <div key={e.id} className="rounded-lg border px-4 py-3 bg-muted/20">
+                <p className="text-sm font-medium">{e.title}</p>
+                {e.description && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{e.description}</p>}
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      ))}
     </div>
   );
 };

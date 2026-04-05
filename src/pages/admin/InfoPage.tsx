@@ -84,7 +84,7 @@ const InfoPage = () => {
         <h2 className="text-lg font-semibold">Número de Cuerda</h2>
         <div className="text-sm space-y-2 text-muted-foreground">
           <p>Cada cuerda tiene un <span className="text-foreground font-medium">número</span> (ej: 101, 202, 301) que identifica a qué zona pertenece.</p>
-          <p>Las cuerdas <span className="text-foreground font-medium">1xx</span> son masculinas, las <span className="text-foreground font-medium">2xx</span> son femeninas, y las <span className="text-foreground font-medium">3xx</span> son mixtas.</p>
+          <p>Las cuerdas <span className="text-foreground font-medium">1xx</span> son masculinas, las <span className="text-foreground font-medium">2xx</span> son femeninas. Dentro de las <span className="text-foreground font-medium">3xx</span>, <span className="text-foreground font-medium">301</span> es de hombres y <span className="text-foreground font-medium">302</span> es de mujeres.</p>
           <p>Cambiar el número de cuerda de un contacto es una acción <span className="text-foreground font-medium">delicada</span> — para la mayoría de los roles, el contacto se devuelve al Semillero para ser reasignado.</p>
         </div>
       </section>

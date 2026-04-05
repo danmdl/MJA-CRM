@@ -13,18 +13,16 @@ interface WhatsAppTemplate {
   name: string;
   body: string;
   is_default: boolean;
+  is_system: boolean;
   created_at: string;
   user_id: string;
-  profiles?: {
-    first_name: string | null;
-    last_name: string | null;
-  };
 }
 
 const TemplatesPage = () => {
   const { session, profile } = useSession();
   const userId = session?.user?.id;
   const userName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuario' : 'Usuario';
+  const isAdmin = profile?.role === 'admin';
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -40,8 +38,8 @@ const TemplatesPage = () => {
     
     let query = supabase
       .from('whatsapp_templates')
-      .select('*, profiles(first_name, last_name)')
-      .eq('user_id', userId);
+      .select('*')
+      .or(`user_id.eq.${userId},is_system.eq.true`);
     
     // Filter by deleted status
     if (showTrash) {
@@ -284,10 +282,6 @@ const TemplatesPage = () => {
         )}
         
         {templates.map((template) => {
-          const creatorName = template.profiles 
-            ? `${template.profiles.first_name || ''} ${template.profiles.last_name || ''}`.trim() || 'Usuario'
-            : userName;
-          
           return (
             <Card key={template.id} className={template.is_default ? 'border-green-500/30 bg-green-500/5' : ''}>
               {editingId === template.id ? (
@@ -322,18 +316,23 @@ const TemplatesPage = () => {
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <div className="space-y-0.5 min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {template.is_default && <Star className="h-3 w-3 text-green-500 fill-green-500 shrink-0" />}
                         <h3 className="font-semibold text-sm">{template.name}</h3>
+                        {template.is_system && (
+                          <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-[#FFC233]/15 text-[#FFC233] border border-[#FFC233]/30 uppercase tracking-wider">
+                            Sistema
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        Por {creatorName} · {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        Por {template.is_system ? 'Admin' : userName} · {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                       </p>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
                       {!showTrash ? (
                         <>
-                          {!template.is_default && (
+                          {!template.is_default && !template.is_system && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -344,23 +343,27 @@ const TemplatesPage = () => {
                               <Star className="h-3 w-3" />
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleStartEdit(template)}
-                            className="h-7 w-7 p-0"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(template.id)}
-                            className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                            title="Mover a papelera"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          {(!template.is_system || isAdmin) && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleStartEdit(template)}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(template.id)}
+                                className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                title="Mover a papelera"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </>
+                          )}
                         </>
                       ) : (
                         <>
@@ -386,7 +389,7 @@ const TemplatesPage = () => {
                       )}
                     </div>
                   </div>
-                  <div className="bg-muted/20 rounded p-2 font-mono text-[11px] whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                  <div className="bg-muted/20 rounded p-2 font-mono text-[11px] whitespace-pre-wrap leading-relaxed text-muted-foreground max-h-32 overflow-y-auto">
                     {template.body}
                   </div>
                 </div>
