@@ -82,7 +82,10 @@ const NotificationsPage = () => {
   };
 
   return (
-    <div className="p-6 max-w-2xl space-y-5">
+    <div className="p-6">
+      <div className="flex gap-6">
+        {/* LEFT: Notifications */}
+        <div className="flex-1 min-w-0 space-y-5 max-w-2xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
@@ -144,8 +147,18 @@ const NotificationsPage = () => {
           ))}
         </div>
       )}
-      {/* Changelog / Novedades */}
-      <ChangelogSection />
+      </div>
+
+        {/* RIGHT: Novedades del sistema */}
+        <div className="w-[320px] shrink-0 hidden lg:block">
+          <ChangelogSection />
+        </div>
+      </div>
+
+      {/* Mobile: show novedades below */}
+      <div className="lg:hidden mt-6">
+        <ChangelogSection />
+      </div>
     </div>
   );
 };
@@ -184,7 +197,7 @@ const ChangelogSection = () => {
   };
 
   return (
-    <div className="space-y-4 border-t pt-6 mt-6">
+    <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Sparkles className="h-5 w-5 text-[#FFC233]" />
         <h2 className="text-lg font-bold">Novedades del sistema</h2>

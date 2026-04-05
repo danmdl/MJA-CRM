@@ -11,6 +11,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { usePermissions } from '@/lib/permissions';
 import { useSession } from '@/hooks/use-session';
+import ContactMapDialog from '@/components/admin/ContactMapDialog';
 
 interface CellRow {
   id: string;
@@ -36,6 +37,7 @@ const CelulasPage = () => {
   const [editCell, setEditCell] = useState<CellRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [mapCell, setMapCell] = useState<{ name: string; address: string; lat: number | null; lng: number | null } | null>(null);
 
   // If user doesn't have "see all" permission, only show their cuerda
   const userCuerda = profile?.numero_cuerda;
@@ -208,7 +210,9 @@ const CelulasPage = () => {
                           <div>
                             <span className="truncate max-w-[250px] block text-sm" title={cell.address!}>{cell.address}</span>
                             {cell.lat && cell.lng && (
-                              <a href={`https://www.google.com/maps?q=${cell.lat},${cell.lng}`} target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline">Ver en Mapa</a>
+                              <button onClick={() => setMapCell({ name: cell.name, address: cell.address!, lat: cell.lat, lng: cell.lng })} className="text-[10px] text-primary hover:underline">
+                                Ver en Mapa ({cell.lat.toFixed(4)}, {cell.lng.toFixed(4)})
+                              </button>
                             )}
                           </div>
                         )}
@@ -370,6 +374,15 @@ const CelulasPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Map popup for cell */}
+      <ContactMapDialog
+        open={!!mapCell}
+        onOpenChange={(o) => { if (!o) setMapCell(null); }}
+        contactName={mapCell?.name || ''}
+        contactAddress={mapCell?.address || ''}
+        suggestedCell={null}
+      />
     </div>
   );
 };

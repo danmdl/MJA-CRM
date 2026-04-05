@@ -116,10 +116,8 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
 
           // Blue info window for contact
           const contactInfo = new gmaps.InfoWindow({
-            content: `<div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
-              <div style="font-size:13px;font-weight:700;color:#1E40AF;">${contactName}</div>
-              <div style="font-size:11px;color:#777;margin-top:2px;">📍 ${contactAddress}</div>
-            </div>`,
+            maxWidth: 200,
+            content: `<div style="font-family:system-ui,sans-serif;padding:0;color:#111;max-width:180px;"><div style="font-size:12px;font-weight:700;color:#1E40AF;">${contactName}</div><div style="font-size:10px;color:#777;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ${contactAddress}</div></div>`,
           });
           contactMarker.addListener('click', () => contactInfo.open(map, contactMarker));
 
@@ -145,13 +143,8 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
 
             const schedule = [suggestedCell.meetingDay, suggestedCell.meetingTime].filter(Boolean).join(' · ');
             const cellInfo = new gmaps.InfoWindow({
-              content: `
-                <div style="font-family:system-ui,sans-serif;padding:2px 0;color:#111;">
-                  <div style="font-size:13px;font-weight:700;color:#B8720A;">${suggestedCell.name}${suggestedCell.cuerdaNumero ? ` · #${suggestedCell.cuerdaNumero}` : ''}</div>
-                  ${schedule ? `<div style="font-size:12px;color:#555;margin-top:2px;">🕐 ${schedule}</div>` : ''}
-                  ${suggestedCell.address ? `<div style="font-size:11px;color:#777;margin-top:2px;">📍 ${suggestedCell.address}</div>` : ''}
-                </div>
-              `,
+              maxWidth: 220,
+              content: `<div style="font-family:system-ui,sans-serif;padding:0;color:#111;max-width:200px;"><div style="font-size:12px;font-weight:700;color:#B8720A;white-space:nowrap;">${suggestedCell.name}${suggestedCell.cuerdaNumero ? ` · #${suggestedCell.cuerdaNumero}` : ''}</div>${schedule ? `<div style="font-size:11px;color:#555;margin-top:1px;">🕐 ${schedule}</div>` : ''}${suggestedCell.address ? `<div style="font-size:10px;color:#777;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ${suggestedCell.address}</div>` : ''}</div>`,
             });
             cellInfo.open(map, cellMarker);
 
