@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -92,6 +92,8 @@ const PoolPage = () => {
 
   const [activePool, setActivePool] = useState<string>('unassigned');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCuerda, setFilterCuerda] = useState<string>('');
+  const [filterResponsable, setFilterResponsable] = useState<string>('');
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
@@ -113,7 +115,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 75, nombre: 200, responsable: 150, direccion: 220, fechaContacto: 90, sugerencia: 200, asignar: 140,
+    cuerda: 55, nombre: 160, responsable: 140, telefono: 110, direccion: 200, fechaContacto: 80, sugerencia: 200, asignar: 140,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -369,11 +371,18 @@ const PoolPage = () => {
       const s = normalize(searchTerm);
       filtered = filtered.filter(c =>
         normalize(c.first_name || '').includes(s) || normalize(c.last_name || '').includes(s) ||
-        normalize(c.address || '').includes(s) || normalize(c.barrio || '').includes(s)
+        normalize(c.address || '').includes(s) || normalize(c.barrio || '').includes(s) ||
+        normalize(c.phone || '').includes(s)
       );
     }
+    if (filterCuerda) {
+      filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
+    }
+    if (filterResponsable) {
+      filtered = filtered.filter(c => c.responsable_id === filterResponsable);
+    }
     return filtered;
-  }, [allContacts, activePool, searchTerm, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero]);
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
@@ -586,7 +595,19 @@ const PoolPage = () => {
           {refreshing ? 'Actualizando...' : 'Actualizar'}
         </Button>
         <div className="flex-1" />
-        <div className="relative w-64 max-w-full">
+        <select className="h-8 text-xs border rounded px-2 bg-background" value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)}>
+          <option value="">Todas las cuerdas</option>
+          {[...new Set((allContacts || []).map(c => c.numero_cuerda).filter(Boolean))].sort().map(n => (
+            <option key={n} value={n!}>Cuerda {n}</option>
+          ))}
+        </select>
+        <select className="h-8 text-xs border rounded px-2 bg-background" value={filterResponsable} onChange={e => setFilterResponsable(e.target.value)}>
+          <option value="">Todos los responsables</option>
+          {(teamMembers || []).map(m => (
+            <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+          ))}
+        </select>
+        <div className="relative w-52 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
@@ -609,6 +630,7 @@ const PoolPage = () => {
                     <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
                     <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>Responsable</ResizableHeader>
+                    <ResizableHeader width={colWidths.telefono} onResize={resizeCol('telefono')}>Teléfono</ResizableHeader>
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>Fecha</ResizableHeader>
                     {isUnassignedView && <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>Sugerencia</ResizableHeader>}
@@ -663,20 +685,46 @@ const PoolPage = () => {
                           </select>
                         </td>
 
-                        {/* Dirección */}
-                        <td className="px-3 py-2" style={{ width: colWidths.direccion }}>
+                        {/* Teléfono + WhatsApp */}
+                        <td className="px-2 py-2" style={{ width: colWidths.telefono }}>
+                          {c.phone ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[11px] text-muted-foreground tabular-nums">{c.phone}</span>
+                              <a
+                                href={`https://wa.me/${c.phone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-500 hover:text-green-400 shrink-0"
+                                title="Enviar WhatsApp"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                              </a>
+                            </div>
+                          ) : <span className="text-[11px] text-muted-foreground">—</span>}
+                        </td>
+
+                        {/* Dirección + Ver en mapa */}
+                        <td className="px-2 py-2" style={{ width: colWidths.direccion }}>
                           {c.address ? (
-                            <button className="text-left hover:underline" onClick={() => {
-                              const sugCell = sug?.cell;
-                              const sugCuerdaNum = sug?.cuerda?.numero;
-                              setMapContact({
-                                name: `${c.first_name} ${c.last_name || ''}`.trim(),
-                                address: c.address!,
-                                sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined, meetingDay: sugCell.meeting_day, meetingTime: sugCell.meeting_time } : null,
-                              });
-                            }}>
-                              <span className="text-xs block truncate max-w-[200px]">{c.address}</span>
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs truncate max-w-[150px]">{c.address}</span>
+                              <button
+                                className="text-primary hover:text-primary/80 shrink-0"
+                                title="Ver en mapa"
+                                onClick={() => {
+                                  const sugCell = sug?.cell;
+                                  const sugCuerdaNum = sug?.cuerda?.numero;
+                                  setMapContact({
+                                    name: `${c.first_name} ${c.last_name || ''}`.trim(),
+                                    address: c.address!,
+                                    sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined, meetingDay: sugCell.meeting_day, meetingTime: sugCell.meeting_time } : null,
+                                  });
+                                }}
+                              >
+                                <MapPin className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           ) : <span className="text-xs text-muted-foreground">—</span>}
                         </td>
 
