@@ -164,6 +164,8 @@ const NotificationsPage = () => {
 };
 
 const ChangelogSection = () => {
+  const [showAll, setShowAll] = useState(false);
+  
   const { data: entries } = useQuery<{ id: string; title: string; description: string | null; importance: number; published_at: string }[]>({
     queryKey: ['changelog'],
     queryFn: async () => {
@@ -178,8 +180,12 @@ const ChangelogSection = () => {
 
   if (!entries?.length) return null;
 
+  // Show only first 10 for preview
+  const displayEntries = showAll ? entries : entries.slice(0, 10);
+  const hasMore = entries.length > 10;
+
   // Group by date
-  const grouped = entries.reduce((acc, e) => {
+  const grouped = displayEntries.reduce((acc, e) => {
     const date = e.published_at;
     if (!acc[date]) acc[date] = [];
     acc[date].push(e);
@@ -196,12 +202,8 @@ const ChangelogSection = () => {
     return date.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   };
 
-  return (
+  const content = (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-[#FFC233]" />
-        <h2 className="text-lg font-bold">Novedades del sistema</h2>
-      </div>
       {Object.entries(grouped).map(([date, items]) => (
         <div key={date} className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{formatDate(date)}</p>
@@ -215,6 +217,50 @@ const ChangelogSection = () => {
           </div>
         </div>
       ))}
+    </div>
+  );
+
+  if (showAll) {
+    return (
+      <>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-[#FFC233]" />
+              <h2 className="text-lg font-bold">Novedades del sistema</h2>
+            </div>
+            <Button size="sm" variant="ghost" onClick={() => setShowAll(false)} className="text-xs">
+              Cerrar
+            </Button>
+          </div>
+          <div className="max-h-[600px] overflow-y-auto pr-2">
+            {content}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-5 w-5 text-[#FFC233]" />
+        <h2 className="text-lg font-bold">Novedades del sistema</h2>
+      </div>
+      <div className="relative">
+        {content}
+        {hasMore && (
+          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background via-background/90 to-transparent flex items-end justify-center pb-2">
+            <Button 
+              size="sm" 
+              onClick={() => setShowAll(true)}
+              className="gap-1.5 text-xs"
+            >
+              Ver todas ({entries.length})
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
