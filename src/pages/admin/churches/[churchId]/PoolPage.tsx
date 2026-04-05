@@ -116,7 +116,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 38, nombre: 140, responsable: 120, telefono: 100, direccion: 170, fechaContacto: 62, sugerencia: 180, asignar: 130,
+    cuerda: 38, nombre: 145, responsable: 115, telefono: 105, direccion: 155, fechaContacto: 62, sugerencia: 165, asignar: 125,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -641,7 +641,7 @@ const PoolPage = () => {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ tableLayout: 'auto' }}>
+              <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 940 }}>
                 <thead>
                   <tr className="border-b">
                     <th className="px-2 py-2 w-8">
@@ -682,7 +682,7 @@ const PoolPage = () => {
                         </td>
 
                         {/* Cuerda */}
-                        <td className="px-3 py-2 text-sm font-mono text-muted-foreground" style={{ width: colWidths.cuerda }}>
+                        <td className="px-1.5 py-1.5 text-xs font-mono text-muted-foreground text-center" style={{ width: colWidths.cuerda, maxWidth: colWidths.cuerda }}>
                           {c.numero_cuerda || '—'}
                         </td>
 
