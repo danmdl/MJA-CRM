@@ -214,6 +214,32 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
 );
 
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
+  const [contact, setContact] = useState<Contact | null>(null);
+  const [originalContact, setOriginalContact] = useState<string>('');
+  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
+  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showContactMap, setShowContactMap] = useState(false);
+  const { canEditDeleteContacts, canEditCuerda } = usePermissions();
+  const { profile, session } = useSession();
+  const [newLog, setNewLog] = useState({ date: '', method: '', notes: '' });
+  const [leaders, setLeaders] = useState<Leader[]>([]);
+  const [cells, setCells] = useState<Cell[]>([]);
+  const [logOpen, setLogOpen] = useState(false);
+  const [addLogOpen, setAddLogOpen] = useState(false);
+  const [historySignal, setHistorySignal] = useState(0);
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
+  const [pendingCuerdaChange, setPendingCuerdaChange] = useState<string | null>(null);
+  const [whatsappMsg, setWhatsappMsg] = useState('');
+  const [editingTemplate, setEditingTemplate] = useState(false);
+  const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; body: string; is_default?: boolean }[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateBody, setNewTemplateBody] = useState('');
+
   const hasUnsavedChanges = contact ? JSON.stringify(contact) !== originalContact : false;
   const safeClose = () => {
     if (hasUnsavedChanges) {
@@ -228,34 +254,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     setShowContactMap(false);
     setTimeout(() => onOpenChange(false), 50);
   };
-  const [contact, setContact] = useState<Contact | null>(null);
-  const [originalContact, setOriginalContact] = useState<string>('');
-  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
-  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const { canEditDeleteContacts, canEditCuerda } = usePermissions();
-  const { profile } = useSession();
-  const [newLog, setNewLog] = useState({ date: '', method: '', notes: '' });
-  const [leaders, setLeaders] = useState<Leader[]>([]);
-  const [cells, setCells] = useState<Cell[]>([]);
-  const [logOpen, setLogOpen] = useState(false);
-  const [addLogOpen, setAddLogOpen] = useState(false);
-  const [historySignal, setHistorySignal] = useState(0);
-  const [transfers, setTransfers] = useState<any[]>([]);
-  const queryClient = useQueryClient();
-  const { session } = useSession();
-
-  // Cell suggestion state
-  const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
-  const [pendingCuerdaChange, setPendingCuerdaChange] = useState<string | null>(null);
-  const [showContactMap, setShowContactMap] = useState(false);
-  const [whatsappMsg, setWhatsappMsg] = useState('');
-  const [editingTemplate, setEditingTemplate] = useState(false);
-  const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; body: string; is_default?: boolean }[]>([]);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState('');
-  const [newTemplateBody, setNewTemplateBody] = useState('');
 
   useEffect(() => {
     if (open && contactId) {
