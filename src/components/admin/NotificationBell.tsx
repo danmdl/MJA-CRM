@@ -26,15 +26,16 @@ const NotificationBell = () => {
     setUnreadMessages(count || 0);
   };
 
-  // Load new contacts count (last 24h)
+  // Load new contacts count (last 2 hours, created by others)
   const loadNewContacts = async () => {
-    if (!profile?.church_id) return;
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    if (!profile?.church_id || !userId) return;
+    const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const { count } = await supabase
       .from('contacts')
       .select('*', { count: 'exact', head: true })
       .eq('church_id', profile.church_id)
       .is('deleted_at', null)
+      .neq('created_by', userId)
       .gte('created_at', since);
     setNewContacts(count || 0);
   };
@@ -96,44 +97,83 @@ const NotificationBell = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="relative p-1.5 rounded-lg hover:bg-[#18181b] transition-colors"
+        style={{
+          position: 'relative',
+          padding: 4,
+          borderRadius: 6,
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
         title="Notificaciones"
       >
-        <Bell className="h-4.5 w-4.5 text-[#a1a1aa]" style={{ width: 18, height: 18 }} />
+        <Bell style={{ width: 16, height: 16, color: '#a1a1aa' }} />
         {totalCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
+          <span style={{
+            position: 'absolute',
+            top: -2,
+            right: -4,
+            minWidth: 14,
+            height: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 999,
+            backgroundColor: '#ef4444',
+            color: 'white',
+            fontSize: 8,
+            fontWeight: 700,
+            padding: '0 3px',
+            lineHeight: 1,
+          }}>
             {totalCount > 99 ? '99+' : totalCount}
           </span>
         )}
       </button>
 
       {showDropdown && (
-        <div className="absolute right-0 top-full mt-1 w-64 bg-[#111113] border border-[#27272a] rounded-lg shadow-xl z-50 overflow-hidden">
-          <div className="px-3 py-2 border-b border-[#27272a]">
-            <p className="text-xs font-medium text-[#fafafa]">Notificaciones</p>
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: '100%',
+          marginTop: 6,
+          width: 240,
+          backgroundColor: '#111113',
+          border: '1px solid #27272a',
+          borderRadius: 8,
+          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          zIndex: 100,
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #27272a' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#fafafa', margin: 0 }}>Notificaciones</p>
           </div>
-          <div className="max-h-[300px] overflow-y-auto">
+          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
             {unreadMessages > 0 && (
-              <a href="/admin/messages" className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#18181b] transition-colors no-underline" onClick={() => setShowDropdown(false)}>
-                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+              <a href="/admin/messages" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', textDecoration: 'none', borderBottom: '1px solid #1a1a1a' }} onClick={() => setShowDropdown(false)}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#3b82f6', flexShrink: 0 }}></span>
                 <div>
-                  <p className="text-xs text-[#fafafa]">{unreadMessages} mensaje{unreadMessages !== 1 ? 's' : ''} sin leer</p>
-                  <p className="text-[10px] text-[#71717a]">Abrí Mensajes para verlos</p>
+                  <p style={{ fontSize: 11, color: '#fafafa', margin: 0 }}>{unreadMessages} mensaje{unreadMessages !== 1 ? 's' : ''} sin leer</p>
+                  <p style={{ fontSize: 9, color: '#71717a', margin: '2px 0 0' }}>Ir a Mensajes</p>
                 </div>
               </a>
             )}
             {newContacts > 0 && (
-              <a href={`/admin/churches/${profile?.church_id}/pool`} className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#18181b] transition-colors no-underline" onClick={() => setShowDropdown(false)}>
-                <span className="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
+              <a href={`/admin/churches/${profile?.church_id}/pool`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', textDecoration: 'none' }} onClick={() => setShowDropdown(false)}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22c55e', flexShrink: 0 }}></span>
                 <div>
-                  <p className="text-xs text-[#fafafa]">{newContacts} contacto{newContacts !== 1 ? 's' : ''} nuevo{newContacts !== 1 ? 's' : ''} (24h)</p>
-                  <p className="text-[10px] text-[#71717a]">Abrí el Semillero para verlos</p>
+                  <p style={{ fontSize: 11, color: '#fafafa', margin: 0 }}>{newContacts} contacto{newContacts !== 1 ? 's' : ''} nuevo{newContacts !== 1 ? 's' : ''}</p>
+                  <p style={{ fontSize: 9, color: '#71717a', margin: '2px 0 0' }}>Ir al Semillero</p>
                 </div>
               </a>
             )}
             {totalCount === 0 && (
-              <div className="px-3 py-6 text-center">
-                <p className="text-xs text-[#71717a]">No hay notificaciones nuevas</p>
+              <div style={{ padding: '20px 12px', textAlign: 'center' }}>
+                <p style={{ fontSize: 11, color: '#71717a', margin: 0 }}>Sin notificaciones nuevas</p>
               </div>
             )}
           </div>
