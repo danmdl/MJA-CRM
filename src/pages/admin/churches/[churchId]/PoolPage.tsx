@@ -94,6 +94,7 @@ const PoolPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCuerda, setFilterCuerda] = useState<string>('');
   const [filterResponsable, setFilterResponsable] = useState<string>('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
@@ -115,7 +116,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 50, nombre: 140, responsable: 120, telefono: 100, direccion: 160, fechaContacto: 75, sugerencia: 170, asignar: 130,
+    cuerda: 45, nombre: 140, responsable: 120, telefono: 100, direccion: 160, fechaContacto: 65, sugerencia: 170, asignar: 130,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -537,8 +538,8 @@ const PoolPage = () => {
         )}
       </div>
 
-      {/* Pool Cards — only Sin asignar + Semillero Externo */}
-      <div className="grid grid-cols-2 gap-3 max-w-md">
+      {/* Pool Cards — Sin asignar + Semillero Externo + counters */}
+      <div className="flex items-center gap-3 flex-wrap">
         <Card className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'unassigned' ? 'ring-2 ring-primary' : ''}`} onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}>
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center justify-between">
@@ -546,7 +547,7 @@ const PoolPage = () => {
                 <p className="text-[11px] text-muted-foreground">Sin asignar</p>
                 <p className={`text-2xl font-bold tabular-nums ${poolCounts.unassigned > 0 ? 'text-yellow-500' : 'text-muted-foreground'}`}>{isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : poolCounts.unassigned}</p>
               </div>
-              {poolCounts.unassigned > 0 && <AlertCircle className="h-6 w-6 text-yellow-500 opacity-70" />}
+              {poolCounts.unassigned > 0 && <AlertCircle className="h-6 w-6 text-yellow-500 opacity-70 ml-3" />}
             </div>
           </CardContent>
         </Card>
@@ -557,10 +558,26 @@ const PoolPage = () => {
                 <p className="text-[11px] text-orange-400">Semillero Externo</p>
                 <p className={`text-2xl font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : externalContacts.length}</p>
               </div>
-              {externalContacts.length > 0 && <ExternalLink className="h-5 w-5 text-orange-400 opacity-70" />}
+              {externalContacts.length > 0 && <ExternalLink className="h-5 w-5 text-orange-400 opacity-70 ml-3" />}
             </div>
           </CardContent>
         </Card>
+        {selectedIds.size > 0 && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="pt-3 pb-3 px-4">
+              <p className="text-[11px] text-primary">Seleccionados</p>
+              <p className="text-2xl font-bold tabular-nums text-primary">{selectedIds.size}</p>
+            </CardContent>
+          </Card>
+        )}
+        {(filterCuerda || filterResponsable || searchTerm) && (
+          <Card className="border-blue-500/30 bg-blue-500/5">
+            <CardContent className="pt-3 pb-3 px-4">
+              <p className="text-[11px] text-blue-400">En este filtro</p>
+              <p className="text-2xl font-bold tabular-nums text-blue-400">{filteredContacts.length}</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Toolbar */}
@@ -627,6 +644,12 @@ const PoolPage = () => {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b">
+                    <th className="px-2 py-2 w-8">
+                      <input type="checkbox" className="rounded border-input" checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0} onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+                        else setSelectedIds(new Set());
+                      }} />
+                    </th>
                     <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
                     <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>Responsable</ResizableHeader>
@@ -649,13 +672,22 @@ const PoolPage = () => {
 
                     return (
                       <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
+                        {/* Selection checkbox */}
+                        <td className="px-2 py-1.5 w-8">
+                          <input type="checkbox" className="rounded border-input" checked={selectedIds.has(c.id)} onChange={(e) => {
+                            const next = new Set(selectedIds);
+                            if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                            setSelectedIds(next);
+                          }} />
+                        </td>
+
                         {/* Cuerda */}
                         <td className="px-3 py-2 text-sm font-mono text-muted-foreground" style={{ width: colWidths.cuerda }}>
                           {c.numero_cuerda || '—'}
                         </td>
 
                         {/* Nombre (con ojo) */}
-                        <td className="px-3 py-2" style={{ width: colWidths.nombre }}>
+                        <td className="px-2 py-1.5" style={{ width: colWidths.nombre }}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium" onClick={() => setSelectedContactId(c.id)}>
@@ -668,7 +700,7 @@ const PoolPage = () => {
                         </td>
 
                         {/* Responsable */}
-                        <td className="px-3 py-2" style={{ width: colWidths.responsable }}>
+                        <td className="px-2 py-1.5" style={{ width: colWidths.responsable }}>
                           <select
                             className="text-xs bg-transparent border border-transparent hover:border-input rounded px-1 py-0.5 w-full cursor-pointer"
                             value={c.responsable_id || ''}
@@ -686,7 +718,7 @@ const PoolPage = () => {
                         </td>
 
                         {/* Teléfono + WhatsApp */}
-                        <td className="px-2 py-2" style={{ width: colWidths.telefono }}>
+                        <td className="px-2 py-1.5" style={{ width: colWidths.telefono }}>
                           {c.phone ? (
                             <div className="flex items-center gap-1">
                               <span className="text-[11px] text-muted-foreground tabular-nums">{c.phone}</span>
@@ -705,7 +737,7 @@ const PoolPage = () => {
                         </td>
 
                         {/* Dirección + Ver en mapa */}
-                        <td className="px-2 py-2" style={{ width: colWidths.direccion }}>
+                        <td className="px-2 py-1.5" style={{ width: colWidths.direccion }}>
                           {c.address ? (
                             <div className="flex items-center gap-1">
                               <span className="text-xs truncate max-w-[150px]">{c.address}</span>
@@ -735,7 +767,7 @@ const PoolPage = () => {
 
                         {/* Sugerencia (Célula + Zona combinadas — all same color) */}
                         {isUnassignedView && (
-                          <td className="px-3 py-2" style={{ width: colWidths.sugerencia }}>
+                          <td className="px-2 py-1.5" style={{ width: colWidths.sugerencia }}>
                             {sugCell ? (() => {
                               const hasDist = c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null;
                               const dist = hasDist ? haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!) : null;
@@ -754,7 +786,7 @@ const PoolPage = () => {
 
                         {/* Assign button */}
                         {isUnassignedView && canAssignContacts() && (
-                          <td className="px-3 py-2" style={{ width: colWidths.asignar }}>
+                          <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
                             {(c as any).is_external && activePool === 'external' ? (
                               <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
                                 await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
@@ -867,13 +899,6 @@ const PoolPage = () => {
           )}
         </CardContent>
       </Card>
-
-      <div className="flex gap-4 text-xs text-muted-foreground px-1 py-1">
-        <span>Total: <strong className="text-foreground">{allContacts?.length || 0}</strong></span>
-        {(filterCuerda || filterResponsable || searchTerm) && (
-          <span>Filtrados: <strong className="text-foreground">{filteredContacts.length}</strong></span>
-        )}
-      </div>
 
       {/* Confirmation Dialog */}
       <Dialog open={!!confirmDialog} onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}>

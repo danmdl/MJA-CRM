@@ -15,14 +15,16 @@ const NotificationBell = () => {
 
   const userId = session?.user?.id;
 
-  // Load initial unread count
+  // Load initial unread count (last 24h only)
   const loadUnreadCount = async () => {
     if (!userId) return;
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count } = await supabase
       .from('message_recipients')
-      .select('*', { count: 'exact', head: true })
+      .select('*, messages!inner(created_at)', { count: 'exact', head: true })
       .eq('recipient_id', userId)
-      .is('read_at', null);
+      .is('read_at', null)
+      .gte('messages.created_at', since);
     setUnreadMessages(count || 0);
   };
 

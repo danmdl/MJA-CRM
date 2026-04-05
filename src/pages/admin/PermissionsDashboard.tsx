@@ -259,7 +259,11 @@ const PermissionsDashboard = () => {
             Configura los permisos de acceso para cada rol en el sistema
           </p>
         </div>
-        <Button onClick={savePermissions} disabled={isSaving}>
+        <div />
+      </div>
+
+      <div className="flex items-center gap-3 mb-4">
+        <Button onClick={savePermissions} disabled={isSaving} size="lg">
           {isSaving ? 'Guardando...' : 'Guardar Permisos'}
         </Button>
       </div>
@@ -280,7 +284,7 @@ const PermissionsDashboard = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr>
-                  <th className="text-left font-medium text-muted-foreground pb-4 pr-4 min-w-[120px]">Rol</th>
+                  <th className="text-left font-medium text-muted-foreground pb-4 pr-4 min-w-[120px] sticky left-0 bg-card z-10">Rol</th>
                   {permissionColumns.filter(c => !permSearch || c.label.toLowerCase().includes(permSearch.toLowerCase())).map((column) => (
                     <th key={column.key} className="text-center font-medium text-muted-foreground pb-4 px-2 min-w-[90px]">
                       <column.icon className="h-4 w-4 mx-auto mb-1" />
@@ -293,7 +297,7 @@ const PermissionsDashboard = () => {
             {/* Permission rows for each role */}
             {permissions.map((config, roleIndex) => (
               <tr key={config.role}>
-                <td className="py-3 pr-4">
+                <td className="py-3 pr-4 sticky left-0 bg-card z-10">
                   <Badge variant={config.role === 'admin' ? 'default' : 'secondary'}>
                     {config.label}
                   </Badge>
