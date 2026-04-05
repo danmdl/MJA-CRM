@@ -239,7 +239,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [showTemplates, setShowTemplates] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateBody, setNewTemplateBody] = useState('');
-  const [churchInfo, setChurchInfo] = useState<{ address?: string; website?: string; hours?: string } | null>(null);
 
   const hasUnsavedChanges = contact ? JSON.stringify(contact) !== originalContact : false;
   const safeClose = () => {
@@ -262,12 +261,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       fetchContactLogs();
       fetchLeadersAndCells();
       fetchTransfers();
-      // Fetch church info for template variables
-      const targetChurchId = churchId || profile?.church_id;
-      if (targetChurchId) {
-        supabase.from('churches').select('address, website, hours').eq('id', targetChurchId).single()
-          .then(({ data }) => setChurchInfo(data));
-      }
       // Load user's WhatsApp templates (active ones only, including system templates)
       supabase.from('whatsapp_templates')
         .select('id, name, body, is_default, is_system')
@@ -286,26 +279,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         });
     }
   }, [open, contactId, churchId, profile?.church_id]);
-
-  // Apply variable replacement when contact, church, or message changes
-  useEffect(() => {
-    if (!contact || !whatsappMsg) return;
-    const hasNewVars = /\{nombre\.contacto\}|\{nombre\.usuario\}|\{direccion\.iglesia\}|\{website\.iglesia\}|\{horarios\.iglesia\}/i.test(whatsappMsg);
-    const hasLegacyVars = /\{nombre\}|\{apellido\}|\{telefono\}/i.test(whatsappMsg);
-    if (!hasNewVars && !hasLegacyVars) return;
-    let msg = whatsappMsg;
-    // New variable system
-    msg = msg.replace(/\{nombre\.contacto\}/gi, contact.first_name || '');
-    msg = msg.replace(/\{nombre\.usuario\}/gi, profile?.first_name || '');
-    msg = msg.replace(/\{direccion\.iglesia\}/gi, churchInfo?.address || '');
-    msg = msg.replace(/\{website\.iglesia\}/gi, churchInfo?.website || '');
-    msg = msg.replace(/\{horarios\.iglesia\}/gi, churchInfo?.hours || '');
-    // Legacy variable system (still supported)
-    msg = msg.replace(/\{nombre\}/gi, contact.first_name || '');
-    msg = msg.replace(/\{apellido\}/gi, contact.last_name || '');
-    msg = msg.replace(/\{telefono\}/gi, contact.phone || '');
-    setWhatsappMsg(msg);
-  }, [contact?.first_name, churchInfo]);
 
   const fetchTransfers = async () => {
     if (!contactId) return;

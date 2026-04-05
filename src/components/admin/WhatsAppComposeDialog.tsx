@@ -52,7 +52,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   useEffect(() => {
     const fetchChurchData = async () => {
       const targetChurchId = churchId || profile?.church_id;
-      if (!targetChurchId) return;
+      if (!targetChurchId) { setChurchData(null); return; }
       const { data } = await supabase
         .from('churches')
         .select('address, website, hours')
@@ -63,7 +63,9 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
     if (open) fetchChurchData();
   }, [open, churchId, profile?.church_id]);
 
-  // Replace variables in template body
+  // Replace variables in a message body. Used at SEND time so values are
+  // always fresh (no race with async church data fetch) and so users can
+  // insert variables mid-edit and have them resolved on send.
   const replaceVars = (body: string) => {
     return body
       .replace(/\{nombre\.contacto\}/gi, contactFirstName || '')
@@ -85,11 +87,12 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
       .order('name');
     const list = (data || []) as WhatsAppTemplate[];
     setTemplates(list);
-    // Auto-load default template into composer (user's own default takes priority)
+    // Auto-load default template into composer (user's own default takes priority).
+    // Raw body is shown with {variables} visible - they resolve on send.
     if (autoLoadDefault) {
       const def = list.find(t => t.is_default && !t.is_system);
       if (def) {
-        setMessage(replaceVars(def.body));
+        setMessage(def.body);
       }
     }
   };
@@ -105,7 +108,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   }, [open, userId]);
 
   const handleSelectTemplate = (t: WhatsAppTemplate) => {
-    setMessage(replaceVars(t.body));
+    setMessage(t.body);
   };
 
   const handleSaveAsTemplate = async () => {
@@ -130,9 +133,10 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   const handleSend = () => {
     if (!message.trim() || !contactPhone) return;
+    const resolvedMessage = replaceVars(message);
     const cleanPhone = contactPhone.replace(/\D/g, '');
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
-    if (onSent) onSent(message);
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(resolvedMessage)}`, '_blank');
+    if (onSent) onSent(resolvedMessage);
     onOpenChange(false);
   };
 
@@ -199,6 +203,14 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                   <Save className="h-3.5 w-3.5" /> Save as template
                 </Button>
               )
+            )}
+
+            {/* Live preview of resolved message (only if message contains variables) */}
+            {/\{(nombre|direccion|website|horarios)\.(contacto|usuario|iglesia)\}/i.test(message) && (
+              <div className="text-[10px] text-muted-foreground border-l-2 border-primary/30 pl-2 py-1 bg-primary/5 rounded-r">
+                <p className="font-medium uppercase tracking-wider mb-0.5 text-[9px]">Vista previa al enviar:</p>
+                <p className="whitespace-pre-wrap font-mono">{replaceVars(message)}</p>
+              </div>
             )}
 
             <Button
