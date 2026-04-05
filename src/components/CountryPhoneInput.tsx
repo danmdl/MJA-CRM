@@ -65,12 +65,11 @@ const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
           value={phone} 
           onChange={(e) => setPhone(e.target.value)} 
           onBlur={handleBlur} 
-          placeholder="Ej: 1165129359"
+          placeholder=""
           inputMode="tel"
           disabled={disabled}
         />
       </div>
-      {!hideExample && <div className="text-xs text-muted-foreground">Ejemplo: 1165129359</div>}
     </div>
   );
 };

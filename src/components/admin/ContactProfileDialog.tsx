@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Send } from 'lucide-react';
+import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Send, X } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -214,8 +214,23 @@ const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
 );
 
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
-  const safeClose = () => { setShowContactMap(false); setTimeout(() => onOpenChange(false), 50); };
+  const hasUnsavedChanges = contact ? JSON.stringify(contact) !== originalContact : false;
+  const safeClose = () => {
+    if (hasUnsavedChanges) {
+      setUnsavedDialogOpen(true);
+      return;
+    }
+    setShowContactMap(false);
+    setTimeout(() => onOpenChange(false), 50);
+  };
+  const forceClose = () => {
+    setUnsavedDialogOpen(false);
+    setShowContactMap(false);
+    setTimeout(() => onOpenChange(false), 50);
+  };
   const [contact, setContact] = useState<Contact | null>(null);
+  const [originalContact, setOriginalContact] = useState<string>('');
+  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -291,7 +306,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       .eq('id', contactId)
       .eq('church_id', churchId)
       .single();
-    if (!error) setContact(data as unknown as Contact);
+    if (!error) {
+      setContact(data as unknown as Contact);
+      setOriginalContact(JSON.stringify(data));
+    }
     setLoading(false);
   };
 
@@ -454,6 +472,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   }
 
   return (
+  <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
       <DialogContent className="sm:max-w-[1300px] max-h-[90vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
         {contact && (
@@ -674,12 +693,20 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 </div>
               )}
 
-              {/* Buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border">
-                <Button size="sm" variant="outline" onClick={() => setAddLogOpen(true)}><MessageSquare className="mr-1.5 h-4 w-4" /> Agregar Registro</Button>
-                <div className="flex-1" />
-                <Button variant="ghost" size="sm" onClick={() => safeClose()} disabled={saving}>Cancelar</Button>
-                {(canEditDeleteContacts() || profile?.role === 'conector') && <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>}
+              {/* Save bar at top of form */}
+              {(canEditDeleteContacts() || profile?.role === 'conector') && hasUnsavedChanges && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+                  <span className="text-xs text-primary font-medium">Hay cambios sin guardar</span>
+                  <div className="flex-1" />
+                  <Button size="sm" onClick={handleSave} disabled={saving} className="h-7 text-xs">{saving ? 'Guardando...' : 'Guardar Cambios'}</Button>
+                </div>
+              )}
+
+              {/* Bottom: red X to close */}
+              <div className="flex items-center justify-end pt-1 border-t border-border">
+                <Button variant="ghost" size="sm" onClick={() => safeClose()} className="text-red-500 hover:text-red-400 hover:bg-red-500/10 gap-1.5">
+                  <X className="h-3.5 w-3.5" /> Cerrar
+                </Button>
               </div>
 
               {/* Hidden dialogs */}
@@ -836,7 +863,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             <div className="w-[320px] flex-shrink-0 border-l border-border bg-muted/30 flex flex-col overflow-hidden">
               {/* Top half: Contact logs */}
               <div className="flex-1 overflow-y-auto p-4 border-b border-border">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Registros de contacto</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Registros de contacto</p>
+                  <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => setAddLogOpen(true)}>+ Agregar</Button>
+                </div>
                 <ContactLogInline churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
               </div>
               {/* Bottom half: Timeline */}
@@ -848,6 +878,29 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Unsaved changes confirmation */}
+    <Dialog open={unsavedDialogOpen} onOpenChange={setUnsavedDialogOpen}>
+      <DialogContent className="sm:max-w-[380px]">
+        <DialogHeader>
+          <DialogTitle>¿Estás seguro?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">Tenés cambios sin guardar. ¿Qué querés hacer?</p>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="ghost" size="sm" onClick={() => { setUnsavedDialogOpen(false); forceClose(); }}>
+            Cerrar sin guardar
+          </Button>
+          <Button size="sm" onClick={async () => {
+            setUnsavedDialogOpen(false);
+            await handleSave();
+            forceClose();
+          }}>
+            Guardar y cerrar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 };
 
