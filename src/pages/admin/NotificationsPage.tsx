@@ -207,7 +207,7 @@ const ChangelogSection = () => {
       {Object.entries(grouped).map(([date, items]) => (
         <div key={date} className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{formatDate(date)}</p>
-          <div className={`grid gap-1.5 ${showAll ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-1.5 ${showAll ? 'grid-cols-1' : 'md:grid-cols-2'}`}>
             {items.map(e => (
               <div key={e.id} className="rounded-lg border px-3 py-2.5 bg-muted/20">
                 <p className="text-sm font-medium">{e.title}</p>

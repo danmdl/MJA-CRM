@@ -37,13 +37,18 @@ const TemplatesPage = () => {
 
   const loadTemplates = async () => {
     if (!userId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('whatsapp_templates')
       .select('*, profiles(first_name, last_name)')
       .eq('user_id', userId)
       .is('deleted_at', showTrash ? 'not.null' : null)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error loading templates:', error);
+    }
+    console.log('Loaded templates:', data);
     setTemplates(data || []);
   };
 
