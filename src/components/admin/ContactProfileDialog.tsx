@@ -280,6 +280,15 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     }
   }, [open, contactId, churchId, profile?.church_id]);
 
+  // When the user returns to this tab (e.g. after sending WhatsApp in a new tab),
+  // refresh the contact logs so recent sends show up immediately.
+  useEffect(() => {
+    if (!open || !contactId) return;
+    const onFocus = () => { fetchContactLogs(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [open, contactId]);
+
   const fetchTransfers = async () => {
     if (!contactId) return;
     const { data } = await supabase
@@ -370,32 +379,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
 
 
-
-  const logWhatsAppSend = async (message: string) => {
-    if (!contact) return;
-    try {
-      const session = (await supabase.auth.getSession()).data.session;
-      const today = new Date().toISOString().split('T')[0];
-      const preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
-      await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
-        },
-        body: JSON.stringify({
-          contactId: contact.id,
-          churchId,
-          contact_date: today,
-          contact_method: 'WhatsApp',
-          notes: `Mensaje enviado: "${preview}"`,
-        }),
-      });
-      setHistorySignal(s => s + 1);
-    } catch (e) {
-      console.error('Failed to log WhatsApp send:', e);
-    }
-  };
 
   const handleSave = async () => {
     if (!contact) return;

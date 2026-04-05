@@ -17,9 +17,10 @@ const ContactLogInline = ({ churchId, contactId, refreshSignal }: Props) => {
     queryFn: async () => {
       const { data } = await supabase
         .from('contact_logs')
-        .select('id, contact_date, notes, contacted_by, method')
+        .select('id, contact_date, notes, contacted_by, contact_method')
         .eq('contact_id', contactId)
         .order('contact_date', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(15);
       return data || [];
     },
@@ -44,7 +45,7 @@ const ContactLogInline = ({ churchId, contactId, refreshSignal }: Props) => {
         return (
           <div key={log.id} className="text-xs space-y-0.5">
             <div className="flex justify-between items-start">
-              <span className="font-medium text-foreground">{log.method || 'Registro'}</span>
+              <span className="font-medium text-foreground">{log.contact_method || 'Registro'}</span>
               <span className="text-muted-foreground text-[10px]">
                 {format(new Date(log.contact_date), "d MMM yy", { locale: es })}
               </span>

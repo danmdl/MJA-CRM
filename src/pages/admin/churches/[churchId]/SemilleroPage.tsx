@@ -1107,6 +1107,7 @@ const SemilleroPage = () => {
               return;
             }
             showSuccess('Envío registrado en el historial.');
+            queryClient.invalidateQueries({ queryKey: ['contact-logs-inline', contactId] });
             queryClient.invalidateQueries({ queryKey: ['contact-logs', contactId] });
             queryClient.invalidateQueries({ queryKey: ['contact_logs', contactId] });
           } catch (e) { console.error('Failed to log WhatsApp send:', e); showError('Error registrando el envío.'); }
