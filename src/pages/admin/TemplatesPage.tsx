@@ -1,0 +1,288 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/use-session';
+import { showSuccess, showError } from '@/utils/toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Plus, Star, Edit3, Trash2, Save, X } from 'lucide-react';
+
+interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  body: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+const TemplatesPage = () => {
+  const { session } = useSession();
+  const userId = session?.user?.id;
+  const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [editingBody, setEditingBody] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newBody, setNewBody] = useState('');
+  const [newIsDefault, setNewIsDefault] = useState(false);
+
+  const loadTemplates = async () => {
+    if (!userId) return;
+    const { data } = await supabase
+      .from('whatsapp_templates')
+      .select('*')
+      .eq('user_id', userId)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false });
+    setTemplates(data || []);
+  };
+
+  useEffect(() => {
+    loadTemplates();
+  }, [userId]);
+
+  const handleCreate = async () => {
+    if (!newName.trim() || !newBody.trim() || !userId) return;
+    
+    if (newIsDefault) {
+      await supabase.from('whatsapp_templates').update({ is_default: false }).eq('user_id', userId);
+    }
+    
+    const { error } = await supabase.from('whatsapp_templates').insert({
+      user_id: userId,
+      name: newName.trim(),
+      body: newBody.trim(),
+      is_default: newIsDefault,
+    });
+    
+    if (error) {
+      showError('Error al crear plantilla.');
+      return;
+    }
+    
+    showSuccess(newIsDefault ? 'Plantilla creada como default.' : 'Plantilla creada.');
+    setNewName('');
+    setNewBody('');
+    setNewIsDefault(false);
+    setCreating(false);
+    loadTemplates();
+  };
+
+  const handleStartEdit = (t: WhatsAppTemplate) => {
+    setEditingId(t.id);
+    setEditingName(t.name);
+    setEditingBody(t.body);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !editingName.trim() || !editingBody.trim()) return;
+    
+    const { error } = await supabase
+      .from('whatsapp_templates')
+      .update({ name: editingName.trim(), body: editingBody.trim() })
+      .eq('id', editingId);
+    
+    if (error) {
+      showError('Error al guardar.');
+      return;
+    }
+    
+    showSuccess('Plantilla actualizada.');
+    setEditingId(null);
+    loadTemplates();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro que querés eliminar esta plantilla?')) return;
+    
+    const { error } = await supabase.from('whatsapp_templates').delete().eq('id', id);
+    
+    if (error) {
+      showError('Error al eliminar.');
+      return;
+    }
+    
+    showSuccess('Plantilla eliminada.');
+    loadTemplates();
+  };
+
+  const handleSetDefault = async (id: string) => {
+    if (!userId) return;
+    
+    await supabase.from('whatsapp_templates').update({ is_default: false }).eq('user_id', userId);
+    await supabase.from('whatsapp_templates').update({ is_default: true }).eq('id', id);
+    
+    showSuccess('Plantilla marcada como default.');
+    loadTemplates();
+  };
+
+  return (
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Plantillas de WhatsApp</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Administrá tus plantillas de mensajes para WhatsApp
+          </p>
+        </div>
+        <Button onClick={() => setCreating(true)} className="gap-2">
+          <Plus className="h-4 w-4" /> Nueva Plantilla
+        </Button>
+      </div>
+
+      {/* Create new template */}
+      {creating && (
+        <Card className="border-primary/50">
+          <CardHeader>
+            <CardTitle className="text-lg">Nueva Plantilla</CardTitle>
+            <CardDescription>
+              Variables disponibles: {'{nombre}'}, {'{apellido}'}, {'{telefono}'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre de la plantilla</label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Ej: Saludo inicial"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mensaje</label>
+              <Textarea
+                value={newBody}
+                onChange={(e) => setNewBody(e.target.value)}
+                placeholder="Hola {nombre}, ¿cómo estás?"
+                className="min-h-[120px] font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">{newBody.length} caracteres</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newIsDefault}
+                onChange={(e) => setNewIsDefault(e.target.checked)}
+                className="rounded border-input"
+              />
+              Marcar como plantilla por defecto
+            </label>
+            <div className="flex gap-2">
+              <Button onClick={handleCreate} disabled={!newName.trim() || !newBody.trim()} className="gap-2">
+                <Save className="h-4 w-4" /> Guardar
+              </Button>
+              <Button variant="outline" onClick={() => { setCreating(false); setNewName(''); setNewBody(''); setNewIsDefault(false); }} className="gap-2">
+                <X className="h-4 w-4" /> Cancelar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Templates list */}
+      <div className="space-y-3">
+        {templates.length === 0 && !creating && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">No tenés plantillas guardadas.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Hacé clic en "Nueva Plantilla" para crear una.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        
+        {templates.map((template) => (
+          <Card key={template.id} className={template.is_default ? 'border-green-500/30 bg-green-500/5' : ''}>
+            {editingId === template.id ? (
+              <CardContent className="pt-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nombre</label>
+                  <Input
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    placeholder="Nombre de la plantilla"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Mensaje</label>
+                  <Textarea
+                    value={editingBody}
+                    onChange={(e) => setEditingBody(e.target.value)}
+                    className="min-h-[120px] font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">{editingBody.length} caracteres</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveEdit} className="gap-2">
+                    <Save className="h-4 w-4" /> Guardar
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditingId(null)} className="gap-2">
+                    <X className="h-4 w-4" /> Cancelar
+                  </Button>
+                </div>
+              </CardContent>
+            ) : (
+              <>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        {template.is_default && <Star className="h-4 w-4 text-green-500 fill-green-500" />}
+                        {template.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Creada {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!template.is_default && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSetDefault(template.id)}
+                          className="gap-1.5 h-8"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                          Hacer default
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStartEdit(template)}
+                        className="gap-1.5 h-8"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(template.id)}
+                        className="gap-1.5 h-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-muted/30 rounded-lg p-4 font-mono text-sm whitespace-pre-wrap">
+                    {template.body}
+                  </div>
+                </CardContent>
+              </>
+            )}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default TemplatesPage;

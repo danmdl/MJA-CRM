@@ -71,6 +71,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
       title: 'Cuenta',
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
+        { to: '/admin/templates', emoji: '📝', label: 'Templates' },
         { to: '/admin/notifications', emoji: '🔔', label: 'Notificaciones' },
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),

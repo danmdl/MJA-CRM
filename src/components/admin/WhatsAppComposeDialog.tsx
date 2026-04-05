@@ -86,6 +86,11 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   const handleSelectTemplate = (t: WhatsAppTemplate) => {
     setMessage(replaceVars(t.body));
+    // Automatically enter edit mode for this template
+    setEditMode(true);
+    setEditingTemplateId(t.id);
+    setEditingName(t.name);
+    setEditingBody(t.body);
   };
 
   const handleSaveAsTemplate = async () => {

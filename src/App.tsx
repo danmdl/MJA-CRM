@@ -66,7 +66,7 @@ const CuerdasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/Cu
 const MapaPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/MapaPage"));
 const ChurchDatabasePage = lazyRetry(() => import("./pages/admin/churches/[churchId]/DatabasePage"));
 const ChurchTeamPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/TeamPage"));
-const PoolPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/PoolPage"));
+const SemilleroPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/SemilleroPage"));
 const CelulasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CelulasPage"));
 const HistorialPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/HistorialPage"));
 const PapeleraPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/PapeleraPage"));
@@ -79,6 +79,7 @@ const Messages = lazyRetry(() => import("./pages/Messages"));
 const PermissionsDashboard = lazyRetry(() => import("./pages/admin/PermissionsDashboard"));
 const InfoPage = lazyRetry(() => import("./pages/admin/InfoPage"));
 const NotificationsPage = lazyRetry(() => import("./pages/admin/NotificationsPage"));
+const TemplatesPage = lazyRetry(() => import("./pages/admin/TemplatesPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -142,6 +143,7 @@ const AppRoutes = () => {
           <Route path="zonas" element={<ZonasPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
+        <Route path="templates" element={<TemplatesPage />} />
         <Route path="info" element={<InfoPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
 
@@ -159,7 +161,7 @@ const AppRoutes = () => {
           <Route path="team" element={<ChurchTeamPage />} />
           <Route path="cuerdas" element={<CuerdasPage />} />
           <Route path="mapa" element={<MapaPage />} />
-          <Route path="pool" element={<PoolPage />} />
+          <Route path="pool" element={<SemilleroPage />} />
           <Route path="celulas" element={<CelulasPage />} />
           <Route path="historial" element={<HistorialPage />} />
           <Route path="papelera" element={<PapeleraPage />} />

@@ -86,7 +86,7 @@ const ResizableHeader = ({ children, width, onResize, className = '' }: {
 };
 
 // ─── Main Component ──────────────────────────────────────────────
-const PoolPage = () => {
+const SemilleroPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const { session, profile } = useSession();
   const queryClient = useQueryClient();
@@ -1056,4 +1056,4 @@ const PoolPage = () => {
   );
 };
 
-export default PoolPage;
+export default SemilleroPage;
