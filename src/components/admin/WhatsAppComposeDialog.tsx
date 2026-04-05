@@ -150,10 +150,10 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex h-[500px]">
+        <div className="flex h-[min(600px,calc(85vh-60px))]">
           {/* LEFT: Message composer */}
-          <div className={`flex-1 p-4 flex flex-col gap-3 ${canUseTemplates() ? 'border-r' : ''}`}>
-            <div className="flex items-center justify-between">
+          <div className={`flex-1 p-4 flex flex-col gap-3 min-w-0 ${canUseTemplates() ? 'border-r' : ''}`}>
+            <div className="flex items-center justify-between shrink-0">
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mensaje</label>
               <span className="text-[10px] text-muted-foreground">{message.length} caracteres</span>
             </div>
@@ -161,11 +161,11 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={canUseTemplates() ? "Escribí tu mensaje o seleccioná una plantilla →" : "Escribí tu mensaje"}
-              className="flex-1 text-sm resize-none min-h-[300px]"
+              className="flex-1 text-sm resize-none min-h-[120px]"
             />
 
             {saveMode ? (
-              <div className="p-2 rounded-md bg-muted/40 border space-y-2">
+              <div className="p-2 rounded-md bg-muted/40 border space-y-2 shrink-0">
                 <div className="flex items-center gap-2">
                   <Input
                     value={newTemplateName}
@@ -196,7 +196,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 text-xs w-full"
+                  className="gap-1.5 text-xs w-full shrink-0"
                   onClick={() => setSaveMode(true)}
                   disabled={!message.trim()}
                 >
@@ -207,14 +207,14 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
             {/* Live preview of resolved message (only if message contains variables) */}
             {/\{(nombre|direccion|website|horarios)\.(contacto|usuario|iglesia)\}/i.test(message) && (
-              <div className="text-[10px] text-muted-foreground border-l-2 border-primary/30 pl-2 py-1 bg-primary/5 rounded-r">
-                <p className="font-medium uppercase tracking-wider mb-0.5 text-[9px]">Vista previa al enviar:</p>
+              <div className="text-[10px] text-muted-foreground border-l-2 border-primary/30 pl-2 py-1 bg-primary/5 rounded-r shrink-0 max-h-24 overflow-y-auto">
+                <p className="font-medium uppercase tracking-wider mb-0.5 text-[9px] sticky top-0 bg-primary/5">Vista previa al enviar:</p>
                 <p className="whitespace-pre-wrap font-mono">{replaceVars(message)}</p>
               </div>
             )}
 
             <Button
-              className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white"
+              className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white shrink-0"
               onClick={handleSend}
               disabled={!message.trim()}
             >
