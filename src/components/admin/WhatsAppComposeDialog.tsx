@@ -34,24 +34,38 @@ interface Props {
 }
 
 const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstName, contactLastName, contactPhone, onSent }: Props) => {
-  const { session } = useSession();
+  const { session, profile } = useSession();
   const userId = session?.user?.id;
   const [message, setMessage] = useState('');
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
-  const [editMode, setEditMode] = useState(false);
   const [saveMode, setSaveMode] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
-  const [editingBody, setEditingBody] = useState('');
+  const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
+  const [churchData, setChurchData] = useState<{ address?: string; website?: string; hours?: string } | null>(null);
+
+  // Fetch church data
+  useEffect(() => {
+    const fetchChurchData = async () => {
+      if (!profile?.church_id) return;
+      const { data } = await supabase
+        .from('churches')
+        .select('address, website, hours')
+        .eq('id', profile.church_id)
+        .single();
+      setChurchData(data);
+    };
+    if (open) fetchChurchData();
+  }, [open, profile?.church_id]);
 
   // Replace variables in template body
   const replaceVars = (body: string) => {
     return body
-      .replace(/\{nombre\}/g, contactFirstName || '')
-      .replace(/\{apellido\}/g, contactLastName || '')
-      .replace(/\{telefono\}/g, contactPhone || '');
+      .replace(/\{nombre\.contacto\}/gi, contactFirstName || '')
+      .replace(/\{nombre\.usuario\}/gi, profile?.first_name || '')
+      .replace(/\{direccion\.iglesia\}/gi, churchData?.address || '')
+      .replace(/\{website\.iglesia\}/gi, churchData?.website || '')
+      .replace(/\{horarios\.iglesia\}/gi, churchData?.hours || '');
   };
 
   // Load templates
@@ -76,21 +90,15 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   useEffect(() => {
     if (open) {
       setMessage('');
-      setEditMode(false);
       setSaveMode(false);
       setSaveAsDefault(false);
-      setEditingTemplateId(null);
+      setExpandedTemplateId(null);
       loadTemplates(true); // auto-load default
     }
   }, [open, userId]);
 
   const handleSelectTemplate = (t: WhatsAppTemplate) => {
     setMessage(replaceVars(t.body));
-    // Automatically enter edit mode for this template
-    setEditMode(true);
-    setEditingTemplateId(t.id);
-    setEditingName(t.name);
-    setEditingBody(t.body);
   };
 
   const handleSaveAsTemplate = async () => {
@@ -110,37 +118,6 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
     setNewTemplateName('');
     setSaveAsDefault(false);
     setSaveMode(false);
-    loadTemplates();
-  };
-
-  const handleDeleteTemplate = async (id: string) => {
-    const { error } = await supabase.from('whatsapp_templates').delete().eq('id', id);
-    if (error) { showError('Error al eliminar.'); return; }
-    showSuccess('Plantilla eliminada.');
-    loadTemplates();
-  };
-
-  const handleSetDefault = async (id: string) => {
-    if (!userId) return;
-    await supabase.from('whatsapp_templates').update({ is_default: false }).eq('user_id', userId);
-    await supabase.from('whatsapp_templates').update({ is_default: true }).eq('id', id);
-    loadTemplates();
-  };
-
-  const handleStartEditTemplate = (t: WhatsAppTemplate) => {
-    setEditingTemplateId(t.id);
-    setEditingName(t.name);
-    setEditingBody(t.body);
-  };
-
-  const handleSaveEditTemplate = async () => {
-    if (!editingTemplateId || !editingName.trim() || !editingBody.trim()) return;
-    const { error } = await supabase.from('whatsapp_templates')
-      .update({ name: editingName.trim(), body: editingBody.trim() })
-      .eq('id', editingTemplateId);
-    if (error) { showError('Error al guardar.'); return; }
-    showSuccess('Plantilla actualizada.');
-    setEditingTemplateId(null);
     loadTemplates();
   };
 
@@ -204,25 +181,15 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                 </label>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs flex-1"
-                  onClick={() => setSaveMode(true)}
-                  disabled={!message.trim()}
-                >
-                  <Save className="h-3.5 w-3.5" /> Save as template
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs flex-1"
-                  onClick={() => setEditMode(!editMode)}
-                >
-                  <Edit3 className="h-3.5 w-3.5" /> {editMode ? 'Done editing' : 'Edit templates'}
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs w-full"
+                onClick={() => setSaveMode(true)}
+                disabled={!message.trim()}
+              >
+                <Save className="h-3.5 w-3.5" /> Save as template
+              </Button>
             )}
 
             <Button
@@ -240,14 +207,20 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">Templates</p>
               <p className="text-[10px] text-muted-foreground mb-1">Insertar variable:</p>
               <div className="flex items-center gap-1 flex-wrap">
-                {(['nombre', 'apellido', 'telefono'] as const).map(v => (
+                {[
+                  { key: 'nombre.contacto', label: 'Nombre Contacto' },
+                  { key: 'nombre.usuario', label: 'Nombre Usuario' },
+                  { key: 'direccion.iglesia', label: 'Dirección Iglesia' },
+                  { key: 'website.iglesia', label: 'Website Iglesia' },
+                  { key: 'horarios.iglesia', label: 'Horarios Iglesia' },
+                ].map(v => (
                   <button
-                    key={v}
+                    key={v.key}
                     type="button"
-                    onClick={() => setMessage(m => m + `{${v}}`)}
-                    className="text-[10px] px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors capitalize"
+                    onClick={() => setMessage(m => m + `{${v.key}}`)}
+                    className="text-[10px] px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors"
                   >
-                    {v}
+                    {v.label}
                   </button>
                 ))}
               </div>
@@ -257,53 +230,33 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                 <p className="text-xs text-muted-foreground italic text-center py-8 px-3">No hay plantillas guardadas. Escribí un mensaje y clickeá "Save as template" para crear una.</p>
               )}
               {templates.map(t => (
-                <div key={t.id} className={`rounded-md border p-2.5 space-y-1.5 ${t.is_default ? 'border-green-500/30 bg-green-500/5' : 'border-border bg-background'}`}>
-                  {editingTemplateId === t.id ? (
-                    <>
-                      <Input
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        className="h-7 text-xs"
-                        placeholder="Nombre"
-                      />
-                      <Textarea
-                        value={editingBody}
-                        onChange={(e) => setEditingBody(e.target.value)}
-                        className="text-xs min-h-[60px]"
-                      />
-                      <div className="flex gap-1">
-                        <Button size="sm" className="h-6 text-[10px] flex-1" onClick={handleSaveEditTemplate}>Guardar</Button>
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditingTemplateId(null)}>Cancelar</Button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="flex items-center gap-1 min-w-0">
-                          {t.is_default && <Star className="h-3 w-3 text-green-500 fill-green-500 shrink-0" />}
-                          <p className="text-xs font-medium truncate">{t.name}</p>
-                        </div>
-                        {editMode && (
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            {!t.is_default && (
-                              <button onClick={() => handleSetDefault(t.id)} className="p-1 hover:bg-muted rounded" title="Hacer default">
-                                <Star className="h-3 w-3 text-muted-foreground" />
-                              </button>
-                            )}
-                            <button onClick={() => handleStartEditTemplate(t)} className="p-1 hover:bg-muted rounded" title="Editar">
-                              <Edit3 className="h-3 w-3 text-muted-foreground" />
-                            </button>
-                            <button onClick={() => handleDeleteTemplate(t.id)} className="p-1 hover:bg-red-500/10 rounded" title="Eliminar">
-                              <Trash2 className="h-3 w-3 text-red-500" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground line-clamp-2">{t.body}</p>
-                      {!editMode && (
-                        <Button
-                          size="sm"
-                          variant="outline"
+                <div 
+                  key={t.id} 
+                  className={`rounded-md border p-2.5 space-y-1.5 cursor-pointer hover:bg-muted/50 transition-colors ${t.is_default ? 'border-green-500/30 bg-green-500/5' : 'border-border bg-background'}`}
+                  onClick={() => setExpandedTemplateId(expandedTemplateId === t.id ? null : t.id)}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1 min-w-0">
+                      {t.is_default && <Star className="h-3 w-3 text-green-500 fill-green-500 shrink-0" />}
+                      <p className="text-xs font-medium truncate">{t.name}</p>
+                    </div>
+                  </div>
+                  <p className={`text-[10px] text-muted-foreground font-mono whitespace-pre-wrap ${expandedTemplateId === t.id ? '' : 'line-clamp-2'}`}>
+                    {t.body}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-6 text-[10px]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectTemplate(t);
+                    }}
+                  >
+                    Usar plantilla
+                  </Button>
+                </div>
+              ))}
                           className="w-full h-6 text-[10px]"
                           onClick={() => handleSelectTemplate(t)}
                         >

@@ -138,7 +138,7 @@ const TemplatesPage = () => {
           <CardHeader>
             <CardTitle className="text-lg">Nueva Plantilla</CardTitle>
             <CardDescription>
-              Variables disponibles: {'{nombre}'}, {'{apellido}'}, {'{telefono}'}
+              Variables disponibles: {'{nombre.contacto}'}, {'{nombre.usuario}'}, {'{direccion.iglesia}'}, {'{website.iglesia}'}, {'{horarios.iglesia}'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
