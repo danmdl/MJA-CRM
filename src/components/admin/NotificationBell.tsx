@@ -52,10 +52,19 @@ const NotificationBell = () => {
         schema: 'public',
         table: 'message_recipients',
         filter: `recipient_id=eq.${userId}`,
-      }, () => {
+      }, async (payload: any) => {
         loadUnreadCount();
-        // Play sound
         try { new Audio(NOTIF_SOUND_URL).play().catch(() => {}); } catch {}
+        // Persist notification
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          church_id: profile?.church_id || null,
+          type: 'message',
+          title: 'Nuevo mensaje',
+          message: 'Tenés un mensaje sin leer.',
+          link: '/admin/messages',
+          read: false,
+        });
       })
       .subscribe();
 
@@ -65,8 +74,20 @@ const NotificationBell = () => {
         event: 'INSERT',
         schema: 'public',
         table: 'contacts',
-      }, () => {
+      }, async (payload: any) => {
         loadNewContacts();
+        const contact = payload.new;
+        if (contact?.created_by !== userId) {
+          await supabase.from('notifications').insert({
+            user_id: userId,
+            church_id: profile?.church_id || null,
+            type: 'contact',
+            title: 'Nuevo contacto',
+            message: `${contact?.first_name || 'Alguien'} fue agregado al Semillero.`,
+            link: `/admin/churches/${profile?.church_id}/pool`,
+            read: false,
+          });
+        }
       })
       .subscribe();
 
@@ -175,6 +196,9 @@ const NotificationBell = () => {
               </div>
             )}
           </div>
+          <a href="/admin/notifications" style={{ display: 'block', padding: '8px 12px', borderTop: '1px solid #27272a', textDecoration: 'none', textAlign: 'center', fontSize: 10, color: '#FFC233' }} onClick={() => setShowDropdown(false)}>
+            Ver todas las notificaciones
+          </a>
         </div>
       )}
     </div>

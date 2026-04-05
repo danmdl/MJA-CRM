@@ -78,6 +78,7 @@ const ZonasPage = lazyRetry(() => import("./pages/admin/ZonasPage"));
 const Messages = lazyRetry(() => import("./pages/Messages"));
 const PermissionsDashboard = lazyRetry(() => import("./pages/admin/PermissionsDashboard"));
 const InfoPage = lazyRetry(() => import("./pages/admin/InfoPage"));
+const NotificationsPage = lazyRetry(() => import("./pages/admin/NotificationsPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -142,6 +143,7 @@ const AppRoutes = () => {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
         <Route path="info" element={<InfoPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
 
         {/* Permissions Dashboard - ADMIN ONLY */}
         <Route path="permissions" element={

@@ -1,0 +1,151 @@
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/use-session';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Bell, CheckCheck, MessageSquare, UserPlus, ArrowRight, Trash2 } from 'lucide-react';
+import { showSuccess } from '@/utils/toast';
+
+interface Notification {
+  id: string;
+  type: string | null;
+  title: string | null;
+  message: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+const NotificationsPage = () => {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  const userId = session?.user?.id;
+
+  const { data: notifications, isLoading } = useQuery<Notification[]>({
+    queryKey: ['notifications-page', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data } = await supabase.from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      return (data || []) as Notification[];
+    },
+    enabled: !!userId,
+  });
+
+  const unreadCount = (notifications || []).filter(n => !n.read).length;
+
+  const markAsRead = async (id: string) => {
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    queryClient.invalidateQueries({ queryKey: ['notifications-page', userId] });
+  };
+
+  const markAllRead = async () => {
+    if (!userId) return;
+    await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+    queryClient.invalidateQueries({ queryKey: ['notifications-page', userId] });
+    showSuccess('Todas las notificaciones marcadas como leídas.');
+  };
+
+  const deleteOld = async () => {
+    if (!userId) return;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from('notifications').delete().eq('user_id', userId).eq('read', true).lt('created_at', thirtyDaysAgo);
+    queryClient.invalidateQueries({ queryKey: ['notifications-page', userId] });
+    showSuccess('Notificaciones antiguas eliminadas.');
+  };
+
+  const getIcon = (type: string | null) => {
+    switch (type) {
+      case 'message': return <MessageSquare className="h-4 w-4 text-blue-400" />;
+      case 'contact': return <UserPlus className="h-4 w-4 text-green-400" />;
+      case 'assignment': return <ArrowRight className="h-4 w-4 text-yellow-400" />;
+      default: return <Bell className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Ahora';
+    if (diffMin < 60) return `Hace ${diffMin} min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `Hace ${diffH}h`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `Hace ${diffD}d`;
+    return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  };
+
+  return (
+    <div className="p-6 max-w-2xl space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <Bell className="h-5 w-5" /> Notificaciones
+          </h1>
+          {unreadCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">{unreadCount} sin leer</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <Button size="sm" variant="outline" onClick={markAllRead} className="gap-1.5 text-xs">
+              <CheckCheck className="h-3.5 w-3.5" /> Marcar todo como leído
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={deleteOld} className="gap-1.5 text-xs text-muted-foreground">
+            <Trash2 className="h-3.5 w-3.5" /> Limpiar antiguas
+          </Button>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="text-center py-12 text-muted-foreground text-sm">Cargando...</div>
+      )}
+
+      {!isLoading && (!notifications || notifications.length === 0) && (
+        <div className="text-center py-12">
+          <Bell className="h-10 w-10 mx-auto mb-2 opacity-30 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">No hay notificaciones.</p>
+          <p className="text-xs text-muted-foreground mt-1">Las notificaciones aparecen cuando recibís mensajes o se crean contactos nuevos.</p>
+        </div>
+      )}
+
+      {!isLoading && notifications && notifications.length > 0 && (
+        <div className="space-y-1">
+          {notifications.map(n => (
+            <div
+              key={n.id}
+              className={`flex items-start gap-3 rounded-lg px-3 py-3 transition-colors cursor-pointer ${n.read ? 'opacity-60 hover:opacity-80' : 'bg-primary/5 border border-primary/10 hover:bg-primary/10'}`}
+              onClick={() => {
+                if (!n.read) markAsRead(n.id);
+                if (n.link) window.location.href = n.link;
+              }}
+            >
+              <div className="mt-0.5 shrink-0">
+                {getIcon(n.type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className={`text-sm ${n.read ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
+                    {n.title || 'Notificación'}
+                  </p>
+                  {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0"></span>}
+                </div>
+                {n.message && <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.message}</p>}
+              </div>
+              <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">{formatTime(n.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NotificationsPage;
