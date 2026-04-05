@@ -64,21 +64,6 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     enabled: !!churchId,
   });
 
-  const { data: totalCount } = useQuery({
-    queryKey: ["contacts-count", churchId],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("contacts")
-        .select("id", { count: "exact", head: true })
-        .eq("church_id", churchId!);
-      
-      if (error) return 0;
-      return count || 0;
-    },
-    enabled: !!churchId,
-    staleTime: 30_000,
-  });
-
   const activeTab = (() => {
     const p = location.pathname;
     if (p.endsWith("/overview")) return "overview";
@@ -120,10 +105,6 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
           <h2 className="text-lg font-bold tracking-tight truncate">
             {nameLoading ? <Skeleton className="h-6 w-40" /> : churchData?.name || "Iglesia"}
           </h2>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-xs text-muted-foreground">Contactos:</span>
-            <span className="text-lg font-bold">{totalCount ?? 0}</span>
-          </div>
         </div>
       </div>
 
