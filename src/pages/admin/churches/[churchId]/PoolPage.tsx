@@ -116,7 +116,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 45, nombre: 140, responsable: 120, telefono: 100, direccion: 160, fechaContacto: 65, sugerencia: 170, asignar: 130,
+    cuerda: 38, nombre: 140, responsable: 120, telefono: 100, direccion: 170, fechaContacto: 62, sugerencia: 180, asignar: 130,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -641,7 +641,7 @@ const PoolPage = () => {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full border-collapse" style={{ tableLayout: 'auto' }}>
                 <thead>
                   <tr className="border-b">
                     <th className="px-2 py-2 w-8">
@@ -774,10 +774,10 @@ const PoolPage = () => {
                               const badgeClass = dist != null ? getDistanceBadgeClass(dist) : (isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15');
                               const textColor = dist != null ? getDistanceColor(dist) : (isExternal ? 'text-orange-400' : 'text-green-500');
                               return (
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <Badge className={`text-[10px] ${badgeClass}`}>{sugCell.name}</Badge>
-                                  {sugZona && <span className={`text-[10px] ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>}
-                                  {dist != null && <span className={`text-[10px] font-medium ${textColor}`}>{dist.toFixed(1)}km</span>}
+                                <div className="flex items-center gap-1 overflow-hidden">
+                                  <Badge className={`text-[9px] shrink-0 ${badgeClass}`}>{sugCell.name}</Badge>
+                                  {sugZona && <span className={`text-[9px] truncate ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>}
+                                  {dist != null && <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{dist.toFixed(1)}km</span>}
                                 </div>
                               );
                             })() : <span className="text-xs text-muted-foreground">—</span>}
