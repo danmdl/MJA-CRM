@@ -120,7 +120,7 @@ const SemilleroPage = () => {
   const [deleting, setDeleting] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 38, nombre: 145, responsable: 115, telefono: 105, direccion: 155, fechaContacto: 62, sugerencia: 165, asignar: 125,
+    cuerda: 38, nombre: 145, responsable: 115, telefono: 125, direccion: 155, fechaContacto: 62, sugerencia: 165, asignar: 125,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -658,7 +658,7 @@ const SemilleroPage = () => {
               <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 940 }}>
                 <thead>
                   <tr className="border-b">
-                    <th className="px-2 py-2 w-8">
+                    <th className="px-1 py-2 w-6">
                       <input type="checkbox" className="rounded border-input" checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0} onChange={(e) => {
                         if (e.target.checked) setSelectedIds(new Set(filteredContacts.map(c => c.id)));
                         else setSelectedIds(new Set());
@@ -687,7 +687,7 @@ const SemilleroPage = () => {
                     return (
                       <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
                         {/* Selection checkbox */}
-                        <td className="px-2 py-1.5 w-8">
+                        <td className="px-1 py-1.5 w-6">
                           <input type="checkbox" className="rounded border-input" checked={selectedIds.has(c.id)} onChange={(e) => {
                             const next = new Set(selectedIds);
                             if (e.target.checked) next.add(c.id); else next.delete(c.id);
