@@ -1,14 +1,15 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { showSuccess, showError } from '@/utils/toast';
-import { Save, Edit3, X, Star, Trash2 } from 'lucide-react';
+import { Save, X, Star } from 'lucide-react';
 
 // Real green WhatsApp icon
 const WhatsAppIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
@@ -45,8 +46,30 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const [saveMode, setSaveMode] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
-  const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
   const [churchData, setChurchData] = useState<{ address?: string; website?: string; hours?: string } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Insert a variable at the current cursor position, keeping focus
+  const insertVariable = (varKey: string) => {
+    const ta = textareaRef.current;
+    const token = `{${varKey}}`;
+    if (!ta) {
+      setMessage(m => m + token);
+      return;
+    }
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const before = message.slice(0, start);
+    const after = message.slice(end);
+    const next = before + token + after;
+    setMessage(next);
+    // Restore focus and caret after React re-render
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + token.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  };
 
   // Fetch church data (prefer explicit churchId prop, fall back to user's church)
   useEffect(() => {
@@ -102,7 +125,6 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
       setMessage('');
       setSaveMode(false);
       setSaveAsDefault(false);
-      setExpandedTemplateId(null);
       loadTemplates(true); // auto-load default
     }
   }, [open, userId]);
@@ -142,145 +164,143 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-hidden p-0">
-        <DialogHeader className="px-5 pt-4 pb-3 border-b">
+      <DialogContent className="sm:max-w-[960px] max-h-[85vh] overflow-hidden p-0 flex flex-col">
+        <DialogHeader className="px-5 pt-4 pb-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <WhatsAppIcon className="h-5 w-5 text-green-500" />
             Enviar WhatsApp a {contactName}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex h-[min(600px,calc(85vh-60px))]">
-          {/* LEFT: Message composer */}
-          <div className={`flex-1 p-4 flex flex-col gap-3 min-w-0 ${canUseTemplates() ? 'border-r' : ''}`}>
-            <div className="flex items-center justify-between shrink-0">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mensaje</label>
-              <span className="text-[10px] text-muted-foreground">{message.length} caracteres</span>
+        {/* TOP BAR: Template picker + variable chips */}
+        {canUseTemplates() && (
+          <div className="px-5 py-3 border-b bg-muted/10 shrink-0 space-y-2">
+            <div className="flex items-center gap-3">
+              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">Plantilla</label>
+              <Select
+                value=""
+                onValueChange={(id) => {
+                  const t = templates.find(x => x.id === id);
+                  if (t) handleSelectTemplate(t);
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs flex-1 max-w-[280px]">
+                  <SelectValue placeholder={templates.length === 0 ? 'No hay plantillas' : 'Elegir una plantilla...'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map(t => (
+                    <SelectItem key={t.id} value={t.id} className="text-xs">
+                      <span className="flex items-center gap-1.5">
+                        {t.is_default && <Star className="h-3 w-3 text-green-500 fill-green-500" />}
+                        {t.name}
+                        {t.is_system && <span className="text-[8px] bg-[#FFC233]/15 text-[#FFC233] px-1 py-0.5 rounded uppercase tracking-wider ml-1">Sistema</span>}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={canUseTemplates() ? "Escribí tu mensaje o seleccioná una plantilla →" : "Escribí tu mensaje"}
-              className="flex-1 text-sm resize-none min-h-[120px]"
-            />
-
-            {saveMode ? (
-              <div className="p-2 rounded-md bg-muted/40 border space-y-2 shrink-0">
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={newTemplateName}
-                    onChange={(e) => setNewTemplateName(e.target.value)}
-                    placeholder="Nombre de la plantilla"
-                    className="h-8 text-xs"
-                    autoFocus
-                  />
-                  <Button size="sm" className="h-8 text-xs" onClick={handleSaveAsTemplate} disabled={!newTemplateName.trim() || !message.trim()}>
-                    Guardar
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setSaveMode(false); setNewTemplateName(''); setSaveAsDefault(false); }}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={saveAsDefault}
-                    onChange={(e) => setSaveAsDefault(e.target.checked)}
-                    className="rounded border-input"
-                  />
-                  Guardar como default (se precargará automáticamente cada vez)
-                </label>
-              </div>
-            ) : (
-              canUseTemplates() && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs w-full shrink-0"
-                  onClick={() => setSaveMode(true)}
-                  disabled={!message.trim()}
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0 mr-1">Variables</label>
+              {[
+                { key: 'nombre.contacto', label: 'Nombre Contacto' },
+                { key: 'nombre.usuario', label: 'Nombre Usuario' },
+                { key: 'direccion.iglesia', label: 'Dirección Iglesia' },
+                { key: 'website.iglesia', label: 'Website Iglesia' },
+                { key: 'horarios.iglesia', label: 'Horarios Iglesia' },
+              ].map(v => (
+                <button
+                  key={v.key}
+                  type="button"
+                  onClick={() => insertVariable(v.key)}
+                  className="text-[10px] px-2 py-1 rounded bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors"
                 >
-                  <Save className="h-3.5 w-3.5" /> Save as template
-                </Button>
-              )
-            )}
-
-            {/* Live preview of resolved message (only if message contains variables) */}
-            {/\{(nombre|direccion|website|horarios)\.(contacto|usuario|iglesia)\}/i.test(message) && (
-              <div className="text-[10px] text-muted-foreground border-l-2 border-primary/30 pl-2 py-1 bg-primary/5 rounded-r shrink-0 max-h-24 overflow-y-auto">
-                <p className="font-medium uppercase tracking-wider mb-0.5 text-[9px] sticky top-0 bg-primary/5">Vista previa al enviar:</p>
-                <p className="whitespace-pre-wrap font-mono">{replaceVars(message)}</p>
-              </div>
-            )}
-
-            <Button
-              className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white shrink-0"
-              onClick={handleSend}
-              disabled={!message.trim()}
-            >
-              <WhatsAppIcon className="h-4 w-4" /> Enviar
-            </Button>
-          </div>
-
-          {/* RIGHT: Templates tab */}
-          {canUseTemplates() && (
-            <div className="w-[320px] flex-shrink-0 bg-muted/20 flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b bg-muted/30">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">Templates</p>
-              <p className="text-[10px] text-muted-foreground mb-1">Insertar variable:</p>
-              <div className="flex items-center gap-1 flex-wrap">
-                {[
-                  { key: 'nombre.contacto', label: 'Nombre Contacto' },
-                  { key: 'nombre.usuario', label: 'Nombre Usuario' },
-                  { key: 'direccion.iglesia', label: 'Dirección Iglesia' },
-                  { key: 'website.iglesia', label: 'Website Iglesia' },
-                  { key: 'horarios.iglesia', label: 'Horarios Iglesia' },
-                ].map(v => (
-                  <button
-                    key={v.key}
-                    type="button"
-                    onClick={() => setMessage(m => m + `{${v.key}}`)}
-                    className="text-[10px] px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    {v.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-              {templates.length === 0 && (
-                <p className="text-xs text-muted-foreground italic text-center py-8 px-3">No hay plantillas guardadas. Escribí un mensaje y clickeá "Save as template" para crear una.</p>
-              )}
-              {templates.map(t => (
-                <div 
-                  key={t.id} 
-                  className={`rounded-md border p-2.5 space-y-1.5 cursor-pointer hover:bg-muted/50 transition-colors ${t.is_default ? 'border-green-500/30 bg-green-500/5' : 'border-border bg-background'}`}
-                  onClick={() => setExpandedTemplateId(expandedTemplateId === t.id ? null : t.id)}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1 min-w-0">
-                      {t.is_default && <Star className="h-3 w-3 text-green-500 fill-green-500 shrink-0" />}
-                      <p className="text-xs font-medium truncate">{t.name}</p>
-                    </div>
-                  </div>
-                  <p className={`text-[10px] text-muted-foreground font-mono whitespace-pre-wrap ${expandedTemplateId === t.id ? '' : 'line-clamp-2'}`}>
-                    {t.body}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full h-6 text-[10px]"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelectTemplate(t);
-                    }}
-                  >
-                    Usar plantilla
-                  </Button>
-                </div>
+                  + {v.label}
+                </button>
               ))}
             </div>
           </div>
+        )}
+
+        {/* MIDDLE: Composer (left) + Preview (right) */}
+        <div className="flex flex-1 min-h-0">
+          {/* LEFT: Message composer */}
+          <div className="flex-1 p-4 flex flex-col gap-2 min-w-0 border-r">
+            <div className="flex items-center justify-between shrink-0">
+              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Mensaje</label>
+              <span className="text-[10px] text-muted-foreground">{message.length} caracteres</span>
+            </div>
+            <Textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={canUseTemplates() ? 'Escribí tu mensaje o elegí una plantilla arriba' : 'Escribí tu mensaje'}
+              className="flex-1 text-sm resize-none min-h-[220px] font-mono"
+            />
+          </div>
+
+          {/* RIGHT: Live preview */}
+          <div className="w-[360px] shrink-0 p-4 flex flex-col gap-2 bg-muted/20 min-h-0">
+            <div className="flex items-center justify-between shrink-0">
+              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Vista previa</label>
+              <span className="text-[10px] text-muted-foreground">como lo verá {contactFirstName || 'el contacto'}</span>
+            </div>
+            <div className="flex-1 overflow-y-auto rounded-md border bg-background p-3 text-sm whitespace-pre-wrap min-h-[220px]">
+              {message.trim() ? replaceVars(message) : <span className="text-muted-foreground italic">El mensaje resuelto aparecerá acá...</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* BOTTOM: Save + Send */}
+        <div className="px-5 py-3 border-t bg-muted/10 shrink-0 space-y-2">
+          {saveMode ? (
+            <div className="p-2 rounded-md bg-muted/40 border space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  placeholder="Nombre de la plantilla"
+                  className="h-8 text-xs"
+                  autoFocus
+                />
+                <Button size="sm" className="h-8 text-xs" onClick={handleSaveAsTemplate} disabled={!newTemplateName.trim() || !message.trim()}>
+                  Guardar
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setSaveMode(false); setNewTemplateName(''); setSaveAsDefault(false); }}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveAsDefault}
+                  onChange={(e) => setSaveAsDefault(e.target.checked)}
+                  className="rounded border-input"
+                />
+                Guardar como default (se precargará automáticamente cada vez)
+              </label>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              {canUseTemplates() && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={() => setSaveMode(true)}
+                  disabled={!message.trim()}
+                >
+                  <Save className="h-3.5 w-3.5" /> Guardar como plantilla
+                </Button>
+              )}
+              <Button
+                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleSend}
+                disabled={!message.trim()}
+              >
+                <WhatsAppIcon className="h-4 w-4" /> Enviar
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

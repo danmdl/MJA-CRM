@@ -1035,22 +1035,31 @@ const SemilleroPage = () => {
         onSent={async (message) => {
           // Log WhatsApp send to contact history
           if (!whatsappCompose) return;
+          const contactId = whatsappCompose.contactId;
           try {
             const session = (await supabase.auth.getSession()).data.session;
             const today = new Date().toISOString().split('T')[0];
             const preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
-            await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+            const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
               body: JSON.stringify({
-                contactId: whatsappCompose.contactId,
+                contactId,
                 churchId,
                 contact_date: today,
                 contact_method: 'WhatsApp',
                 notes: `Mensaje enviado: "${preview}"`,
               }),
             });
-          } catch (e) { console.error('Failed to log WhatsApp send:', e); }
+            if (!resp.ok) {
+              console.error('add-contact-log failed:', resp.status, await resp.text());
+              showError('No se pudo registrar el envío en el historial.');
+              return;
+            }
+            showSuccess('Envío registrado en el historial.');
+            queryClient.invalidateQueries({ queryKey: ['contact-logs', contactId] });
+            queryClient.invalidateQueries({ queryKey: ['contact_logs', contactId] });
+          } catch (e) { console.error('Failed to log WhatsApp send:', e); showError('Error registrando el envío.'); }
         }}
       />
     </div>
