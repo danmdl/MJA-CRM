@@ -27,7 +27,15 @@ const ContactLogInline = ({ churchId, contactId, refreshSignal }: Props) => {
   });
 
   if (!logs?.length) {
-    return <p className="text-xs text-muted-foreground italic">Sin registros aún.</p>;
+    return (
+      <div className="space-y-2">
+        <p className="text-[10px] text-muted-foreground/60 italic">Sin registros aún. Ejemplo:</p>
+        <div className="rounded border border-dashed border-muted-foreground/20 bg-muted/10 p-2 space-y-0.5 opacity-50">
+          <p className="text-[10px] text-muted-foreground">04/04/26 · WhatsApp</p>
+          <p className="text-xs italic text-muted-foreground">Estuvo enfermo en los últimos días. Nos pidió oración por su familia.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

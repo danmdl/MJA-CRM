@@ -72,7 +72,7 @@ const AddContactLogDialog: React.FC<AddContactLogDialogProps> = ({ open, onOpenC
           </div>
           <div>
             <Label>Notas</Label>
-            <Textarea rows={4} placeholder="Detalle" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={MAX_NOTES} />
+            <Textarea rows={4} placeholder="Ej: Estuvo enfermo en los últimos días. Nos pidió oración por su familia." value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={MAX_NOTES} />
             <div className="text-sm text-muted-foreground text-right">{notes.length}/{MAX_NOTES}</div>
           </div>
           <Button onClick={handleAdd} disabled={!date || loading}>Guardar</Button>
