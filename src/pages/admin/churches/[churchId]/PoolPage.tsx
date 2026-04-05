@@ -722,11 +722,11 @@ const PoolPage = () => {
                         {/* Teléfono + WhatsApp */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.telefono }}>
                           {c.phone ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-[11px] text-muted-foreground tabular-nums">{c.phone}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-foreground tabular-nums font-medium">{c.phone}</span>
                               {canSendWhatsapp() && (
                                 <button
-                                  className="text-green-500 hover:text-green-400 shrink-0"
+                                  className="flex items-center gap-1 text-green-500 hover:text-green-400 shrink-0 group"
                                   title="Enviar WhatsApp"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -739,7 +739,8 @@ const PoolPage = () => {
                                     });
                                   }}
                                 >
-                                  <WhatsAppIcon className="h-3.5 w-3.5" />
+                                  <span className="text-[10px] font-medium">Enviar</span>
+                                  <WhatsAppIcon className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" />
                                 </button>
                               )}
                             </div>
