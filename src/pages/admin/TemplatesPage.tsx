@@ -33,6 +33,7 @@ const TemplatesPage = () => {
   const [newName, setNewName] = useState('');
   const [newBody, setNewBody] = useState('');
   const [newIsDefault, setNewIsDefault] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
 
   const loadTemplates = async () => {
     if (!userId) return;
@@ -40,6 +41,7 @@ const TemplatesPage = () => {
       .from('whatsapp_templates')
       .select('*, profiles(first_name, last_name)')
       .eq('user_id', userId)
+      .is('deleted_at', showTrash ? 'not.null' : null)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
     setTemplates(data || []);
@@ -47,7 +49,7 @@ const TemplatesPage = () => {
 
   useEffect(() => {
     loadTemplates();
-  }, [userId]);
+  }, [userId, showTrash]);
 
   const handleCreate = async () => {
     if (!newName.trim() || !newBody.trim() || !userId) return;
@@ -101,16 +103,48 @@ const TemplatesPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro que querés eliminar esta plantilla?')) return;
+    if (!confirm('¿Mover esta plantilla a la papelera?')) return;
     
-    const { error } = await supabase.from('whatsapp_templates').delete().eq('id', id);
+    const { error } = await supabase
+      .from('whatsapp_templates')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
     
     if (error) {
       showError('Error al eliminar.');
       return;
     }
     
-    showSuccess('Plantilla eliminada.');
+    showSuccess('Plantilla movida a la papelera.');
+    loadTemplates();
+  };
+
+  const handleRestore = async (id: string) => {
+    const { error } = await supabase
+      .from('whatsapp_templates')
+      .update({ deleted_at: null })
+      .eq('id', id);
+    
+    if (error) {
+      showError('Error al restaurar.');
+      return;
+    }
+    
+    showSuccess('Plantilla restaurada.');
+    loadTemplates();
+  };
+
+  const handlePermanentDelete = async (id: string) => {
+    if (!confirm('¿Eliminar permanentemente? Esta acción no se puede deshacer.')) return;
+    
+    const { error } = await supabase.from('whatsapp_templates').delete().eq('id', id);
+    
+    if (error) {
+      showError('Error al eliminar permanentemente.');
+      return;
+    }
+    
+    showSuccess('Plantilla eliminada permanentemente.');
     loadTemplates();
   };
 
@@ -137,9 +171,21 @@ const TemplatesPage = () => {
             Administrá tus plantillas de mensajes para WhatsApp
           </p>
         </div>
-        <Button onClick={() => setCreating(true)} className="gap-2">
-          <Plus className="h-4 w-4" /> Nueva Plantilla
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant={showTrash ? "default" : "outline"} 
+            size="sm"
+            onClick={() => setShowTrash(!showTrash)} 
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" /> {showTrash ? 'Ver activas' : 'Papelera'}
+          </Button>
+          {!showTrash && (
+            <Button onClick={() => setCreating(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Nueva Plantilla
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Create new template */}
@@ -271,33 +317,59 @@ const TemplatesPage = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
-                      {!template.is_default && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSetDefault(template.id)}
-                          className="h-7 w-7 p-0"
-                          title="Hacer default"
-                        >
-                          <Star className="h-3 w-3" />
-                        </Button>
+                      {!showTrash ? (
+                        <>
+                          {!template.is_default && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSetDefault(template.id)}
+                              className="h-7 w-7 p-0"
+                              title="Hacer default"
+                            >
+                              <Star className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleStartEdit(template)}
+                            className="h-7 w-7 p-0"
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(template.id)}
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            title="Mover a papelera"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRestore(template.id)}
+                            className="h-7 w-7 p-0 text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                            title="Restaurar"
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handlePermanentDelete(template.id)}
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            title="Eliminar permanentemente"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleStartEdit(template)}
-                        className="h-7 w-7 p-0"
-                      >
-                        <Edit3 className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(template.id)}
-                        className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
                     </div>
                   </div>
                   <div className="bg-muted/20 rounded p-2 font-mono text-[11px] whitespace-pre-wrap leading-relaxed text-muted-foreground">
