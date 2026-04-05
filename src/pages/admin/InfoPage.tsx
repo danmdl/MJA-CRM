@@ -5,19 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { showSuccess, showError } from '@/utils/toast';
-import { HelpCircle, Send } from 'lucide-react';
+import { HelpCircle, Send, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 const InfoPage = () => {
   const { session, profile } = useSession();
   const [supportOpen, setSupportOpen] = useState(false);
   const [supportMsg, setSupportMsg] = useState('');
   const [sending, setSending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const sendSupport = async () => {
     if (!supportMsg.trim()) { showError('Escribí tu mensaje.'); return; }
     setSending(true);
     try {
-      // Find admin user(s)
       const { data: admins } = await supabase.from('profiles').select('id').eq('role', 'admin');
       if (!admins || admins.length === 0) { showError('No se encontró un admin.'); return; }
 
@@ -33,9 +33,11 @@ const InfoPage = () => {
         admins.map(a => ({ message_id: msg.id, recipient_id: a.id }))
       );
 
-      showSuccess('Mensaje de soporte enviado al administrador.');
       setSupportMsg('');
       setSupportOpen(false);
+      setConfirmOpen(true);
+      // Auto-close confirmation after 5 seconds
+      setTimeout(() => setConfirmOpen(false), 5000);
     } catch { showError('Error inesperado.'); } finally { setSending(false); }
   };
 
@@ -114,20 +116,45 @@ const InfoPage = () => {
             <DialogTitle>Pedir ayuda a Soporte</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Tu mensaje será enviado al administrador del sistema. Podés adjuntar una captura de pantalla haciendo una captura y pegándola en el chat de WhatsApp o describiéndola acá.</p>
+            <p className="text-xs text-muted-foreground">Tu mensaje será enviado al administrador del sistema a través del sistema de mensajería interno.</p>
             <Textarea
               placeholder="Describí tu problema o duda..."
               value={supportMsg}
               onChange={e => setSupportMsg(e.target.value)}
               rows={5}
             />
-            <p className="text-[10px] text-muted-foreground">Tip: si necesitás adjuntar una captura, hacé una screenshot y enviala por WhatsApp al admin junto con este mensaje.</p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setSupportOpen(false)}>Cancelar</Button>
               <Button size="sm" className="gap-1.5" onClick={sendSupport} disabled={sending}>
                 <Send className="h-3.5 w-3.5" /> {sending ? 'Enviando...' : 'Enviar a Soporte'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation dialog after sending */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <div className="flex flex-col items-center text-center space-y-4 py-4">
+            <div className="w-14 h-14 rounded-full bg-green-500/15 flex items-center justify-center">
+              <CheckCircle2 className="h-7 w-7 text-green-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">¡Mensaje enviado!</h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                Tu mensaje fue enviado al administrador. La respuesta llegará a tu bandeja de <strong>Mensajes</strong>.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-4 py-2.5">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              <div className="text-left">
+                <p className="text-xs font-medium">💬 Mensajes</p>
+                <p className="text-[10px] text-muted-foreground">Revisá tu bandeja para ver la respuesta</p>
+              </div>
+              <span className="text-primary text-lg ml-1">←</span>
+            </div>
+            <Button size="sm" onClick={() => setConfirmOpen(false)}>Entendido</Button>
           </div>
         </DialogContent>
       </Dialog>

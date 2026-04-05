@@ -83,15 +83,6 @@ const AdminLayout = () => {
           <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa', flexShrink: 0 }}>
             {title}
           </span>
-
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button style={{
-              width: 32, height: 32, borderRadius: 7,
-              border: '1px solid rgba(255,255,255,0.07)',
-              background: '#111113', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', cursor: 'pointer', color: '#a1a1aa', fontSize: 14,
-            }}>🔔</button>
-          </div>
         </div>
 
         {/* Page content */}

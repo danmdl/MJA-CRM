@@ -115,7 +115,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 55, nombre: 160, responsable: 140, telefono: 110, direccion: 200, fechaContacto: 80, sugerencia: 200, asignar: 140,
+    cuerda: 50, nombre: 140, responsable: 120, telefono: 100, direccion: 160, fechaContacto: 75, sugerencia: 170, asignar: 130,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -868,11 +868,11 @@ const PoolPage = () => {
         </CardContent>
       </Card>
 
-      <div className="flex gap-4 text-xs text-muted-foreground">
-        <span>Total: {allContacts?.length || 0}</span>
-        <span>Sin asignar: {poolCounts.unassigned}</span>
-        <span>Externo: {externalContacts.length}</span>
-        <span>Mostrando: {filteredContacts.length}</span>
+      <div className="flex gap-4 text-xs text-muted-foreground px-1 py-1">
+        <span>Total: <strong className="text-foreground">{allContacts?.length || 0}</strong></span>
+        {(filterCuerda || filterResponsable || searchTerm) && (
+          <span>Filtrados: <strong className="text-foreground">{filteredContacts.length}</strong></span>
+        )}
       </div>
 
       {/* Confirmation Dialog */}
