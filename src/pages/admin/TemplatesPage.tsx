@@ -37,11 +37,20 @@ const TemplatesPage = () => {
 
   const loadTemplates = async () => {
     if (!userId) return;
-    const { data, error } = await supabase
+    
+    let query = supabase
       .from('whatsapp_templates')
       .select('*, profiles(first_name, last_name)')
-      .eq('user_id', userId)
-      .is('deleted_at', showTrash ? 'not.null' : null)
+      .eq('user_id', userId);
+    
+    // Filter by deleted status
+    if (showTrash) {
+      query = query.not('deleted_at', 'is', null);
+    } else {
+      query = query.is('deleted_at', null);
+    }
+    
+    const { data, error } = await query
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
     
