@@ -226,57 +226,53 @@ const TemplatesPage = () => {
                 </div>
               </CardContent>
             ) : (
-              <>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        {template.is_default && <Star className="h-4 w-4 text-green-500 fill-green-500" />}
-                        {template.name}
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        Creada {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </CardDescription>
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {template.is_default && <Star className="h-3.5 w-3.5 text-green-500 fill-green-500 shrink-0" />}
+                      <h3 className="font-semibold text-sm">{template.name}</h3>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {!template.is_default && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSetDefault(template.id)}
-                          className="gap-1.5 h-8"
-                        >
-                          <Star className="h-3.5 w-3.5" />
-                          Hacer default
-                        </Button>
-                      )}
+                    <p className="text-xs text-muted-foreground">
+                      Creada {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {!template.is_default && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleStartEdit(template)}
-                        className="gap-1.5 h-8"
+                        onClick={() => handleSetDefault(template.id)}
+                        className="gap-1.5 h-8 text-xs"
+                        title="Hacer default"
                       >
-                        <Edit3 className="h-3.5 w-3.5" />
-                        Editar
+                        <Star className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(template.id)}
-                        className="gap-1.5 h-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Eliminar
-                      </Button>
-                    </div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleStartEdit(template)}
+                      className="gap-1.5 h-8 text-xs"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(template.id)}
+                      className="gap-1.5 h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Eliminar
+                    </Button>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-muted/30 rounded-lg p-4 font-mono text-sm whitespace-pre-wrap">
-                    {template.body}
-                  </div>
-                </CardContent>
-              </>
+                </div>
+                <div className="bg-muted/30 rounded-md p-3 font-mono text-xs whitespace-pre-wrap leading-relaxed">
+                  {template.body}
+                </div>
+              </div>
             )}
           </Card>
         ))}
