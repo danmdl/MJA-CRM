@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -25,6 +27,9 @@ interface Church {
   created_at: string;
   is_pinned: boolean;
   pin_order: number | null;
+  address: string | null;
+  website: string | null;
+  hours: string | null;
 }
 
 interface Cell {
@@ -138,6 +143,12 @@ const OverviewPage = () => {
   const { profile } = useSession();
   const { canAccessAllChurches, canEditDeleteUsers } = usePermissions();
   const isAdminOrGeneral = canAccessAllChurches() || canEditDeleteUsers();
+  
+  // Church info editing state
+  const [editingChurchInfo, setEditingChurchInfo] = useState(false);
+  const [churchAddress, setChurchAddress] = useState('');
+  const [churchWebsite, setChurchWebsite] = useState('');
+  const [churchHours, setChurchHours] = useState('');
 
   const { data: church, isLoading, isError, error } = useQuery<Church>({
     queryKey: ['churchDetails', churchId],
@@ -231,6 +242,41 @@ const OverviewPage = () => {
       showSuccess('Pastor secundario eliminado.');
       queryClient.invalidateQueries({ queryKey: ['churchSecondaryPastors', churchId] });
     }
+  };
+
+  // Populate church info fields when church data loads
+  React.useEffect(() => {
+    if (church) {
+      setChurchAddress(church.address || '');
+      setChurchWebsite(church.website || '');
+      setChurchHours(church.hours || '');
+    }
+  }, [church]);
+
+  const handleSaveChurchInfo = async () => {
+    const { error } = await supabase
+      .from('churches')
+      .update({
+        address: churchAddress.trim() || null,
+        website: churchWebsite.trim() || null,
+        hours: churchHours.trim() || null,
+      })
+      .eq('id', churchId!);
+    
+    if (error) {
+      showError('Error al guardar información de la iglesia.');
+    } else {
+      showSuccess('Información actualizada.');
+      setEditingChurchInfo(false);
+      queryClient.invalidateQueries({ queryKey: ['churchDetails', churchId] });
+    }
+  };
+
+  const handleCancelChurchInfo = () => {
+    setChurchAddress(church?.address || '');
+    setChurchWebsite(church?.website || '');
+    setChurchHours(church?.hours || '');
+    setEditingChurchInfo(false);
   };
 
   const analytics = useMemo(() => {
@@ -397,6 +443,83 @@ const OverviewPage = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Church Information Card */}
+      {isAdminOrGeneral && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Información de la Iglesia</CardTitle>
+                <CardDescription className="text-xs">
+                  Estos datos se usan en las plantillas de WhatsApp
+                </CardDescription>
+              </div>
+              {!editingChurchInfo && (
+                <Button size="sm" variant="outline" onClick={() => setEditingChurchInfo(true)} className="h-8 text-xs">
+                  Editar
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {editingChurchInfo ? (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Dirección</label>
+                  <Input
+                    value={churchAddress}
+                    onChange={(e) => setChurchAddress(e.target.value)}
+                    placeholder="Ej: Ricardo Balbín 1860, San Martín"
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Sitio Web</label>
+                  <Input
+                    value={churchWebsite}
+                    onChange={(e) => setChurchWebsite(e.target.value)}
+                    placeholder="Ej: www.mjatucasa.org"
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Horarios</label>
+                  <Textarea
+                    value={churchHours}
+                    onChange={(e) => setChurchHours(e.target.value)}
+                    placeholder="Ej: 10hs / 16hs / 20hs"
+                    className="text-sm min-h-[60px]"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button size="sm" onClick={handleSaveChurchInfo} className="h-8">
+                    Guardar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelChurchInfo} className="h-8">
+                    Cancelar
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-xs text-muted-foreground">Dirección:</span>
+                  <p className="mt-0.5">{church.address || <span className="text-muted-foreground italic">No configurada</span>}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Sitio Web:</span>
+                  <p className="mt-0.5">{church.website || <span className="text-muted-foreground italic">No configurado</span>}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Horarios:</span>
+                  <p className="mt-0.5 whitespace-pre-wrap">{church.hours || <span className="text-muted-foreground italic">No configurados</span>}</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Dialog to add a second pastor */}
