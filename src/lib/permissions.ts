@@ -28,6 +28,7 @@ export interface PermissionData {
   can_assign_contacts: boolean;
   can_see_cuerdas: boolean;
   can_edit_cuerdas: boolean;
+  can_send_whatsapp: boolean;
 }
 
 // Role hierarchy: higher index = higher privilege
@@ -106,6 +107,7 @@ export const usePermissions = () => {
   const canAssignContacts = () => hasPermission('can_assign_contacts');
   const canSeeCuerdas = () => hasPermission('can_see_cuerdas');
   const canEditCuerdas = () => hasPermission('can_edit_cuerdas');
+  const canSendWhatsapp = () => hasPermission('can_send_whatsapp');
 
   // Only admin can access permissions management
   const canAccessPermissions = () => profile?.role === 'admin';
@@ -146,6 +148,7 @@ export const usePermissions = () => {
     canAssignContacts,
     canSeeCuerdas,
     canEditCuerdas,
+    canSendWhatsapp,
     canAccessPermissions,
     canManageUser,
   };

@@ -232,8 +232,20 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
           {/* RIGHT: Templates tab */}
           <div className="w-[320px] flex-shrink-0 bg-muted/20 flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b bg-muted/30">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Templates</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Variables: {'{nombre}'}, {'{apellido}'}, {'{telefono}'}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">Templates</p>
+              <p className="text-[10px] text-muted-foreground mb-1">Insertar variable:</p>
+              <div className="flex items-center gap-1 flex-wrap">
+                {(['nombre', 'apellido', 'telefono'] as const).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setMessage(m => m + `{${v}}`)}
+                    className="text-[10px] px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors capitalize"
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {templates.length === 0 && (

@@ -498,7 +498,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   return (
   <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
-      <DialogContent className="sm:max-w-[1300px] max-h-[90vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
+      <DialogContent hideCloseButton className="sm:max-w-[1300px] max-h-[90vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
         {/* Close X button — top right */}
         <button
           onClick={() => safeClose()}

@@ -125,7 +125,7 @@ const PoolPage = () => {
   };
 
   // Assignment permission comes from canAssignContacts() via usePermissions
-  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts } = usePermissions();
+  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
@@ -724,22 +724,24 @@ const PoolPage = () => {
                           {c.phone ? (
                             <div className="flex items-center gap-1">
                               <span className="text-[11px] text-muted-foreground tabular-nums">{c.phone}</span>
-                              <button
-                                className="text-green-500 hover:text-green-400 shrink-0"
-                                title="Enviar WhatsApp"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setWhatsappCompose({
-                                    contactId: c.id,
-                                    name: `${c.first_name} ${c.last_name || ''}`.trim(),
-                                    firstName: c.first_name,
-                                    lastName: c.last_name || '',
-                                    phone: c.phone!,
-                                  });
-                                }}
-                              >
-                                <WhatsAppIcon className="h-3.5 w-3.5" />
-                              </button>
+                              {canSendWhatsapp() && (
+                                <button
+                                  className="text-green-500 hover:text-green-400 shrink-0"
+                                  title="Enviar WhatsApp"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setWhatsappCompose({
+                                      contactId: c.id,
+                                      name: `${c.first_name} ${c.last_name || ''}`.trim(),
+                                      firstName: c.first_name,
+                                      lastName: c.last_name || '',
+                                      phone: c.phone!,
+                                    });
+                                  }}
+                                >
+                                  <WhatsAppIcon className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           ) : <span className="text-[11px] text-muted-foreground">—</span>}
                         </td>
