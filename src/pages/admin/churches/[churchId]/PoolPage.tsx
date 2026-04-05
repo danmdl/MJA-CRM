@@ -24,7 +24,7 @@ import {
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { normalize } from '@/lib/normalize';
-import { isWithinGBA, getDistanceColor, getDistanceWarning } from '@/lib/geo-validation';
+import { isWithinGBA, getDistanceColor, getDistanceWarning, getDistanceBadgeClass } from '@/lib/geo-validation';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
@@ -685,25 +685,22 @@ const PoolPage = () => {
                           {c.created_at ? new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                         </td>
 
-                        {/* Sugerencia (Célula + Zona combinadas) */}
+                        {/* Sugerencia (Célula + Zona combinadas — all same color) */}
                         {isUnassignedView && (
                           <td className="px-3 py-2" style={{ width: colWidths.sugerencia }}>
-                            {sugCell ? (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge className={`text-[10px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
-                                  {sugCell.name}
-                                </Badge>
-                                {sugZona && (
-                                  <span className={`text-[10px] ${isExternal ? 'text-orange-400' : 'text-muted-foreground'}`}>
-                                    {sugZona.nombre}{isExternal ? ' ↗' : ''}
-                                  </span>
-                                )}
-                                {c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null && (() => {
-                                  const dist = haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!);
-                                  return <span className={`text-[10px] font-medium ${getDistanceColor(dist)}`}>{dist.toFixed(1)}km</span>;
-                                })()}
-                              </div>
-                            ) : <span className="text-xs text-muted-foreground">—</span>}
+                            {sugCell ? (() => {
+                              const hasDist = c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null;
+                              const dist = hasDist ? haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!) : null;
+                              const badgeClass = dist != null ? getDistanceBadgeClass(dist) : (isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15');
+                              const textColor = dist != null ? getDistanceColor(dist) : (isExternal ? 'text-orange-400' : 'text-green-500');
+                              return (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge className={`text-[10px] ${badgeClass}`}>{sugCell.name}</Badge>
+                                  {sugZona && <span className={`text-[10px] ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>}
+                                  {dist != null && <span className={`text-[10px] font-medium ${textColor}`}>{dist.toFixed(1)}km</span>}
+                                </div>
+                              );
+                            })() : <span className="text-xs text-muted-foreground">—</span>}
                           </td>
                         )}
 

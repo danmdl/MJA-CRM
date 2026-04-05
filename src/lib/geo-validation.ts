@@ -29,10 +29,9 @@ export const validateCoords = (lat: number | null | undefined, lng: number | nul
  * Distance thresholds for proximity warnings
  */
 export const DISTANCE_THRESHOLDS = {
-  CLOSE: 1,      // < 1 km = green, great match
-  MEDIUM: 3,     // 1-3 km = yellow, acceptable
-  FAR: 5,        // 3-5 km = orange, needs review
-  TOO_FAR: 10,   // > 5 km = red, likely wrong
+  CLOSE: 2,      // < 2 km = green
+  FAR: 5,        // 2-5 km = orange
+  TOO_FAR: 5,    // > 5 km = red
 };
 
 /**
@@ -40,9 +39,17 @@ export const DISTANCE_THRESHOLDS = {
  */
 export const getDistanceColor = (distKm: number): string => {
   if (distKm < DISTANCE_THRESHOLDS.CLOSE) return 'text-green-500';
-  if (distKm < DISTANCE_THRESHOLDS.MEDIUM) return 'text-yellow-500';
   if (distKm < DISTANCE_THRESHOLDS.FAR) return 'text-orange-500';
   return 'text-red-500';
+};
+
+/**
+ * Get badge color class based on distance (for the cell name badge + zona)
+ */
+export const getDistanceBadgeClass = (distKm: number): string => {
+  if (distKm < DISTANCE_THRESHOLDS.CLOSE) return 'bg-green-500/15 text-green-500 hover:bg-green-500/15';
+  if (distKm < DISTANCE_THRESHOLDS.FAR) return 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15';
+  return 'bg-red-500/15 text-red-500 hover:bg-red-500/15';
 };
 
 /**
@@ -50,6 +57,5 @@ export const getDistanceColor = (distKm: number): string => {
  */
 export const getDistanceWarning = (distKm: number): string | null => {
   if (distKm >= DISTANCE_THRESHOLDS.TOO_FAR) return '⚠️ Muy lejos — verificar dirección';
-  if (distKm >= DISTANCE_THRESHOLDS.FAR) return 'Distancia considerable';
   return null;
 };
