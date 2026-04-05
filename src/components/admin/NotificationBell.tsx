@@ -136,12 +136,10 @@ const NotificationBell = () => {
 
       {showDropdown && (
         <div style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          top: '100%',
-          marginTop: 6,
-          width: 240,
+          position: 'fixed',
+          top: 50,
+          left: 60,
+          width: 260,
           backgroundColor: '#111113',
           border: '1px solid #27272a',
           borderRadius: 8,
