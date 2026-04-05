@@ -40,6 +40,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [saveMode, setSaveMode] = useState(false);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -54,23 +55,32 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   };
 
   // Load templates
-  const loadTemplates = async () => {
+  const loadTemplates = async (autoLoadDefault = false) => {
     if (!userId) return;
     const { data } = await supabase.from('whatsapp_templates')
       .select('id, name, body, is_default')
       .eq('user_id', userId)
       .order('is_default', { ascending: false })
       .order('name');
-    setTemplates(data || []);
+    const list = data || [];
+    setTemplates(list);
+    // Auto-load default template into composer
+    if (autoLoadDefault) {
+      const def = list.find(t => t.is_default);
+      if (def) {
+        setMessage(replaceVars(def.body));
+      }
+    }
   };
 
   useEffect(() => {
     if (open) {
-      loadTemplates();
       setMessage('');
       setEditMode(false);
       setSaveMode(false);
+      setSaveAsDefault(false);
       setEditingTemplateId(null);
+      loadTemplates(true); // auto-load default
     }
   }, [open, userId]);
 
@@ -80,15 +90,20 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   const handleSaveAsTemplate = async () => {
     if (!newTemplateName.trim() || !message.trim() || !userId) return;
+    // If saving as default, unset all existing defaults first
+    if (saveAsDefault) {
+      await supabase.from('whatsapp_templates').update({ is_default: false }).eq('user_id', userId);
+    }
     const { error } = await supabase.from('whatsapp_templates').insert({
       user_id: userId,
       name: newTemplateName.trim(),
       body: message.trim(),
-      is_default: false,
+      is_default: saveAsDefault,
     });
     if (error) { showError('Error al guardar plantilla.'); return; }
-    showSuccess('Plantilla guardada.');
+    showSuccess(saveAsDefault ? 'Plantilla guardada como default.' : 'Plantilla guardada.');
     setNewTemplateName('');
+    setSaveAsDefault(false);
     setSaveMode(false);
     loadTemplates();
   };
@@ -157,20 +172,31 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
             />
 
             {saveMode ? (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-muted/40 border">
-                <Input
-                  value={newTemplateName}
-                  onChange={(e) => setNewTemplateName(e.target.value)}
-                  placeholder="Nombre de la plantilla"
-                  className="h-8 text-xs"
-                  autoFocus
-                />
-                <Button size="sm" className="h-8 text-xs" onClick={handleSaveAsTemplate} disabled={!newTemplateName.trim() || !message.trim()}>
-                  Guardar
-                </Button>
-                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setSaveMode(false); setNewTemplateName(''); }}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+              <div className="p-2 rounded-md bg-muted/40 border space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value)}
+                    placeholder="Nombre de la plantilla"
+                    className="h-8 text-xs"
+                    autoFocus
+                  />
+                  <Button size="sm" className="h-8 text-xs" onClick={handleSaveAsTemplate} disabled={!newTemplateName.trim() || !message.trim()}>
+                    Guardar
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setSaveMode(false); setNewTemplateName(''); setSaveAsDefault(false); }}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveAsDefault}
+                    onChange={(e) => setSaveAsDefault(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  Guardar como default (se precargará automáticamente cada vez)
+                </label>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -199,7 +225,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
               onClick={handleSend}
               disabled={!message.trim()}
             >
-              <WhatsAppIcon className="h-4 w-4" /> Enviar por WhatsApp
+              <WhatsAppIcon className="h-4 w-4" /> Enviar
             </Button>
           </div>
 
