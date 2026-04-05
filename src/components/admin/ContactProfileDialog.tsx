@@ -861,12 +861,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             {/* RIGHT: Sidebar — Registros (top) + Historial (bottom) */}
             <div className="w-[320px] flex-shrink-0 border-l border-border bg-muted/30 flex flex-col overflow-hidden">
               {/* Top half: Contact logs */}
-              <div className="flex-1 overflow-y-auto p-4 border-b border-border">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Registros de contacto</p>
-                  <Button size="sm" className="h-6 text-[10px] px-2" onClick={() => setAddLogOpen(true)}>+ Agregar</Button>
+              <div className="flex-1 overflow-y-auto p-4 border-b border-border flex flex-col">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Registros de contacto</p>
+                <div className="flex-1">
+                  <ContactLogInline churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
                 </div>
-                <ContactLogInline churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
+                <Button size="sm" className="w-full mt-3 gap-1.5 text-xs" onClick={() => setAddLogOpen(true)}>
+                  <ClipboardList className="h-3.5 w-3.5" /> Agregar Registro
+                </Button>
               </div>
               {/* Bottom half: Timeline */}
               <div className="flex-1 overflow-y-auto p-4">
