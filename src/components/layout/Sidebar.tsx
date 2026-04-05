@@ -72,11 +72,11 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
         ...(canUseTemplates() ? [{ to: '/admin/templates', emoji: '📝', label: 'Templates' }] : []),
-        { to: '/admin/notifications', emoji: '🔔', label: 'Notificaciones' },
+        ...(profile?.role !== 'conector' ? [{ to: '/admin/notifications', emoji: '🔔', label: 'Notificaciones' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
-        { to: '/admin/info', emoji: 'ℹ️', label: 'Información' },
+        ...(profile?.role !== 'conector' ? [{ to: '/admin/info', emoji: 'ℹ️', label: 'Información' }] : []),
       ],
     },
   ];

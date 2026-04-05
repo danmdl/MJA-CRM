@@ -181,9 +181,9 @@ const ChangelogSection = () => {
 
   if (!entries?.length) return null;
 
-  // Show only first 5 for preview
-  const displayEntries = showAll ? entries : entries.slice(0, 5);
-  const hasMore = entries.length > 5;
+  // Show 10 entries (5 rows x 2 cols) in the preview before Ver todas
+  const displayEntries = entries.slice(0, 10);
+  const hasMore = entries.length > 10;
 
   // Group by date
   const grouped = displayEntries.reduce((acc, e) => {

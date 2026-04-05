@@ -261,16 +261,22 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       fetchContactLogs();
       fetchLeadersAndCells();
       fetchTransfers();
-      // Load user's WhatsApp templates
-      supabase.from('whatsapp_templates').select('id, name, body, is_default').then(({ data }) => {
-        const templates = data || [];
-        setSavedTemplates(templates);
-        // Auto-load default template
-        const defaultTpl = templates.find((t: any) => t.is_default);
-        if (defaultTpl) {
-          setWhatsappMsg(defaultTpl.body);
-        }
-      });
+      // Load user's WhatsApp templates (active ones only, including system templates)
+      supabase.from('whatsapp_templates')
+        .select('id, name, body, is_default, is_system')
+        .is('deleted_at', null)
+        .order('is_default', { ascending: false })
+        .order('is_system', { ascending: false })
+        .order('name')
+        .then(({ data }) => {
+          const templates = data || [];
+          setSavedTemplates(templates);
+          // Auto-load default template (user's own, not system)
+          const defaultTpl = templates.find((t: any) => t.is_default && !t.is_system);
+          if (defaultTpl) {
+            setWhatsappMsg(defaultTpl.body);
+          }
+        });
     }
   }, [open, contactId]);
 

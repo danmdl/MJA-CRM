@@ -534,7 +534,7 @@ const SemilleroPage = () => {
           <p className="text-muted-foreground text-xs mt-1">Asignación de contactos a células por cercanía</p>
         </div>
         {undoData && (
-          <Button variant="outline" size="sm" onClick={() => undoMutation.mutate()} disabled={undoMutation.isPending} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => undoMutation.mutate()} disabled={undoMutation.isPending} className="gap-1.5 border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300">
             <Undo2 className="h-4 w-4" /> Deshacer ({undoData.contactIds.length})
           </Button>
         )}
@@ -595,7 +595,7 @@ const SemilleroPage = () => {
           </Button>
         )}
         {canAddContacts() && (
-          <Button size="sm" variant="outline" onClick={() => setAddContactOpen(true)} className="gap-1.5">
+          <Button size="sm" onClick={() => setAddContactOpen(true)} className="gap-1.5">
             <PlusCircle className="h-4 w-4" /> Crear Contacto
           </Button>
         )}
