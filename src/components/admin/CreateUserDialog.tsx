@@ -33,7 +33,7 @@ const fetchChurches = async (): Promise<Church[]> => {
   return data || [];
 };
 
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'supervisor' | 'anfitrion';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'supervisor';
 
 const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);

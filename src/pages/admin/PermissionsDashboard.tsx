@@ -70,10 +70,6 @@ const defaultPermissions: PermissionConfig[] = [
     role: 'conector', label: 'Conector',
     permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: true, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false, canAssignContacts: false, canSeeCuerdas: false, canEditCuerdas: false },
   },
-  {
-    role: 'anfitrion', label: 'Anfitrión',
-    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: false, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false, canAssignContacts: false, canSeeCuerdas: false, canEditCuerdas: false },
-  },
 ];
 
 const PermissionsDashboard = () => {

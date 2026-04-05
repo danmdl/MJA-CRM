@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -51,6 +51,9 @@ interface Contact {
   cell_id: string | null; estado_seguimiento?: string | null;
   lat?: number | null; lng?: number | null;
   sexo?: string | null;
+  is_external?: boolean;
+  responsable_id?: string | null;
+  created_at?: string | null;
 }
 
 // Haversine distance in km
@@ -110,7 +113,7 @@ const PoolPage = () => {
   } | null>(null);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 80, conector: 130, nombre: 140, apellido: 120, edad: 55, direccion: 200, estado: 100, fechaContacto: 100, asignar: 130, celulaSug: 160, zonaSug: 120,
+    cuerda: 75, nombre: 200, responsable: 150, direccion: 220, fechaContacto: 90, sugerencia: 200, asignar: 140,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -148,6 +151,16 @@ const PoolPage = () => {
     enabled: !!zonas?.length,
   });
 
+  // Team members for Responsable dropdown
+  const { data: teamMembers } = useQuery<{ id: string; first_name: string; last_name: string; numero_cuerda: string | null }[]>({
+    queryKey: ['team-pool', churchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('id, first_name, last_name, numero_cuerda').eq('church_id', churchId!);
+      return data || [];
+    },
+    enabled: !!churchId,
+  });
+
   const { data: cells } = useQuery<Cell[]>({
     queryKey: ['cells-pool', churchId],
     queryFn: async () => {
@@ -161,7 +174,7 @@ const PoolPage = () => {
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
       let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, is_external')
+        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, is_external, responsable_id, created_at')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
       if (profile?.role === 'conector') {
@@ -594,16 +607,12 @@ const PoolPage = () => {
                 <thead>
                   <tr className="border-b">
                     <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
-                    <ResizableHeader width={colWidths.conector} onResize={resizeCol('conector')}>Conector</ResizableHeader>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
-                    <ResizableHeader width={colWidths.apellido} onResize={resizeCol('apellido')}>Apellido</ResizableHeader>
-                    <ResizableHeader width={colWidths.edad} onResize={resizeCol('edad')} className="text-center">Edad</ResizableHeader>
+                    <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>Responsable</ResizableHeader>
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>Fecha</ResizableHeader>
-                    <ResizableHeader width={colWidths.estado} onResize={resizeCol('estado')}>Estado</ResizableHeader>
+                    {isUnassignedView && <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>Sugerencia</ResizableHeader>}
                     {isUnassignedView && canAssignContacts() && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
-                    {isUnassignedView && <ResizableHeader width={colWidths.celulaSug} onResize={resizeCol('celulaSug')}>Célula sug.</ResizableHeader>}
-                    {isUnassignedView && <ResizableHeader width={colWidths.zonaSug} onResize={resizeCol('zonaSug')}>Zona sug.</ResizableHeader>}
                   </tr>
                 </thead>
                 <tbody>
@@ -614,26 +623,50 @@ const PoolPage = () => {
                     const sugZona = sug?.zona;
                     const hasAddress = !!(c.address || c.barrio);
                     const isExternal = sugZona && homeZonaId && sugZona.id !== homeZonaId;
+                    const responsable = teamMembers?.find(m => m.id === c.responsable_id);
 
                     return (
                       <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
-                        <td className="px-3 py-2.5 text-sm font-mono text-muted-foreground" style={{ width: colWidths.cuerda }}>
+                        {/* Cuerda */}
+                        <td className="px-3 py-2 text-sm font-mono text-muted-foreground" style={{ width: colWidths.cuerda }}>
                           {c.numero_cuerda || '—'}
                         </td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground truncate" style={{ width: colWidths.conector }}>
-                          {c.conector || '—'}
+
+                        {/* Nombre (con ojo) */}
+                        <td className="px-3 py-2" style={{ width: colWidths.nombre }}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium" onClick={() => setSelectedContactId(c.id)}>
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                {c.first_name} {c.last_name || ''}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent><p className="text-xs">Ver contacto</p></TooltipContent>
+                          </Tooltip>
                         </td>
-                        <td className="px-3 py-2.5 text-sm font-medium" style={{ width: colWidths.nombre }}>
-                          <button className="hover:underline text-left" onClick={() => setSelectedContactId(c.id)}>{c.first_name}</button>
+
+                        {/* Responsable */}
+                        <td className="px-3 py-2" style={{ width: colWidths.responsable }}>
+                          <select
+                            className="text-xs bg-transparent border border-transparent hover:border-input rounded px-1 py-0.5 w-full cursor-pointer"
+                            value={c.responsable_id || ''}
+                            onChange={async (e) => {
+                              const val = e.target.value || null;
+                              await supabase.from('contacts').update({ responsable_id: val }).eq('id', c.id);
+                              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                            }}
+                          >
+                            <option value="">Sin responsable</option>
+                            {(teamMembers || []).map(m => (
+                              <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+                            ))}
+                          </select>
                         </td>
-                        <td className="px-3 py-2.5 text-sm" style={{ width: colWidths.apellido }}>
-                          <button className="hover:underline text-left" onClick={() => setSelectedContactId(c.id)}>{c.last_name || '—'}</button>
-                        </td>
-                        <td className="px-3 py-2.5 text-sm text-center text-muted-foreground tabular-nums" style={{ width: colWidths.edad }}>{c.edad || '—'}</td>
-                        <td className="px-3 py-2.5" style={{ width: colWidths.direccion }}>
+
+                        {/* Dirección */}
+                        <td className="px-3 py-2" style={{ width: colWidths.direccion }}>
                           {c.address ? (
                             <button className="text-left hover:underline" onClick={() => {
-                              const sug = suggestions[c.id];
                               const sugCell = sug?.cell;
                               const sugCuerdaNum = sug?.cuerda?.numero;
                               setMapContact({
@@ -642,35 +675,41 @@ const PoolPage = () => {
                                 sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined, meetingDay: sugCell.meeting_day, meetingTime: sugCell.meeting_time } : null,
                               });
                             }}>
-                              <span className="text-xs block truncate">{c.address}</span>
-                              {c.barrio && <span className="text-[11px] text-muted-foreground">{c.barrio}</span>}
+                              <span className="text-xs block truncate max-w-[200px]">{c.address}</span>
                             </button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
                         </td>
 
-                        {/* Fecha de contacto */}
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums" style={{ width: colWidths.fechaContacto }}>
-                          {c.fecha_contacto ? new Date(c.fecha_contacto).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
+                        {/* Fecha (created_at) */}
+                        <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums" style={{ width: colWidths.fechaContacto }}>
+                          {c.created_at ? new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                         </td>
 
-                        {/* Estado seguimiento */}
-                        <td className="px-3 py-2.5" style={{ width: colWidths.estado }}>
-                          <ContactPipelineBadge
-                            status={c.estado_seguimiento || 'nuevo'}
-                            editable={canAssignContacts()}
-                            onChange={async (newStatus) => {
-                              await supabase.from('contacts').update({ estado_seguimiento: newStatus, ultimo_seguimiento: new Date().toISOString() }).eq('id', c.id);
-                              queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
-                            }}
-                          />
-                        </td>
+                        {/* Sugerencia (Célula + Zona combinadas) */}
+                        {isUnassignedView && (
+                          <td className="px-3 py-2" style={{ width: colWidths.sugerencia }}>
+                            {sugCell ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge className={`text-[10px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
+                                  {sugCell.name}
+                                </Badge>
+                                {sugZona && (
+                                  <span className={`text-[10px] ${isExternal ? 'text-orange-400' : 'text-muted-foreground'}`}>
+                                    {sugZona.nombre}{isExternal ? ' ↗' : ''}
+                                  </span>
+                                )}
+                                {c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null && (() => {
+                                  const dist = haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!);
+                                  return <span className={`text-[10px] font-medium ${getDistanceColor(dist)}`}>{dist.toFixed(1)}km</span>;
+                                })()}
+                              </div>
+                            ) : <span className="text-xs text-muted-foreground">—</span>}
+                          </td>
+                        )}
 
                         {/* Assign button */}
                         {isUnassignedView && canAssignContacts() && (
-                          <td className="px-3 py-2.5" style={{ width: colWidths.asignar }}>
-                            {/* If contact is in external pool, show Devolver button */}
+                          <td className="px-3 py-2" style={{ width: colWidths.asignar }}>
                             {(c as any).is_external && activePool === 'external' ? (
                               <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
                                 await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
@@ -684,7 +723,6 @@ const PoolPage = () => {
                                 <TooltipContent><p className="text-xs">Completá la dirección para asignar.</p></TooltipContent></Tooltip>
                             ) : (
                               <div className="flex items-center gap-1">
-                                {/* Quick auto-assign button */}
                                 {sugCell && !isExternal && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
                                     type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
@@ -693,26 +731,22 @@ const PoolPage = () => {
                                     <Zap className="h-3 w-3 mr-1" /> Asignar
                                   </Button>
                                 )}
-                                {/* External zona — move to Semillero Externo */}
                                 {sugCell && isExternal && (
                                   <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
                                     await supabase.from('contacts').update({ is_external: true }).eq('id', c.id);
-                                    showSuccess('Contacto movido al Semillero Externo para revisión.');
+                                    showSuccess('Contacto movido al Semillero Externo.');
                                     queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                                   }}>
                                     <ExternalLink className="h-3 w-3 mr-1" /> Externo
                                   </Button>
                                 )}
-                                {/* Dropdown for manual selection */}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-64 max-h-[340px] overflow-y-auto">
-                                    {/* Cuerda-only assignment */}
                                     <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
                                     {(cuerdas || []).filter(cr => {
-                                      // Gender filter: 1xx male, 2xx female, 3xx both
                                       const prefix = parseInt(cr.numero.charAt(0));
                                       const sexo = c.sexo?.toLowerCase();
                                       if (sexo === 'femenino' && prefix === 1) return false;
@@ -731,14 +765,13 @@ const PoolPage = () => {
                                       );
                                     })}
                                     <DropdownMenuSeparator />
-                                    {/* Cell assignment */}
                                     {(() => {
                                       const { inZone, otherZone } = getCellDropdownItems(c);
                                       return (
                                         <>
                                           {inZone.length > 0 && (
                                             <>
-                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Células cercanas (misma zona)</DropdownMenuLabel>
+                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Células cercanas</DropdownMenuLabel>
                                               {inZone.map(cell => {
                                                 const info = getCellLabel(cell);
                                                 return (
@@ -771,9 +804,6 @@ const PoolPage = () => {
                                               })}
                                             </>
                                           )}
-                                          {inZone.length === 0 && otherZone.length === 0 && (
-                                            <DropdownMenuItem disabled className="text-xs text-muted-foreground">Sin células disponibles</DropdownMenuItem>
-                                          )}
                                         </>
                                       );
                                     })()}
@@ -781,50 +811,6 @@ const PoolPage = () => {
                                 </DropdownMenu>
                               </div>
                             )}
-                          </td>
-                        )}
-
-                        {/* Célula sug. + Zona sug. */}
-                        {isUnassignedView && (
-                          <>
-                            <td className="px-3 py-2.5" style={{ width: colWidths.celulaSug }}>
-                              {sugCell ? (
-                                <div>
-                                  <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
-                                    {sugCell.name}
-                                  </Badge>
-                                  {c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null && (() => {
-                                    const dist = haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!);
-                                    const warning = getDistanceWarning(dist);
-                                    return (
-                                      <div>
-                                        <span className={`text-[10px] font-medium ${getDistanceColor(dist)}`}>
-                                          {dist.toFixed(1)} km
-                                        </span>
-                                        {warning && <span className="text-[9px] text-red-400 block">{warning}</span>}
-                                      </div>
-                                    );
-                                  })()}
-                                  {c.lat != null && c.lng != null && !isWithinGBA(c.lat, c.lng) && (
-                                    <span className="text-[9px] text-red-400 block">⚠️ Coordenadas fuera de zona</span>
-                                  )}
-                                </div>
-                              ) : <span className="text-xs text-muted-foreground">—</span>}
-                            </td>
-                            <td className="px-3 py-2.5" style={{ width: colWidths.zonaSug }}>
-                              {sugZona ? (
-                                <Badge className={`text-[11px] ${isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'}`}>
-                                  {sugZona.nombre}
-                                  {isExternal && <ExternalLink className="h-3 w-3 ml-1 inline" />}
-                                </Badge>
-                              ) : <span className="text-xs text-muted-foreground">Sin datos</span>}
-                            </td>
-                          </>
-                        )}
-
-                        {!isUnassignedView && (
-                          <td className="px-3 py-2.5" style={{ width: colWidths.cuerda }}>
-                            {c.numero_cuerda ? <Badge variant="secondary" className="text-xs font-mono">{c.numero_cuerda}</Badge> : <span className="text-xs text-muted-foreground">—</span>}
                           </td>
                         )}
                       </tr>

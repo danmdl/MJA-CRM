@@ -126,6 +126,16 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
       if (session) {
         // Silently refresh profile without showing loading screen
         fetchProfile(session);
+        // Log login event
+        if (_event === 'SIGNED_IN') {
+          supabase.from('activity_logs').insert({
+            user_id: session.user.id,
+            church_id: null,
+            action: 'login',
+            entity_type: 'auth',
+            entity_id: session.user.id,
+          }).then(() => {});
+        }
       } else {
         setProfile(null);
         setLoading(false);
