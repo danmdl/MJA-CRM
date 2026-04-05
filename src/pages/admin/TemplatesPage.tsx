@@ -14,11 +14,17 @@ interface WhatsAppTemplate {
   body: string;
   is_default: boolean;
   created_at: string;
+  user_id: string;
+  profiles?: {
+    first_name: string | null;
+    last_name: string | null;
+  };
 }
 
 const TemplatesPage = () => {
-  const { session } = useSession();
+  const { session, profile } = useSession();
   const userId = session?.user?.id;
+  const userName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuario' : 'Usuario';
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -32,7 +38,7 @@ const TemplatesPage = () => {
     if (!userId) return;
     const { data } = await supabase
       .from('whatsapp_templates')
-      .select('*')
+      .select('*, profiles(first_name, last_name)')
       .eq('user_id', userId)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
@@ -118,6 +124,10 @@ const TemplatesPage = () => {
     loadTemplates();
   };
 
+  const insertVariable = (variable: string) => {
+    setNewBody(prev => prev + `{${variable}}`);
+  };
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -135,10 +145,28 @@ const TemplatesPage = () => {
       {/* Create new template */}
       {creating && (
         <Card className="border-primary/50">
-          <CardHeader>
+          <CardHeader className="pb-4">
             <CardTitle className="text-lg">Nueva Plantilla</CardTitle>
-            <CardDescription>
-              Variables disponibles: {'{nombre.contacto}'}, {'{nombre.usuario}'}, {'{direccion.iglesia}'}, {'{website.iglesia}'}, {'{horarios.iglesia}'}
+            <CardDescription className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs">Variables disponibles:</span>
+              {[
+                { key: 'nombre.contacto', label: 'Nombre Contacto' },
+                { key: 'nombre.usuario', label: 'Nombre Usuario' },
+                { key: 'direccion.iglesia', label: 'Dirección' },
+                { key: 'website.iglesia', label: 'Website' },
+                { key: 'horarios.iglesia', label: 'Horarios' },
+              ].map(v => (
+                <Button
+                  key={v.key}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => insertVariable(v.key)}
+                  className="h-6 text-[10px] px-2 bg-primary/5 hover:bg-primary/10 border-primary/30"
+                >
+                  {v.label}
+                </Button>
+              ))}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -147,7 +175,7 @@ const TemplatesPage = () => {
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Ej: Saludo inicial"
+                placeholder=""
                 autoFocus
               />
             </div>
@@ -156,8 +184,8 @@ const TemplatesPage = () => {
               <Textarea
                 value={newBody}
                 onChange={(e) => setNewBody(e.target.value)}
-                placeholder="Hola {nombre}, ¿cómo estás?"
-                className="min-h-[120px] font-mono text-sm"
+                placeholder=""
+                className="min-h-[200px] font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">{newBody.length} caracteres</p>
             </div>
@@ -195,87 +223,91 @@ const TemplatesPage = () => {
           </Card>
         )}
         
-        {templates.map((template) => (
-          <Card key={template.id} className={template.is_default ? 'border-green-500/30 bg-green-500/5' : ''}>
-            {editingId === template.id ? (
-              <CardContent className="pt-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Nombre</label>
-                  <Input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    placeholder="Nombre de la plantilla"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Mensaje</label>
-                  <Textarea
-                    value={editingBody}
-                    onChange={(e) => setEditingBody(e.target.value)}
-                    className="min-h-[120px] font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">{editingBody.length} caracteres</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleSaveEdit} className="gap-2">
-                    <Save className="h-4 w-4" /> Guardar
-                  </Button>
-                  <Button variant="outline" onClick={() => setEditingId(null)} className="gap-2">
-                    <X className="h-4 w-4" /> Cancelar
-                  </Button>
-                </div>
-              </CardContent>
-            ) : (
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="space-y-0.5 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {template.is_default && <Star className="h-3.5 w-3.5 text-green-500 fill-green-500 shrink-0" />}
-                      <h3 className="font-semibold text-sm">{template.name}</h3>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Creada {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </p>
+        {templates.map((template) => {
+          const creatorName = template.profiles 
+            ? `${template.profiles.first_name || ''} ${template.profiles.last_name || ''}`.trim() || 'Usuario'
+            : userName;
+          
+          return (
+            <Card key={template.id} className={template.is_default ? 'border-green-500/30 bg-green-500/5' : ''}>
+              {editingId === template.id ? (
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Nombre</label>
+                    <Input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      placeholder="Nombre de la plantilla"
+                    />
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {!template.is_default && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Mensaje</label>
+                    <Textarea
+                      value={editingBody}
+                      onChange={(e) => setEditingBody(e.target.value)}
+                      className="min-h-[120px] font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">{editingBody.length} caracteres</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveEdit} className="gap-2">
+                      <Save className="h-4 w-4" /> Guardar
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditingId(null)} className="gap-2">
+                      <X className="h-4 w-4" /> Cancelar
+                    </Button>
+                  </div>
+                </CardContent>
+              ) : (
+                <div className="p-3">
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {template.is_default && <Star className="h-3 w-3 text-green-500 fill-green-500 shrink-0" />}
+                        <h3 className="font-semibold text-sm">{template.name}</h3>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Por {creatorName} · {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {!template.is_default && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSetDefault(template.id)}
+                          className="h-7 w-7 p-0"
+                          title="Hacer default"
+                        >
+                          <Star className="h-3 w-3" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleSetDefault(template.id)}
-                        className="gap-1.5 h-8 text-xs"
-                        title="Hacer default"
+                        onClick={() => handleStartEdit(template)}
+                        className="h-7 w-7 p-0"
                       >
-                        <Star className="h-3.5 w-3.5" />
+                        <Edit3 className="h-3 w-3" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleStartEdit(template)}
-                      className="gap-1.5 h-8 text-xs"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(template.id)}
-                      className="gap-1.5 h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Eliminar
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(template.id)}
+                        className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="bg-muted/20 rounded p-2 font-mono text-[11px] whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                    {template.body}
                   </div>
                 </div>
-                <div className="bg-muted/30 rounded-md p-3 font-mono text-xs whitespace-pre-wrap leading-relaxed">
-                  {template.body}
-                </div>
-              </div>
-            )}
-          </Card>
-        ))}
+              )}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
