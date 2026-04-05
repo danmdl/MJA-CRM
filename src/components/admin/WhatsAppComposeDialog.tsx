@@ -32,10 +32,11 @@ interface Props {
   contactFirstName: string;
   contactLastName: string;
   contactPhone: string;
+  churchId?: string;
   onSent?: (message: string) => void;
 }
 
-const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstName, contactLastName, contactPhone, onSent }: Props) => {
+const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstName, contactLastName, contactPhone, churchId, onSent }: Props) => {
   const { session, profile } = useSession();
   const { canUseTemplates } = usePermissions();
   const userId = session?.user?.id;
@@ -47,19 +48,20 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
   const [churchData, setChurchData] = useState<{ address?: string; website?: string; hours?: string } | null>(null);
 
-  // Fetch church data
+  // Fetch church data (prefer explicit churchId prop, fall back to user's church)
   useEffect(() => {
     const fetchChurchData = async () => {
-      if (!profile?.church_id) return;
+      const targetChurchId = churchId || profile?.church_id;
+      if (!targetChurchId) return;
       const { data } = await supabase
         .from('churches')
         .select('address, website, hours')
-        .eq('id', profile.church_id)
+        .eq('id', targetChurchId)
         .single();
       setChurchData(data);
     };
     if (open) fetchChurchData();
-  }, [open, profile?.church_id]);
+  }, [open, churchId, profile?.church_id]);
 
   // Replace variables in template body
   const replaceVars = (body: string) => {

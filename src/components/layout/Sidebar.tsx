@@ -102,6 +102,20 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
 
   const sections = isInsideChurch ? churchSections : globalSections;
 
+  // Strict allowlist for conectores: only Semillero, Mensajes, Perfil
+  const filteredSections = profile?.role === 'conector'
+    ? sections
+        .map(section => ({
+          ...section,
+          items: section.items.filter(item =>
+            item.to.endsWith('/pool') ||
+            item.to === '/admin/messages' ||
+            item.to === '/admin/profile'
+          ),
+        }))
+        .filter(section => section.items.length > 0)
+    : sections;
+
   return (
     <aside style={{
       width: 220,
@@ -163,7 +177,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {sections.map(({ title, items }) => (
+        {filteredSections.map(({ title, items }) => (
           <div key={title}>
             <div style={{
               fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',

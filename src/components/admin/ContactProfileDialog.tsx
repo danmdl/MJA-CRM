@@ -239,6 +239,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [showTemplates, setShowTemplates] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateBody, setNewTemplateBody] = useState('');
+  const [churchInfo, setChurchInfo] = useState<{ address?: string; website?: string; hours?: string } | null>(null);
 
   const hasUnsavedChanges = contact ? JSON.stringify(contact) !== originalContact : false;
   const safeClose = () => {
@@ -261,6 +262,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       fetchContactLogs();
       fetchLeadersAndCells();
       fetchTransfers();
+      // Fetch church info for template variables
+      const targetChurchId = churchId || profile?.church_id;
+      if (targetChurchId) {
+        supabase.from('churches').select('address, website, hours').eq('id', targetChurchId).single()
+          .then(({ data }) => setChurchInfo(data));
+      }
       // Load user's WhatsApp templates (active ones only, including system templates)
       supabase.from('whatsapp_templates')
         .select('id, name, body, is_default, is_system')
@@ -278,19 +285,27 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
           }
         });
     }
-  }, [open, contactId]);
+  }, [open, contactId, churchId, profile?.church_id]);
 
-  // Apply variable replacement to default template when contact data is available
+  // Apply variable replacement when contact, church, or message changes
   useEffect(() => {
     if (!contact || !whatsappMsg) return;
+    const hasNewVars = /\{nombre\.contacto\}|\{nombre\.usuario\}|\{direccion\.iglesia\}|\{website\.iglesia\}|\{horarios\.iglesia\}/i.test(whatsappMsg);
+    const hasLegacyVars = /\{nombre\}|\{apellido\}|\{telefono\}/i.test(whatsappMsg);
+    if (!hasNewVars && !hasLegacyVars) return;
     let msg = whatsappMsg;
-    if (msg.includes('{nombre}') || msg.includes('{apellido}') || msg.includes('{telefono}')) {
-      msg = msg.replace(/\{nombre\}/gi, contact.first_name || '');
-      msg = msg.replace(/\{apellido\}/gi, contact.last_name || '');
-      msg = msg.replace(/\{telefono\}/gi, contact.phone || '');
-      setWhatsappMsg(msg);
-    }
-  }, [contact?.first_name]);
+    // New variable system
+    msg = msg.replace(/\{nombre\.contacto\}/gi, contact.first_name || '');
+    msg = msg.replace(/\{nombre\.usuario\}/gi, profile?.first_name || '');
+    msg = msg.replace(/\{direccion\.iglesia\}/gi, churchInfo?.address || '');
+    msg = msg.replace(/\{website\.iglesia\}/gi, churchInfo?.website || '');
+    msg = msg.replace(/\{horarios\.iglesia\}/gi, churchInfo?.hours || '');
+    // Legacy variable system (still supported)
+    msg = msg.replace(/\{nombre\}/gi, contact.first_name || '');
+    msg = msg.replace(/\{apellido\}/gi, contact.last_name || '');
+    msg = msg.replace(/\{telefono\}/gi, contact.phone || '');
+    setWhatsappMsg(msg);
+  }, [contact?.first_name, churchInfo]);
 
   const fetchTransfers = async () => {
     if (!contactId) return;
@@ -793,14 +808,19 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                                   if (!t.is_default) {
                                     await supabase.from('whatsapp_templates').update({ is_default: true }).eq('id', t.id);
                                   }
-                                  const { data } = await supabase.from('whatsapp_templates').select('id, name, body, is_default');
+                                  const { data } = await supabase.from('whatsapp_templates')
+                                    .select('id, name, body, is_default, is_system')
+                                    .is('deleted_at', null)
+                                    .order('is_default', { ascending: false })
+                                    .order('is_system', { ascending: false })
+                                    .order('name');
                                   setSavedTemplates(data || []);
                                   showSuccess(t.is_default ? 'Default removido.' : `"${t.name}" es ahora la plantilla por defecto.`);
                                 }}>
                                   {t.is_default ? 'Quitar default' : 'Hacer default'}
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-red-400" onClick={async () => {
-                                  await supabase.from('whatsapp_templates').delete().eq('id', t.id);
+                                  await supabase.from('whatsapp_templates').update({ deleted_at: new Date().toISOString() }).eq('id', t.id);
                                   setSavedTemplates(prev => prev.filter(x => x.id !== t.id));
                                 }}>Eliminar</Button>
                               </div>

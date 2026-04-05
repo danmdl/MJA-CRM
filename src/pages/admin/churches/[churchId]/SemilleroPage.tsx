@@ -1031,6 +1031,7 @@ const SemilleroPage = () => {
         contactFirstName={whatsappCompose?.firstName || ''}
         contactLastName={whatsappCompose?.lastName || ''}
         contactPhone={whatsappCompose?.phone || ''}
+        churchId={churchId}
         onSent={async (message) => {
           // Log WhatsApp send to contact history
           if (!whatsappCompose) return;

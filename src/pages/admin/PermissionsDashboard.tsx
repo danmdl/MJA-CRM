@@ -222,7 +222,7 @@ const PermissionsDashboard = () => {
     { key: 'canImportCsv', label: 'Importar contactos por CSV', icon: Edit },
     { key: 'canAssignContacts', label: 'Asignar contactos a células/cuerdas', icon: Edit },
     { key: 'canSendWhatsapp', label: 'Enviar WhatsApp desde el Semillero', icon: Edit },
-    { key: 'canUseTemplates', label: 'Usar plantillas de WhatsApp', icon: Edit },
+    { key: 'canUseTemplates', label: 'Usar Templates', icon: Edit },
     { key: 'canSeeCuerdas', label: 'Ver solapa Cuerdas', icon: Edit },
     { key: 'canEditCuerdas', label: 'Editar cuerdas (agregar células, etc.)', icon: Edit },
     { key: 'seeOwnChurchAnalytics', label: 'Ver Resumen / Equipo / Cuerdas / Mapa', icon: BarChart },
