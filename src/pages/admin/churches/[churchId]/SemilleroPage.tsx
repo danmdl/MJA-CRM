@@ -120,7 +120,7 @@ const SemilleroPage = () => {
   const [deleting, setDeleting] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 38, nombre: 145, responsable: 115, telefono: 125, direccion: 155, fechaContacto: 62, sugerencia: 165, asignar: 125,
+    cuerda: 34, nombre: 130, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -655,7 +655,7 @@ const SemilleroPage = () => {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 940 }}>
+              <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
                 <thead>
                   <tr className="border-b">
                     <th className="px-1 py-2 w-6">
@@ -820,13 +820,83 @@ const SemilleroPage = () => {
                                     <Zap className="h-3 w-3 mr-1" /> Asignar
                                   </Button>
                                 )}
-                                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
-                                  await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
-                                  showSuccess('Contacto devuelto al Semillero Sin Asignar.');
-                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                                }}>
-                                  <Undo2 className="h-3 w-3 mr-1" /> Devolver
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-64 max-h-[340px] overflow-y-auto">
+                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
+                                    {(cuerdas || []).filter(cr => {
+                                      const prefix = parseInt(cr.numero.charAt(0));
+                                      const sexo = c.sexo?.toLowerCase();
+                                      if (sexo === 'femenino' && prefix === 1) return false;
+                                      if (sexo === 'masculino' && prefix === 2) return false;
+                                      return true;
+                                    }).map(cr => {
+                                      const zona = zonas?.find(z => z.id === cr.zona_id);
+                                      return (
+                                        <DropdownMenuItem key={`cuerda-ext-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
+                                          type: 'cuerda_only', contactId: c.id, cellId: '', cellName: `Cuerda ${cr.numero}`,
+                                          cuerdaNum: cr.numero, zonaName: zona?.nombre, cuerdaZonaId: zona?.id,
+                                        })}>
+                                          <span className="font-mono font-medium">{cr.numero}</span>
+                                          {zona && <span className="text-[10px] text-muted-foreground ml-1.5">{zona.nombre}</span>}
+                                        </DropdownMenuItem>
+                                      );
+                                    })}
+                                    <DropdownMenuSeparator />
+                                    {(() => {
+                                      const { inZone, otherZone } = getCellDropdownItems(c);
+                                      return (
+                                        <>
+                                          {inZone.length > 0 && (
+                                            <>
+                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Células cercanas</DropdownMenuLabel>
+                                              {inZone.map(cell => {
+                                                const info = getCellLabel(cell);
+                                                return (
+                                                  <DropdownMenuItem key={cell.id} className="text-xs" onClick={() => setConfirmDialog({
+                                                    type: 'manual', contactId: c.id, cellId: cell.id, cellName: cell.name,
+                                                    cuerdaNum: info.cuerda, zonaName: info.zona,
+                                                  })}>
+                                                    <span className="font-medium">{cell.name}</span>
+                                                    {info.cuerda && <Badge variant="secondary" className="ml-1.5 text-[9px] font-mono">{info.cuerda}</Badge>}
+                                                  </DropdownMenuItem>
+                                                );
+                                              })}
+                                            </>
+                                          )}
+                                          {otherZone.length > 0 && (
+                                            <>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-orange-400 py-1">Otras zonas</DropdownMenuLabel>
+                                              {otherZone.slice(0, 10).map(cell => {
+                                                const info = getCellLabel(cell);
+                                                return (
+                                                  <DropdownMenuItem key={cell.id} className="text-xs" onClick={() => setConfirmDialog({
+                                                    type: 'manual', contactId: c.id, cellId: cell.id, cellName: cell.name,
+                                                    cuerdaNum: info.cuerda, zonaName: info.zona,
+                                                  })}>
+                                                    <span>{cell.name}</span>
+                                                    {info.zona && <span className="text-[10px] text-orange-400 ml-1">{info.zona}</span>}
+                                                  </DropdownMenuItem>
+                                                );
+                                              })}
+                                            </>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-xs text-muted-foreground" onClick={async () => {
+                                      await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
+                                      showSuccess('Contacto devuelto al Semillero Sin Asignar.');
+                                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                    }}>
+                                      <Undo2 className="h-3 w-3 mr-1.5" /> Devolver a Sin Asignar
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             ) : !hasAddress ? (
                               <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help">Sin dirección</Badge></TooltipTrigger>
