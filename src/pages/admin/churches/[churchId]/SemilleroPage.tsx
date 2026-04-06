@@ -887,16 +887,15 @@ const SemilleroPage = () => {
                                         </>
                                       );
                                     })()}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-xs text-muted-foreground" onClick={async () => {
-                                      await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
-                                      showSuccess('Contacto devuelto al Semillero Sin Asignar.');
-                                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                                    }}>
-                                      <Undo2 className="h-3 w-3 mr-1.5" /> Devolver a Sin Asignar
-                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
+                                  await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
+                                  showSuccess('Contacto devuelto al Semillero Sin Asignar.');
+                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                }}>
+                                  <Undo2 className="h-3 w-3 mr-1" /> Devolver
+                                </Button>
                               </div>
                             ) : !hasAddress ? (
                               <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help">Sin dirección</Badge></TooltipTrigger>
