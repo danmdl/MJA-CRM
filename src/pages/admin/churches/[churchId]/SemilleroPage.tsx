@@ -734,11 +734,11 @@ const SemilleroPage = () => {
                         {/* Teléfono + WhatsApp */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.telefono }}>
                           {c.phone ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-foreground tabular-nums font-medium">{c.phone}</span>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[11px] text-foreground tabular-nums font-medium truncate">{c.phone}</span>
                               {canSendWhatsapp() && (
                                 <button
-                                  className="flex items-center gap-1 text-green-500 hover:text-green-400 shrink-0 group"
+                                  className="flex items-center gap-0.5 text-green-500 hover:text-green-400 shrink-0 group"
                                   title="Enviar WhatsApp"
                                   onClick={(e) => {
                                     e.stopPropagation();
