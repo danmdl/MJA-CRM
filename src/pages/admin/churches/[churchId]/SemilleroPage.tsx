@@ -811,13 +811,23 @@ const SemilleroPage = () => {
                         {isUnassignedView && canAssignContacts() && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
                             {(c as any).is_external && activePool === 'external' ? (
-                              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
-                                await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
-                                showSuccess('Contacto devuelto al Semillero Sin Asignar.');
-                                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                              }}>
-                                <Undo2 className="h-3 w-3 mr-1" /> Devolver
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                {sugCell && (
+                                  <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
+                                    type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
+                                    cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
+                                  })}>
+                                    <Zap className="h-3 w-3 mr-1" /> Asignar
+                                  </Button>
+                                )}
+                                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
+                                  await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
+                                  showSuccess('Contacto devuelto al Semillero Sin Asignar.');
+                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                }}>
+                                  <Undo2 className="h-3 w-3 mr-1" /> Devolver
+                                </Button>
+                              </div>
                             ) : !hasAddress ? (
                               <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help">Sin dirección</Badge></TooltipTrigger>
                                 <TooltipContent><p className="text-xs">Completá la dirección para asignar.</p></TooltipContent></Tooltip>
