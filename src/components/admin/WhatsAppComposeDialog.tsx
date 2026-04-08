@@ -24,6 +24,7 @@ interface WhatsAppTemplate {
   body: string;
   is_default: boolean;
   is_system: boolean;
+  image_url: string | null;
 }
 
 interface Props {
@@ -43,6 +44,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const userId = session?.user?.id;
   const [message, setMessage] = useState('');
   const [selectedTemplateName, setSelectedTemplateName] = useState<string | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [saveMode, setSaveMode] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
@@ -103,7 +105,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const loadTemplates = async (autoLoadDefault = false) => {
     if (!userId || !canUseTemplates()) return;
     const { data } = await supabase.from('whatsapp_templates')
-      .select('id, name, body, is_default, is_system')
+      .select('id, name, body, is_default, is_system, image_url')
       .or(`user_id.eq.${userId},is_system.eq.true`)
       .is('deleted_at', null)
       .order('is_default', { ascending: false })
@@ -118,6 +120,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
       if (def) {
         setMessage(def.body);
         setSelectedTemplateName(def.name);
+        setSelectedImageUrl(def.image_url);
       }
     }
   };
@@ -126,6 +129,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
     if (open) {
       setMessage('');
       setSelectedTemplateName(null);
+      setSelectedImageUrl(null);
       setSaveMode(false);
       setSaveAsDefault(false);
       loadTemplates(true); // auto-load default
@@ -135,6 +139,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const handleSelectTemplate = (t: WhatsAppTemplate) => {
     setMessage(t.body);
     setSelectedTemplateName(t.name);
+    setSelectedImageUrl(t.image_url);
   };
 
   const handleSaveAsTemplate = async () => {
@@ -159,7 +164,13 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   const handleSend = () => {
     if (!message.trim() || !contactPhone) return;
-    const resolvedMessage = replaceVars(message);
+    let resolvedMessage = replaceVars(message);
+    // Append the template image URL on its own paragraph so WhatsApp's link
+    // unfurling generates an inline preview card. The receiver sees the
+    // message text + an image preview as if the picture were attached.
+    if (selectedImageUrl) {
+      resolvedMessage = `${resolvedMessage}\n\n${selectedImageUrl}`;
+    }
     const cleanPhone = contactPhone.replace(/\D/g, '');
     // If the user has edited the template body, don't claim a template was used
     const templates_ = templates.find(t => t.name === selectedTemplateName);
@@ -254,6 +265,13 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
             </div>
             <div className="flex-1 overflow-y-auto rounded-md border bg-background p-3 text-sm whitespace-pre-wrap min-h-[220px]">
               {message.trim() ? replaceVars(message) : <span className="text-muted-foreground italic">El mensaje resuelto aparecerá acá...</span>}
+              {selectedImageUrl && (
+                <div className="mt-3 pt-3 border-t border-border/60">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Imagen adjunta</div>
+                  <img src={selectedImageUrl} alt="Adjunto" className="max-w-full rounded-md border" />
+                  <div className="text-[10px] text-muted-foreground mt-1">WhatsApp va a mostrar esta imagen como vista previa al final del mensaje.</div>
+                </div>
+              )}
             </div>
           </div>
         </div>

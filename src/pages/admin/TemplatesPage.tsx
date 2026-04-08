@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Plus, Star, Edit3, Trash2, Save, X } from 'lucide-react';
+import { Plus, Star, Edit3, Trash2, Save, X, ImageIcon, Upload } from 'lucide-react';
 
 interface WhatsAppTemplate {
   id: string;
@@ -17,6 +17,7 @@ interface WhatsAppTemplate {
   is_system: boolean;
   created_at: string;
   user_id: string;
+  image_url: string | null;
 }
 
 const TemplatesPage = () => {
@@ -33,7 +34,43 @@ const TemplatesPage = () => {
   const [newName, setNewName] = useState('');
   const [newBody, setNewBody] = useState('');
   const [newIsDefault, setNewIsDefault] = useState(false);
+  const [newImageUrl, setNewImageUrl] = useState<string | null>(null);
+  const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+
+  // Upload an image file to Supabase Storage and return its public URL.
+  // Used by both the create form and the edit form.
+  const uploadImage = async (file: File): Promise<string | null> => {
+    if (!userId) return null;
+    if (file.size > 3 * 1024 * 1024) {
+      showError('La imagen no puede superar 3 MB.');
+      return null;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      showError('Formato no soportado. Usá JPG, PNG, WebP o GIF.');
+      return null;
+    }
+    setUploadingImage(true);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('whatsapp-template-images')
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+      if (upErr) {
+        console.error('upload error', upErr);
+        showError('Error subiendo la imagen.');
+        return null;
+      }
+      const { data: publicData } = supabase.storage
+        .from('whatsapp-template-images')
+        .getPublicUrl(path);
+      return publicData.publicUrl;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const loadTemplates = async () => {
     if (!userId) return;
@@ -77,6 +114,7 @@ const TemplatesPage = () => {
       name: newName.trim(),
       body: newBody.trim(),
       is_default: newIsDefault,
+      image_url: newImageUrl,
     });
     
     if (error) {
@@ -88,6 +126,7 @@ const TemplatesPage = () => {
     setNewName('');
     setNewBody('');
     setNewIsDefault(false);
+    setNewImageUrl(null);
     setCreating(false);
     loadTemplates();
   };
@@ -96,6 +135,7 @@ const TemplatesPage = () => {
     setEditingId(t.id);
     setEditingName(t.name);
     setEditingBody(t.body);
+    setEditingImageUrl(t.image_url);
   };
 
   const handleSaveEdit = async () => {
@@ -103,7 +143,7 @@ const TemplatesPage = () => {
     
     const { error } = await supabase
       .from('whatsapp_templates')
-      .update({ name: editingName.trim(), body: editingBody.trim() })
+      .update({ name: editingName.trim(), body: editingBody.trim(), image_url: editingImageUrl })
       .eq('id', editingId);
     
     if (error) {
@@ -113,6 +153,7 @@ const TemplatesPage = () => {
     
     showSuccess('Plantilla actualizada.');
     setEditingId(null);
+    setEditingImageUrl(null);
     loadTemplates();
   };
 
@@ -264,6 +305,47 @@ const TemplatesPage = () => {
               />
               <p className="text-xs text-muted-foreground">{newBody.length} caracteres</p>
             </div>
+
+            {/* Image upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <ImageIcon className="h-4 w-4" /> Imagen (opcional)
+              </label>
+              <p className="text-[11px] text-muted-foreground">
+                Si adjuntás una imagen, se va a incluir como vista previa al final del mensaje. WhatsApp la va a mostrar automáticamente.
+              </p>
+              {newImageUrl ? (
+                <div className="relative inline-block">
+                  <img src={newImageUrl} alt="Preview" className="max-h-40 rounded-md border" />
+                  <button
+                    type="button"
+                    onClick={() => setNewImageUrl(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg"
+                    title="Quitar imagen"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-input bg-muted/20 hover:bg-muted/40 cursor-pointer text-sm w-fit ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <Upload className="h-4 w-4" />
+                  {uploadingImage ? 'Subiendo...' : 'Subir imagen'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const url = await uploadImage(file);
+                      if (url) setNewImageUrl(url);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
                 type="checkbox"
@@ -274,10 +356,10 @@ const TemplatesPage = () => {
               Marcar como plantilla por defecto
             </label>
             <div className="flex gap-2">
-              <Button onClick={handleCreate} disabled={!newName.trim() || !newBody.trim()} className="gap-2">
+              <Button onClick={handleCreate} disabled={!newName.trim() || !newBody.trim() || uploadingImage} className="gap-2">
                 <Save className="h-4 w-4" /> Guardar
               </Button>
-              <Button variant="outline" onClick={() => { setCreating(false); setNewName(''); setNewBody(''); setNewIsDefault(false); }} className="gap-2">
+              <Button variant="outline" onClick={() => { setCreating(false); setNewName(''); setNewBody(''); setNewIsDefault(false); setNewImageUrl(null); }} className="gap-2">
                 <X className="h-4 w-4" /> Cancelar
               </Button>
             </div>
@@ -320,11 +402,49 @@ const TemplatesPage = () => {
                     />
                     <p className="text-xs text-muted-foreground">{editingBody.length} caracteres</p>
                   </div>
+
+                  {/* Image upload (edit) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-1.5">
+                      <ImageIcon className="h-4 w-4" /> Imagen (opcional)
+                    </label>
+                    {editingImageUrl ? (
+                      <div className="relative inline-block">
+                        <img src={editingImageUrl} alt="Preview" className="max-h-40 rounded-md border" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingImageUrl(null)}
+                          className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg"
+                          title="Quitar imagen"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className={`flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-input bg-muted/20 hover:bg-muted/40 cursor-pointer text-sm w-fit ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <Upload className="h-4 w-4" />
+                        {uploadingImage ? 'Subiendo...' : 'Subir imagen'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const url = await uploadImage(file);
+                            if (url) setEditingImageUrl(url);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+
                   <div className="flex gap-2">
-                    <Button onClick={handleSaveEdit} className="gap-2">
+                    <Button onClick={handleSaveEdit} disabled={uploadingImage} className="gap-2">
                       <Save className="h-4 w-4" /> Guardar
                     </Button>
-                    <Button variant="outline" onClick={() => setEditingId(null)} className="gap-2">
+                    <Button variant="outline" onClick={() => { setEditingId(null); setEditingImageUrl(null); }} className="gap-2">
                       <X className="h-4 w-4" /> Cancelar
                     </Button>
                   </div>
@@ -409,6 +529,14 @@ const TemplatesPage = () => {
                   <div className="bg-muted/20 rounded p-2 font-mono text-[11px] whitespace-pre-wrap leading-relaxed text-muted-foreground max-h-32 overflow-y-auto">
                     {template.body}
                   </div>
+                  {template.image_url && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <img src={template.image_url} alt="" className="h-12 w-12 object-cover rounded border" />
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <ImageIcon className="h-3 w-3" /> Imagen adjunta
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
