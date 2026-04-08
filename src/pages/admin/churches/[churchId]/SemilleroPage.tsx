@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -634,19 +634,6 @@ const SemilleroPage = () => {
             <option key={n} value={n!}>Cuerda {n}</option>
           ))}
         </select>
-        <select className="h-8 text-xs border rounded px-2 bg-background" value={filterResponsable} onChange={e => setFilterResponsable(e.target.value)}>
-          <option value="">Todos los responsables</option>
-          {session?.user?.id && (
-            <option value={session.user.id}>⭐ Mis contactos</option>
-          )}
-          <option value="__none__">Sin responsable</option>
-          <option disabled>──────────</option>
-          {(teamMembers || [])
-            .filter(m => m.id !== session?.user?.id)
-            .map(m => (
-              <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-            ))}
-        </select>
         <div className="relative w-52 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
@@ -675,7 +662,38 @@ const SemilleroPage = () => {
                     </th>
                     <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
-                    <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>Responsable</ResizableHeader>
+                    <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                            Responsable
+                            <Filter className={`h-3 w-3 ${filterResponsable ? 'text-primary fill-primary/30' : 'opacity-60'}`} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
+                          <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Filtrar por responsable</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => setFilterResponsable('')} className={filterResponsable === '' ? 'bg-accent' : ''}>
+                            Todos
+                          </DropdownMenuItem>
+                          {session?.user?.id && (
+                            <DropdownMenuItem onClick={() => setFilterResponsable(session.user.id)} className={filterResponsable === session.user.id ? 'bg-accent' : ''}>
+                              ⭐ Mis contactos
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => setFilterResponsable('__none__')} className={filterResponsable === '__none__' ? 'bg-accent' : ''}>
+                            Sin responsable
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {(teamMembers || [])
+                            .filter(m => m.id !== session?.user?.id)
+                            .map(m => (
+                              <DropdownMenuItem key={m.id} onClick={() => setFilterResponsable(m.id)} className={filterResponsable === m.id ? 'bg-accent' : ''}>
+                                {m.first_name} {m.last_name}
+                              </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </ResizableHeader>
                     <ResizableHeader width={colWidths.telefono} onResize={resizeCol('telefono')}>Teléfono</ResizableHeader>
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>Fecha</ResizableHeader>
