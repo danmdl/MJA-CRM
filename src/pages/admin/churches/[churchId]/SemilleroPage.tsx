@@ -934,7 +934,8 @@ const SemilleroPage = () => {
                         </td>
 
                         {/* Teléfono + WhatsApp - on mobile we hide the number text and keep just the WhatsApp button to save horizontal space.
-                            Invalid AR phones (truncated / missing digits) render in red on both the text and the WhatsApp icon. */}
+                            Invalid AR phones (truncated / missing digits) render in red on both the text and the WhatsApp icon.
+                            Missing phones show the same red button (non-clickable) instead of a dash, so the gap is visually obvious. */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.telefono }}>
                           {c.phone ? (() => {
                             const phoneOk = isValidArgentinePhone(c.phone);
@@ -967,7 +968,19 @@ const SemilleroPage = () => {
                                 )}
                               </div>
                             );
-                          })() : <span className="text-[11px] text-muted-foreground">—</span>}
+                          })() : (
+                            <div className="flex items-center justify-end gap-1">
+                              {canSendWhatsapp() && (
+                                <span
+                                  className="flex items-center gap-0.5 shrink-0 text-red-500 cursor-not-allowed"
+                                  title="Sin teléfono cargado"
+                                >
+                                  <span className="text-[10px] font-medium">Enviar</span>
+                                  <WhatsAppIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Responsable */}
