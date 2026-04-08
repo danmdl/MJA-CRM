@@ -673,6 +673,16 @@ const SemilleroPage = () => {
           <Button
             size="sm"
             variant="outline"
+            onClick={() => { setBulkAssignTargetId(''); setBulkAssignOpen(true); }}
+            className="gap-1.5"
+          >
+            <Users className="h-4 w-4" /> Asignar Responsable ({visibleSelectedCount})
+          </Button>
+        )}
+        {visibleSelectedCount > 0 && canEditDeleteContacts() && (
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setBulkDeleteOpen(true)}
             className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
           >
@@ -928,7 +938,7 @@ const SemilleroPage = () => {
                                     });
                                   }}
                                 >
-                                  <span className="hidden sm:inline text-[10px] font-medium">Enviar</span>
+                                  <span className="text-[10px] font-medium">Enviar</span>
                                   <WhatsAppIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5 group-hover:scale-110 transition-transform" />
                                 </button>
                               )}

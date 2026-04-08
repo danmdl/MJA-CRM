@@ -273,12 +273,11 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
           </div>
         )}
 
-        {/* MIDDLE: Composer (left) + Preview (right). On mobile the preview
-            is hidden entirely - the composer takes the full width and the
-            textarea is reachable/typeable. On desktop the side-by-side layout
-            comes back at md+ breakpoint. */}
+        {/* MIDDLE: Composer (top on mobile / left on desktop) + Preview (bottom on mobile / right on desktop).
+            On mobile both stack vertically with the preview compacted so it doesn't dominate the screen.
+            On desktop they sit side by side. */}
         <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-visible">
-          {/* LEFT: Message composer */}
+          {/* Message composer */}
           <div className="flex-1 p-4 flex flex-col gap-2 min-w-0 md:border-r">
             <div className="flex items-center justify-between shrink-0">
               <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Mensaje</label>
@@ -289,17 +288,18 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={canUseTemplates() ? 'Escribí tu mensaje o elegí una plantilla arriba' : 'Escribí tu mensaje'}
-              className="flex-1 text-sm resize-none min-h-[180px] md:min-h-[220px] font-mono"
+              className="flex-1 text-sm resize-none min-h-[140px] md:min-h-[220px] font-mono"
             />
           </div>
 
-          {/* RIGHT: Live preview - hidden on mobile, visible md+ */}
-          <div className="hidden md:flex w-[360px] shrink-0 p-4 flex-col gap-2 bg-muted/20 min-h-0">
+          {/* Live preview - on mobile this stacks below the composer (parent is flex-col),
+              on desktop it sits to the right (parent becomes flex-row at md+) */}
+          <div className="w-full md:w-[360px] shrink-0 p-4 flex flex-col gap-2 bg-muted/20 min-h-0 border-t md:border-t-0">
             <div className="flex items-center justify-between shrink-0">
               <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Vista previa</label>
               <span className="text-[10px] text-muted-foreground">como lo verá {contactFirstName || 'el contacto'}</span>
             </div>
-            <div className="flex-1 overflow-y-auto rounded-md border bg-background p-3 text-sm whitespace-pre-wrap min-h-[220px]">
+            <div className="flex-1 overflow-y-auto rounded-md border bg-background p-3 text-sm whitespace-pre-wrap max-h-[35vh] md:max-h-none min-h-[80px] md:min-h-[220px]">
               {message.trim() ? replaceVars(message) : <span className="text-muted-foreground italic">El mensaje resuelto aparecerá acá...</span>}
               {selectedImageUrl && (
                 <div className="mt-3 pt-3 border-t border-border/60">
