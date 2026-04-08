@@ -477,7 +477,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   return (
   <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
-      <DialogContent hideCloseButton className="sm:max-w-[1300px] max-h-[90vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
+      <DialogContent hideCloseButton className="w-[96vw] sm:max-w-[1300px] max-h-[92vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
         {/* Close X button — top right */}
         <button
           onClick={() => safeClose()}
@@ -487,11 +487,11 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
           <X className="h-4 w-4 text-muted-foreground" />
         </button>
         {contact && (
-          <div className="flex h-full max-h-[88vh]">
+          <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
             {/* LEFT: Form fields */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
               {/* Row 1: Nombre / Apellido / Teléfono */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
                 <ContactInfoField label="Apellido" value={contact.last_name || ''} onChange={(v) => setContact({ ...contact, last_name: v || null })} />
                 <CountryPhoneInput label="Teléfono" value={contact.phone || ''} onChange={(v) => setContact({ ...contact, phone: v || null })} />
@@ -565,7 +565,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
 
               {/* Row 4: Apartamento / Barrio / Fecha nacimiento */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ContactInfoField label="Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
                 <ContactInfoField label="Barrio" value={contact.barrio || ''} onChange={(v) => setContact({ ...contact, barrio: v || null })} />
                 <div className="space-y-1">
@@ -595,7 +595,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
 
               {/* Row 4b: Sexo / Estado civil */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sexo</label>
                   <select
@@ -629,7 +629,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
 
               {/* Row 5: Estado / Célula / Líder */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estado</label>
                   <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={contact.estado_seguimiento || 'nuevo'} onChange={(e) => setContact({ ...contact, estado_seguimiento: e.target.value })}>
@@ -664,7 +664,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </div>
 
               {/* Observaciones / Pedido de oración */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observaciones</label>
                   <textarea
@@ -850,7 +850,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             </div>
 
             {/* RIGHT: Sidebar — Registros (top) + Historial (bottom) */}
-            <div className="w-[320px] flex-shrink-0 border-l border-border bg-muted/30 flex flex-col overflow-hidden">
+            <div className="w-full md:w-[320px] md:flex-shrink-0 border-t md:border-t-0 md:border-l border-border bg-muted/30 flex flex-col overflow-hidden max-h-[50vh] md:max-h-none">
               {/* Top half: Contact logs */}
               <div className="flex-1 overflow-y-auto p-4 border-b border-border flex flex-col">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Registros de contacto</p>
