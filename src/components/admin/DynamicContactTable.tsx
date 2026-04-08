@@ -244,7 +244,7 @@ const TableCellContent = ({
               target="_blank"
               rel="noreferrer"
               className={`text-xs px-2 py-1 rounded border ${waNumber ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
-              onClick={(e) => { if (!waNumber) e.preventDefault(); }}
+              onClick={(e) => { if (!waNumber) { e.preventDefault(); return; } logWhatsAppSendQuick(contact.id); }}
             >
               Enviar Whatsapp
             </a>
@@ -307,6 +307,33 @@ const DynamicContactTable = ({
 }: { churchId?: string; searchTerm?: string; filterField?: string | null; ageGroup?: string | null; cuerdaFilter?: string | null; useExternalToolbarContainer?: boolean; canEdit?: boolean; canDelete?: boolean; canAdd?: boolean }) => {
   logger.log('[DynamicContactTable] Component rendered', { churchId, searchTerm, filterField });
 
+  const queryClient = useQueryClient();
+
+  // Log a WhatsApp send to contact_logs via the add-contact-log edge function.
+  // Used for the bare wa.me links that don't go through the WhatsAppComposeDialog.
+  // Fire-and-forget so the WhatsApp tab opens without any perceived delay.
+  const logWhatsAppSendQuick = async (contactId: string) => {
+    if (!churchId) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({
+          contactId,
+          churchId,
+          contact_date: today,
+          contact_method: 'WhatsApp',
+          notes: `WhatsApp enviado a las ${time} (sin plantilla).`,
+        }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['contact-logs-inline', contactId] });
+    } catch (e) { console.error('Failed to log WhatsApp send:', e); }
+  };
+
   const extendedContactFields = useMemo(() => [
     ...CONTACT_FIELDS,
     { key: 'cell.name', label: 'Célula', type: 'text' },
@@ -367,7 +394,6 @@ const DynamicContactTable = ({
 
   const activeFilterCount = Object.values(columnFilters).filter(v => v.length > 0).length;
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
   const computeAge = (dob?: string | null) => {
     if (!dob) return null;
@@ -598,7 +624,7 @@ const DynamicContactTable = ({
           target="_blank"
           rel="noreferrer"
           className={`text-xs px-2 py-1 rounded border ${wa ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
-          onClick={(e) => { if (!wa) e.preventDefault(); }}
+          onClick={(e) => { if (!wa) { e.preventDefault(); return; } logWhatsAppSendQuick(c.id); }}
           title="Enviar Whatsapp"
         >
           Whatsapp

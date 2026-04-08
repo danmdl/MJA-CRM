@@ -98,8 +98,14 @@ const TemplatesPage = lazyRetry(() => import("./pages/admin/TemplatesPage"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,  // Prevents re-fetching (and re-rendering) when user switches back to the tab
-      staleTime: 30_000,            // Data stays fresh for 30s
+      // Refetch when the user comes back to the tab so data stays fresh
+      // (e.g. after sending WhatsApp in a new tab, or coming back after editing
+      // something elsewhere). The user explicitly complained about having to
+      // refresh manually to see changes.
+      refetchOnWindowFocus: true,
+      // Short stale time so invalidations + refocus pull fresh data quickly,
+      // but not so short that we hammer the API on every render.
+      staleTime: 10_000,
     },
   },
 });

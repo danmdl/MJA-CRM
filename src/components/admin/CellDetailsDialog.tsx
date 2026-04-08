@@ -53,6 +53,28 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
   const [search, setSearch] = useState('');
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
 
+  // Log a WhatsApp send to contact_logs. Used for the bare wa.me link below.
+  const logWhatsAppSendQuick = async (contactId: string) => {
+    if (!churchId) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({
+          contactId,
+          churchId,
+          contact_date: today,
+          contact_method: 'WhatsApp',
+          notes: `WhatsApp enviado a las ${time} (sin plantilla).`,
+        }),
+      });
+    } catch (e) { console.error('Failed to log WhatsApp send:', e); }
+  };
+
   useEffect(() => {
     if (!open || !cellId) return;
 
@@ -208,7 +230,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
                                 target="_blank"
                                 rel="noreferrer"
                                 className={`text-xs px-2 py-1 rounded border ${waNumber ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
-                                onClick={(e) => { if (!waNumber) e.preventDefault(); }}
+                                onClick={(e) => { if (!waNumber) { e.preventDefault(); return; } logWhatsAppSendQuick(a.id); }}
                               >
                                 Enviar Whatsapp
                               </a>

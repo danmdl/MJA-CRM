@@ -248,7 +248,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         }
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+        queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+        queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
+        queryClient.invalidateQueries({ queryKey: ['cuerdas-pool', churchId] });
         queryClient.invalidateQueries({ queryKey: ['historial'] });
+        queryClient.invalidateQueries({ queryKey: ['contact-logs-inline'] });
         if (keepOpen) {
           resetForm();
           setTimeout(() => firstNameRef.current?.focus(), 50);
