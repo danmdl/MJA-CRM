@@ -162,20 +162,53 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
     loadTemplates();
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!message.trim() || !contactPhone) return;
-    let resolvedMessage = replaceVars(message);
-    // Append the template image URL on its own paragraph so WhatsApp's link
-    // unfurling generates an inline preview card. The receiver sees the
-    // message text + an image preview as if the picture were attached.
-    if (selectedImageUrl) {
-      resolvedMessage = `${resolvedMessage}\n\n${selectedImageUrl}`;
-    }
+    const resolvedMessage = replaceVars(message);
     const cleanPhone = contactPhone.replace(/\D/g, '');
     // If the user has edited the template body, don't claim a template was used
     const templates_ = templates.find(t => t.name === selectedTemplateName);
     const templateActuallyUsed = templates_ && templates_.body === message ? selectedTemplateName : null;
+
+    // If the template has an image, copy it to the clipboard so the user can
+    // paste it directly into the WhatsApp chat as a real attachment. Appending
+    // the URL to the message body looks ugly and only sometimes generates a
+    // preview, so this is the more reliable path. Falls back gracefully if
+    // the browser doesn't support clipboard image writes (Safari iOS, etc).
+    let copiedImage = false;
+    if (selectedImageUrl) {
+      try {
+        const imgResponse = await fetch(selectedImageUrl);
+        const blob = await imgResponse.blob();
+        // Some clipboards reject non-png. Convert via canvas if needed.
+        if (blob.type === 'image/png' && navigator.clipboard && (window as any).ClipboardItem) {
+          await navigator.clipboard.write([new (window as any).ClipboardItem({ 'image/png': blob })]);
+          copiedImage = true;
+        } else if (navigator.clipboard && (window as any).ClipboardItem) {
+          // Convert to PNG via canvas
+          const bitmap = await createImageBitmap(blob);
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(bitmap, 0, 0);
+          const pngBlob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          if (pngBlob) {
+            await navigator.clipboard.write([new (window as any).ClipboardItem({ 'image/png': pngBlob })]);
+            copiedImage = true;
+          }
+        }
+      } catch (e) {
+        console.error('clipboard image copy failed', e);
+      }
+    }
+
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(resolvedMessage)}`, '_blank');
+    if (copiedImage) {
+      showSuccess('Imagen copiada. Pegala en el chat con Ctrl+V (o Cmd+V en Mac).');
+    } else if (selectedImageUrl) {
+      showError('No se pudo copiar la imagen al portapapeles. Adjuntala manualmente.');
+    }
     if (onSent) onSent(resolvedMessage, templateActuallyUsed);
     onOpenChange(false);
   };
@@ -269,7 +302,9 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                 <div className="mt-3 pt-3 border-t border-border/60">
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Imagen adjunta</div>
                   <img src={selectedImageUrl} alt="Adjunto" className="max-w-full rounded-md border" />
-                  <div className="text-[10px] text-muted-foreground mt-1">WhatsApp va a mostrar esta imagen como vista previa al final del mensaje.</div>
+                  <div className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
+                    Al hacer click en <strong>Enviar</strong>, esta imagen se va a copiar al portapapeles. Cuando se abra WhatsApp, pegala en el chat con <kbd className="px-1 py-0.5 rounded bg-muted text-[9px] font-mono">Ctrl+V</kbd> o <kbd className="px-1 py-0.5 rounded bg-muted text-[9px] font-mono">Cmd+V</kbd>.
+                  </div>
                 </div>
               )}
             </div>
