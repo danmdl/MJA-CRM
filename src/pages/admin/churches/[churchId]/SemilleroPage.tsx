@@ -383,7 +383,9 @@ const SemilleroPage = () => {
     if (filterCuerda) {
       filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
     }
-    if (filterResponsable) {
+    if (filterResponsable === '__none__') {
+      filtered = filtered.filter(c => !c.responsable_id);
+    } else if (filterResponsable) {
       filtered = filtered.filter(c => c.responsable_id === filterResponsable);
     }
     return filtered;
@@ -634,9 +636,16 @@ const SemilleroPage = () => {
         </select>
         <select className="h-8 text-xs border rounded px-2 bg-background" value={filterResponsable} onChange={e => setFilterResponsable(e.target.value)}>
           <option value="">Todos los responsables</option>
-          {(teamMembers || []).map(m => (
-            <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-          ))}
+          {session?.user?.id && (
+            <option value={session.user.id}>⭐ Mis contactos</option>
+          )}
+          <option value="__none__">Sin responsable</option>
+          <option disabled>──────────</option>
+          {(teamMembers || [])
+            .filter(m => m.id !== session?.user?.id)
+            .map(m => (
+              <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+            ))}
         </select>
         <div className="relative w-52 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
