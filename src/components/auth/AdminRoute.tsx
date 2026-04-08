@@ -35,22 +35,26 @@ const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Check if user has specific permission if required
+  // Check if user has specific permission if required.
+  // Send them to /login (not /) because /admin and /admin/anything would
+  // re-trigger this same guard and infinite-loop.
   if (requiredPermission && !hasPermission(requiredPermission)) {
     showError('No tienes permiso para acceder a esta página.');
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   // For admin routes: any authenticated user with ANY permission can access admin section.
-  // Users with zero permissions are redirected.
+  // Users with zero permissions are sent to /login.
+  // 'consolidador' was added to the role hierarchy and must be included here too,
+  // otherwise consolidadores would be locked out of /admin entirely.
   if (location.pathname.startsWith('/admin')) {
     const userRole = profile?.role;
-    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'conector', 'supervisor', 'anfitrion'].includes(userRole || '');
+    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'consolidador', 'conector', 'supervisor', 'anfitrion'].includes(userRole || '');
     const hasBroadAccess = canSeeAllChurches();
 
     if (!hasBroadAccess && !isChurchRole) {
       showError('No tienes permiso para acceder al panel de administración.');
-      return <Navigate to="/" replace />;
+      return <Navigate to="/login" replace />;
     }
   }
 

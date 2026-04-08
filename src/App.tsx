@@ -19,24 +19,20 @@ import PasswordChangeForm from "./components/auth/PasswordChangeForm";
 import OnboardingForm from "./components/auth/OnboardingForm";
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
-import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 
 // Sends users to their appropriate landing page based on role.
-// Admin/general → /admin/dashboard. Everyone else → /admin/churches.
+// - Admin/general (canSeeAllAnalytics) → /admin/dashboard
+// - Anyone else with a church_id → /admin/churches/<id>/overview (Resumen)
+// - Anyone else without a church_id (rare/misconfigured) → /admin/churches list
 const AdminRootRedirect = () => {
   const { canSeeAllAnalytics } = usePermissions();
   const { profile } = useSession();
 
-  // Admins/generals with global view → dashboard.
   if (canSeeAllAnalytics()) return <Navigate to="dashboard" replace />;
 
-  // Non-admin users that belong to a specific church → drop them straight into
-  // that church's Semillero. Skips the 'Ministerio' churches list which for a
-  // single-church user is just one extra click of friction. Falls back to the
-  // churches list only when the user has no church_id (rare/misconfigured).
   if (profile?.church_id) {
-    return <Navigate to={`churches/${profile.church_id}/pool`} replace />;
+    return <Navigate to={`churches/${profile.church_id}/overview`} replace />;
   }
   return <Navigate to="churches" replace />;
 };
@@ -149,7 +145,10 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
 
-      {/* User-specific routes, wrapped by PrivateRoute and UserLayout */}
+      {/* Root route: redirect to /admin so the AdminRootRedirect can pick the
+          right destination based on role. The old <Index /> 'Welcome' page was
+          deleted - it was a dead end that forced users to click before getting
+          into the actual app. */}
       <Route path="/" element={
         <PrivateRoute>
           <UserLayout>
@@ -157,7 +156,7 @@ const AppRoutes = () => {
           </UserLayout>
         </PrivateRoute>
       }>
-        <Route index element={<Index />} />
+        <Route index element={<Navigate to="/admin" replace />} />
         <Route path="profile" element={<Profile />} />
         <Route path="messages" element={<Messages />} />
       </Route>
