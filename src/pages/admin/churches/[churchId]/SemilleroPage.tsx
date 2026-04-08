@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -96,6 +96,9 @@ const SemilleroPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCuerda, setFilterCuerda] = useState<string>('');
   const [filterResponsable, setFilterResponsable] = useState<string>('');
+  // Sort state: which column and direction. null = default order from query.
+  const [sortBy, setSortBy] = useState<'nombre' | 'fecha' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   // Track whether we've applied the per-user filter defaults yet, so we only
   // do it once per session and don't overwrite user changes on re-renders.
   const filterDefaultsAppliedRef = useRef(false);
@@ -428,8 +431,33 @@ const SemilleroPage = () => {
     } else if (filterResponsable) {
       filtered = filtered.filter(c => c.responsable_id === filterResponsable);
     }
+    // Sorting - applied last so it ranks the final filtered set
+    if (sortBy === 'nombre') {
+      filtered = [...filtered].sort((a, b) => {
+        const an = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
+        const bn = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+        return sortDir === 'asc' ? an.localeCompare(bn) : bn.localeCompare(an);
+      });
+    } else if (sortBy === 'fecha') {
+      filtered = [...filtered].sort((a, b) => {
+        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return sortDir === 'asc' ? at - bt : bt - at;
+      });
+    }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero, sortBy, sortDir]);
+
+  // How many of the currently-selected contacts are actually visible in the
+  // filtered view. Prevents the "Seleccionados" counter from showing stale
+  // ghost numbers when filters/refresh change which rows are on screen.
+  const visibleSelectedCount = useMemo(() => {
+    if (selectedIds.size === 0) return 0;
+    const visibleIds = new Set(filteredContacts.map(c => c.id));
+    let count = 0;
+    selectedIds.forEach(id => { if (visibleIds.has(id)) count++; });
+    return count;
+  }, [selectedIds, filteredContacts]);
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
@@ -608,11 +636,11 @@ const SemilleroPage = () => {
             </div>
           </CardContent>
         </Card>
-        {selectedIds.size > 0 && (
+        {visibleSelectedCount > 0 && (
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="pt-3 pb-3 px-4">
               <p className="text-[11px] text-primary">Seleccionados</p>
-              <p className="text-2xl font-bold tabular-nums text-primary">{selectedIds.size}</p>
+              <p className="text-2xl font-bold tabular-nums text-primary">{visibleSelectedCount}</p>
             </CardContent>
           </Card>
         )}
@@ -633,14 +661,14 @@ const SemilleroPage = () => {
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
           </Button>
         )}
-        {selectedIds.size > 0 && canEditDeleteContacts() && (
+        {visibleSelectedCount > 0 && canEditDeleteContacts() && (
           <Button
             size="sm"
             variant="outline"
             onClick={() => setBulkDeleteOpen(true)}
             className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
           >
-            <Trash2 className="h-4 w-4" /> Eliminar ({selectedIds.size})
+            <Trash2 className="h-4 w-4" /> Eliminar ({visibleSelectedCount})
           </Button>
         )}
         {canImportCsv() && (
@@ -718,7 +746,23 @@ const SemilleroPage = () => {
                         else setSelectedIds(new Set());
                       }} />
                     </th>
-                    <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
+                    <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                        onClick={() => {
+                          if (sortBy !== 'nombre') { setSortBy('nombre'); setSortDir('asc'); }
+                          else if (sortDir === 'asc') { setSortDir('desc'); }
+                          else { setSortBy(null); }
+                        }}
+                        title="Ordenar por nombre"
+                      >
+                        Nombre
+                        {sortBy === 'nombre'
+                          ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />)
+                          : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                      </button>
+                    </ResizableHeader>
                     <ResizableHeader width={colWidths.telefono} onResize={resizeCol('telefono')}>Teléfono</ResizableHeader>
                     <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>
                       <DropdownMenu>
@@ -760,7 +804,23 @@ const SemilleroPage = () => {
                       </DropdownMenu>
                     </ResizableHeader>
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
-                    <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>Fecha</ResizableHeader>
+                    <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                        onClick={() => {
+                          if (sortBy !== 'fecha') { setSortBy('fecha'); setSortDir('desc'); }
+                          else if (sortDir === 'desc') { setSortDir('asc'); }
+                          else { setSortBy(null); }
+                        }}
+                        title="Ordenar por fecha"
+                      >
+                        Fecha
+                        {sortBy === 'fecha'
+                          ? (sortDir === 'desc' ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />)
+                          : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                      </button>
+                    </ResizableHeader>
                     {isUnassignedView && <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>Sugerencia</ResizableHeader>}
                     {isUnassignedView && canAssignContacts() && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                   </tr>
@@ -1284,10 +1344,10 @@ const SemilleroPage = () => {
       {/* Floating action bar - appears at bottom of viewport when contacts are selected.
           Solves the problem of having to scroll back to the top to find the delete
           button when the user selects a contact at the bottom of a long list. */}
-      {selectedIds.size > 0 && (
+      {visibleSelectedCount > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-3 rounded-xl bg-background border-2 border-primary/40 shadow-2xl backdrop-blur-sm" style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4), 0 0 20px rgba(255,194,51,0.2)' }}>
           <span className="text-sm font-medium">
-            <strong className="text-primary">{selectedIds.size}</strong> seleccionado{selectedIds.size === 1 ? '' : 's'}
+            <strong className="text-primary">{visibleSelectedCount}</strong> seleccionado{visibleSelectedCount === 1 ? '' : 's'}
           </span>
           <button
             onClick={() => setSelectedIds(new Set())}
