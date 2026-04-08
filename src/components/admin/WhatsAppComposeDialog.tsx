@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
+import { normalizeArgentinePhoneForWhatsapp } from '@/lib/phone-validation';
 import { showSuccess, showError } from '@/utils/toast';
 import { Save, X, Star } from 'lucide-react';
 
@@ -165,7 +166,14 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const handleSend = async () => {
     if (!message.trim() || !contactPhone) return;
     const resolvedMessage = replaceVars(message);
-    const cleanPhone = contactPhone.replace(/\D/g, '');
+    // Normalize to wa.me international format (549 + area + number for AR mobiles).
+    // Without this, a bare "11xxxxxxxx" gets interpreted by WhatsApp as a US +1 number
+    // and fails with "no es un número de teléfono válido".
+    const waPhone = normalizeArgentinePhoneForWhatsapp(contactPhone);
+    if (!waPhone) {
+      showError('El número de teléfono del contacto es inválido o está incompleto.');
+      return;
+    }
     // If the user has edited the template body, don't claim a template was used
     const templates_ = templates.find(t => t.name === selectedTemplateName);
     const templateActuallyUsed = templates_ && templates_.body === message ? selectedTemplateName : null;
@@ -203,7 +211,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
       }
     }
 
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(resolvedMessage)}`, '_blank');
+    window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(resolvedMessage)}`, '_blank');
     if (copiedImage) {
       showSuccess('Imagen copiada. Pegala en el chat con Ctrl+V (o Cmd+V en Mac).');
     } else if (selectedImageUrl) {

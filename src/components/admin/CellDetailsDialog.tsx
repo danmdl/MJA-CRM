@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import ContactProfileDialog from './ContactProfileDialog';
 import { normalize } from '@/lib/normalize';
+import { normalizeArgentinePhoneForWhatsapp } from '@/lib/phone-validation';
 
 interface CellDetailsDialogProps {
   open: boolean;
@@ -210,7 +211,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
                       <div className="p-4 text-sm text-muted-foreground">No hay asistentes.</div>
                     ) : (
                       filteredAttendees.map(a => {
-                        const waNumber = (a.phone || '').replace(/[^\d]/g, '');
+                        const waNumber = normalizeArgentinePhoneForWhatsapp(a.phone);
                         const mapQuery = encodeURIComponent(a.address || '');
                         return (
                           <div key={a.id} className="p-3 hover:bg-muted/50 transition-colors">
