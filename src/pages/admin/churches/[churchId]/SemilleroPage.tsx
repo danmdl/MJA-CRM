@@ -54,6 +54,7 @@ interface Contact {
   sexo?: string | null;
   is_external?: boolean;
   responsable_id?: string | null;
+  created_by?: string | null;
   created_at?: string | null;
 }
 
@@ -168,6 +169,21 @@ const SemilleroPage = () => {
     enabled: !!churchId,
   });
 
+  // All profiles (used to resolve creator names; creators may be admins/generals
+  // who don't belong to a specific church and so aren't in teamMembers).
+  const { data: allProfiles } = useQuery<{ id: string; first_name: string; last_name: string }[]>({
+    queryKey: ['all-profiles-creator-lookup'],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('id, first_name, last_name');
+      return data || [];
+    },
+  });
+  const profileById = React.useMemo(() => {
+    const m = new Map<string, { first_name: string; last_name: string }>();
+    (allProfiles || []).forEach(p => m.set(p.id, p));
+    return m;
+  }, [allProfiles]);
+
   const { data: cells } = useQuery<Cell[]>({
     queryKey: ['cells-pool', churchId],
     queryFn: async () => {
@@ -181,7 +197,7 @@ const SemilleroPage = () => {
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
       let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, is_external, responsable_id, created_at')
+        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, is_external, responsable_id, created_by, created_at')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
       if (profile?.role === 'conector') {
@@ -384,9 +400,9 @@ const SemilleroPage = () => {
       filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
     }
     if (filterResponsable === '__none__') {
-      filtered = filtered.filter(c => !c.responsable_id);
+      filtered = filtered.filter(c => !c.created_by);
     } else if (filterResponsable) {
-      filtered = filtered.filter(c => c.responsable_id === filterResponsable);
+      filtered = filtered.filter(c => c.created_by === filterResponsable);
     }
     return filtered;
   }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero]);
@@ -684,13 +700,20 @@ const SemilleroPage = () => {
                             Sin responsable
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          {(teamMembers || [])
-                            .filter(m => m.id !== session?.user?.id)
-                            .map(m => (
-                              <DropdownMenuItem key={m.id} onClick={() => setFilterResponsable(m.id)} className={filterResponsable === m.id ? 'bg-accent' : ''}>
-                                {m.first_name} {m.last_name}
+                          {(() => {
+                            // Build unique creator list from current contacts
+                            const creatorIds = new Set<string>();
+                            (allContacts || []).forEach(c => { if (c.created_by) creatorIds.add(c.created_by); });
+                            const creators = Array.from(creatorIds)
+                              .map(id => ({ id, profile: profileById.get(id) }))
+                              .filter(c => c.profile && c.id !== session?.user?.id)
+                              .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
+                            return creators.map(c => (
+                              <DropdownMenuItem key={c.id} onClick={() => setFilterResponsable(c.id)} className={filterResponsable === c.id ? 'bg-accent' : ''}>
+                                {c.profile!.first_name} {c.profile!.last_name}
                               </DropdownMenuItem>
-                            ))}
+                            ));
+                          })()}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </ResizableHeader>
@@ -742,20 +765,11 @@ const SemilleroPage = () => {
 
                         {/* Responsable */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.responsable }}>
-                          <select
-                            className="text-xs bg-transparent border border-transparent hover:border-input rounded px-1 py-0.5 w-full cursor-pointer"
-                            value={c.responsable_id || ''}
-                            onChange={async (e) => {
-                              const val = e.target.value || null;
-                              await supabase.from('contacts').update({ responsable_id: val }).eq('id', c.id);
-                              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                            }}
-                          >
-                            <option value="">Sin responsable</option>
-                            {(teamMembers || []).map(m => (
-                              <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                            ))}
-                          </select>
+                          {(() => {
+                            const creator = c.created_by ? profileById.get(c.created_by) : null;
+                            if (!creator) return <span className="text-[11px] text-muted-foreground italic">—</span>;
+                            return <span className="text-[11px] text-foreground truncate block">{creator.first_name} {creator.last_name}</span>;
+                          })()}
                         </td>
 
                         {/* Teléfono + WhatsApp */}

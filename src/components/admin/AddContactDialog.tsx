@@ -196,7 +196,6 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           cell_id: cellId,
           church_id: churchId,
           created_by: session?.user?.id || null,
-          responsable_id: session?.user?.id || null,
           date_of_birth: dateOfBirth || null,
           edad: edad ? parseInt(edad) : null,
           fecha_contacto: fechaContacto || null,
