@@ -215,7 +215,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[960px] max-h-[85vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="w-[96vw] sm:max-w-[960px] max-h-[92vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="px-5 pt-4 pb-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <WhatsAppIcon className="h-5 w-5 text-green-500" />
@@ -273,10 +273,13 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
           </div>
         )}
 
-        {/* MIDDLE: Composer (left) + Preview (right) */}
-        <div className="flex flex-1 min-h-0">
+        {/* MIDDLE: Composer (left) + Preview (right). On mobile the preview
+            is hidden entirely - the composer takes the full width and the
+            textarea is reachable/typeable. On desktop the side-by-side layout
+            comes back at md+ breakpoint. */}
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-visible">
           {/* LEFT: Message composer */}
-          <div className="flex-1 p-4 flex flex-col gap-2 min-w-0 border-r">
+          <div className="flex-1 p-4 flex flex-col gap-2 min-w-0 md:border-r">
             <div className="flex items-center justify-between shrink-0">
               <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Mensaje</label>
               <span className="text-[10px] text-muted-foreground">{message.length} caracteres</span>
@@ -286,12 +289,12 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={canUseTemplates() ? 'Escribí tu mensaje o elegí una plantilla arriba' : 'Escribí tu mensaje'}
-              className="flex-1 text-sm resize-none min-h-[220px] font-mono"
+              className="flex-1 text-sm resize-none min-h-[180px] md:min-h-[220px] font-mono"
             />
           </div>
 
-          {/* RIGHT: Live preview */}
-          <div className="w-[360px] shrink-0 p-4 flex flex-col gap-2 bg-muted/20 min-h-0">
+          {/* RIGHT: Live preview - hidden on mobile, visible md+ */}
+          <div className="hidden md:flex w-[360px] shrink-0 p-4 flex-col gap-2 bg-muted/20 min-h-0">
             <div className="flex items-center justify-between shrink-0">
               <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Vista previa</label>
               <span className="text-[10px] text-muted-foreground">como lo verá {contactFirstName || 'el contacto'}</span>

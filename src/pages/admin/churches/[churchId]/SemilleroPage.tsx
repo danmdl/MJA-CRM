@@ -125,6 +125,14 @@ const SemilleroPage = () => {
   } | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Track the index (within filteredContacts) of the last checkbox the user
+  // clicked, so shift-click can select the range between two clicks. Same
+  // pattern as Gmail/file managers.
+  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null);
+  // Bulk-assign-responsable dialog state
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkAssignTargetId, setBulkAssignTargetId] = useState<string>('');
+  const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
     cuerda: 34, nombre: 130, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145,
@@ -837,7 +845,7 @@ const SemilleroPage = () => {
                       </td>
                     </tr>
                   )}
-                  {filteredContacts.map(c => {
+                  {filteredContacts.map((c, idx) => {
                     const sug = suggestions[c.id];
                     const sugCell = sug?.cell;
                     const sugCuerda = sug?.cuerda;
@@ -848,13 +856,43 @@ const SemilleroPage = () => {
 
                     return (
                       <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
-                        {/* Selection checkbox */}
+                        {/* Selection checkbox - supports shift-click range select */}
                         <td className="px-1 py-1.5 w-6">
-                          <input type="checkbox" className="rounded border-input" checked={selectedIds.has(c.id)} onChange={(e) => {
-                            const next = new Set(selectedIds);
-                            if (e.target.checked) next.add(c.id); else next.delete(c.id);
-                            setSelectedIds(next);
-                          }} />
+                          <input
+                            type="checkbox"
+                            className="rounded border-input"
+                            checked={selectedIds.has(c.id)}
+                            onClick={(e) => {
+                              // Shift-click: select the range from lastClickedIdx to current idx.
+                              // Range is INCLUSIVE on both ends. The action (select vs deselect)
+                              // matches the new state of the clicked checkbox, so shift-clicking
+                              // an unchecked one selects the range, and shift-clicking a checked
+                              // one deselects the range.
+                              const isShift = (e as any).nativeEvent?.shiftKey;
+                              if (isShift && lastClickedIdx !== null && lastClickedIdx !== idx) {
+                                e.preventDefault(); // we'll set the state ourselves
+                                const start = Math.min(lastClickedIdx, idx);
+                                const end = Math.max(lastClickedIdx, idx);
+                                const next = new Set(selectedIds);
+                                const willSelect = !selectedIds.has(c.id); // toggle direction based on the clicked row
+                                for (let i = start; i <= end; i++) {
+                                  const rowId = filteredContacts[i]?.id;
+                                  if (!rowId) continue;
+                                  if (willSelect) next.add(rowId); else next.delete(rowId);
+                                }
+                                setSelectedIds(next);
+                                setLastClickedIdx(idx);
+                              }
+                            }}
+                            onChange={(e) => {
+                              // Skip if the click handler already handled it (shift-click case).
+                              // Otherwise normal toggle behavior.
+                              const next = new Set(selectedIds);
+                              if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                              setSelectedIds(next);
+                              setLastClickedIdx(idx);
+                            }}
+                          />
                         </td>
 
                         {/* Nombre (con ojo) */}
@@ -870,11 +908,11 @@ const SemilleroPage = () => {
                           </Tooltip>
                         </td>
 
-                        {/* Teléfono + WhatsApp */}
+                        {/* Teléfono + WhatsApp - on mobile we hide the number text and keep just the WhatsApp button to save horizontal space */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.telefono }}>
                           {c.phone ? (
                             <div className="flex items-center justify-between gap-1">
-                              <span className="text-[11px] text-foreground tabular-nums font-medium truncate">{c.phone}</span>
+                              <span className="hidden sm:inline text-[11px] text-foreground tabular-nums font-medium truncate">{c.phone}</span>
                               {canSendWhatsapp() && (
                                 <button
                                   className="flex items-center gap-0.5 text-green-500 hover:text-green-400 shrink-0 group"
@@ -890,8 +928,8 @@ const SemilleroPage = () => {
                                     });
                                   }}
                                 >
-                                  <span className="text-[10px] font-medium">Enviar</span>
-                                  <WhatsAppIcon className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" />
+                                  <span className="hidden sm:inline text-[10px] font-medium">Enviar</span>
+                                  <WhatsAppIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5 group-hover:scale-110 transition-transform" />
                                 </button>
                               )}
                             </div>
@@ -1345,7 +1383,7 @@ const SemilleroPage = () => {
           Solves the problem of having to scroll back to the top to find the delete
           button when the user selects a contact at the bottom of a long list. */}
       {visibleSelectedCount > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-3 rounded-xl bg-background border-2 border-primary/40 shadow-2xl backdrop-blur-sm" style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4), 0 0 20px rgba(255,194,51,0.2)' }}>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex flex-wrap items-center justify-center gap-2 px-4 py-3 rounded-xl bg-background border-2 border-primary/40 shadow-2xl backdrop-blur-sm max-w-[95vw]" style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4), 0 0 20px rgba(255,194,51,0.2)' }}>
           <span className="text-sm font-medium">
             <strong className="text-primary">{visibleSelectedCount}</strong> seleccionado{visibleSelectedCount === 1 ? '' : 's'}
           </span>
@@ -1359,6 +1397,16 @@ const SemilleroPage = () => {
             <Button
               size="sm"
               variant="outline"
+              onClick={() => { setBulkAssignTargetId(''); setBulkAssignOpen(true); }}
+              className="gap-1.5"
+            >
+              <Users className="h-4 w-4" /> Asignar Responsable
+            </Button>
+          )}
+          {canEditDeleteContacts() && (
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => setBulkDeleteOpen(true)}
               className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
             >
@@ -1367,6 +1415,65 @@ const SemilleroPage = () => {
           )}
         </div>
       )}
+
+      {/* Bulk-assign Responsable dialog */}
+      <Dialog open={bulkAssignOpen} onOpenChange={(o) => { if (!o && !bulkAssigning) setBulkAssignOpen(false); }}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Asignar Responsable</DialogTitle>
+            <DialogDescription>
+              Vas a asignar un responsable a <strong>{visibleSelectedCount}</strong> contacto{visibleSelectedCount === 1 ? '' : 's'}.
+              Esto va a sobreescribir el responsable actual.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nuevo responsable</label>
+            <select
+              className="w-full h-9 text-sm border rounded px-2 bg-background"
+              value={bulkAssignTargetId}
+              onChange={(e) => setBulkAssignTargetId(e.target.value)}
+              disabled={bulkAssigning}
+            >
+              <option value="">Seleccionar responsable...</option>
+              <option value="__none__">— Sin responsable (limpiar)</option>
+              {(teamMembers || [])
+                .filter(m => m.id)
+                .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
+                .map(m => (
+                  <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+                ))}
+            </select>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setBulkAssignOpen(false)} disabled={bulkAssigning}>Cancelar</Button>
+            <Button
+              disabled={bulkAssigning || !bulkAssignTargetId}
+              onClick={async () => {
+                if (!bulkAssignTargetId) return;
+                setBulkAssigning(true);
+                // Only act on the contacts that are actually visible in the
+                // current filtered view, matching the visibleSelectedCount UI.
+                const visibleIds = new Set(filteredContacts.map(c => c.id));
+                const ids = Array.from(selectedIds).filter(id => visibleIds.has(id));
+                const newResponsableId = bulkAssignTargetId === '__none__' ? null : bulkAssignTargetId;
+                const { error } = await supabase
+                  .from('contacts')
+                  .update({ responsable_id: newResponsableId })
+                  .in('id', ids);
+                setBulkAssigning(false);
+                if (error) { showError(error.message); return; }
+                showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} actualizado${ids.length === 1 ? '' : 's'}.`);
+                setSelectedIds(new Set());
+                setBulkAssignOpen(false);
+                setBulkAssignTargetId('');
+                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+              }}
+            >
+              {bulkAssigning ? 'Asignando...' : 'Confirmar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

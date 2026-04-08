@@ -26,7 +26,19 @@ import Profile from "./pages/Profile";
 // Admin/general → /admin/dashboard. Everyone else → /admin/churches.
 const AdminRootRedirect = () => {
   const { canSeeAllAnalytics } = usePermissions();
-  return <Navigate to={canSeeAllAnalytics() ? 'dashboard' : 'churches'} replace />;
+  const { profile } = useSession();
+
+  // Admins/generals with global view → dashboard.
+  if (canSeeAllAnalytics()) return <Navigate to="dashboard" replace />;
+
+  // Non-admin users that belong to a specific church → drop them straight into
+  // that church's Semillero. Skips the 'Ministerio' churches list which for a
+  // single-church user is just one extra click of friction. Falls back to the
+  // churches list only when the user has no church_id (rare/misconfigured).
+  if (profile?.church_id) {
+    return <Navigate to={`churches/${profile.church_id}/pool`} replace />;
+  }
+  return <Navigate to="churches" replace />;
 };
 
 // Guards the dashboard route - only admins/generals can access.
