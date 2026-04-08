@@ -21,6 +21,20 @@ import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 
+// Sends users to their appropriate landing page based on role.
+// Admin/general → /admin/dashboard. Everyone else → /admin/churches.
+const AdminRootRedirect = () => {
+  const { canSeeAllAnalytics } = usePermissions();
+  return <Navigate to={canSeeAllAnalytics() ? 'dashboard' : 'churches'} replace />;
+};
+
+// Guards the dashboard route - only admins/generals can access.
+const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
+  const { canSeeAllAnalytics } = usePermissions();
+  if (!canSeeAllAnalytics()) return <Navigate to="/admin/churches" replace />;
+  return <>{children}</>;
+};
+
 // Error boundary: catches chunk load failures and auto-reloads
 class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; isRetrying: boolean }> {
   constructor(props: any) { super(props); this.state = { hasError: false, isRetrying: false }; }
@@ -135,8 +149,8 @@ const AppRoutes = () => {
           <AdminLayout />
         </AdminRoute>
       }>
-        <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route index element={<AdminRootRedirect />} />
+        <Route path="dashboard" element={<DashboardGuard><AdminDashboard /></DashboardGuard>} />
         <Route path="churches" element={<ChurchesPage />} />
         <Route path="login-management" element={<LoginManagementPage />} />
           <Route path="logs" element={<LogsPage />} />
