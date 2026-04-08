@@ -676,7 +676,6 @@ const SemilleroPage = () => {
                         else setSelectedIds(new Set());
                       }} />
                     </th>
-                    <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>Cuerda</ResizableHeader>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
                     <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>
                       <DropdownMenu>
@@ -743,11 +742,6 @@ const SemilleroPage = () => {
                             if (e.target.checked) next.add(c.id); else next.delete(c.id);
                             setSelectedIds(next);
                           }} />
-                        </td>
-
-                        {/* Cuerda */}
-                        <td className="px-1.5 py-1.5 text-xs font-mono text-muted-foreground text-center" style={{ width: colWidths.cuerda, maxWidth: colWidths.cuerda }}>
-                          {c.numero_cuerda || '—'}
                         </td>
 
                         {/* Nombre (con ojo) */}
