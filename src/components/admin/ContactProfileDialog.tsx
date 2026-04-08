@@ -604,8 +604,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     onChange={(e) => setContact({ ...contact, sexo: e.target.value || null })}
                   >
                     <option value="">Sin especificar</option>
-                    <option value="masculino">Masculino</option>
-                    <option value="femenino">Femenino</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Femenino">Femenino</option>
+                    <option value="No brindó información">No brindó información</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -616,11 +617,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     onChange={(e) => setContact({ ...contact, estado_civil: e.target.value || null })}
                   >
                     <option value="">Sin especificar</option>
-                    <option value="soltero">Soltero/a</option>
-                    <option value="casado">Casado/a</option>
-                    <option value="divorciado">Divorciado/a</option>
-                    <option value="viudo">Viudo/a</option>
-                    <option value="union_libre">Unión libre</option>
+                    <option value="Soltero/a">Soltero/a</option>
+                    <option value="Casado/a">Casado/a</option>
+                    <option value="Divorciado/a">Divorciado/a</option>
+                    <option value="Viudo/a">Viudo/a</option>
+                    <option value="Unión libre">Unión libre</option>
+                    <option value="No brindó información">No brindó información</option>
                   </select>
                 </div>
                 <div />

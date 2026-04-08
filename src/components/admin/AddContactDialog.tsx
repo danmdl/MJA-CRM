@@ -438,8 +438,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 disabled={loading}
               >
                 <option value="none">Sin especificar</option>
-                <option value="masculino">Masculino</option>
-                <option value="femenino">Femenino</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Femenino">Femenino</option>
               </select>
             </div>
 
