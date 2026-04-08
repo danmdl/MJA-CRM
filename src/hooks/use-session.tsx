@@ -13,6 +13,7 @@ interface UserProfile {
   role: UserRole;
   church_id: string | null;
   numero_cuerda: string | null;
+  profile_completed: boolean;
 }
 
 interface SessionContextType {

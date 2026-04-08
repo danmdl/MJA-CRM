@@ -14,6 +14,7 @@ interface UserProfile {
   role: RoleKey;
   church_id: string | null;
   numero_cuerda: string | null;
+  profile_completed: boolean;
 }
 
 interface SessionProviderProps {
@@ -26,7 +27,16 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
-  const clearPasswordSetup = () => setNeedsPasswordSetup(false);
+  const clearPasswordSetup = () => {
+    setNeedsPasswordSetup(false);
+    // Strip the invite/recovery hash from the URL so refreshing the page
+    // doesn't reopen the onboarding screen.
+    if (typeof window !== 'undefined' && window.location.hash) {
+      try {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch { /* ignore */ }
+    }
+  };
 
   // Check if any cell's leader_name matches this profile's name
   const checkLeaderMatches = async (profileId: string, firstName: string, lastName: string | null, churchId: string) => {
@@ -68,11 +78,9 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   };
 
   useEffect(() => {
-    // Detect invite link: Supabase puts type=invite in the URL hash
-    const hash = window.location.hash;
-    if (hash.includes('type=invite') || hash.includes('type=signup') || hash.includes('type=recovery')) {
-      setNeedsPasswordSetup(true);
-    }
+    // Note: invite-link detection now lives inside fetchProfile so we can also
+    // check whether the user has already completed onboarding (profile_completed).
+    // Re-clicking an old invite link no longer reopens the password-setup screen.
 
     let isInitialLoad = true;
 
@@ -80,7 +88,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
       if (currentSession) {
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, role, church_id, numero_cuerda')
+          .select('id, first_name, last_name, email, role, church_id, numero_cuerda, profile_completed')
           .eq('id', currentSession.user.id)
           .single();
 
@@ -90,6 +98,17 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
             email: currentSession.user.email ?? null,
           } as UserProfile;
           setProfile(fullProfile);
+
+          // Detect users who arrived via an invite/recovery link AND haven't
+          // completed onboarding yet. We do NOT want to show the password-setup
+          // screen to a user who has already finished onboarding and is just
+          // re-clicking an old invite link from their inbox - that was the
+          // backdoor that let them keep changing their password.
+          const hash = window.location.hash;
+          const isInviteLink = hash.includes('type=invite') || hash.includes('type=signup') || hash.includes('type=recovery');
+          if (isInviteLink && !profileData.profile_completed) {
+            setNeedsPasswordSetup(true);
+          }
 
           // Check for leader name matches (runs silently in background)
           if (profileData.first_name && profileData.church_id) {

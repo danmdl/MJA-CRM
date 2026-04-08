@@ -70,9 +70,44 @@ serve(async (req) => {
           return new Response('Forbidden: Only administrators can assign admin or general roles.', { status: 403, headers: corsHeaders });
         }
 
+        // Fetch inviter's full name and church name so the onboarding screen can show
+        // a personalized welcome ("X te invitó a la cuerda Y en [iglesia]"). These
+        // are stored in raw_user_meta_data and read by the OnboardingForm component.
+        let inviterName: string | null = null;
+        let churchName: string | null = null;
+        try {
+          const { data: inviterProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', userAuth.user.id)
+            .single();
+          if (inviterProfile) {
+            inviterName = `${inviterProfile.first_name || ''} ${inviterProfile.last_name || ''}`.trim() || null;
+          }
+        } catch (e) { console.error('[admin-user-actions] Failed to fetch inviter profile', e); }
+        if (churchId) {
+          try {
+            const { data: churchRow } = await supabaseAdmin
+              .from('churches')
+              .select('name')
+              .eq('id', churchId)
+              .single();
+            if (churchRow) churchName = churchRow.name;
+          } catch (e) { console.error('[admin-user-actions] Failed to fetch church name', e); }
+        }
+
         const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${siteUrl}/login`,
-          data: { role: role || 'conector', church_id: churchId || null, first_name: first_name || null, last_name: last_name || null, phone: phone || null, numero_cuerda: numero_cuerda || null }
+          data: {
+            role: role || 'conector',
+            church_id: churchId || null,
+            first_name: first_name || null,
+            last_name: last_name || null,
+            phone: phone || null,
+            numero_cuerda: numero_cuerda || null,
+            invited_by_name: inviterName,
+            invited_to_church_name: churchName,
+          },
         });
 
         if (error) {

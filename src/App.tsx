@@ -16,6 +16,7 @@ import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import PasswordChangeForm from "./components/auth/PasswordChangeForm";
+import OnboardingForm from "./components/auth/OnboardingForm";
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";
 import Index from "./pages/Index";
@@ -232,9 +233,9 @@ const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
               <img src="/logo.png" alt="MJA" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-2xl font-bold">MJA CRM</h1>
-            <p className="text-muted-foreground text-sm mt-1">Bienvenido/a. Configura tu acceso.</p>
+            <p className="text-muted-foreground text-sm mt-1">Bienvenido/a a la familia.</p>
           </div>
-          <PasswordChangeForm isFirstSetup onSuccess={clearPasswordSetup} />
+          <OnboardingForm onSuccess={clearPasswordSetup} />
         </div>
       </div>
     );
