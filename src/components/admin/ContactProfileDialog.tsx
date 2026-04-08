@@ -406,6 +406,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             cell_id: contact.cell_id,
             zona_id: (contact as any).zona_id || null,
             date_of_birth: contact.date_of_birth || null,
+            sexo: contact.sexo || null,
+            estado_civil: contact.estado_civil || null,
             numero_cuerda: contact.numero_cuerda || null,
             zona: contact.zona || null,
             estado_seguimiento: contact.estado_seguimiento || 'nuevo',
@@ -590,6 +592,38 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Row 4b: Sexo / Estado civil */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sexo</label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    value={contact.sexo || ''}
+                    onChange={(e) => setContact({ ...contact, sexo: e.target.value || null })}
+                  >
+                    <option value="">Sin especificar</option>
+                    <option value="masculino">Masculino</option>
+                    <option value="femenino">Femenino</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estado civil</label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    value={contact.estado_civil || ''}
+                    onChange={(e) => setContact({ ...contact, estado_civil: e.target.value || null })}
+                  >
+                    <option value="">Sin especificar</option>
+                    <option value="soltero">Soltero/a</option>
+                    <option value="casado">Casado/a</option>
+                    <option value="divorciado">Divorciado/a</option>
+                    <option value="viudo">Viudo/a</option>
+                    <option value="union_libre">Unión libre</option>
+                  </select>
+                </div>
+                <div />
               </div>
 
               {/* Row 5: Estado / Célula / Líder */}
