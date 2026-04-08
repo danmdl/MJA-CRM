@@ -33,7 +33,8 @@ export interface PermissionData {
 }
 
 // Role hierarchy: higher index = higher privilege
-const ROLE_HIERARCHY: string[] = ['conector', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
+// consolidador sits between conector and encargado_de_celula per user spec
+const ROLE_HIERARCHY: string[] = ['conector', 'consolidador', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
 
 export const getRoleLevel = (role: string): number => {
   const idx = ROLE_HIERARCHY.indexOf(role);
@@ -47,6 +48,7 @@ export const ROLE_LABELS: Record<string, string> = {
   pastor: 'Pastor',
   referente: 'Referente',
   encargado_de_celula: 'Líder de Célula',
+  consolidador: 'Consolidador',
   conector: 'Conector',
   supervisor: 'Supervisor',
 };

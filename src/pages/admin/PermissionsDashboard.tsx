@@ -69,6 +69,13 @@ const defaultPermissions: PermissionConfig[] = [
     permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: true, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: true, canSeePool: true, canEditCuerda: false, canSeeCelulas: true, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false, canAssignContacts: false, canSeeCuerdas: false, canEditCuerdas: false, canSendWhatsapp: true, canUseTemplates: true },
   },
   {
+    // Consolidador: new role added per user request, sits between conector and
+    // encargado_de_celula in the hierarchy. ALL permissions default to false so
+    // the admin configures them manually in the dashboard.
+    role: 'consolidador', label: 'Consolidador',
+    permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: false, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: false, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: false, canRestoreDeleted: false, canImportCsv: false, canAssignContacts: false, canSeeCuerdas: false, canEditCuerdas: false, canSendWhatsapp: false, canUseTemplates: false },
+  },
+  {
     role: 'conector', label: 'Conector',
     permissions: { seeAllChurches: false, accessAllChurches: false, addUsers: false, editDeleteUsers: false, seeAllAnalytics: false, seeOwnChurchAnalytics: false, changeUserRole: false, addMembers: false, addContacts: true, editDeleteContacts: false, editDeleteMembers: false, baseDatosTotal: false, canSeeBaseDatos: false, canSeePool: true, canEditCuerda: false, canSeeCelulas: false, canEditCelulas: false, canSeeHistorial: false, canSendMessages: true, canRestoreDeleted: false, canImportCsv: false, canAssignContacts: false, canSeeCuerdas: false, canEditCuerdas: false, canSendWhatsapp: true, canUseTemplates: true },
   },

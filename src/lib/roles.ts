@@ -1,4 +1,4 @@
-export type RoleKey = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'supervisor' | 'anfitrion';
+export type RoleKey = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'consolidador' | 'supervisor' | 'anfitrion';
 
 export const ROLE_LABELS: Record<RoleKey, string> = {
   admin: 'Admin',
@@ -6,6 +6,7 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   pastor: 'Pastor',
   referente: 'Referente',
   encargado_de_celula: 'Encargado de Célula',
+  consolidador: 'Consolidador',
   user: 'Usuario',
 };
 

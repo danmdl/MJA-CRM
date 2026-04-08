@@ -11,7 +11,7 @@ import { useSession } from '@/hooks/use-session';
 import { getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
 
 // DB enum values for user_role
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'supervisor' | 'anfitrion';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'consolidador' | 'supervisor' | 'anfitrion';
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -20,7 +20,7 @@ interface InviteUserDialogProps {
 }
 
 // All roles in hierarchy order (lowest to highest)
-const ALL_ROLES: UserRole[] = ['anfitrion', 'conector', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
+const ALL_ROLES: UserRole[] = ['anfitrion', 'conector', 'consolidador', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
 
 const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProps) => {
   const [loading, setLoading] = useState(false);
