@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Send, X } from 'lucide-react';
+import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Send, X, History as HistoryIcon } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -230,6 +230,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [addLogOpen, setAddLogOpen] = useState(false);
   const [historySignal, setHistorySignal] = useState(0);
   const [transfers, setTransfers] = useState<any[]>([]);
+  // On mobile, the Registros sidebar is hidden by default and toggled via a button.
+  // On desktop the sidebar is always visible alongside the form.
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const queryClient = useQueryClient();
   const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
   const [pendingCuerdaChange, setPendingCuerdaChange] = useState<string | null>(null);
@@ -478,18 +481,31 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) safeClose(); else onOpenChange(true); }}>
       <DialogContent hideCloseButton className="w-[96vw] sm:max-w-[1300px] max-h-[92vh] overflow-hidden p-0" style={{ boxShadow: '8px 8px 0px rgba(255,194,51,0.3), 4px 4px 0px rgba(255,194,51,0.15)' }}>
-        {/* Close X button — top right */}
+        {/* Close X button — top right, red so users actually find it */}
         <button
           onClick={() => safeClose()}
-          className="absolute right-3 top-3 z-20 rounded-full p-1.5 hover:bg-muted transition-colors"
+          className="absolute right-3 top-3 z-30 rounded-full p-2 bg-red-500 hover:bg-red-600 text-white shadow-lg transition-colors"
           title="Cerrar"
+          aria-label="Cerrar"
         >
-          <X className="h-4 w-4 text-muted-foreground" />
+          <X className="h-4 w-4" />
         </button>
         {contact && (
           <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
             {/* LEFT: Form fields */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              {/* Mobile-only: Registros button. On desktop the sidebar is always visible. */}
+              <div className="md:hidden">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMobileSidebarOpen(true)}
+                  className="w-full gap-2 border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary"
+                >
+                  <ClipboardList className="h-4 w-4" /> Ver Registros e Historial
+                </Button>
+              </div>
+
               {/* Row 1: Nombre / Apellido / Teléfono */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
@@ -849,8 +865,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
               </Dialog>
             </div>
 
-            {/* RIGHT: Sidebar — Registros (top) + Historial (bottom) */}
-            <div className="w-full md:w-[320px] md:flex-shrink-0 border-t md:border-t-0 md:border-l border-border bg-muted/30 flex flex-col overflow-hidden max-h-[50vh] md:max-h-none">
+            {/* RIGHT: Sidebar — Registros (top) + Historial (bottom). Desktop only. */}
+            <div className="hidden md:flex w-[320px] flex-shrink-0 border-l border-border bg-muted/30 flex-col overflow-hidden">
               {/* Top half: Contact logs */}
               <div className="flex-1 overflow-y-auto p-4 border-b border-border flex flex-col">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Registros de contacto</p>
@@ -866,6 +882,40 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <UnifiedTimeline contactId={contact.id} churchId={churchId} transfers={transfers} />
               </div>
             </div>
+
+            {/* MOBILE-ONLY: Registros sidebar as a full-screen drawer overlay */}
+            {mobileSidebarOpen && (
+              <div className="md:hidden fixed inset-0 z-40 bg-background flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">Registros e Historial</span>
+                  </div>
+                  <button
+                    onClick={() => setMobileSidebarOpen(false)}
+                    className="rounded-full p-2 bg-red-500 hover:bg-red-600 text-white shadow"
+                    aria-label="Cerrar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {/* Registros section */}
+                  <div className="p-4 border-b border-border">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Registros de contacto</p>
+                    <ContactLogInline churchId={churchId} contactId={contact.id} refreshSignal={historySignal} />
+                    <Button size="sm" className="w-full mt-3 gap-1.5 text-xs" onClick={() => setAddLogOpen(true)}>
+                      <ClipboardList className="h-3.5 w-3.5" /> Agregar Registro
+                    </Button>
+                  </div>
+                  {/* Timeline section */}
+                  <div className="p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Historial</p>
+                    <UnifiedTimeline contactId={contact.id} churchId={churchId} transfers={transfers} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

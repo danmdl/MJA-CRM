@@ -1233,6 +1233,33 @@ const SemilleroPage = () => {
           } catch (e) { console.error('Failed to log WhatsApp send:', e); showError('Error registrando el envío.'); }
         }}
       />
+
+      {/* Floating action bar - appears at bottom of viewport when contacts are selected.
+          Solves the problem of having to scroll back to the top to find the delete
+          button when the user selects a contact at the bottom of a long list. */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-3 rounded-xl bg-background border-2 border-primary/40 shadow-2xl backdrop-blur-sm" style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4), 0 0 20px rgba(255,194,51,0.2)' }}>
+          <span className="text-sm font-medium">
+            <strong className="text-primary">{selectedIds.size}</strong> seleccionado{selectedIds.size === 1 ? '' : 's'}
+          </span>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            Limpiar
+          </button>
+          {canEditDeleteContacts() && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBulkDeleteOpen(true)}
+              className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+            >
+              <Trash2 className="h-4 w-4" /> Eliminar
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
