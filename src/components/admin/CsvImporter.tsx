@@ -253,7 +253,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
       let successCount = 0;
       
       for (let i = 0; i < recordsToInsert.length; i++) {
-        const { error } = await supabase.from(tableName).insert(recordsToInsert[i]);
+        const { data: inserted, error } = await supabase.from(tableName).insert(recordsToInsert[i]).select().single();
         if (error) {
           const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);
           const valMatch = colMatch ? colMatch[1] : '';
@@ -268,6 +268,20 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           await logEvent({ action: 'csv_import', error, payload: { row: i + 1, church_id: churchId }, context: { church_id: churchId } });
         } else {
           successCount++;
+          // Log every successful import to activity_logs so it appears in Historial.
+          // Without this, bulk-imported contacts were invisible in the historial view
+          // even though they existed in the contacts table.
+          if (inserted && tableName === 'contacts' && churchId) {
+            await supabase.from('activity_logs').insert({
+              user_id: session?.user?.id,
+              church_id: churchId,
+              action: 'create',
+              entity_type: 'contact',
+              entity_id: inserted.id,
+              before_data: null,
+              after_data: { ...inserted, _source: 'csv_import' },
+            });
+          }
         }
       }
       
