@@ -24,6 +24,7 @@ import {
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { normalize } from '@/lib/normalize';
+import { isValidArgentinePhone } from '@/lib/phone-validation';
 import { isWithinGBA, getDistanceColor, getDistanceWarning, getDistanceBadgeClass } from '@/lib/geo-validation';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
@@ -932,32 +933,41 @@ const SemilleroPage = () => {
                           </Tooltip>
                         </td>
 
-                        {/* Teléfono + WhatsApp - on mobile we hide the number text and keep just the WhatsApp button to save horizontal space */}
+                        {/* Teléfono + WhatsApp - on mobile we hide the number text and keep just the WhatsApp button to save horizontal space.
+                            Invalid AR phones (truncated / missing digits) render in red on both the text and the WhatsApp icon. */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.telefono }}>
-                          {c.phone ? (
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="hidden sm:inline text-[11px] text-foreground tabular-nums font-medium truncate">{c.phone}</span>
-                              {canSendWhatsapp() && (
-                                <button
-                                  className="flex items-center gap-0.5 text-green-500 hover:text-green-400 shrink-0 group"
-                                  title="Enviar WhatsApp"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setWhatsappCompose({
-                                      contactId: c.id,
-                                      name: `${c.first_name} ${c.last_name || ''}`.trim(),
-                                      firstName: c.first_name,
-                                      lastName: c.last_name || '',
-                                      phone: c.phone!,
-                                    });
-                                  }}
+                          {c.phone ? (() => {
+                            const phoneOk = isValidArgentinePhone(c.phone);
+                            return (
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className={`hidden sm:inline text-[11px] tabular-nums font-medium truncate ${phoneOk ? 'text-foreground' : 'text-red-500'}`}
+                                  title={phoneOk ? undefined : 'Número incompleto o inválido'}
                                 >
-                                  <span className="text-[10px] font-medium">Enviar</span>
-                                  <WhatsAppIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5 group-hover:scale-110 transition-transform" />
-                                </button>
-                              )}
-                            </div>
-                          ) : <span className="text-[11px] text-muted-foreground">—</span>}
+                                  {c.phone}
+                                </span>
+                                {canSendWhatsapp() && (
+                                  <button
+                                    className={`flex items-center gap-0.5 shrink-0 group ${phoneOk ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`}
+                                    title={phoneOk ? 'Enviar WhatsApp' : 'Número incompleto o inválido'}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setWhatsappCompose({
+                                        contactId: c.id,
+                                        name: `${c.first_name} ${c.last_name || ''}`.trim(),
+                                        firstName: c.first_name,
+                                        lastName: c.last_name || '',
+                                        phone: c.phone!,
+                                      });
+                                    }}
+                                  >
+                                    <span className="text-[10px] font-medium">Enviar</span>
+                                    <WhatsAppIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5 group-hover:scale-110 transition-transform" />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })() : <span className="text-[11px] text-muted-foreground">—</span>}
                         </td>
 
                         {/* Responsable */}
