@@ -424,9 +424,9 @@ const SemilleroPage = () => {
       filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
     }
     if (filterResponsable === '__none__') {
-      filtered = filtered.filter(c => !c.created_by);
+      filtered = filtered.filter(c => !c.responsable_id);
     } else if (filterResponsable) {
-      filtered = filtered.filter(c => c.created_by === filterResponsable);
+      filtered = filtered.filter(c => c.responsable_id === filterResponsable);
     }
     return filtered;
   }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero]);
@@ -684,7 +684,7 @@ const SemilleroPage = () => {
               <option value="__none__">Sin responsable</option>
               {(() => {
                 const creatorIds = new Set<string>();
-                (allContacts || []).forEach(c => { if (c.created_by) creatorIds.add(c.created_by); });
+                (allContacts || []).forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
                 const creators = Array.from(creatorIds)
                   .map(id => ({ id, profile: profileById.get(id) }))
                   .filter(c => c.profile && c.id !== session?.user?.id)
@@ -719,6 +719,7 @@ const SemilleroPage = () => {
                       }} />
                     </th>
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>Nombre</ResizableHeader>
+                    <ResizableHeader width={colWidths.telefono} onResize={resizeCol('telefono')}>Teléfono</ResizableHeader>
                     <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -742,9 +743,9 @@ const SemilleroPage = () => {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {(() => {
-                            // Build unique creator list from current contacts
+                            // Build unique responsable list from current contacts
                             const creatorIds = new Set<string>();
-                            (allContacts || []).forEach(c => { if (c.created_by) creatorIds.add(c.created_by); });
+                            (allContacts || []).forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
                             const creators = Array.from(creatorIds)
                               .map(id => ({ id, profile: profileById.get(id) }))
                               .filter(c => c.profile && c.id !== session?.user?.id)
@@ -758,7 +759,6 @@ const SemilleroPage = () => {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </ResizableHeader>
-                    <ResizableHeader width={colWidths.telefono} onResize={resizeCol('telefono')}>Teléfono</ResizableHeader>
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>Fecha</ResizableHeader>
                     {isUnassignedView && <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>Sugerencia</ResizableHeader>}
@@ -810,15 +810,6 @@ const SemilleroPage = () => {
                           </Tooltip>
                         </td>
 
-                        {/* Responsable */}
-                        <td className="px-2 py-1.5" style={{ width: colWidths.responsable }}>
-                          {(() => {
-                            const creator = c.created_by ? profileById.get(c.created_by) : null;
-                            if (!creator) return <span className="text-[11px] text-muted-foreground italic">—</span>;
-                            return <span className="text-[11px] text-foreground truncate block">{creator.first_name} {creator.last_name}</span>;
-                          })()}
-                        </td>
-
                         {/* Teléfono + WhatsApp */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.telefono }}>
                           {c.phone ? (
@@ -845,6 +836,15 @@ const SemilleroPage = () => {
                               )}
                             </div>
                           ) : <span className="text-[11px] text-muted-foreground">—</span>}
+                        </td>
+
+                        {/* Responsable */}
+                        <td className="px-2 py-1.5" style={{ width: colWidths.responsable }}>
+                          {(() => {
+                            const resp = c.responsable_id ? profileById.get(c.responsable_id) : null;
+                            if (!resp) return <span className="text-[11px] text-muted-foreground italic">—</span>;
+                            return <span className="text-[11px] text-foreground truncate block">{resp.first_name} {resp.last_name}</span>;
+                          })()}
                         </td>
 
                         {/* Dirección + Ver en mapa */}

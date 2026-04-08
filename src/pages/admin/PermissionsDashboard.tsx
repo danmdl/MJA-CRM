@@ -283,6 +283,27 @@ const PermissionsDashboard = () => {
         </Button>
       </div>
 
+      {/* Info banner: business rule about automatic responsable assignment.
+          Placed prominently so admins remember why some roles auto-assign and
+          others don't. This is NOT a permission to toggle - it's hardcoded in
+          the database trigger auto_assign_responsable_on_contact. */}
+      <div className="rounded-lg border border-[#FFC233]/30 bg-[#FFC233]/5 p-4">
+        <div className="flex items-start gap-3">
+          <div className="text-xl shrink-0">ℹ️</div>
+          <div className="flex-1 text-sm">
+            <p className="font-semibold text-[#FFC233] mb-1">Regla de auto-asignación de Responsable</p>
+            <p className="text-foreground/90 leading-relaxed">
+              Cuando un usuario crea un contacto, el sistema asigna automáticamente el campo <strong>Responsable</strong> según el rol:
+            </p>
+            <ul className="mt-2 space-y-1 text-foreground/80 ml-1">
+              <li>• <strong className="text-foreground">Consolidador, Líder de Célula, Referente, Supervisor</strong>: el contacto queda asignado a ellos como responsables.</li>
+              <li>• <strong className="text-foreground">Admin, General, Pastor, Conector y otros roles</strong>: el contacto se carga sin responsable (queda en el pool para asignación posterior).</li>
+            </ul>
+            <p className="text-xs text-muted-foreground mt-2 italic">Esta regla está aplicada a nivel de base de datos y no se puede cambiar desde este panel. Los admins igual pueden asignar manualmente cualquier responsable a cualquier contacto desde la ficha individual.</p>
+          </div>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Configuración de Permisos por Rol</CardTitle>
