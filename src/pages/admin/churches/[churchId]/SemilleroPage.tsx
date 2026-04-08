@@ -168,10 +168,14 @@ const SemilleroPage = () => {
   }, [profile, session?.user?.id, userCuerdaNumero]);
 
   // ─── Data Fetching ─────────────────────────────────────────────
+  // Zonas, barrios, cuerdas, cells: these change very rarely. 5 min staleTime
+  // means we don't re-fetch on every component remount. Mutations on these
+  // tables explicitly invalidate the relevant query keys when they happen.
   const { data: zonas } = useQuery<Zona[]>({
     queryKey: ['zonas', churchId],
     queryFn: async () => { const { data } = await supabase.from('zonas').select('id, nombre').eq('church_id', churchId!).order('nombre'); return data || []; },
     enabled: !!churchId,
+    staleTime: 5 * 60_000,
   });
 
   const { data: barrios } = useQuery<Barrio[]>({
@@ -182,6 +186,7 @@ const SemilleroPage = () => {
       return data || [];
     },
     enabled: !!zonas?.length,
+    staleTime: 5 * 60_000,
   });
 
   const { data: cuerdas } = useQuery<Cuerda[]>({
@@ -192,9 +197,11 @@ const SemilleroPage = () => {
       return data || [];
     },
     enabled: !!zonas?.length,
+    staleTime: 5 * 60_000,
   });
 
-  // Team members for Responsable dropdown
+  // Team members for Responsable dropdown.
+  // staleTime is 5 min because team membership changes very rarely.
   const { data: teamMembers } = useQuery<{ id: string; first_name: string; last_name: string; numero_cuerda: string | null }[]>({
     queryKey: ['team-pool', churchId],
     queryFn: async () => {
@@ -202,22 +209,23 @@ const SemilleroPage = () => {
       return data || [];
     },
     enabled: !!churchId,
+    staleTime: 5 * 60_000,
   });
 
-  // All profiles (used to resolve creator names; creators may be admins/generals
-  // who don't belong to a specific church and so aren't in teamMembers).
-  const { data: allProfiles } = useQuery<{ id: string; first_name: string; last_name: string }[]>({
-    queryKey: ['all-profiles-creator-lookup'],
-    queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('id, first_name, last_name');
-      return data || [];
-    },
-  });
+  // Build a lookup map from teamMembers for resolving responsable names in
+  // the table cells and filter dropdowns. The previous version was a separate
+  // useQuery that fetched ALL profiles in the entire database with no filter
+  // (queryKey 'all-profiles-creator-lookup'), which was the main slowdown
+  // the user reported. The responsable_id field is only ever set to one of
+  // the 4 eligible roles (consolidador, encargado_de_celula, referente,
+  // supervisor) by the auto_assign_responsable trigger, and all of those roles
+  // belong to a specific church, so they're guaranteed to be in teamMembers.
+  // No need for a global profile lookup.
   const profileById = React.useMemo(() => {
     const m = new Map<string, { first_name: string; last_name: string }>();
-    (allProfiles || []).forEach(p => m.set(p.id, p));
+    (teamMembers || []).forEach(p => m.set(p.id, { first_name: p.first_name, last_name: p.last_name }));
     return m;
-  }, [allProfiles]);
+  }, [teamMembers]);
 
   const { data: cells } = useQuery<Cell[]>({
     queryKey: ['cells-pool', churchId],
@@ -226,8 +234,12 @@ const SemilleroPage = () => {
       return (data || []) as Cell[];
     },
     enabled: !!churchId,
+    staleTime: 5 * 60_000,
   });
 
+  // Contacts is the hot data - users expect it to update when they come back
+  // to the tab after sending a WhatsApp or editing in another tab. Override
+  // the global default of refetchOnWindowFocus=false specifically for this query.
   const { data: allContacts, isLoading } = useQuery<Contact[]>({
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
@@ -243,6 +255,8 @@ const SemilleroPage = () => {
       return (data || []) as Contact[];
     },
     enabled: !!churchId,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────

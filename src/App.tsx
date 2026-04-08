@@ -107,14 +107,19 @@ const TemplatesPage = lazyRetry(() => import("./pages/admin/TemplatesPage"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Refetch when the user comes back to the tab so data stays fresh
-      // (e.g. after sending WhatsApp in a new tab, or coming back after editing
-      // something elsewhere). The user explicitly complained about having to
-      // refresh manually to see changes.
-      refetchOnWindowFocus: true,
-      // Short stale time so invalidations + refocus pull fresh data quickly,
-      // but not so short that we hammer the API on every render.
-      staleTime: 10_000,
+      // Don't refetch on every tab focus - that was hammering the API and making
+      // the UI feel frozen for 1-2 seconds every time the user clicked back
+      // into the tab. Mutations explicitly invalidate the queries that need
+      // to update, and individual hot queries can opt back in via
+      // refetchOnWindowFocus: true when needed.
+      refetchOnWindowFocus: false,
+      // 60s stale time as a sensible default. Things like zonas/cuerdas/team
+      // barely ever change so this is plenty. Hot queries that need fresher
+      // data (like contact lists) can override per-query.
+      staleTime: 60_000,
+      // Don't refetch on remount within the staleTime window. Prevents the
+      // 'every tab navigation feels slow' bug.
+      refetchOnMount: false,
     },
   },
 });
