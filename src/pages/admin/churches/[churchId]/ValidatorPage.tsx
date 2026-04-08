@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Crosshair } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { isWithinGBA } from '@/lib/geo-validation';
+import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 
 interface Issue {
   id: string;
@@ -33,6 +34,7 @@ const ValidatorPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [profileContactId, setProfileContactId] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<Date | null>(null);
 
   const runValidation = async () => {
@@ -279,7 +281,7 @@ const ValidatorPage = () => {
                     <button
                       className="text-sm font-medium text-primary hover:underline text-left"
                       onClick={() => {
-                        if (item.entity === 'contact') navigate(`/admin/churches/${churchId}/pool`);
+                        if (item.entity === 'contact') setProfileContactId(item.entityId);
                         else if (item.entity === 'cell') navigate(`/admin/churches/${churchId}/celulas`);
                       }}
                     >
@@ -355,6 +357,14 @@ const ValidatorPage = () => {
           </div>
         </div>
       )}
+
+      {/* Contact profile dialog - opens when clicking a contact name in a validation row */}
+      <ContactProfileDialog
+        open={!!profileContactId}
+        onOpenChange={(o) => { if (!o) { setProfileContactId(null); runValidation(); } }}
+        contactId={profileContactId || ''}
+        churchId={churchId!}
+      />
     </div>
   );
 };
