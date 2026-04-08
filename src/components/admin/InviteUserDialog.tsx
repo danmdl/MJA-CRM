@@ -51,11 +51,11 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
     try {
       if (!session?.access_token) { showError('No hay sesión activa.'); setLoading(false); return; }
 
-      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+      const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/invite-user-v2`;
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ action: 'resendInvite', email, role, churchId, first_name: firstName, last_name: lastName, phone }),
+        body: JSON.stringify({ email, role, churchId, first_name: firstName, last_name: lastName, phone, numero_cuerda: numeroCuerda }),
       });
       const data = await response.json();
       if (!response.ok) {
