@@ -181,6 +181,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
 
   const handleSubmit = async (e: React.FormEvent, keepOpen = false) => {
     e.preventDefault();
+    if (!firstName.trim()) { showError('El nombre es obligatorio.'); return; }
+    if (!sexo) { showError('El sexo es obligatorio.'); return; }
     setLoading(true);
     try {
       const { data: createdContact, error } = await supabase
@@ -432,16 +434,17 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               />
             </div>
 
-            {/* Sexo */}
+            {/* Sexo - REQUIRED */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Sexo</label>
+              <label className="text-sm font-medium">Sexo <span className="text-red-500">*</span></label>
               <select
-                className={nativeSelectClass}
-                value={sexo || 'none'}
-                onChange={(e) => setSexo(e.target.value === 'none' ? null : e.target.value)}
+                className={`${nativeSelectClass} ${!sexo ? 'border-red-500/60' : ''}`}
+                value={sexo || ''}
+                onChange={(e) => setSexo(e.target.value || null)}
                 disabled={loading}
+                required
               >
-                <option value="none">Sin especificar</option>
+                <option value="" disabled>Seleccionar...</option>
                 <option value="Masculino">Masculino</option>
                 <option value="Femenino">Femenino</option>
               </select>
@@ -534,10 +537,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
             <Button type="button" variant="ghost" onClick={() => { onOpenChange(false); }} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="button" variant="outline" disabled={loading || !firstName.trim()} onClick={(e) => handleSubmit(e as any, true)}>
+            <Button type="button" variant="outline" disabled={loading || !firstName.trim() || !sexo} onClick={(e) => handleSubmit(e as any, true)}>
               {loading ? 'Guardando...' : 'Guardar y agregar otro'}
             </Button>
-            <Button type="submit" disabled={loading || !firstName.trim()}>
+            <Button type="submit" disabled={loading || !firstName.trim() || !sexo}>
               {loading ? 'Creando...' : 'Crear Contacto'}
             </Button>
           </div>

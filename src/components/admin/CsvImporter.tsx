@@ -242,17 +242,42 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
             }
           }
         });
+
+        // Sexo is mandatory. Normalize incoming values to canonical Masculino/Femenino
+        // and reject the row if it's missing or unrecognizable.
+        if (tableName === 'contacts') {
+          const rawSexo = String(record.sexo || '').trim().toLowerCase();
+          if (!rawSexo) {
+            validationErrors.push({ row: idx + 1, field: 'Sexo', value: '', message: 'Sexo es obligatorio (Masculino o Femenino).' });
+          } else if (['masculino', 'hombre', 'varon', 'varón', 'm', 'male'].includes(rawSexo)) {
+            record.sexo = 'Masculino';
+          } else if (['femenino', 'mujer', 'f', 'female'].includes(rawSexo)) {
+            record.sexo = 'Femenino';
+          } else {
+            validationErrors.push({ row: idx + 1, field: 'Sexo', value: String(record.sexo), message: 'Sexo no reconocido. Usar Masculino o Femenino.' });
+          }
+        }
       });
 
       if (validationErrors.length > 0) {
         setImportErrors(validationErrors);
       }
 
+      // Rows with fatal Sexo errors must not be inserted (sexo is mandatory).
+      // Build a set of row indexes (0-based) that have a Sexo validation error.
+      const fatalRowIdxs = new Set(
+        validationErrors.filter(v => v.field === 'Sexo').map(v => v.row - 1)
+      );
+
       // Insert records individually to track exactly which ones fail
       const failed: {row: number, data: Record<string, string>}[] = [];
       let successCount = 0;
       
       for (let i = 0; i < recordsToInsert.length; i++) {
+        if (fatalRowIdxs.has(i)) {
+          failed.push({ row: i + 1, data: dataToImport[i] as Record<string, string> });
+          continue;
+        }
         const { data: inserted, error } = await supabase.from(tableName).insert(recordsToInsert[i]).select().single();
         if (error) {
           const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);

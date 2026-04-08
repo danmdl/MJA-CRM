@@ -686,7 +686,7 @@ const SemilleroPage = () => {
                             <Filter className={`h-3 w-3 ${filterResponsable ? 'text-primary fill-primary/30' : 'opacity-60'}`} />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
+                        <DropdownMenuContent align="start" collisionPadding={16} className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
                           <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Filtrar por responsable</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => setFilterResponsable('')} className={filterResponsable === '' ? 'bg-accent' : ''}>
                             Todos
@@ -865,7 +865,7 @@ const SemilleroPage = () => {
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-64 max-h-[340px] overflow-y-auto">
+                                  <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
                                     <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
                                     {(cuerdas || []).filter(cr => {
                                       const prefix = parseInt(cr.numero.charAt(0));
@@ -964,7 +964,7 @@ const SemilleroPage = () => {
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-64 max-h-[340px] overflow-y-auto">
+                                  <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
                                     <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
                                     {(cuerdas || []).filter(cr => {
                                       const prefix = parseInt(cr.numero.charAt(0));
@@ -1118,8 +1118,8 @@ const SemilleroPage = () => {
           </DialogHeader>
           <CsvImporter
             tableName="contacts"
-            requiredFields={CONTACT_FIELDS.filter(f => f.key === 'first_name')}
-            optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name')}
+            requiredFields={CONTACT_FIELDS.filter(f => f.key === 'first_name' || f.key === 'sexo')}
+            optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name' && f.key !== 'sexo')}
             churchId={churchId}
           />
         </DialogContent>
