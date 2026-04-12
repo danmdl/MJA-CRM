@@ -969,7 +969,7 @@ const SemilleroPage = () => {
                               </div>
                             );
                           })() : (
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center gap-1">
                               {canSendWhatsapp() && (
                                 <span
                                   className="flex items-center gap-0.5 shrink-0 text-red-500 cursor-not-allowed"
