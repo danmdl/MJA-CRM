@@ -20,7 +20,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { logEvent } from '@/utils/clientLogger';
 import { ContactField } from '@/lib/contact-fields'; // Import ContactField type
-import { Checkbox } from '@/components/ui/checkbox';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface CsvImporterProps {
@@ -37,11 +36,11 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [dataToImport, setDataToImport] = useState<Record<string, string>[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string | null>>({});
+  const [autoMatchedFields, setAutoMatchedFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const [importErrors, setImportErrors] = useState<{row: number, field: string, value: string, message: string}[]>([]);
   const [failedContacts, setFailedContacts] = useState<{row: number, data: Record<string, string>}[]>([]);
-  const [ignoreMap, setIgnoreMap] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -70,7 +69,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
     setImportErrors([]);
     setFailedContacts([]);
     setColumnMapping({});
-    setIgnoreMap({});
+    setAutoMatchedFields(new Set());
 
     const isXlsx = /\.xlsx?$/i.test(selectedFile.name);
 
@@ -196,6 +195,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
     });
 
     setColumnMapping(initialMapping);
+    // Track which fields were auto-detected so we can highlight them green
+    const matched = new Set<string>();
+    Object.entries(initialMapping).forEach(([key, val]) => { if (val) matched.add(key); });
+    setAutoMatchedFields(matched);
     setDataToImport(data);
   };
 
@@ -207,13 +210,8 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
 
   const handleColumnMappingChange = (targetFieldKey: string, csvHeader: string) => {
     setColumnMapping(prev => ({ ...prev, [targetFieldKey]: csvHeader === '__none__' ? null : csvHeader }));
-  };
-
-  const toggleIgnore = (targetFieldKey: string, ignore: boolean) => {
-    setIgnoreMap(prev => ({ ...prev, [targetFieldKey]: ignore }));
-    if (ignore) {
-      setColumnMapping(prev => ({ ...prev, [targetFieldKey]: null }));
-    }
+    // If user manually changes a mapping, remove it from auto-matched set
+    setAutoMatchedFields(prev => { const next = new Set(prev); next.delete(targetFieldKey); return next; });
   };
 
   const handleImportData = async () => {
@@ -270,7 +268,6 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         const newRecord: Record<string, any> = {};
         allTargetFields.forEach(targetField => {
           if (BLOCKED_FIELDS.has(targetField.key)) return; // Never import these
-          if (ignoreMap[targetField.key]) return; // Skip ignored fields
           const csvHeader = columnMapping[targetField.key];
           if (csvHeader && row[csvHeader] !== undefined) {
             newRecord[targetField.key] = sanitizeValue(targetField.key, row[csvHeader]);
@@ -515,43 +512,26 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
               Asigna los encabezados de tu CSV a los campos de la tabla de {tableName}.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {requiredFields.map(field => (
-                <div key={field.key} className="space-y-2">
-                  <Label htmlFor={`map-${field.key}`}>
-                    {field.label} <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    onValueChange={(value) => handleColumnMappingChange(field.key, value)}
-                    value={columnMapping[field.key] ?? undefined}
-                    disabled={loading}
-                  >
-                    <SelectTrigger id={`map-${field.key}`} className="w-full">
-                      <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {csvHeaders.map((header, i) => (
-                        <SelectItem key={header || `empty-${i}`} value={header || `__empty_${i}__`}>
-                          {header || '(columna vacía)'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-              {optionalFields.map(field => (
-                <div key={field.key} className="space-y-2">
-                  <Label htmlFor={`map-${field.key}`}>{field.label}</Label>
-                  <div className="flex items-center gap-3">
+              {requiredFields.map(field => {
+                const isAutoMatched = autoMatchedFields.has(field.key) && !!columnMapping[field.key];
+                return (
+                  <div key={field.key} className="space-y-2">
+                    <Label htmlFor={`map-${field.key}`} className="flex items-center gap-1.5">
+                      {field.label} <span className="text-red-500">*</span>
+                      {isAutoMatched && <span className="text-[10px] text-green-500 font-medium">✓ auto</span>}
+                    </Label>
                     <Select
                       onValueChange={(value) => handleColumnMappingChange(field.key, value)}
-                      value={ignoreMap[field.key] ? '__none__' : (columnMapping[field.key] ?? '__none__')}
-                      disabled={loading || !!ignoreMap[field.key]}
+                      value={columnMapping[field.key] ?? undefined}
+                      disabled={loading}
                     >
-                      <SelectTrigger id={`map-${field.key}`} className="w-full">
+                      <SelectTrigger
+                        id={`map-${field.key}`}
+                        className={`w-full ${isAutoMatched ? 'border-green-500/50 ring-1 ring-green-500/20' : ''}`}
+                      >
                         <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">(Opcional)</SelectItem>
                         {csvHeaders.map((header, i) => (
                           <SelectItem key={header || `empty-${i}`} value={header || `__empty_${i}__`}>
                             {header || '(columna vacía)'}
@@ -559,16 +539,40 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
                         ))}
                       </SelectContent>
                     </Select>
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={!!ignoreMap[field.key]}
-                        onCheckedChange={(val) => toggleIgnore(field.key, !!val)}
-                      />
-                      <span>No agregar</span>
-                    </label>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+              {optionalFields.map(field => {
+                const isAutoMatched = autoMatchedFields.has(field.key) && !!columnMapping[field.key];
+                return (
+                  <div key={field.key} className="space-y-2">
+                    <Label htmlFor={`map-${field.key}`} className="flex items-center gap-1.5">
+                      {field.label}
+                      {isAutoMatched && <span className="text-[10px] text-green-500 font-medium">✓ auto</span>}
+                    </Label>
+                    <Select
+                      onValueChange={(value) => handleColumnMappingChange(field.key, value)}
+                      value={columnMapping[field.key] ?? '__none__'}
+                      disabled={loading}
+                    >
+                      <SelectTrigger
+                        id={`map-${field.key}`}
+                        className={`w-full ${isAutoMatched ? 'border-green-500/50 ring-1 ring-green-500/20' : ''}`}
+                      >
+                        <SelectValue placeholder={`Selecciona columna para ${field.label}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">(No importar)</SelectItem>
+                        {csvHeaders.map((header, i) => (
+                          <SelectItem key={header || `empty-${i}`} value={header || `__empty_${i}__`}>
+                            {header || '(columna vacía)'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

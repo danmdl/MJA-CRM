@@ -164,8 +164,38 @@ const MapaPage = () => {
   // Stable key for the set of visible cells so the map re-renders on filter changes
   const mappableCellIds = mappableCells.map(c => c.id).join(',');
 
+  // Distinct colors for each cuerda
+  const CUERDA_COLORS = [
+    { fill: '#3b82f6', stroke: '#1d4ed8' }, // blue
+    { fill: '#ef4444', stroke: '#b91c1c' }, // red
+    { fill: '#10b981', stroke: '#047857' }, // green
+    { fill: '#f59e0b', stroke: '#b45309' }, // amber
+    { fill: '#8b5cf6', stroke: '#6d28d9' }, // purple
+    { fill: '#ec4899', stroke: '#be185d' }, // pink
+    { fill: '#06b6d4', stroke: '#0e7490' }, // cyan
+    { fill: '#f97316', stroke: '#c2410c' }, // orange
+    { fill: '#14b8a6', stroke: '#0f766e' }, // teal
+    { fill: '#a855f7', stroke: '#7e22ce' }, // violet
+  ];
+  const cuerdaColorMap = React.useMemo(() => {
+    const map = new Map<string, typeof CUERDA_COLORS[0]>();
+    availableCuerdas.forEach((num, i) => {
+      map.set(num, CUERDA_COLORS[i % CUERDA_COLORS.length]);
+    });
+    return map;
+  }, [availableCuerdas]);
+
   useEffect(() => {
-    if (!mappableCells.length || !mapRef.current || isLoading || geocoding) return;
+    if (!mapRef.current || isLoading || geocoding) return;
+
+    // If no cells to show (e.g. "Ninguna" filter), clear the map
+    if (!mappableCells.length) {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current = null;
+        mapRef.current!.innerHTML = '';
+      }
+      return;
+    }
 
     const initMap = async () => {
       const gmaps = await loadGoogleMaps();
@@ -211,11 +241,16 @@ const MapaPage = () => {
         const cuerdaLabel = cell.cuerda_numero ? `Cuerda ${cell.cuerda_numero}` : '';
         const pos = { lat: cell.lat!, lng: cell.lng! };
 
+        // Color by cuerda, fallback to gold
+        const colors = cell.cuerda_numero ? cuerdaColorMap.get(cell.cuerda_numero) : null;
+        const fillColor = colors?.fill || '#FFC233';
+        const strokeColor = colors?.stroke || '#B8720A';
+
         const markerIcon = {
           path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
-          fillColor: '#FFC233',
+          fillColor,
           fillOpacity: 1,
-          strokeColor: '#B8720A',
+          strokeColor,
           strokeWeight: 1.5,
           scale: 1.6,
           anchor: new gmaps.Point(12, 24),
@@ -232,7 +267,7 @@ const MapaPage = () => {
           infoWindow.setContent(`
             <div style="font-family:system-ui,sans-serif;min-width:200px;padding:4px 0;color:#111;">
               <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${cell.name}</div>
-              ${cuerdaLabel ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🎵 ${cuerdaLabel}</div>` : ''}
+              ${cuerdaLabel ? `<div style="font-size:12px;color:#555;margin-bottom:2px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fillColor};margin-right:4px;vertical-align:middle;"></span>${cuerdaLabel}</div>` : ''}
               <div style="font-size:12px;color:#555;margin-bottom:2px;">👤 Líder: ${leader}</div>
               ${anfitrion ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🏠 Anfitrión: ${anfitrion}</div>` : ''}
               <div style="font-size:12px;color:#555;margin-bottom:2px;">🕐 ${schedule}</div>
@@ -278,17 +313,21 @@ const MapaPage = () => {
           >
             {visibleCuerdas?.size === availableCuerdas.length ? 'Ninguna' : 'Todas'}
           </button>
-          {availableCuerdas.map(num => (
-            <label key={num} className="flex items-center gap-1 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="rounded border-input h-3.5 w-3.5"
-                checked={visibleCuerdas?.has(num) ?? true}
-                onChange={() => toggleCuerda(num)}
-              />
-              <span className="text-xs font-medium">{num}</span>
-            </label>
-          ))}
+          {availableCuerdas.map(num => {
+            const colors = cuerdaColorMap.get(num);
+            return (
+              <label key={num} className="flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="rounded border-input h-3.5 w-3.5"
+                  checked={visibleCuerdas?.has(num) ?? true}
+                  onChange={() => toggleCuerda(num)}
+                />
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors?.fill || '#FFC233' }} />
+                <span className="text-xs font-medium">{num}</span>
+              </label>
+            );
+          })}
           <span className="text-xs text-muted-foreground ml-1">
             ({mappableCells.length}/{allMappable.length} en mapa)
           </span>
@@ -335,8 +374,17 @@ const MapaPage = () => {
         <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
           <div>
             <MapPin className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="text-lg font-medium mb-2">Sin coordenadas registradas</p>
-            <p className="text-sm">Las células no tienen direcciones válidas para mostrar en el mapa.</p>
+            {allMappable.length > 0 ? (
+              <>
+                <p className="text-lg font-medium mb-2">Sin células seleccionadas</p>
+                <p className="text-sm">Activá al menos una cuerda en el filtro de arriba para ver células en el mapa.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-medium mb-2">Sin coordenadas registradas</p>
+                <p className="text-sm">Las células no tienen direcciones válidas para mostrar en el mapa.</p>
+              </>
+            )}
           </div>
         </div>
       ) : (
