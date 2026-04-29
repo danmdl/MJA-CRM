@@ -267,9 +267,15 @@ const App = () => (
 );
 
 const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
-  const { needsPasswordSetup, clearPasswordSetup, session } = useSession();
+  const { session, profile, loading } = useSession();
 
-  if (needsPasswordSetup && session) {
+  // If still loading session/profile, don't flash anything
+  if (loading) return null;
+
+  // If there's an active session but the user never completed onboarding,
+  // force them through the password + profile setup flow.
+  // This is the standard SaaS pattern: invite click → auto-login → setup screen.
+  if (session && profile && !profile.profile_completed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md">
@@ -278,9 +284,12 @@ const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
               <img src="/logo.png" alt="MJA" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-2xl font-bold">MJA CRM</h1>
-            <p className="text-muted-foreground text-sm mt-1">Bienvenido/a a la familia.</p>
+            <p className="text-muted-foreground text-sm mt-1">Bienvenido/a — completá tu cuenta para continuar.</p>
           </div>
-          <OnboardingForm onSuccess={clearPasswordSetup} />
+          <OnboardingForm onSuccess={() => {
+            // Reload to get fresh profile with profile_completed=true
+            window.location.href = '/';
+          }} />
         </div>
       </div>
     );
