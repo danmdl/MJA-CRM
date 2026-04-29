@@ -32,6 +32,8 @@ interface User {
   confirmed_at: string | null;
   church_id: string | null;
   numero_cuerda: string | null;
+  profile_completed?: boolean;
+  last_sign_in_at?: string | null;
 }
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
@@ -70,13 +72,20 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     queryKey: ['churchUsers', churchId],
     queryFn: async () => {
       const edgeUsers = await fetchChurchUsers(session?.access_token || '', churchId);
-      // Fetch numero_cuerda directly from profiles (edge function may not return it)
+      // Fetch profile details directly from profiles (edge function may not return them)
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, numero_cuerda')
+        .select('id, numero_cuerda, profile_completed')
         .eq('church_id', churchId);
-      const cuerdaMap = new Map((profiles || []).map(p => [p.id, p.numero_cuerda]));
-      return edgeUsers.map(u => ({ ...u, numero_cuerda: u.numero_cuerda ?? cuerdaMap.get(u.id) ?? null }));
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      return edgeUsers.map(u => {
+        const prof = profileMap.get(u.id);
+        return {
+          ...u,
+          numero_cuerda: u.numero_cuerda ?? prof?.numero_cuerda ?? null,
+          profile_completed: prof?.profile_completed ?? false,
+        };
+      });
     },
     enabled: !!session?.access_token && !!churchId,
   });
@@ -147,12 +156,11 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     try { return format(new Date(d), 'dd/MM/yyyy'); } catch { return d; }
   };
 
-  const getStatusBadge = (status: User['status']) => {
-    switch (status) {
-      case 'confirmed': return <Badge className="bg-green-500 hover:bg-green-500">Confirmado</Badge>;
-      case 'invited': return <Badge variant="outline" className="bg-yellow-500 hover:bg-yellow-500 text-white">Invitación Enviada</Badge>;
-      default: return <Badge variant="secondary">Desconocido</Badge>;
-    }
+  const getStatusBadge = (user: User) => {
+    if (user.status === 'invited') return <Badge variant="outline" className="bg-yellow-500 hover:bg-yellow-500 text-white">Invitación Enviada</Badge>;
+    if (user.status === 'confirmed' && user.profile_completed) return <Badge className="bg-green-500 hover:bg-green-500">Activo</Badge>;
+    if (user.status === 'confirmed' && !user.profile_completed) return <Badge variant="outline" className="bg-blue-500 hover:bg-blue-500 text-white">Pendiente de Ingreso</Badge>;
+    return <Badge variant="secondary">Desconocido</Badge>;
   };
 
   // Roles assignable by current user (strictly below their level)
@@ -230,7 +238,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                     <span className="text-sm">{ROLE_LABELS[user.role] || user.role}</span>
                   )}
                 </TableCell>
-                <TableCell>{getStatusBadge(user.status)}</TableCell>
+                <TableCell>{getStatusBadge(user)}</TableCell>
                 <TableCell>{formatDate(user.updated_at)}</TableCell>
                 <TableCell className="text-right">
                   {/* Only show actions menu if user has edit/delete permissions and can manage this user */}
