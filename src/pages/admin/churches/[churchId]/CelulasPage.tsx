@@ -292,9 +292,12 @@ const CelulasPage = () => {
                     const map = new google.maps.Map(el, {
                       center,
                       zoom: editCell.lat ? 16 : 12,
+                      zoomControl: true,
                       mapTypeControl: false,
                       streetViewControl: false,
-                      fullscreenControl: false,
+                      fullscreenControl: true,
+                      scrollwheel: true,
+                      gestureHandling: 'greedy',
                     });
                     const marker = new google.maps.Marker({
                       position: center,

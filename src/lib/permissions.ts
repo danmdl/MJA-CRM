@@ -33,6 +33,7 @@ export interface PermissionData {
   can_see_mapa: boolean;
   can_see_validador: boolean;
   can_see_papelera: boolean;
+  can_see_procesos: boolean;
 }
 
 // Role hierarchy: higher index = higher privilege
@@ -118,6 +119,7 @@ export const usePermissions = () => {
   const canSeeMapa = () => hasPermission('can_see_mapa');
   const canSeeValidador = () => hasPermission('can_see_validador');
   const canSeePapelera = () => hasPermission('can_see_papelera');
+  const canSeeProcesos = () => hasPermission('can_see_procesos');
 
   // Only admin can access permissions management
   const canAccessPermissions = () => profile?.role === 'admin';
@@ -163,6 +165,7 @@ export const usePermissions = () => {
     canSeeMapa,
     canSeeValidador,
     canSeePapelera,
+    canSeeProcesos,
     canAccessPermissions,
     canManageUser,
   };
