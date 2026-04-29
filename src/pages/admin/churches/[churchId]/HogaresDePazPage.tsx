@@ -63,16 +63,7 @@ const HogaresDePazPage = () => {
       return (data || []) as Hogar[];
     },
     enabled: !!churchId,
-  });
-
-  const { data: cuerdas } = useQuery<Cuerda[]>({
-    queryKey: ['cuerdas-hogares', churchId],
-    queryFn: async () => {
-      const { data } = await supabase.from('cuerdas').select('id, numero, zona_id')
-        .in('zona_id', (await supabase.from('zonas').select('id').eq('church_id', churchId!)).data?.map(z => z.id) || []);
-      return (data || []) as Cuerda[];
-    },
-    enabled: !!churchId,
+    staleTime: 5 * 60_000,
   });
 
   const { data: zonas } = useQuery<Zona[]>({
@@ -82,6 +73,19 @@ const HogaresDePazPage = () => {
       return (data || []) as Zona[];
     },
     enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: cuerdas } = useQuery<Cuerda[]>({
+    queryKey: ['cuerdas-hogares', churchId],
+    queryFn: async () => {
+      if (!zonas?.length) return [];
+      const zonaIds = zonas.map(z => z.id);
+      const { data } = await supabase.from('cuerdas').select('id, numero, zona_id').in('zona_id', zonaIds);
+      return (data || []) as Cuerda[];
+    },
+    enabled: !!churchId && !!zonas?.length,
+    staleTime: 5 * 60_000,
   });
 
   const getZonaForCuerda = (cuerdaId: string | null) => {
@@ -292,21 +296,30 @@ const HogaresDePazPage = () => {
               {showMap && (
                 <div
                   ref={(el) => {
-                    if (!el || !(window as any).google) return;
-                    const google = (window as any).google;
-                    const center = current.lat && current.lng ? { lat: current.lat, lng: current.lng } : { lat: -34.58, lng: -58.52 };
-                    const map = new google.maps.Map(el, { center, zoom: current.lat ? 16 : 13, mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
-                    const marker = new google.maps.Marker({ position: center, map, draggable: true });
-                    const updatePos = (lat: number, lng: number) => {
-                      const geocoder = new google.maps.Geocoder();
-                      geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
-                        if (status === 'OK' && results?.[0]) setField('address', results[0].formatted_address);
-                        setField('lat', lat);
-                        setField('lng', lng);
-                      });
+                    if (!el) return;
+                    if ((el as any).__mapInit) return;
+                    const initMap = () => {
+                      if (!(window as any).google?.maps) return false;
+                      (el as any).__mapInit = true;
+                      const google = (window as any).google;
+                      const center = current.lat && current.lng ? { lat: current.lat, lng: current.lng } : { lat: -34.58, lng: -58.52 };
+                      const map = new google.maps.Map(el, { center, zoom: current.lat ? 16 : 13, zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: true, scrollwheel: true, gestureHandling: 'greedy' });
+                      const marker = new google.maps.Marker({ position: center, map, draggable: true });
+                      const updatePos = (lat: number, lng: number) => {
+                        const geocoder = new google.maps.Geocoder();
+                        geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
+                          if (status === 'OK' && results?.[0]) setField('address', results[0].formatted_address);
+                          setField('lat', lat);
+                          setField('lng', lng);
+                        });
+                      };
+                      map.addListener('click', (e: any) => { marker.setPosition(e.latLng); updatePos(e.latLng.lat(), e.latLng.lng()); });
+                      marker.addListener('dragend', () => { const p = marker.getPosition(); updatePos(p.lat(), p.lng()); });
+                      return true;
                     };
-                    map.addListener('click', (e: any) => { marker.setPosition(e.latLng); updatePos(e.latLng.lat(), e.latLng.lng()); });
-                    marker.addListener('dragend', () => { const p = marker.getPosition(); updatePos(p.lat(), p.lng()); });
+                    if (!initMap()) {
+                      const interval = setInterval(() => { if (initMap()) clearInterval(interval); }, 200);
+                    }
                   }}
                   className="w-full h-[200px] rounded border"
                 />
