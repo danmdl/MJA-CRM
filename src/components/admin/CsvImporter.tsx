@@ -125,17 +125,75 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
     }
   };
 
-  // Shared logic for both CSV and XLSX after parsing headers + data
+  // Shared logic for both CSV and XLSX after parsing headers + data.
+  // Auto-detects column mapping using a rich alias table that covers common
+  // Spanish header variants (with/without accents, abbreviations, synonyms).
+  // Each CSV header can only be claimed by ONE target field (first match wins
+  // in priority order: exact key → exact label → alias substring).
   const processHeaders = (headers: string[], data: Record<string, string>[]) => {
     setCsvHeaders(headers);
+
+    // Strip diacritics + lowercase for fuzzy comparison
+    const norm = (s: string) =>
+      s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Alias table: for each target field key, a list of strings that should
+    // match CSV headers. Order matters — put the most specific first.
+    const ALIASES: Record<string, string[]> = {
+      first_name:         ['nombre', 'name', 'primer nombre', 'nombres'],
+      last_name:          ['apellido', 'apellidos', 'last name', 'surname'],
+      phone:              ['telefono', 'celular', 'cel', 'phone', 'tel', 'movil', 'mobile', 'whatsapp', 'nro telefono', 'numero telefono', 'numero celular'],
+      address:            ['direccion', 'domicilio', 'address', 'calle'],
+      apartment_number:   ['departamento', 'depto', 'dpto', 'piso', 'apartment', 'nro depto'],
+      barrio:             ['barrio', 'localidad', 'neighborhood', 'zona barrio'],
+      numero_cuerda:      ['cuerda', 'nro cuerda', 'numero cuerda', 'num cuerda'],
+      zona:               ['zona'],
+      leader_assigned:    ['lider', 'lider de celula', 'leader', 'lider asignado'],
+      conector:           ['conector', 'connector', 'quien contacto', 'quien lo contacto'],
+      estado_seguimiento: ['seguimiento', 'estado seguimiento', 'estado', 'follow up', 'status'],
+      fecha_contacto:     ['fecha contacto', 'fecha de contacto', 'fecha', 'date', 'fecha ingreso'],
+      date_of_birth:      ['nacimiento', 'fecha nacimiento', 'fecha de nacimiento', 'cumpleanos', 'birthday', 'date of birth', 'fdn'],
+      edad:               ['edad', 'age', 'anos'],
+      sexo:               ['sexo', 'genero', 'gender', 'sex', 'm/f'],
+      estado_civil:       ['estado civil', 'civil', 'marital'],
+      observaciones:      ['observaciones', 'observacion', 'notas', 'nota', 'notes', 'comentarios', 'comments'],
+      pedido_de_oracion:  ['pedido de oracion', 'oracion', 'prayer', 'pedido oracion', 'prayer request'],
+    };
+
     const initialMapping: Record<string, string | null> = {};
+    const claimedHeaders = new Set<string>(); // prevent double-mapping
+
+    // For each target field, try to find the best CSV header match.
+    // Process in allTargetFields order so required fields get first pick.
     allTargetFields.forEach(targetField => {
-      const matchingCsvHeader = headers.find(csvHeader =>
-        csvHeader.toLowerCase().includes(targetField.label.toLowerCase().replace(/\s/g, '_')) ||
-        csvHeader.toLowerCase().includes(targetField.key.toLowerCase())
-      );
-      initialMapping[targetField.key] = matchingCsvHeader || null;
+      const aliases = ALIASES[targetField.key] || [targetField.label.toLowerCase(), targetField.key];
+      const normedAliases = aliases.map(norm);
+
+      let bestMatch: string | null = null;
+
+      // Pass 1: exact match (normed CSV header === normed alias)
+      for (const csvHeader of headers) {
+        if (claimedHeaders.has(csvHeader)) continue;
+        const nh = norm(csvHeader);
+        if (normedAliases.includes(nh)) { bestMatch = csvHeader; break; }
+      }
+
+      // Pass 2: substring match (normed CSV header contains a normed alias, or vice versa)
+      if (!bestMatch) {
+        for (const csvHeader of headers) {
+          if (claimedHeaders.has(csvHeader)) continue;
+          const nh = norm(csvHeader);
+          if (normedAliases.some(a => nh.includes(a) || a.includes(nh))) {
+            bestMatch = csvHeader;
+            break;
+          }
+        }
+      }
+
+      initialMapping[targetField.key] = bestMatch;
+      if (bestMatch) claimedHeaders.add(bestMatch);
     });
+
     setColumnMapping(initialMapping);
     setDataToImport(data);
   };
