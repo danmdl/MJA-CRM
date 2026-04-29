@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useTransition } from "react";
 import { useParams, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useSession } from "@/hooks/use-session";
 import { usePermissions } from "@/lib/permissions";
@@ -21,6 +21,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [accessChecked, setAccessChecked] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (sessionLoading) {
@@ -113,7 +114,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         <div className="overflow-x-auto">
           <Tabs
             value={activeTab}
-            onValueChange={(val) => navigate(`/admin/churches/${churchId}/${val}`)}
+            onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchId}/${val}`))}
             className="w-full px-3"
           >
             <TabsList className="mb-0 w-max">
@@ -135,7 +136,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
       </div>
 
       {/* Main content area */}
-      <main className="flex-1 p-3 sm:p-6 overflow-auto">
+      <main className={`flex-1 p-3 sm:p-6 overflow-auto transition-opacity duration-150 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
         {children || <Outlet />}
       </main>
     </div>
