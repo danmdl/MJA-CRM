@@ -159,6 +159,8 @@ const CelulasPage = () => {
       showSuccess('Célula actualizada. Los cambios se reflejan en todas las solapas.');
       setEditCell(null);
       queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+      queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
+      queryClient.invalidateQueries({ queryKey: ['cell-contact-counts', churchId] });
       queryClient.invalidateQueries({ queryKey: ['overviewCells'] });
       queryClient.invalidateQueries({ queryKey: ['cells-pool'] });
       queryClient.invalidateQueries({ queryKey: ['cells'] });
@@ -396,6 +398,7 @@ const CelulasPage = () => {
                     showSuccess(`${editCell.name} reabierta.`);
                     setEditCell(null);
                     queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+                    queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
                   }}>
                     <Unlock className="h-3.5 w-3.5 mr-1.5" /> Reabrir Célula
                   </Button>
@@ -472,6 +475,7 @@ const CelulasPage = () => {
                 showSuccess(`${closeDialog.name} cerrada.`);
                 setCloseDialog(null);
                 queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+                queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
               }}>
                 Cerrar Célula
               </Button>
