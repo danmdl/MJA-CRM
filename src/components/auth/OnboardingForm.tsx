@@ -105,6 +105,11 @@ const OnboardingForm = ({ onSuccess }: Props) => {
       <CardHeader>
         <CardTitle>Crea tu usuario</CardTitle>
         <CardDescription>{welcomeLine} Completá tus datos para activar tu cuenta.</CardDescription>
+        <div className="mt-3 p-3 rounded-md bg-amber-500/10 border border-amber-500/30">
+          <p className="text-xs text-amber-300">
+            ⚠ <strong>Importante:</strong> No cierres esta pestaña hasta completar el formulario. El link de invitación es de un solo uso — si lo cerrás antes de terminar, vas a tener que pedirle a tu admin un nuevo link.
+          </p>
+        </div>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -142,7 +147,7 @@ const OnboardingForm = ({ onSuccess }: Props) => {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contraseña <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>Creá tu contraseña <span className="text-red-500">*</span></FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
@@ -150,7 +155,10 @@ const OnboardingForm = ({ onSuccess }: Props) => {
                         {...field}
                         disabled={loading}
                         className="pr-10"
-                        autoComplete="new-password"
+                        placeholder="Escribí tu contraseña (mínimo 6 caracteres)"
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
                       <button
                         type="button"
@@ -180,7 +188,10 @@ const OnboardingForm = ({ onSuccess }: Props) => {
                         {...field}
                         disabled={loading}
                         className="pr-10"
-                        autoComplete="new-password"
+                        placeholder="Repetí tu contraseña"
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                       />
                       <button
                         type="button"

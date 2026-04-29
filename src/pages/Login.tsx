@@ -40,7 +40,9 @@ const Login = () => {
   if (session) return <Navigate to="/" replace />;
 
   const translateError = (msg: string) => {
-    if (msg.includes('Invalid login credentials')) return 'Email o contraseña incorrectos.';
+    if (msg.includes('Invalid login credentials')) {
+      return 'Email o contraseña incorrectos. Si recibiste una invitación y nunca creaste tu contraseña, hacé click en "Olvidé mi contraseña" abajo.';
+    }
     if (msg.includes('Email not confirmed')) return 'Tu email no fue confirmado. Revisá tu bandeja de entrada.';
     if (msg.includes('User not found')) return 'No existe una cuenta con ese email.';
     if (msg.includes('rate limit') || msg.includes('too many requests')) return 'Demasiados intentos. Esperá unos minutos.';
