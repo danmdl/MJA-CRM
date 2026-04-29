@@ -91,6 +91,7 @@ const ChurchDatabasePage = lazyRetry(() => import("./pages/admin/churches/[churc
 const ChurchTeamPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/TeamPage"));
 const SemilleroPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/SemilleroPage"));
 const CelulasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CelulasPage"));
+const ProcesosPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/ProcesosPage"));
 const HistorialPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/HistorialPage"));
 const PapeleraPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/PapeleraPage"));
 const ValidatorPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/ValidatorPage"));
@@ -200,6 +201,7 @@ const AppRoutes = () => {
           <Route path="mapa" element={<MapaPage />} />
           <Route path="pool" element={<SemilleroPage />} />
           <Route path="celulas" element={<CelulasPage />} />
+          <Route path="procesos" element={<ProcesosPage />} />
           <Route path="historial" element={<HistorialPage />} />
           <Route path="papelera" element={<PapeleraPage />} />
           <Route path="validator" element={<ValidatorPage />} />

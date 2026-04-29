@@ -70,6 +70,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/team")) return "team";
     if (p.endsWith("/cuerdas")) return "cuerdas";
     if (p.endsWith("/celulas")) return "celulas";
+    if (p.endsWith("/procesos")) return "procesos";
     if (p.endsWith("/mapa")) return "mapa";
     if (p.endsWith("/pool")) return "pool";
     if (p.endsWith("/historial")) return "historial";
@@ -118,6 +119,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
             <TabsList className="mb-0 w-max">
               {canSeeOverview && <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>}
               {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🌱 Semillero</TabsTrigger>}
+              {canSeePool() && <TabsTrigger value="procesos" className="text-xs sm:text-sm px-2 sm:px-3">⚡ Procesos</TabsTrigger>}
               {canSeeCuerdas() && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
               {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
               {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}

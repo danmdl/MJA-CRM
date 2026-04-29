@@ -25,6 +25,7 @@ interface CellRow {
   anfitrion_name: string | null;
   cuerda_numero: string | null;
   zona_nombre: string | null;
+  referente_name: string | null;
 }
 
 const CelulasPage = () => {
@@ -53,7 +54,7 @@ const CelulasPage = () => {
         .is('deleted_at', null);
       if (error) throw error;
 
-      const { data: cuerdas } = await supabase.from('cuerdas').select('id, numero, zona_id');
+      const { data: cuerdas } = await supabase.from('cuerdas').select('id, numero, zona_id, referente_name');
       const { data: zonas } = await supabase.from('zonas').select('id, nombre').eq('church_id', churchId!);
 
       const cuerdaMap = new Map((cuerdas || []).map(c => [c.id, c]));
@@ -68,6 +69,7 @@ const CelulasPage = () => {
           meeting_day: cell.meeting_day, meeting_time: cell.meeting_time,
           leader_name: cell.leader_name, anfitrion_name: cell.anfitrion_name,
           cuerda_numero: cuerda?.numero || null, zona_nombre: zona?.nombre || null,
+          referente_name: cuerda?.referente_name || null,
         };
       });
 
@@ -94,7 +96,7 @@ const CelulasPage = () => {
       result = result.filter(c =>
         normalize(c.name || '').includes(q) || normalize(c.address || '').includes(q) ||
         normalize(c.leader_name || '').includes(q) || normalize(c.anfitrion_name || '').includes(q) ||
-        normalize(c.cuerda_numero || '').includes(q)
+        normalize(c.cuerda_numero || '').includes(q) || normalize(c.referente_name || '').includes(q)
       );
     }
     return result;
@@ -191,6 +193,7 @@ const CelulasPage = () => {
               <th className="text-left px-3 py-2 font-medium text-xs w-[70px]">Hora</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Líder</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Anfitrión</th>
+              <th className="text-left px-3 py-2 font-medium text-xs">Referente</th>
               {canEditCelulas() && <th className="w-[40px]"></th>}
             </tr>
           </thead>
@@ -198,7 +201,7 @@ const CelulasPage = () => {
             {grouped.map(([zona, rows]) => (
               <React.Fragment key={zona}>
                 <tr className="bg-muted/30">
-                  <td colSpan={canEditCelulas() ? 7 : 6} className="px-3 py-1.5 font-semibold text-xs uppercase tracking-wide text-muted-foreground">{zona} ({rows.length})</td>
+                  <td colSpan={canEditCelulas() ? 8 : 7} className="px-3 py-1.5 font-semibold text-xs uppercase tracking-wide text-muted-foreground">{zona} ({rows.length})</td>
                 </tr>
                 {rows.map(cell => {
                   const noAddr = !cell.address;
@@ -221,6 +224,7 @@ const CelulasPage = () => {
                       <td className="px-3 py-2 text-muted-foreground">{cell.meeting_time || '—'}</td>
                       <td className="px-3 py-2">{cell.leader_name || '—'}</td>
                       <td className="px-3 py-2">{cell.anfitrion_name || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{cell.referente_name || '—'}</td>
                       {canEditCelulas() && (
                         <td className="px-3 py-1">
                           <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
@@ -231,7 +235,7 @@ const CelulasPage = () => {
                 })}
               </React.Fragment>
             ))}
-            {grouped.length === 0 && <tr><td colSpan={canEditCelulas() ? 7 : 6} className="text-center py-8 text-muted-foreground">No se encontraron células.</td></tr>}
+            {grouped.length === 0 && <tr><td colSpan={canEditCelulas() ? 8 : 7} className="text-center py-8 text-muted-foreground">No se encontraron células.</td></tr>}
           </tbody>
         </table>
       </div>

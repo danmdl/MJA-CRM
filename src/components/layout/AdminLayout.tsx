@@ -12,6 +12,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.includes('/team')) return 'Equipo';
   if (pathname.includes('/cuerdas')) return 'Cuerdas';
   if (pathname.includes('/pool')) return 'Semillero';
+  if (pathname.includes('/procesos')) return 'Procesos';
   if (pathname.includes('/hogares')) return 'Hogares de Paz';
   if (pathname.includes('/validator')) return 'Validador de Datos';
   if (pathname.includes('/zonas')) return 'Zonas y Barrios';
