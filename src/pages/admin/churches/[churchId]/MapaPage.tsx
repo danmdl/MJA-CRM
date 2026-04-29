@@ -181,8 +181,8 @@ const MapaPage = () => {
     }
   }, [isLoading, cells?.length]);
 
-  // Stable key for the set of visible cells so the map re-renders on filter changes
-  const mappableCellIds = mappableCells.map(c => c.id).join(',');
+  // Stable key that changes when ANY cell's position changes, not just the set of IDs
+  const mappableCellKey = mappableCells.map(c => `${c.id}:${c.lat}:${c.lng}`).join(',');
 
   // Distinct colors for each cuerda
   const CUERDA_COLORS = [
@@ -317,7 +317,7 @@ const MapaPage = () => {
     };
 
     initMap();
-  }, [mappableCellIds, isLoading, geocoding, cellContactCounts]);
+  }, [mappableCellKey, isLoading, geocoding, cellContactCounts]);
 
   return (
     <div className="h-full flex flex-col gap-3">
