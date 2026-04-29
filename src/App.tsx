@@ -94,6 +94,9 @@ if (typeof window !== 'undefined') {
     prefetch(() => import("./pages/admin/churches/[churchId]/OverviewPage"));
     prefetch(() => import("./pages/admin/churches/[churchId]/ProcesosPage"));
     prefetch(() => import("./pages/admin/churches/[churchId]/TeamPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/HogaresDePazPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/MapaPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/HistorialPage"));
   }, 2000);
 }
 
