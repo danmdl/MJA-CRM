@@ -4,8 +4,9 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Loader2 } from 'lucide-react';
+import { MapPin, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
 
 interface Cell {
@@ -77,6 +78,7 @@ const MapaPage = () => {
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  const [cuerdaSearch, setCuerdaSearch] = useState('');
 
   const { data: cells, isLoading } = useQuery<Cell[]>({
     queryKey: ['cells-map', churchId],
@@ -330,35 +332,60 @@ const MapaPage = () => {
       </div>
 
       {/* Cuerda filter */}
-      {!isLoading && !geocoding && availableCuerdas.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground mr-1">Cuerdas:</span>
-          <button
-            className="text-xs underline text-muted-foreground hover:text-foreground"
-            onClick={() => toggleAllCuerdas(visibleCuerdas?.size !== availableCuerdas.length)}
-          >
-            {visibleCuerdas?.size === availableCuerdas.length ? 'Ninguna' : 'Todas'}
-          </button>
-          {availableCuerdas.map(num => {
-            const colors = cuerdaColorMap.get(num);
-            return (
-              <label key={num} className="flex items-center gap-1 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="rounded border-input h-3.5 w-3.5"
-                  checked={visibleCuerdas?.has(num) ?? true}
-                  onChange={() => toggleCuerda(num)}
-                />
-                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors?.fill || '#FFC233' }} />
-                <span className="text-xs font-medium">{num}</span>
-              </label>
-            );
-          })}
-          <span className="text-xs text-muted-foreground ml-1">
-            ({mappableCells.length}/{allMappable.length} en mapa)
-          </span>
-        </div>
-      )}
+      {!isLoading && !geocoding && availableCuerdas.length > 1 && (() => {
+        // Group cuerdas by their last two digits (zona pairing: 101/201, 102/202, etc.)
+        const groups = new Map<string, string[]>();
+        availableCuerdas.forEach(num => {
+          const suffix = num.slice(-2);
+          if (!groups.has(suffix)) groups.set(suffix, []);
+          groups.get(suffix)!.push(num);
+        });
+        const sortedGroups = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+        return (
+          <div className="rounded-lg border border-border bg-muted/10 px-3 py-2.5 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground">Cuerdas</span>
+                <span className="text-[10px] text-muted-foreground">({mappableCells.length}/{allMappable.length} en mapa)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  <input
+                    className="h-6 w-28 pl-6 pr-2 text-[10px] rounded border border-border bg-background"
+                    placeholder="Buscar cuerda..."
+                    value={cuerdaSearch}
+                    onChange={e => setCuerdaSearch(e.target.value)}
+                  />
+                </div>
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors text-muted-foreground"
+                  onClick={() => toggleAllCuerdas(visibleCuerdas?.size !== availableCuerdas.length)}
+                >
+                  {visibleCuerdas?.size === availableCuerdas.length ? 'Ninguna' : 'Todas'}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1">
+              {availableCuerdas.filter(num => !cuerdaSearch || num.includes(cuerdaSearch)).map(num => {
+                const colors = cuerdaColorMap.get(num);
+                const isActive = visibleCuerdas?.has(num) ?? true;
+                return (
+                  <button
+                    key={num}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all ${isActive ? 'bg-muted/60 text-foreground' : 'opacity-30 text-muted-foreground'}`}
+                    onClick={() => toggleCuerda(num)}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colors?.fill || '#FFC233' }} />
+                    {num}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {geocoding && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-500/30 bg-blue-500/10 text-sm text-blue-400">
