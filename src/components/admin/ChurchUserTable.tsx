@@ -157,10 +157,8 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   };
 
   const getStatusBadge = (user: User) => {
-    if (user.status === 'invited') return <Badge variant="outline" className="bg-yellow-500 hover:bg-yellow-500 text-white">Invitación Enviada</Badge>;
-    if (user.status === 'confirmed' && user.profile_completed) return <Badge className="bg-green-500 hover:bg-green-500">Activo</Badge>;
-    if (user.status === 'confirmed' && !user.profile_completed) return <Badge variant="outline" className="bg-blue-500 hover:bg-blue-500 text-white">Pendiente de Ingreso</Badge>;
-    return <Badge variant="secondary">Desconocido</Badge>;
+    if (user.profile_completed) return <Badge className="bg-green-500 hover:bg-green-500">Activo</Badge>;
+    return <Badge variant="outline" className="bg-red-500/80 hover:bg-red-500/80 text-white">Nunca Ingresó</Badge>;
   };
 
   // Roles assignable by current user (strictly below their level)
