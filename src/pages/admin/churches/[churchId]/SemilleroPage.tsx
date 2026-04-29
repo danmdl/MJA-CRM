@@ -418,23 +418,31 @@ const SemilleroPage = () => {
   const poolCounts = useMemo(() => {
     let unassigned = 0;
     allContacts?.forEach(c => {
-      if (!c.cell_id) {
-        if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return;
-        if (externalIds.has(c.id)) return;
-        unassigned++;
-      }
+      if (externalIds.has(c.id)) return;
+      if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return;
+      unassigned++;
     });
     return { unassigned };
   }, [allContacts, canSeeAllCuerdas, userCuerdaNumero, externalIds]);
 
 
   // ─── Filtered contacts ─────────────────────────────────────────
+  // The Semillero is the user's working view — it shows ALL contacts
+  // belonging to the user's cuerda (or all contacts for admins).
+  // Contacts only disappear from a referente's Semillero if they get
+  // assigned to a DIFFERENT cuerda. Having a cell_id is irrelevant —
+  // the referente still needs to see and manage them.
   const filteredContacts = useMemo(() => {
     if (!allContacts) return [];
     let filtered: Contact[];
-    if (activePool === 'unassigned') filtered = allContacts.filter(c => !c.cell_id && !externalIds.has(c.id));
-    else if (activePool === 'external') filtered = externalContacts;
-    else filtered = [];
+    if (activePool === 'unassigned') {
+      // Start with all non-external contacts
+      filtered = allContacts.filter(c => !externalIds.has(c.id));
+    } else if (activePool === 'external') {
+      filtered = externalContacts;
+    } else {
+      filtered = [];
+    }
     // Cuerda filter: non-global users only see contacts with their cuerda
     if (!canSeeAllCuerdas && userCuerdaNumero) {
       filtered = filtered.filter(c => c.numero_cuerda === userCuerdaNumero);
@@ -1042,10 +1050,20 @@ const SemilleroPage = () => {
                           {c.created_at ? new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                         </td>
 
-                        {/* Sugerencia (Célula + Zona combinadas — all same color) */}
+                        {/* Sugerencia / Célula asignada */}
                         {isUnassignedView && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.sugerencia }}>
-                            {sugCell ? (() => {
+                            {c.cell_id ? (() => {
+                              // Already assigned to a cell — show the assignment
+                              const assignedCell = cells?.find(cl => cl.id === c.cell_id);
+                              const assignedCuerda = assignedCell?.cuerda_id ? cuerdas?.find(cr => cr.id === assignedCell.cuerda_id) : null;
+                              return assignedCell ? (
+                                <div className="flex items-center gap-1 overflow-hidden">
+                                  <Badge className="text-[9px] shrink-0 bg-blue-500/15 text-blue-400 hover:bg-blue-500/15">{assignedCell.name}</Badge>
+                                  {assignedCuerda && <span className="text-[9px] text-blue-400/70">Cda {assignedCuerda.numero}</span>}
+                                </div>
+                              ) : <span className="text-xs text-muted-foreground">Asignado</span>;
+                            })() : sugCell ? (() => {
                               const hasDist = c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null;
                               const dist = hasDist ? haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!) : null;
                               const badgeClass = dist != null ? getDistanceBadgeClass(dist) : (isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15');
@@ -1061,10 +1079,12 @@ const SemilleroPage = () => {
                           </td>
                         )}
 
-                        {/* Assign button */}
+                        {/* Assign button — only for contacts without a cell */}
                         {isUnassignedView && canAssignContacts() && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
-                            {(c as any).is_external && activePool === 'external' ? (
+                            {c.cell_id ? (
+                              <span className="text-[10px] text-blue-400">✓ Asignado</span>
+                            ) : (c as any).is_external && activePool === 'external' ? (
                               <div className="flex items-center gap-1">
                                 {sugCell && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
