@@ -32,7 +32,7 @@ const loadGoogleMaps = (): Promise<any> => {
     }
     const script = document.createElement('script');
     script.id = 'google-maps-script';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places`;
     script.async = true;
     script.onload = () => resolve((window as any).google.maps);
     document.head.appendChild(script);

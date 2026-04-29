@@ -305,11 +305,12 @@ const CelulasPage = () => {
                 <p className="text-[10px] text-muted-foreground">Arrastrá el pin o hacé clic en el mapa para setear la dirección.</p>
                 <div
                   ref={(el) => {
-                    if (!el || !(window as any).google) return;
-                    // Prevent re-initializing if map is already rendered in this element
+                    if (!el) return;
                     if ((el as any).__mapInit) return;
-                    (el as any).__mapInit = true;
-                    const google = (window as any).google;
+                    const initMap = () => {
+                      if (!(window as any).google?.maps) return false;
+                      (el as any).__mapInit = true;
+                      const google = (window as any).google;
                     const center = editCell.lat && editCell.lng
                       ? { lat: editCell.lat, lng: editCell.lng }
                       : { lat: -34.58, lng: -58.46 }; // Default: Buenos Aires
@@ -356,6 +357,14 @@ const CelulasPage = () => {
                         }
                       });
                     });
+                      return true;
+                    };
+                    // If Google Maps isn't loaded yet, retry every 200ms until it is
+                    if (!initMap()) {
+                      const interval = setInterval(() => {
+                        if (initMap()) clearInterval(interval);
+                      }, 200);
+                    }
                   }}
                   className="w-full h-[250px] rounded border"
                 />
