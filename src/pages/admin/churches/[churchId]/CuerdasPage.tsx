@@ -37,7 +37,7 @@ import CellCsvImporter from '@/components/admin/CellCsvImporter';
 // ─── Types ───────────────────────────────────────────────────────
 interface Cuerda {
   id: string; numero: string; zona_id: string;
-  address?: string | null; referente_name?: string | null;
+  address?: string | null; referente_name?: string | null; supervisor_name?: string | null;
   meeting_day?: string | null; meeting_time?: string | null;
 }
 interface Zona { id: string; nombre: string; }
@@ -70,6 +70,8 @@ const CuerdasPage = () => {
   const [savingCuerda, setSavingCuerda] = useState(false);
   const [creatingZona, setCreatingZona] = useState(false);
   const [newZonaNombre, setNewZonaNombre] = useState('');
+  const [editCuerdaLeaders, setEditCuerdaLeaders] = useState<{ id: string; numero: string; referente_name: string; supervisor_name: string } | null>(null);
+  const [savingLeaders, setSavingLeaders] = useState(false);
 
   // User's own cuerda (for filtering)
   const userCuerdaNumero = profile?.numero_cuerda || null;
@@ -93,7 +95,7 @@ const CuerdasPage = () => {
       if (!zonas?.length) return [];
       const zonaIds = zonas.map(z => z.id);
       const { data } = await supabase.from('cuerdas')
-        .select('id, numero, zona_id, address, referente_name, meeting_day, meeting_time')
+        .select('id, numero, zona_id, address, referente_name, supervisor_name, meeting_day, meeting_time')
         .in('zona_id', zonaIds)
         .order('numero');
       return data || [];
@@ -151,6 +153,7 @@ const CuerdasPage = () => {
         const cuerdaCells = (cells || []).filter(cell => cell.cuerda_id === c.id);
         return norm(c.numero).includes(s) ||
           norm(c.referente_name || '').includes(s) ||
+          norm(c.supervisor_name || '').includes(s) ||
           norm(zona?.nombre || '').includes(s) ||
           cuerdaCells.some(cell => {
             const leaderName = cell.encargado_id ? profilesMap?.[cell.encargado_id] || cell.leader_name || '' : cell.leader_name || '';
@@ -365,6 +368,9 @@ const CuerdasPage = () => {
                             {cuerda.referente_name && (
                               <span className="text-xs text-muted-foreground flex items-center gap-1"><UserCheck className="h-3 w-3" /> {cuerda.referente_name}</span>
                             )}
+                            {cuerda.supervisor_name && (
+                              <span className="text-xs text-blue-400/70 flex items-center gap-1"><UserCheck className="h-3 w-3" /> Sup: {cuerda.supervisor_name}</span>
+                            )}
                             {(cuerda.meeting_day || cuerda.meeting_time) && (
                               <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> {[cuerda.meeting_day, cuerda.meeting_time].filter(Boolean).join(' · ')}</span>
                             )}
@@ -379,6 +385,9 @@ const CuerdasPage = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setEditCuerdaLeaders({ id: cuerda.id, numero: cuerda.numero, referente_name: cuerda.referente_name || '', supervisor_name: cuerda.supervisor_name || '' })}>
+                                <UserCheck className="h-4 w-4 mr-1.5" /> Editar Referente / Supervisor
+                              </DropdownMenuItem>
                               <DropdownMenuItem className="text-red-600" onClick={() => deleteCuerda(cuerda.id, cuerda.numero)}>
                                 <Trash2 className="h-4 w-4 mr-1.5" /> Eliminar cuerda
                               </DropdownMenuItem>
@@ -607,6 +616,53 @@ const CuerdasPage = () => {
               {savingCuerda ? 'Creando...' : 'Crear'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Referente / Supervisor dialog */}
+      <Dialog open={!!editCuerdaLeaders} onOpenChange={(o) => { if (!o) setEditCuerdaLeaders(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Cuerda #{editCuerdaLeaders?.numero} — Referente y Supervisor</DialogTitle>
+          </DialogHeader>
+          {editCuerdaLeaders && (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Referente</label>
+                <Input
+                  value={editCuerdaLeaders.referente_name}
+                  onChange={e => setEditCuerdaLeaders(prev => prev ? { ...prev, referente_name: e.target.value } : null)}
+                  placeholder="Nombre del referente"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Supervisor</label>
+                <Input
+                  value={editCuerdaLeaders.supervisor_name}
+                  onChange={e => setEditCuerdaLeaders(prev => prev ? { ...prev, supervisor_name: e.target.value } : null)}
+                  placeholder="Nombre del supervisor"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="ghost" size="sm" onClick={() => setEditCuerdaLeaders(null)}>Cancelar</Button>
+                <Button size="sm" disabled={savingLeaders} onClick={async () => {
+                  setSavingLeaders(true);
+                  const { error } = await supabase.from('cuerdas').update({
+                    referente_name: editCuerdaLeaders.referente_name.trim() || null,
+                    supervisor_name: editCuerdaLeaders.supervisor_name.trim() || null,
+                  }).eq('id', editCuerdaLeaders.id);
+                  setSavingLeaders(false);
+                  if (error) { showError(error.message); return; }
+                  showSuccess(`Cuerda #${editCuerdaLeaders.numero} actualizada.`);
+                  setEditCuerdaLeaders(null);
+                  queryClient.invalidateQueries({ queryKey: ['cuerdas', churchId] });
+                  queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+                }}>
+                  {savingLeaders ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

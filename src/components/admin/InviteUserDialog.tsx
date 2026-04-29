@@ -35,13 +35,12 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
 
   const myLevel = getRoleLevel(profile?.role || '');
 
-  // Roles available to assign: strictly below current user's level
-  // Admin can assign everything except admin itself
-  // General can assign pastor, referente, encargado_de_celula, user
-  // Pastor can assign referente, encargado_de_celula, user
+  // Roles available to assign: same level or below current user's level.
+  // A referente can invite another referente, but not a supervisor.
+  // Admin can assign everything except admin itself.
   const assignableRoles = ALL_ROLES.filter(r => {
-    if (profile?.role === 'admin') return r !== 'admin'; // admin can assign all except admin
-    return getRoleLevel(r) < myLevel; // others can only assign roles below themselves
+    if (profile?.role === 'admin') return r !== 'admin';
+    return getRoleLevel(r) <= myLevel;
   });
 
   const onSubmit = async (e: React.FormEvent) => {
