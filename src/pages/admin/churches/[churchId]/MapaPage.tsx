@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
 
 interface Cell {
   id: string;
@@ -75,6 +76,7 @@ const MapaPage = () => {
   const queryClient = useQueryClient();
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
+  const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
 
   const { data: cells, isLoading } = useQuery<Cell[]>({
     queryKey: ['cells-map', churchId],
@@ -93,7 +95,23 @@ const MapaPage = () => {
     enabled: !!churchId,
   });
 
-  // Distinct cuerdas for filter checkboxes
+  // Count contacts assigned to each cell for the popup
+  const { data: cellContactCounts } = useQuery<Record<string, number>>({
+    queryKey: ['cell-contact-counts', churchId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('contacts')
+        .select('cell_id')
+        .eq('church_id', churchId!)
+        .is('deleted_at', null)
+        .not('cell_id', 'is', null);
+      const counts: Record<string, number> = {};
+      (data || []).forEach((c: any) => { if (c.cell_id) counts[c.cell_id] = (counts[c.cell_id] || 0) + 1; });
+      return counts;
+    },
+    enabled: !!churchId,
+    staleTime: 60_000,
+  });
   const availableCuerdas = React.useMemo(() => {
     const nums = new Set<string>();
     (cells || []).forEach(c => { if (c.cuerda_numero) nums.add(c.cuerda_numero); });
@@ -234,12 +252,18 @@ const MapaPage = () => {
       const bounds = new gmaps.LatLngBounds();
       const infoWindow = new gmaps.InfoWindow();
 
+      // Global callback for info window "Ver detalles" button
+      (window as any).__openCellDetails = (cellId: string) => {
+        setSelectedCellId(cellId);
+      };
+
       mappableCells.forEach(cell => {
         const leader = cell.leader_name || 'Sin líder';
         const anfitrion = cell.anfitrion_name || '';
         const schedule = [cell.meeting_day, cell.meeting_time].filter(Boolean).join(' · ') || 'Sin horario';
         const cuerdaLabel = cell.cuerda_numero ? `Cuerda ${cell.cuerda_numero}` : '';
         const pos = { lat: cell.lat!, lng: cell.lng! };
+        const contactCount = cellContactCounts?.[cell.id] || 0;
 
         // Color by cuerda, fallback to gold
         const colors = cell.cuerda_numero ? cuerdaColorMap.get(cell.cuerda_numero) : null;
@@ -265,13 +289,15 @@ const MapaPage = () => {
 
         marker.addListener('click', () => {
           infoWindow.setContent(`
-            <div style="font-family:system-ui,sans-serif;min-width:200px;padding:4px 0;color:#111;">
+            <div style="font-family:system-ui,sans-serif;min-width:220px;padding:4px 0;color:#111;">
               <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${cell.name}</div>
               ${cuerdaLabel ? `<div style="font-size:12px;color:#555;margin-bottom:2px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fillColor};margin-right:4px;vertical-align:middle;"></span>${cuerdaLabel}</div>` : ''}
               <div style="font-size:12px;color:#555;margin-bottom:2px;">👤 Líder: ${leader}</div>
               ${anfitrion ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🏠 Anfitrión: ${anfitrion}</div>` : ''}
               <div style="font-size:12px;color:#555;margin-bottom:2px;">🕐 ${schedule}</div>
+              <div style="font-size:12px;color:#555;margin-bottom:2px;">👥 ${contactCount} persona${contactCount !== 1 ? 's' : ''}</div>
               ${cell.address ? `<div style="font-size:11px;color:#777;margin-top:4px;">📍 ${cell.address}</div>` : ''}
+              <div style="margin-top:8px;"><button onclick="window.__openCellDetails('${cell.id}')" style="background:#FFC233;color:#000;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Ver detalles</button></div>
             </div>
           `);
           infoWindow.open(map, marker);
@@ -289,7 +315,7 @@ const MapaPage = () => {
     };
 
     initMap();
-  }, [mappableCellIds, isLoading, geocoding]);
+  }, [mappableCellIds, isLoading, geocoding, cellContactCounts]);
 
   return (
     <div className="h-full flex flex-col gap-3">
@@ -390,6 +416,14 @@ const MapaPage = () => {
       ) : (
         <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border" style={{ minHeight: '400px' }} />
       )}
+
+      {/* Cell details dialog — opens when clicking "Ver detalles" in a marker popup */}
+      <CellDetailsDialog
+        open={!!selectedCellId}
+        onOpenChange={(o) => { if (!o) setSelectedCellId(null); }}
+        churchId={churchId!}
+        cellId={selectedCellId}
+      />
     </div>
   );
 };
