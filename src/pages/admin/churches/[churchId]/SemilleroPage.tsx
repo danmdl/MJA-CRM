@@ -1033,26 +1033,36 @@ const SemilleroPage = () => {
 
                         {/* Dirección + Ver en mapa */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.direccion }}>
-                          {c.address ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs truncate max-w-[150px]">{c.address}</span>
-                              <button
-                                className="text-primary hover:text-primary/80 shrink-0"
-                                title="Ver en mapa"
-                                onClick={() => {
-                                  const sugCell = sug?.cell;
-                                  const sugCuerdaNum = sug?.cuerda?.numero;
-                                  setMapContact({
-                                    name: `${c.first_name} ${c.last_name || ''}`.trim(),
-                                    address: c.address!,
-                                    sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined, meetingDay: sugCell.meeting_day, meetingTime: sugCell.meeting_time } : null,
-                                  });
-                                }}
-                              >
-                                <MapPin className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : <span className="text-xs text-muted-foreground">—</span>}
+                          {c.address ? (() => {
+                            // Incomplete address = no street number (just a locality like "San Martín")
+                            const hasStreetNumber = /\d/.test(c.address!);
+                            const colorClass = hasStreetNumber ? 'text-foreground' : 'text-amber-400';
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span
+                                  className={`text-xs truncate max-w-[150px] ${colorClass}`}
+                                  title={hasStreetNumber ? c.address! : `⚠ Dirección incompleta (sin número): ${c.address}`}
+                                >
+                                  {c.address}
+                                </span>
+                                <button
+                                  className="text-primary hover:text-primary/80 shrink-0"
+                                  title="Ver en mapa"
+                                  onClick={() => {
+                                    const sugCell = sug?.cell;
+                                    const sugCuerdaNum = sug?.cuerda?.numero;
+                                    setMapContact({
+                                      name: `${c.first_name} ${c.last_name || ''}`.trim(),
+                                      address: c.address!,
+                                      sugCell: sugCell ? { name: sugCell.name, address: sugCell.address, lat: sugCell.lat, lng: sugCell.lng, cuerdaNumero: sugCuerdaNum || undefined, meetingDay: sugCell.meeting_day, meetingTime: sugCell.meeting_time } : null,
+                                    });
+                                  }}
+                                >
+                                  <MapPin className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })() : <span className="text-xs text-muted-foreground">—</span>}
                         </td>
 
                         {/* Fecha (created_at) */}
