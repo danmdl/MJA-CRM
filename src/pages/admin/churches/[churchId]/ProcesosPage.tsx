@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { normalize } from '@/lib/normalize';
+import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 
 // Pipeline stages in order
 const STAGES = [
@@ -46,6 +47,7 @@ const ProcesosPage = () => {
   const [contactSearch, setContactSearch] = useState('');
   const [dragItem, setDragItem] = useState<{ id: string; stage: StageKey } | null>(null);
   const [dragOverStage, setDragOverStage] = useState<StageKey | null>(null);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
 
   // Fetch all process entries for this church, joined with contact data
   const { data: processContacts, isLoading } = useQuery<ProcessContact[]>({
@@ -283,7 +285,12 @@ const ProcesosPage = () => {
                       <div className="flex items-start justify-between gap-1">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          <span className="text-sm font-medium truncate">{pc.first_name} {pc.last_name || ''}</span>
+                          <button
+                            className="text-sm font-medium truncate text-left hover:text-primary hover:underline transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setSelectedContactId(pc.contact_id); }}
+                          >
+                            {pc.first_name} {pc.last_name || ''}
+                          </button>
                         </div>
                         <button
                           className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all shrink-0"
@@ -363,6 +370,19 @@ const ProcesosPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Contact Profile Dialog — same as Semillero */}
+      <ContactProfileDialog
+        open={!!selectedContactId}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSelectedContactId(null);
+            queryClient.invalidateQueries({ queryKey: ['processes', churchId] });
+          }
+        }}
+        contactId={selectedContactId || ''}
+        churchId={churchId!}
+      />
     </div>
   );
 };
