@@ -417,13 +417,20 @@ const SemilleroPage = () => {
 
   const poolCounts = useMemo(() => {
     let unassigned = 0;
+    const userId = session?.user?.id;
     allContacts?.forEach(c => {
       if (externalIds.has(c.id)) return;
-      if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return;
+      if (!canSeeAllCuerdas) {
+        if (userCuerdaNumero) {
+          if (c.numero_cuerda !== userCuerdaNumero && c.responsable_id !== userId && c.created_by !== userId) return;
+        } else {
+          if (c.responsable_id !== userId && c.created_by !== userId) return;
+        }
+      }
       unassigned++;
     });
     return { unassigned };
-  }, [allContacts, canSeeAllCuerdas, userCuerdaNumero, externalIds]);
+  }, [allContacts, canSeeAllCuerdas, userCuerdaNumero, externalIds, session?.user?.id]);
 
 
   // ─── Filtered contacts ─────────────────────────────────────────
@@ -443,9 +450,25 @@ const SemilleroPage = () => {
     } else {
       filtered = [];
     }
-    // Cuerda filter: non-global users only see contacts with their cuerda
-    if (!canSeeAllCuerdas && userCuerdaNumero) {
-      filtered = filtered.filter(c => c.numero_cuerda === userCuerdaNumero);
+    // Visibility rules for non-global users:
+    // - If they have a cuerda: see contacts of their cuerda + contacts they created + contacts they're responsible for
+    // - If they DON'T have a cuerda: only see contacts they created or are responsible for
+    // This prevents users from seeing/editing contacts that belong to other cuerdas
+    if (!canSeeAllCuerdas) {
+      const userId = session?.user?.id;
+      if (userCuerdaNumero) {
+        filtered = filtered.filter(c =>
+          c.numero_cuerda === userCuerdaNumero ||
+          c.responsable_id === userId ||
+          c.created_by === userId
+        );
+      } else {
+        // No cuerda assigned — only see own contacts
+        filtered = filtered.filter(c =>
+          c.responsable_id === userId ||
+          c.created_by === userId
+        );
+      }
     }
     if (searchTerm) {
       const s = normalize(searchTerm);
@@ -478,7 +501,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero, sortBy, sortDir]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -910,7 +933,9 @@ const SemilleroPage = () => {
                           ? 'Sin resultados para tu búsqueda.'
                           : (filterCuerda || filterResponsable)
                             ? 'No hay contactos que coincidan con los filtros aplicados.'
-                            : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Semillero Externo vacío.'}
+                            : !canSeeAllCuerdas && !userCuerdaNumero
+                              ? 'No tenés una cuerda asignada. Pedile a tu admin que te asigne una cuerda desde el panel de Equipo.'
+                              : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Semillero Externo vacío.'}
                       </td>
                     </tr>
                   )}
