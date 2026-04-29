@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import SetupAccount from "./pages/SetupAccount";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
 import { usePermissions } from "./lib/permissions";
@@ -177,6 +178,7 @@ const AppRoutes = () => {
     <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/setup-account" element={<SetupAccount />} />
 
       {/* Root route: redirect to /admin so the AdminRootRedirect can pick the
           right destination based on role. The old <Index /> 'Welcome' page was
