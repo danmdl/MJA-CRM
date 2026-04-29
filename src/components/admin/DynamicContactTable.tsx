@@ -367,7 +367,7 @@ const DynamicContactTable = ({
         const restored = keys.map(k => map.get(k)).filter(Boolean) as ContactField[];
         if (restored.length > 0) return restored;
       }
-    } catch {}
+    } catch (e) { console.warn('Failed to restore column preferences:', e); }
     return defaultVisibleColumns;
   });
 
@@ -375,7 +375,7 @@ const DynamicContactTable = ({
     try {
       const keys = visibleColumns.map(c => c.key);
       localStorage.setItem(storageKey, JSON.stringify(keys));
-    } catch {}
+    } catch (e) { console.warn('Failed to save column preferences:', e); }
   }, [visibleColumns, storageKey]);
 
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);

@@ -96,7 +96,7 @@ const PapeleraPage = () => {
     showSuccess(`${item.type === 'contact' ? 'Contacto' : 'Célula'} "${item.name}" restaurado/a.`);
     queryClient.invalidateQueries({ queryKey: ['papelera'] });
     queryClient.invalidateQueries({ queryKey: ['contacts'] });
-    queryClient.invalidateQueries({ queryKey: ['celulas-page'] });
+    queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
     queryClient.invalidateQueries({ queryKey: ['cells'] });
     setConfirmAction(null);
   };

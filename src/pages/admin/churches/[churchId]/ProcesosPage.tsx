@@ -242,51 +242,51 @@ const ProcesosPage = () => {
 
       {/* Kanban board */}
       <div className="flex-1 overflow-x-auto pb-4">
-        <div className="flex gap-3" style={{ minWidth: STAGES.length * 240 }}>
+        <div className="flex gap-2" style={{ minWidth: STAGES.length * 170 }}>
           {STAGES.map(stage => {
             const cards = stageGroups[stage.key];
             const isOver = dragOverStage === stage.key;
             return (
               <div
                 key={stage.key}
-                className={`flex flex-col rounded-lg border transition-colors ${isOver ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}
-                style={{ width: 260, minWidth: 240, flexShrink: 0 }}
+                className={`flex flex-col flex-1 rounded-lg border transition-colors ${isOver ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'}`}
+                style={{ minWidth: 160 }}
                 onDragOver={(e) => handleDragOver(e, stage.key)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, stage.key)}
               >
                 {/* Column header */}
-                <div className="flex items-center justify-between px-3 py-2.5 border-b" style={{ borderBottomColor: stage.color + '40' }}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
-                    <span className="text-sm font-semibold">{stage.label}</span>
+                <div className="flex items-center justify-between px-2 py-2 border-b" style={{ borderBottomColor: stage.color + '40' }}>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                    <span className="text-xs font-semibold truncate">{stage.label}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">{cards.length}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5">{cards.length}</span>
                     <button
                       className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="Agregar persona"
                       onClick={() => { setAddDialogStage(stage.key); setContactSearch(''); }}
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
 
                 {/* Cards */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+                <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5" style={{ maxHeight: 'calc(100vh - 260px)' }}>
                   {cards.map(pc => (
                     <div
                       key={pc.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, pc.id, pc.stage)}
-                      className="group rounded-md border bg-card px-3 py-2.5 cursor-grab active:cursor-grabbing hover:border-primary/40 transition-colors"
+                      className="group rounded-md border bg-card px-2 py-2 cursor-grab active:cursor-grabbing hover:border-primary/40 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex items-center gap-1 min-w-0">
+                          <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                           <button
-                            className="text-sm font-medium truncate text-left hover:text-primary hover:underline transition-colors"
+                            className="text-xs font-medium truncate text-left hover:text-primary hover:underline transition-colors"
                             onClick={(e) => { e.stopPropagation(); setSelectedContactId(pc.contact_id); }}
                           >
                             {pc.first_name} {pc.last_name || ''}
@@ -300,11 +300,11 @@ const ProcesosPage = () => {
                           <X className="h-3 w-3" />
                         </button>
                       </div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-                        {pc.numero_cuerda && <span className="font-mono">🎵 {pc.numero_cuerda}</span>}
-                        {pc.responsable_name && <span className="truncate max-w-[120px]">👤 {pc.responsable_name}</span>}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-muted-foreground">
+                        {pc.numero_cuerda && <span className="font-mono">🎵{pc.numero_cuerda}</span>}
+                        {pc.responsable_name && <span className="truncate max-w-[100px]">👤{pc.responsable_name}</span>}
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground/60">
+                      <div className="mt-0.5 flex items-center justify-between text-[9px] text-muted-foreground/60">
                         <span>{timeAgo(pc.moved_at)}</span>
                         {pc.phone && <span className="font-mono truncate max-w-[100px]">{pc.phone}</span>}
                       </div>

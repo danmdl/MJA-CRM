@@ -94,7 +94,6 @@ const TemplatesPage = () => {
     if (error) {
       console.error('Error loading templates:', error);
     }
-    console.log('Loaded templates:', data);
     setTemplates(data || []);
   };
 

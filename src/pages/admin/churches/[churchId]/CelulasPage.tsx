@@ -158,7 +158,7 @@ const CelulasPage = () => {
 
       showSuccess('Célula actualizada. Los cambios se reflejan en todas las solapas.');
       setEditCell(null);
-      queryClient.invalidateQueries({ queryKey: ['celulas-page'] });
+      queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
       queryClient.invalidateQueries({ queryKey: ['overviewCells'] });
       queryClient.invalidateQueries({ queryKey: ['cells-pool'] });
       queryClient.invalidateQueries({ queryKey: ['cells'] });
@@ -257,7 +257,7 @@ const CelulasPage = () => {
                                 onClick={async () => {
                                   await supabase.from('cells').update({ closed_at: null, closed_reason: null, closed_by: null }).eq('id', cell.id);
                                   showSuccess(`${cell.name} reabierta.`);
-                                  queryClient.invalidateQueries({ queryKey: ['celulas-page'] });
+                                  queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
                                 }}
                               >
                                 <Unlock className="h-3.5 w-3.5" />
@@ -470,7 +470,7 @@ const CelulasPage = () => {
                 });
                 showSuccess(`${closeDialog.name} cerrada.`);
                 setCloseDialog(null);
-                queryClient.invalidateQueries({ queryKey: ['celulas-page'] });
+                queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
               }}>
                 Cerrar Célula
               </Button>
