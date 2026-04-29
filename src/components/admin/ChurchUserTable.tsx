@@ -158,7 +158,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   // Roles assignable by current user (strictly below their level)
   const assignableRoles = ALL_ROLES.filter(r => {
     if (profile?.role === 'admin') return r !== 'admin';
-    return getRoleLevel(r) < myLevel;
+    return getRoleLevel(r) <= myLevel;
   });
 
   if (isLoading) return (
@@ -197,7 +197,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
           {filteredUsers.length > 0 ? filteredUsers.map((user) => {
             const isSelf = user.id === session?.user.id;
             const canManageThisUser = !isSelf && (
-              profile?.role === 'admin' || getRoleLevel(user.role) < myLevel
+              profile?.role === 'admin' || getRoleLevel(user.role) <= myLevel
             );
 
             return (
@@ -214,8 +214,8 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                       value={user.role}
                       onChange={(e) => {
                         const newRole = e.target.value as UserRole;
-                        if (profile?.role !== 'admin' && getRoleLevel(newRole) >= myLevel) {
-                          showError('No podés asignar un rol igual o superior al tuyo.');
+                        if (profile?.role !== 'admin' && getRoleLevel(newRole) > myLevel) {
+                          showError('No podés asignar un rol superior al tuyo.');
                           return;
                         }
                         updateUserRoleMutation.mutate({ userId: user.id, newRole });
