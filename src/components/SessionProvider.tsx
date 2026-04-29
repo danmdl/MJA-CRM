@@ -105,8 +105,16 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
           // re-clicking an old invite link from their inbox - that was the
           // backdoor that let them keep changing their password.
           const hash = window.location.hash;
-          const isInviteLink = hash.includes('type=invite') || hash.includes('type=signup') || hash.includes('type=recovery');
+          const search = window.location.search;
+          const fullUrl = hash + search;
+          const isInviteLink = fullUrl.includes('type=invite') || fullUrl.includes('type=signup') || fullUrl.includes('type=recovery') || search.includes('code=');
           if (isInviteLink && !profileData.profile_completed) {
+            setNeedsPasswordSetup(true);
+          }
+          // Also catch users who have a session but never set a password
+          // (they clicked the invite link and Supabase auto-logged them in
+          // via PKCE without going through the hash flow)
+          if (!profileData.profile_completed && currentSession) {
             setNeedsPasswordSetup(true);
           }
 
