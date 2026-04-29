@@ -545,6 +545,16 @@ const SemilleroPage = () => {
         transferred_by: session?.user?.id,
         transfer_type: 'pool_assignment',
       });
+      // Log to activity_logs for Historial
+      await supabase.from('activity_logs').insert({
+        user_id: session?.user?.id,
+        church_id: churchId,
+        action: 'assign',
+        entity_type: 'contact',
+        entity_id: contactId,
+        before_data: { numero_cuerda: contact?.numero_cuerda, cell_id: contact?.cell_id, zona: contact?.zona },
+        after_data: { numero_cuerda: cuerdaNum, cell_id: cellId, zona: zonaName, cell_name: cell?.name },
+      });
       setUndoData({
         contactIds: [contactId],
         prevStates: [{ zona_id: contact?.zona_id || null, zona: contact?.zona || null, numero_cuerda: contact?.numero_cuerda || null, cell_id: contact?.cell_id || null }],
@@ -1324,6 +1334,17 @@ const SemilleroPage = () => {
                   }).eq('id', confirmDialog.contactId);
                   if (error) showError(error.message);
                   else {
+                    const contact = allContacts?.find(ct => ct.id === confirmDialog.contactId);
+                    // Log to activity_logs for Historial
+                    await supabase.from('activity_logs').insert({
+                      user_id: session?.user?.id,
+                      church_id: churchId,
+                      action: 'assign',
+                      entity_type: 'contact',
+                      entity_id: confirmDialog.contactId,
+                      before_data: { numero_cuerda: contact?.numero_cuerda, cell_id: contact?.cell_id, zona: contact?.zona },
+                      after_data: { numero_cuerda: confirmDialog.cuerdaNum, cell_id: null, zona: zona?.nombre },
+                    });
                     showSuccess(`Contacto asignado a Cuerda ${confirmDialog.cuerdaNum}.`);
                     queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                     queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
@@ -1352,7 +1373,7 @@ const SemilleroPage = () => {
           <CsvImporter
             tableName="contacts"
             requiredFields={CONTACT_FIELDS.filter(f => f.key === 'first_name' || f.key === 'sexo')}
-            optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name' && f.key !== 'sexo')}
+            optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name' && f.key !== 'sexo' && f.key !== 'barrio' && f.key !== 'leader_assigned')}
             churchId={churchId}
             onImportComplete={(ids) => {
               setRecentImportIds(new Set(ids));

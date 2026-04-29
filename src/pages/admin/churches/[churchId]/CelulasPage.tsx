@@ -5,13 +5,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, MapPin, Pencil } from 'lucide-react';
+import { Search, MapPin, Pencil, Lock, Unlock } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError } from '@/utils/toast';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { usePermissions } from '@/lib/permissions';
 import { useSession } from '@/hooks/use-session';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CellRow {
   id: string;
@@ -27,6 +28,8 @@ interface CellRow {
   zona_nombre: string | null;
   referente_name: string | null;
   supervisor_name: string | null;
+  closed_at: string | null;
+  closed_reason: string | null;
 }
 
 const CelulasPage = () => {
@@ -38,6 +41,8 @@ const CelulasPage = () => {
   const [zonaFilter, setZonaFilter] = useState<string>('all');
   const [editCell, setEditCell] = useState<CellRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [closeDialog, setCloseDialog] = useState<{ id: string; name: string } | null>(null);
+  const [closeReason, setCloseReason] = useState('');
   const [mapCell, setMapCell] = useState<{ name: string; address: string; lat: number | null; lng: number | null } | null>(null);
 
   // If user doesn't have "see all" permission, only show their cuerda
@@ -49,7 +54,7 @@ const CelulasPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('cells')
-        .select('id, name, address, lat, lng, meeting_day, meeting_time, leader_name, anfitrion_name, cuerda_id')
+        .select('id, name, address, lat, lng, meeting_day, meeting_time, leader_name, anfitrion_name, cuerda_id, closed_at, closed_reason')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
       if (error) throw error;
@@ -71,6 +76,8 @@ const CelulasPage = () => {
           cuerda_numero: cuerda?.numero || null, zona_nombre: zona?.nombre || null,
           referente_name: cuerda?.referente_name || null,
           supervisor_name: cuerda?.supervisor_name || null,
+          closed_at: (cell as any).closed_at || null,
+          closed_reason: (cell as any).closed_reason || null,
         };
       });
 
@@ -209,10 +216,18 @@ const CelulasPage = () => {
                 {rows.map(cell => {
                   const noAddr = !cell.address;
                   return (
-                    <tr key={cell.id} className={`border-b hover:bg-muted/30 transition-colors ${noAddr ? 'bg-red-500/5' : ''}`}>
-                      <td className="px-3 py-2 font-mono text-muted-foreground">{cell.cuerda_numero || '—'}</td>
+                    <tr key={cell.id} className={`border-b hover:bg-muted/30 transition-colors ${cell.closed_at ? 'opacity-50' : noAddr ? 'bg-red-500/5' : ''}`}>
+                      <td className="px-3 py-2 font-mono text-muted-foreground">
+                        {cell.cuerda_numero || '—'}
+                        {cell.closed_at && <span className="ml-1 text-[9px] text-red-400" title={cell.closed_reason || 'Cerrada'}>🔒</span>}
+                      </td>
                       <td className={`px-3 py-2 ${noAddr ? 'text-red-400 font-medium' : ''}`}>
-                        {noAddr ? <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Sin dirección</span> : (
+                        {cell.closed_at ? (
+                          <div>
+                            <span className="text-sm text-red-400 line-through">{cell.address || cell.name}</span>
+                            {cell.closed_reason && <p className="text-[10px] text-muted-foreground mt-0.5">Motivo: {cell.closed_reason}</p>}
+                          </div>
+                        ) : noAddr ? <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Sin dirección</span> : (
                           <div>
                             <span className="truncate max-w-[250px] block text-sm" title={cell.address!}>{cell.address}</span>
                             {cell.lat && cell.lng && (
@@ -231,7 +246,32 @@ const CelulasPage = () => {
                       <td className="px-3 py-2 text-muted-foreground">{cell.supervisor_name || '—'}</td>
                       {canEditCelulas() && (
                         <td className="px-3 py-1">
-                          <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
+                          <div className="flex items-center gap-0.5">
+                            {!cell.closed_at && (
+                              <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
+                            )}
+                            {cell.closed_at ? (
+                              <button
+                                className="p-1 rounded hover:bg-green-500/20 text-muted-foreground hover:text-green-400 transition-colors"
+                                title="Reabrir célula"
+                                onClick={async () => {
+                                  await supabase.from('cells').update({ closed_at: null, closed_reason: null, closed_by: null }).eq('id', cell.id);
+                                  showSuccess(`${cell.name} reabierta.`);
+                                  queryClient.invalidateQueries({ queryKey: ['celulas-page'] });
+                                }}
+                              >
+                                <Unlock className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                className="p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+                                title="Cerrar célula"
+                                onClick={() => { setCloseDialog({ id: cell.id, name: cell.name }); setCloseReason(''); }}
+                              >
+                                <Lock className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -389,6 +429,55 @@ const CelulasPage = () => {
         contactAddress={mapCell?.address || ''}
         suggestedCell={null}
       />
+
+      {/* Close cell dialog */}
+      <Dialog open={!!closeDialog} onOpenChange={(o) => { if (!o) setCloseDialog(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Cerrar célula</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Vas a cerrar <strong>{closeDialog?.name}</strong>. La célula seguirá visible pero marcada como cerrada.
+            </p>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Motivo del cierre</label>
+              <Textarea
+                value={closeReason}
+                onChange={e => setCloseReason(e.target.value)}
+                placeholder="Ej: Mudanza del anfitrión, falta de asistentes..."
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="ghost" size="sm" onClick={() => setCloseDialog(null)}>Cancelar</Button>
+              <Button variant="destructive" size="sm" onClick={async () => {
+                if (!closeDialog) return;
+                const { error } = await supabase.from('cells').update({
+                  closed_at: new Date().toISOString(),
+                  closed_reason: closeReason.trim() || null,
+                  closed_by: session?.user?.id,
+                }).eq('id', closeDialog.id);
+                if (error) { showError(error.message); return; }
+                await supabase.from('activity_logs').insert({
+                  user_id: session?.user?.id,
+                  church_id: churchId,
+                  action: 'close',
+                  entity_type: 'cell',
+                  entity_id: closeDialog.id,
+                  before_data: null,
+                  after_data: { reason: closeReason.trim() || null },
+                });
+                showSuccess(`${closeDialog.name} cerrada.`);
+                setCloseDialog(null);
+                queryClient.invalidateQueries({ queryKey: ['celulas-page'] });
+              }}>
+                Cerrar Célula
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

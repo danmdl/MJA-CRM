@@ -728,24 +728,36 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-muted-foreground">Nueva cuerda</label>
-                      <select
-                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                        value={pendingCuerdaChange === '__open__' ? '' : (pendingCuerdaChange || '')}
-                        onChange={(e) => setPendingCuerdaChange(e.target.value || '__open__')}
-                      >
-                        <option value="">Seleccionar cuerda...</option>
-                        <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
-                        <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
-                        <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
-                        <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
-                        <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
-                        <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
-                        <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
-                        <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
-                        <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
-                        <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
-                        <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
-                      </select>
+                      {/* Referentes can only reassign to their own cuerda (return to origin) */}
+                      {profile?.role === 'referente' && profile?.numero_cuerda ? (
+                        <select
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                          value={pendingCuerdaChange === '__open__' ? '' : (pendingCuerdaChange || '')}
+                          onChange={(e) => setPendingCuerdaChange(e.target.value || '__open__')}
+                        >
+                          <option value="">Seleccionar cuerda...</option>
+                          <option value={profile.numero_cuerda}>{profile.numero_cuerda} (mi cuerda)</option>
+                        </select>
+                      ) : (
+                        <select
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                          value={pendingCuerdaChange === '__open__' ? '' : (pendingCuerdaChange || '')}
+                          onChange={(e) => setPendingCuerdaChange(e.target.value || '__open__')}
+                        >
+                          <option value="">Seleccionar cuerda...</option>
+                          <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
+                          <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
+                          <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
+                          <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
+                          <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
+                          <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
+                          <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
+                          <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
+                          <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
+                          <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
+                          <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
+                        </select>
+                      )}
                     </div>
 
                     {/* Warning: non-privileged roles return contact to Semillero */}

@@ -376,19 +376,20 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         throw new Error(`No se pudo importar ningún contacto. ${failed.length} fila(s) con errores.`);
       }
 
-      showSuccess(`¡Importación completada! ${successCount} contactos importados.`);
+      showSuccess(`¡Importación completada! ${successCount} contactos importados${failed.length > 0 ? ` (${failed.length} con errores)` : ''}.`);
       setImportSuccess(true);
       setFile(null);
       setCsvHeaders([]);
       setDataToImport([]);
       setColumnMapping({});
+      setAutoMatchedFields(new Set());
       // Refresh Semillero contacts list immediately so user sees new data without F5
       if (churchId) {
         queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
       }
-      // Notify parent with the imported IDs so it can highlight them
-      if (importedIds.length > 0 && onImportComplete) {
+      // Notify parent: close dialog + highlight imported rows
+      if (onImportComplete) {
         onImportComplete(importedIds);
       }
     } catch (error: any) {
