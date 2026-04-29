@@ -382,7 +382,7 @@ const SemilleroPage = () => {
   const suggestions = useMemo(() => {
     const map: Record<string, { cell: Cell | null; cuerda: Cuerda | null; zona: Zona | null }> = {};
     allContacts?.forEach(c => {
-      if (!c.zona_id && !c.cell_id) {
+      if (!c.cell_id) {
         const sugZona = detectZonaForContact(c);
         const sortedCells = getCellsByDistance(c, sugZona);
         const sugCell = sortedCells[0] || null;
@@ -418,7 +418,7 @@ const SemilleroPage = () => {
   const poolCounts = useMemo(() => {
     let unassigned = 0;
     allContacts?.forEach(c => {
-      if (!c.zona_id && !c.cell_id) {
+      if (!c.cell_id) {
         if (!canSeeAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return;
         if (externalIds.has(c.id)) return;
         unassigned++;
@@ -432,7 +432,7 @@ const SemilleroPage = () => {
   const filteredContacts = useMemo(() => {
     if (!allContacts) return [];
     let filtered: Contact[];
-    if (activePool === 'unassigned') filtered = allContacts.filter(c => !c.zona_id && !c.cell_id && !externalIds.has(c.id));
+    if (activePool === 'unassigned') filtered = allContacts.filter(c => !c.cell_id && !externalIds.has(c.id));
     else if (activePool === 'external') filtered = externalContacts;
     else filtered = [];
     // Cuerda filter: non-global users only see contacts with their cuerda
@@ -491,7 +491,7 @@ const SemilleroPage = () => {
     const counts: Record<string, number> = {};
     let noMatch = 0;
     allContacts?.forEach(c => {
-      if (c.zona_id || c.cell_id) return;
+      if (c.cell_id) return;
       const sug = suggestions[c.id];
       if (sug?.cell) {
         const label = sug.cell.name + (sug.cuerda ? ` (Cuerda ${sug.cuerda.numero})` : '');
