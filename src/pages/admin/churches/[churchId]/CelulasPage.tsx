@@ -268,6 +268,8 @@ const CelulasPage = () => {
                   }}
                   placeholder="Ej: Av Corrientes 4000, CABA"
                 />
+              </div>
+
               {/* Map — always visible for drag-and-drop pin placement */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
