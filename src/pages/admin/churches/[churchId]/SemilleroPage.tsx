@@ -144,7 +144,7 @@ const SemilleroPage = () => {
   };
 
   // Assignment permission comes from canAssignContacts() via usePermissions
-  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign } = usePermissions();
+  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
@@ -783,30 +783,38 @@ const SemilleroPage = () => {
         <div className="flex-1" />
         {profile?.role !== 'conector' && (
           <>
-            <select className="h-8 text-xs border rounded px-2 bg-background" value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)}>
-              <option value="">Todas las cuerdas</option>
-              {[...new Set((allContacts || []).map(c => c.numero_cuerda).filter(Boolean))].sort().map(n => (
-                <option key={n} value={n!}>Cuerda {n}</option>
-              ))}
-            </select>
-            <select className="h-8 text-xs border rounded px-2 bg-background max-w-[180px]" value={filterResponsable} onChange={e => setFilterResponsable(e.target.value)}>
-              <option value="">Todos los responsables</option>
-              {session?.user?.id && (
-                <option value={session.user.id}>⭐ Mis contactos</option>
-              )}
-              <option value="__none__">Sin responsable</option>
-              {(() => {
-                const creatorIds = new Set<string>();
-                (allContacts || []).forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
-                const creators = Array.from(creatorIds)
-                  .map(id => ({ id, profile: profileById.get(id) }))
-                  .filter(c => c.profile && c.id !== session?.user?.id)
-                  .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
-                return creators.map(c => (
-                  <option key={c.id} value={c.id}>{c.profile!.first_name} {c.profile!.last_name}</option>
-                ));
-              })()}
-            </select>
+            {canFilterAllContacts() && (
+              <select className="h-8 text-xs border rounded px-2 bg-background" value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)}>
+                <option value="">Todas las cuerdas</option>
+                {[...new Set((allContacts || []).map(c => c.numero_cuerda).filter(Boolean))].sort().map(n => (
+                  <option key={n} value={n!}>Cuerda {n}</option>
+                ))}
+              </select>
+            )}
+            {canFilterAllContacts() ? (
+              <select className="h-8 text-xs border rounded px-2 bg-background max-w-[180px]" value={filterResponsable} onChange={e => setFilterResponsable(e.target.value)}>
+                <option value="">Todos los responsables</option>
+                {session?.user?.id && (
+                  <option value={session.user.id}>⭐ Mis contactos</option>
+                )}
+                <option value="__none__">Sin responsable</option>
+                {(() => {
+                  const creatorIds = new Set<string>();
+                  (allContacts || []).forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
+                  const creators = Array.from(creatorIds)
+                    .map(id => ({ id, profile: profileById.get(id) }))
+                    .filter(c => c.profile && c.id !== session?.user?.id)
+                    .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
+                  return creators.map(c => (
+                    <option key={c.id} value={c.id}>{c.profile!.first_name} {c.profile!.last_name}</option>
+                  ));
+                })()}
+              </select>
+            ) : (
+              <span className="h-8 flex items-center text-xs text-muted-foreground px-2 border rounded bg-muted/30">
+                Mis contactos
+              </span>
+            )}
           </>
         )}
         <div className="relative w-52 max-w-full">
