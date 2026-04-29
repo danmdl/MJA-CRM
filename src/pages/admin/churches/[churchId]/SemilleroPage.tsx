@@ -892,7 +892,12 @@ const SemilleroPage = () => {
                     const sugCuerda = sug?.cuerda;
                     const sugZona = sug?.zona;
                     const hasAddress = !!(c.address || c.barrio);
-                    const isExternal = sugZona && homeZonaId && sugZona.id !== homeZonaId;
+                    // A contact is "external" when the nearest suggested cell belongs to a
+                    // different cuerda than the contact's own cuerda. If the contact has no
+                    // cuerda assigned, fall back to comparing zonas.
+                    const isExternal = sugCuerda
+                      ? (c.numero_cuerda ? sugCuerda.numero !== c.numero_cuerda : (sugZona && homeZonaId ? sugZona.id !== homeZonaId : false))
+                      : false;
                     const responsable = teamMembers?.find(m => m.id === c.responsable_id);
 
                     return (
