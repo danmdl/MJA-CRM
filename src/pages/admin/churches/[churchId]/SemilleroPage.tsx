@@ -989,9 +989,9 @@ const SemilleroPage = () => {
                           {c.phone ? (() => {
                             const phoneOk = isValidArgentinePhone(c.phone);
                             return (
-                              <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1">
                                 <span
-                                  className={`hidden sm:inline text-[11px] tabular-nums font-medium truncate ${phoneOk ? 'text-foreground' : 'text-red-500'}`}
+                                  className={`hidden sm:inline text-[11px] tabular-nums font-medium truncate flex-1 ${phoneOk ? 'text-foreground' : 'text-red-500'}`}
                                   title={phoneOk ? undefined : 'Número incompleto o inválido'}
                                 >
                                   {c.phone}
@@ -1046,7 +1046,7 @@ const SemilleroPage = () => {
                           {c.address ? (() => {
                             // Incomplete address = no street number (just a locality like "San Martín")
                             const hasStreetNumber = /\d/.test(c.address!);
-                            const colorClass = hasStreetNumber ? 'text-foreground' : 'text-amber-400';
+                            const colorClass = hasStreetNumber ? 'text-foreground' : 'text-red-400';
                             return (
                               <div className="flex items-center gap-1">
                                 <span
