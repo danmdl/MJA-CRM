@@ -81,7 +81,31 @@ const lazyRetry = (fn: () => Promise<any>) => React.lazy(() =>
   }))
 );
 
-// Lazy-loaded pages (heavy components, loaded on demand)
+// Prefetch the most-used page chunks on app load so tab switches feel instant.
+// These imports fire in the background — if they arrive before the user clicks
+// the tab, React.lazy resolves immediately with no loading flash.
+const prefetch = (fn: () => Promise<any>) => { fn().catch(() => {}); };
+if (typeof window !== 'undefined') {
+  // Delay prefetch slightly so it doesn't compete with initial page load
+  setTimeout(() => {
+    prefetch(() => import("./pages/admin/churches/[churchId]/SemilleroPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/CuerdasPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/CelulasPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/OverviewPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/ProcesosPage"));
+    prefetch(() => import("./pages/admin/churches/[churchId]/TeamPage"));
+  }, 2000);
+}
+
+// Minimal loading indicator for tab transitions — prevents the flash-to-black
+// that happens when Suspense fallback is null and the lazy chunk hasn't loaded yet.
+const PageLoader = () => (
+  <div className="p-6 space-y-3 animate-pulse">
+    <div className="h-8 w-48 bg-muted rounded" />
+    <div className="h-4 w-96 bg-muted/50 rounded" />
+    <div className="h-64 w-full bg-muted/30 rounded-lg mt-4" />
+  </div>
+);
 const AdminProfile = lazyRetry(() => import("./pages/admin/Profile"));
 const ChurchesPage = lazyRetry(() => import("./pages/admin/ChurchesPage"));
 const ChurchOverviewPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/OverviewPage"));
@@ -147,7 +171,7 @@ const AppRoutes = () => {
 
   return (
     <ChunkErrorBoundary>
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={<Login />} />
 
