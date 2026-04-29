@@ -37,7 +37,6 @@ const CelulasPage = () => {
   const [zonaFilter, setZonaFilter] = useState<string>('all');
   const [editCell, setEditCell] = useState<CellRow | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showMap, setShowMap] = useState(false);
   const [mapCell, setMapCell] = useState<{ name: string; address: string; lat: number | null; lng: number | null } | null>(null);
 
   // If user doesn't have "see all" permission, only show their cuerda
@@ -241,7 +240,7 @@ const CelulasPage = () => {
       </div>
 
       {/* Edit dialog — updates the cells table directly, all pages see the change */}
-      <Dialog open={!!editCell} onOpenChange={(o) => { if (!o) { setEditCell(null); setShowMap(false); } }}>
+      <Dialog open={!!editCell} onOpenChange={(o) => { if (!o) { setEditCell(null); } }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Célula — Cuerda {editCell?.cuerda_numero}</DialogTitle>
@@ -264,84 +263,77 @@ const CelulasPage = () => {
                   }}
                   placeholder="Ej: Av Corrientes 4000, CABA"
                 />
-                {editCell.lat && editCell.lng && (
-                  <p className="text-[10px] text-muted-foreground">Coordenadas: {editCell.lat.toFixed(5)}, {editCell.lng.toFixed(5)}</p>
-                )}
-              </div>
-
-              {/* Map toggle + manual pin */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" className="text-xs gap-1" onClick={() => setShowMap(!showMap)}>
-                    <MapPin className="h-3.5 w-3.5" /> {showMap ? 'Ocultar mapa' : 'Ver / Editar en Mapa'}
-                  </Button>
-                  {editCell.lat && editCell.lng && !showMap && (
+              {/* Map — always visible for drag-and-drop pin placement */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Ubicación en el mapa</label>
+                  {editCell.lat && editCell.lng && (
                     <a
                       href={`https://www.google.com/maps?q=${editCell.lat},${editCell.lng}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-primary hover:underline"
+                      className="text-[10px] text-primary hover:underline"
                     >
                       Abrir en Google Maps
                     </a>
                   )}
                 </div>
-
-                {showMap && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground">Hacé clic en el mapa para mover el pin manualmente.</p>
-                    <div
-                      ref={(el) => {
-                        if (!el || !(window as any).google) return;
-                        const google = (window as any).google;
-                        const center = editCell.lat && editCell.lng
-                          ? { lat: editCell.lat, lng: editCell.lng }
-                          : { lat: -34.58, lng: -58.46 }; // Default: Buenos Aires
-                        const map = new google.maps.Map(el, {
-                          center,
-                          zoom: editCell.lat ? 16 : 12,
-                          mapTypeControl: false,
-                          streetViewControl: false,
-                          fullscreenControl: false,
-                        });
-                        const marker = new google.maps.Marker({
-                          position: center,
-                          map,
-                          draggable: true,
-                        });
-                        // Click on map → move pin
-                        map.addListener('click', (e: any) => {
-                          const lat = e.latLng.lat();
-                          const lng = e.latLng.lng();
-                          marker.setPosition(e.latLng);
-                          // Reverse geocode to get address
-                          const geocoder = new google.maps.Geocoder();
-                          geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
-                            if (status === 'OK' && results[0]) {
-                              setEditCell(prev => prev ? { ...prev, lat, lng, address: results[0].formatted_address } : null);
-                            } else {
-                              setEditCell(prev => prev ? { ...prev, lat, lng } : null);
-                            }
-                          });
-                        });
-                        // Drag marker → update
-                        marker.addListener('dragend', () => {
-                          const pos = marker.getPosition();
-                          const lat = pos.lat();
-                          const lng = pos.lng();
-                          const geocoder = new google.maps.Geocoder();
-                          geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
-                            if (status === 'OK' && results[0]) {
-                              setEditCell(prev => prev ? { ...prev, lat, lng, address: results[0].formatted_address } : null);
-                            } else {
-                              setEditCell(prev => prev ? { ...prev, lat, lng } : null);
-                            }
-                          });
-                        });
-                      }}
-                      className="w-full h-[250px] rounded border"
-                    />
-                  </div>
+                <p className="text-[10px] text-muted-foreground">Arrastrá el pin o hacé clic en el mapa para setear la dirección.</p>
+                <div
+                  ref={(el) => {
+                    if (!el || !(window as any).google) return;
+                    // Prevent re-initializing if map is already rendered in this element
+                    if ((el as any).__mapInit) return;
+                    (el as any).__mapInit = true;
+                    const google = (window as any).google;
+                    const center = editCell.lat && editCell.lng
+                      ? { lat: editCell.lat, lng: editCell.lng }
+                      : { lat: -34.58, lng: -58.46 }; // Default: Buenos Aires
+                    const map = new google.maps.Map(el, {
+                      center,
+                      zoom: editCell.lat ? 16 : 12,
+                      mapTypeControl: false,
+                      streetViewControl: false,
+                      fullscreenControl: false,
+                    });
+                    const marker = new google.maps.Marker({
+                      position: center,
+                      map,
+                      draggable: true,
+                    });
+                    // Click on map → move pin
+                    map.addListener('click', (e: any) => {
+                      const lat = e.latLng.lat();
+                      const lng = e.latLng.lng();
+                      marker.setPosition(e.latLng);
+                      const geocoder = new google.maps.Geocoder();
+                      geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
+                        if (status === 'OK' && results[0]) {
+                          setEditCell(prev => prev ? { ...prev, lat, lng, address: results[0].formatted_address } : null);
+                        } else {
+                          setEditCell(prev => prev ? { ...prev, lat, lng } : null);
+                        }
+                      });
+                    });
+                    // Drag marker → update
+                    marker.addListener('dragend', () => {
+                      const pos = marker.getPosition();
+                      const lat = pos.lat();
+                      const lng = pos.lng();
+                      const geocoder = new google.maps.Geocoder();
+                      geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
+                        if (status === 'OK' && results[0]) {
+                          setEditCell(prev => prev ? { ...prev, lat, lng, address: results[0].formatted_address } : null);
+                        } else {
+                          setEditCell(prev => prev ? { ...prev, lat, lng } : null);
+                        }
+                      });
+                    });
+                  }}
+                  className="w-full h-[250px] rounded border"
+                />
+                {editCell.lat && editCell.lng && (
+                  <p className="text-[10px] text-muted-foreground">Coordenadas: {editCell.lat.toFixed(5)}, {editCell.lng.toFixed(5)}</p>
                 )}
               </div>
 
@@ -371,7 +363,7 @@ const CelulasPage = () => {
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button variant="ghost" size="sm" onClick={() => { setEditCell(null); setShowMap(false); }}>Cancelar</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setEditCell(null); }}>Cancelar</Button>
                 <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
               </div>
             </div>
