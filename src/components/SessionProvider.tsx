@@ -166,6 +166,11 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
       } else {
         setProfile(null);
         setLoading(false);
+        // If user was signed out (session expired, manual logout, etc.)
+        // redirect to login to prevent stale UI
+        if (_event === 'SIGNED_OUT') {
+          window.location.href = '/login';
+        }
       }
     });
 

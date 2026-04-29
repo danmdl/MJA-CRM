@@ -20,14 +20,42 @@ const Login = () => {
   const [mode, setMode] = useState<'login' | 'forgot'>('login');
   const [resetSent, setResetSent] = useState(false);
 
+  // Detect error params from expired/invalid invite links
+  React.useEffect(() => {
+    const hash = window.location.hash;
+    const search = window.location.search;
+    const params = new URLSearchParams(search || hash.replace('#', '?'));
+    const errorDesc = params.get('error_description') || params.get('error');
+    if (errorDesc) {
+      if (errorDesc.includes('expired') || errorDesc.includes('invalid')) {
+        setError('El link de invitación expiró o es inválido. Pedile a tu admin que te envíe uno nuevo.');
+      } else {
+        setError(errorDesc);
+      }
+      // Clean URL
+      window.history.replaceState({}, '', '/login');
+    }
+  }, []);
+
   if (session) return <Navigate to="/" replace />;
+
+  const translateError = (msg: string) => {
+    if (msg.includes('Invalid login credentials')) return 'Email o contraseña incorrectos.';
+    if (msg.includes('Email not confirmed')) return 'Tu email no fue confirmado. Revisá tu bandeja de entrada.';
+    if (msg.includes('User not found')) return 'No existe una cuenta con ese email.';
+    if (msg.includes('rate limit') || msg.includes('too many requests')) return 'Demasiados intentos. Esperá unos minutos.';
+    if (msg.includes('email rate limit')) return 'Límite de emails alcanzado. Intentá en unos minutos.';
+    if (msg.includes('Token has expired') || msg.includes('token is expired')) return 'El link expiró. Pedí una nueva invitación a tu admin.';
+    if (msg.includes('Network')) return 'Error de conexión. Verificá tu internet.';
+    return msg;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
+    if (error) setError(translateError(error.message));
     setLoading(false);
   };
 
@@ -37,9 +65,9 @@ const Login = () => {
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/#type=recovery`,
+      redirectTo: `${window.location.origin}/login`,
     });
-    if (error) setError(error.message);
+    if (error) setError(translateError(error.message));
     else setResetSent(true);
     setLoading(false);
   };
