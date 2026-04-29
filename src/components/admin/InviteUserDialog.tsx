@@ -117,6 +117,10 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
             <label className="text-sm font-medium">Teléfono</label>
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="5491122334455" disabled={loading} />
           </div>
+          <div>
+            <label className="text-sm font-medium">Número de Cuerda</label>
+            <Input value={numeroCuerda} onChange={(e) => setNumeroCuerda(e.target.value)} placeholder="Ej: 202" disabled={loading} />
+          </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setTimeout(() => onOpenChange(false), 50)} disabled={loading}>Cancelar</Button>
             <Button type="submit" disabled={loading}>
