@@ -57,7 +57,24 @@ const Login = () => {
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(translateError(error.message));
+    if (error) {
+      // If wrong credentials, check if this email exists but has no password yet
+      // (invited user who never completed onboarding). Auto-send a recovery link.
+      if (error.message.includes('Invalid login credentials')) {
+        const { data: hasNoPassword } = await supabase.rpc('email_needs_setup', { p_email: email }).single();
+        if (hasNoPassword) {
+          await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/login`,
+          });
+          setError('');
+          setResetSent(true);
+          setMode('forgot');
+          setLoading(false);
+          return;
+        }
+      }
+      setError(translateError(error.message));
+    }
     setLoading(false);
   };
 
