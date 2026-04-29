@@ -17,6 +17,7 @@ interface Cell {
   meeting_time: string | null;
   leader_name: string | null;
   anfitrion_name: string | null;
+  cuerda_numero: string | null;
 }
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
@@ -80,15 +81,50 @@ const MapaPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('cells')
-        .select('id, name, address, lat, lng, meeting_day, meeting_time, leader_name, anfitrion_name')
-        .eq('church_id', churchId!);
+        .select('id, name, address, lat, lng, meeting_day, meeting_time, leader_name, anfitrion_name, cuerda_id, cuerdas(numero)')
+        .eq('church_id', churchId!)
+        .is('deleted_at', null);
       if (error) throw error;
-      return data || [];
+      return (data || []).map((c: any) => ({
+        ...c,
+        cuerda_numero: c.cuerdas?.numero ?? null,
+      }));
     },
     enabled: !!churchId,
   });
 
-  const mappableCells = (cells || []).filter(c => c.lat && c.lng);
+  // Distinct cuerdas for filter checkboxes
+  const availableCuerdas = React.useMemo(() => {
+    const nums = new Set<string>();
+    (cells || []).forEach(c => { if (c.cuerda_numero) nums.add(c.cuerda_numero); });
+    return Array.from(nums).sort((a, b) => Number(a) - Number(b));
+  }, [cells]);
+
+  // Which cuerdas are visible — starts with all selected
+  const [visibleCuerdas, setVisibleCuerdas] = useState<Set<string> | null>(null);
+  // Initialize once when cuerdas data loads
+  React.useEffect(() => {
+    if (availableCuerdas.length > 0 && visibleCuerdas === null) {
+      setVisibleCuerdas(new Set(availableCuerdas));
+    }
+  }, [availableCuerdas]);
+
+  const toggleCuerda = (num: string) => {
+    setVisibleCuerdas(prev => {
+      const next = new Set(prev);
+      if (next.has(num)) next.delete(num); else next.add(num);
+      return next;
+    });
+  };
+
+  const toggleAllCuerdas = (on: boolean) => {
+    setVisibleCuerdas(on ? new Set(availableCuerdas) : new Set());
+  };
+
+  const allMappable = (cells || []).filter(c => c.lat && c.lng);
+  const mappableCells = allMappable.filter(c =>
+    !c.cuerda_numero || !visibleCuerdas || visibleCuerdas.has(c.cuerda_numero)
+  );
   const needsGeocode = (cells || []).filter(c => c.address && (!c.lat || !c.lng));
   const noAddress = (cells || []).filter(c => !c.address);
 
@@ -124,6 +160,9 @@ const MapaPage = () => {
       runGeocode();
     }
   }, [isLoading, cells?.length]);
+
+  // Stable key for the set of visible cells so the map re-renders on filter changes
+  const mappableCellIds = mappableCells.map(c => c.id).join(',');
 
   useEffect(() => {
     if (!mappableCells.length || !mapRef.current || isLoading || geocoding) return;
@@ -169,6 +208,7 @@ const MapaPage = () => {
         const leader = cell.leader_name || 'Sin líder';
         const anfitrion = cell.anfitrion_name || '';
         const schedule = [cell.meeting_day, cell.meeting_time].filter(Boolean).join(' · ') || 'Sin horario';
+        const cuerdaLabel = cell.cuerda_numero ? `Cuerda ${cell.cuerda_numero}` : '';
         const pos = { lat: cell.lat!, lng: cell.lng! };
 
         const markerIcon = {
@@ -192,6 +232,7 @@ const MapaPage = () => {
           infoWindow.setContent(`
             <div style="font-family:system-ui,sans-serif;min-width:200px;padding:4px 0;color:#111;">
               <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${cell.name}</div>
+              ${cuerdaLabel ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🎵 ${cuerdaLabel}</div>` : ''}
               <div style="font-size:12px;color:#555;margin-bottom:2px;">👤 Líder: ${leader}</div>
               ${anfitrion ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🏠 Anfitrión: ${anfitrion}</div>` : ''}
               <div style="font-size:12px;color:#555;margin-bottom:2px;">🕐 ${schedule}</div>
@@ -213,7 +254,7 @@ const MapaPage = () => {
     };
 
     initMap();
-  }, [mappableCells.length, isLoading, geocoding]);
+  }, [mappableCellIds, isLoading, geocoding]);
 
   return (
     <div className="h-full flex flex-col gap-3">
@@ -226,6 +267,33 @@ const MapaPage = () => {
           }
         </p>
       </div>
+
+      {/* Cuerda filter */}
+      {!isLoading && !geocoding && availableCuerdas.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground mr-1">Cuerdas:</span>
+          <button
+            className="text-xs underline text-muted-foreground hover:text-foreground"
+            onClick={() => toggleAllCuerdas(visibleCuerdas?.size !== availableCuerdas.length)}
+          >
+            {visibleCuerdas?.size === availableCuerdas.length ? 'Ninguna' : 'Todas'}
+          </button>
+          {availableCuerdas.map(num => (
+            <label key={num} className="flex items-center gap-1 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="rounded border-input h-3.5 w-3.5"
+                checked={visibleCuerdas?.has(num) ?? true}
+                onChange={() => toggleCuerda(num)}
+              />
+              <span className="text-xs font-medium">{num}</span>
+            </label>
+          ))}
+          <span className="text-xs text-muted-foreground ml-1">
+            ({mappableCells.length}/{allMappable.length} en mapa)
+          </span>
+        </div>
+      )}
 
       {geocoding && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-500/30 bg-blue-500/10 text-sm text-blue-400">
