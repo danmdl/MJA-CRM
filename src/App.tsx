@@ -274,6 +274,11 @@ const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
   // If still loading session/profile, don't flash anything
   if (loading) return null;
 
+  // Don't gate the dedicated setup page — it handles its own flow
+  if (typeof window !== 'undefined' && window.location.pathname === '/setup-account') {
+    return <>{children}</>;
+  }
+
   // No session = not logged in, let the login page handle it
   if (!session) return <>{children}</>;
 
