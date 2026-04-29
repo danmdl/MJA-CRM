@@ -28,9 +28,10 @@ interface CsvImporterProps {
   requiredFields: ContactField[]; // Updated type to ContactField[]
   optionalFields: ContactField[]; // Updated type to ContactField[]
   churchId?: string; // Add optional churchId prop
+  onImportComplete?: (importedIds: string[]) => void; // Callback with imported contact IDs
 }
 
-const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: CsvImporterProps) => {
+const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onImportComplete }: CsvImporterProps) => {
   const { session, profile } = useSession();
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -329,6 +330,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
 
       // Insert records individually to track exactly which ones fail
       const failed: {row: number, data: Record<string, string>}[] = [];
+      const importedIds: string[] = [];
       let successCount = 0;
       
       for (let i = 0; i < recordsToInsert.length; i++) {
@@ -351,6 +353,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
           await logEvent({ action: 'csv_import', error, payload: { row: i + 1, church_id: churchId }, context: { church_id: churchId } });
         } else {
           successCount++;
+          if (inserted) importedIds.push(inserted.id);
           // Log every successful import to activity_logs so it appears in Historial.
           // Without this, bulk-imported contacts were invisible in the historial view
           // even though they existed in the contacts table.
@@ -376,15 +379,20 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId }: Cs
         throw new Error(`No se pudo importar ningún contacto. ${failed.length} fila(s) con errores.`);
       }
 
-      showSuccess(`¡Importación completada! ${recordsToInsert.length - (failedContacts.length || 0)} contactos importados.`);
+      showSuccess(`¡Importación completada! ${successCount} contactos importados.`);
       setImportSuccess(true);
       setFile(null);
       setCsvHeaders([]);
       setDataToImport([]);
       setColumnMapping({});
-      // NEW: refresh contacts list immediately
+      // Refresh Semillero contacts list immediately so user sees new data without F5
       if (churchId) {
+        queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+      }
+      // Notify parent with the imported IDs so it can highlight them
+      if (importedIds.length > 0 && onImportComplete) {
+        onImportComplete(importedIds);
       }
     } catch (error: any) {
       console.error('[CsvImporter] Error during import:', error);

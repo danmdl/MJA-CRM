@@ -105,6 +105,7 @@ const SemilleroPage = () => {
   const filterDefaultsAppliedRef = useRef(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [recentImportIds, setRecentImportIds] = useState<Set<string>>(new Set());
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
   const [whatsappCompose, setWhatsappCompose] = useState<{ contactId: string; name: string; firstName: string; lastName: string; phone: string } | null>(null);
@@ -763,6 +764,21 @@ const SemilleroPage = () => {
         </div>
       </div>
 
+      {/* Recently imported contacts banner */}
+      {recentImportIds.size > 0 && (
+        <div className="flex items-center justify-between bg-amber-500/15 border border-amber-500/30 rounded-lg px-4 py-2 mb-3">
+          <span className="text-sm font-medium text-amber-300">
+            ✨ {recentImportIds.size} contacto{recentImportIds.size > 1 ? 's' : ''} recién importado{recentImportIds.size > 1 ? 's' : ''} — resaltados en la tabla
+          </span>
+          <button
+            className="text-xs text-amber-400 hover:text-amber-300 underline"
+            onClick={() => setRecentImportIds(new Set())}
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
         <CardContent className="p-0">
@@ -880,7 +896,7 @@ const SemilleroPage = () => {
                     const responsable = teamMembers?.find(m => m.id === c.responsable_id);
 
                     return (
-                      <tr key={c.id} className="border-b hover:bg-muted/50 transition-colors">
+                      <tr key={c.id} className={`border-b transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
                         {/* Selection checkbox - supports shift-click range select */}
                         <td className="px-1 py-1.5 w-6">
                           <input
@@ -1313,6 +1329,10 @@ const SemilleroPage = () => {
             requiredFields={CONTACT_FIELDS.filter(f => f.key === 'first_name' || f.key === 'sexo')}
             optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name' && f.key !== 'sexo')}
             churchId={churchId}
+            onImportComplete={(ids) => {
+              setRecentImportIds(new Set(ids));
+              setCsvDialogOpen(false);
+            }}
           />
         </DialogContent>
       </Dialog>
