@@ -200,13 +200,13 @@ const CelulasPage = () => {
             <tr className="border-b bg-muted/50">
               <th className="text-left px-3 py-2 font-medium text-xs w-[60px]">Cuerda</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Dirección</th>
+              {canEditCelulas() && <th className="w-[32px]"></th>}
               <th className="text-left px-3 py-2 font-medium text-xs w-[90px]">Día</th>
               <th className="text-left px-3 py-2 font-medium text-xs w-[70px]">Hora</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Líder</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Anfitrión</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Referente</th>
               <th className="text-left px-3 py-2 font-medium text-xs">Supervisor</th>
-              {canEditCelulas() && <th className="w-[40px]"></th>}
             </tr>
           </thead>
           <tbody>
@@ -240,17 +240,17 @@ const CelulasPage = () => {
                           </div>
                         )}
                       </td>
+                      {canEditCelulas() && (
+                        <td className="px-1 py-1">
+                          <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title={cell.closed_at ? 'Ver / Reabrir' : 'Editar'}><Pencil className="h-3.5 w-3.5" /></button>
+                        </td>
+                      )}
                       <td className="px-3 py-2 text-muted-foreground">{cell.meeting_day || '—'}</td>
                       <td className="px-3 py-2 text-muted-foreground">{cell.meeting_time || '—'}</td>
                       <td className="px-3 py-2">{cell.leader_name || '—'}</td>
                       <td className="px-3 py-2">{cell.anfitrion_name || '—'}</td>
                       <td className="px-3 py-2 text-muted-foreground">{cell.referente_name || '—'}</td>
                       <td className="px-3 py-2 text-muted-foreground">{cell.supervisor_name || '—'}</td>
-                      {canEditCelulas() && (
-                        <td className="px-3 py-1">
-                          <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title={cell.closed_at ? 'Ver / Reabrir' : 'Editar'}><Pencil className="h-3.5 w-3.5" /></button>
-                        </td>
-                      )}
                     </tr>
                   );
                 })}
