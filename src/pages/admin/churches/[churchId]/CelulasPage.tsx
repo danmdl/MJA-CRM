@@ -246,32 +246,7 @@ const CelulasPage = () => {
                       <td className="px-3 py-2 text-muted-foreground">{cell.supervisor_name || '—'}</td>
                       {canEditCelulas() && (
                         <td className="px-3 py-1">
-                          <div className="flex items-center gap-0.5">
-                            {!cell.closed_at && (
-                              <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
-                            )}
-                            {cell.closed_at ? (
-                              <button
-                                className="p-1 rounded hover:bg-green-500/20 text-muted-foreground hover:text-green-400 transition-colors"
-                                title="Reabrir célula"
-                                onClick={async () => {
-                                  await supabase.from('cells').update({ closed_at: null, closed_reason: null, closed_by: null }).eq('id', cell.id);
-                                  showSuccess(`${cell.name} reabierta.`);
-                                  queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
-                                }}
-                              >
-                                <Unlock className="h-3.5 w-3.5" />
-                              </button>
-                            ) : (
-                              <button
-                                className="p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
-                                title="Cerrar célula"
-                                onClick={() => { setCloseDialog({ id: cell.id, name: cell.name }); setCloseReason(''); }}
-                              >
-                                <Lock className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
+                          <button className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" onClick={() => setEditCell({ ...cell })} title={cell.closed_at ? 'Ver / Reabrir' : 'Editar'}><Pencil className="h-3.5 w-3.5" /></button>
                         </td>
                       )}
                     </tr>
@@ -412,10 +387,36 @@ const CelulasPage = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button variant="ghost" size="sm" onClick={() => { setEditCell(null); }}>Cancelar</Button>
-                <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
-              </div>
+              {editCell.closed_at ? (
+                <div className="p-3 rounded border border-red-500/30 bg-red-500/5 space-y-2">
+                  <p className="text-sm text-red-400 font-medium">🔒 Célula cerrada</p>
+                  {editCell.closed_reason && <p className="text-xs text-muted-foreground">Motivo: {editCell.closed_reason}</p>}
+                  <Button variant="outline" size="sm" className="text-xs" onClick={async () => {
+                    await supabase.from('cells').update({ closed_at: null, closed_reason: null, closed_by: null }).eq('id', editCell.id);
+                    showSuccess(`${editCell.name} reabierta.`);
+                    setEditCell(null);
+                    queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+                  }}>
+                    <Unlock className="h-3.5 w-3.5 mr-1.5" /> Reabrir Célula
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-end gap-2 pt-2 border-t">
+                    <Button variant="ghost" size="sm" onClick={() => { setEditCell(null); }}>Cancelar</Button>
+                    <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <Button variant="ghost" size="sm" className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={() => {
+                      setCloseDialog({ id: editCell.id, name: editCell.name });
+                      setCloseReason('');
+                      setEditCell(null);
+                    }}>
+                      <Lock className="h-3.5 w-3.5 mr-1.5" /> Cerrar esta célula...
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>

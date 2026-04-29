@@ -112,7 +112,7 @@ const SemilleroPage = () => {
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
-    type: 'auto' | 'manual' | 'cuerda_only';
+    type: 'auto' | 'manual' | 'cuerda_only' | 'auto_selected';
     contactId?: string;
     cellId?: string;
     cellName?: string;
@@ -144,7 +144,7 @@ const SemilleroPage = () => {
   };
 
   // Assignment permission comes from canAssignContacts() via usePermissions
-  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts } = usePermissions();
+  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
@@ -698,9 +698,19 @@ const SemilleroPage = () => {
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2.5">
-        {activePool === 'unassigned' && canAssignContacts() && poolCounts.unassigned > 0 && (
+        {activePool === 'unassigned' && canAutoAssign() && poolCounts.unassigned > 0 && (
           <Button size="sm" onClick={() => setConfirmDialog({ type: 'auto', preview: autoAssignPreview })} className="gap-1.5">
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
+          </Button>
+        )}
+        {visibleSelectedCount > 0 && canAssignContacts() && (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => setConfirmDialog({ type: 'auto_selected' })}
+            className="gap-1.5"
+          >
+            <Zap className="h-4 w-4" /> Autoasignar seleccionados ({visibleSelectedCount})
           </Button>
         )}
         {visibleSelectedCount > 0 && canEditDeleteContacts() && (
@@ -1300,7 +1310,7 @@ const SemilleroPage = () => {
       <Dialog open={!!confirmDialog} onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{confirmDialog?.type === 'auto' ? 'Autoasignar contactos' : 'Confirmar asignación'}</DialogTitle>
+            <DialogTitle>{confirmDialog?.type === 'auto' ? 'Autoasignar contactos' : confirmDialog?.type === 'auto_selected' ? `Autoasignar ${visibleSelectedCount} seleccionados` : 'Confirmar asignación'}</DialogTitle>
             <DialogDescription asChild>
               <div>
                 {confirmDialog?.type === 'auto' ? (
@@ -1318,6 +1328,8 @@ const SemilleroPage = () => {
                       </div>
                     )}
                   </>
+                ) : confirmDialog?.type === 'auto_selected' ? (
+                  <p>Se asignarán los <strong>{visibleSelectedCount}</strong> contactos seleccionados a la célula más cercana según su dirección. Solo se asignarán los que tengan dirección y no estén ya asignados a una célula.</p>
                 ) : (
                   <p>
                     ¿Asignar a <strong>{confirmDialog?.cellName}</strong>
@@ -1333,6 +1345,44 @@ const SemilleroPage = () => {
             <Button
               onClick={async () => {
                 if (confirmDialog?.type === 'auto') autoAssignMutation.mutate();
+                else if (confirmDialog?.type === 'auto_selected') {
+                  // Auto-assign only selected contacts that don't have a cell yet
+                  const toAssign = filteredContacts.filter(c => selectedIds.has(c.id) && !c.cell_id);
+                  let count = 0;
+                  for (const c of toAssign) {
+                    const sug = suggestions[c.id];
+                    if (!sug?.cell) continue;
+                    const cell = sug.cell;
+                    let zonaId: string | null = null;
+                    let zonaName: string | null = null;
+                    let cuerdaNum: string | null = null;
+                    if (cell.cuerda_id && cuerdas?.length) {
+                      const cuerda = cuerdas.find(cr => cr.id === cell.cuerda_id);
+                      if (cuerda) {
+                        cuerdaNum = cuerda.numero;
+                        const zona = zonas?.find(z => z.id === cuerda.zona_id);
+                        if (zona) { zonaId = zona.id; zonaName = zona.nombre; }
+                      }
+                    }
+                    const { error } = await supabase.from('contacts').update({
+                      cell_id: cell.id, zona_id: zonaId, zona: zonaName, numero_cuerda: cuerdaNum,
+                      pool_assigned_at: new Date().toISOString(), pool_assigned_by: session?.user?.id,
+                    }).eq('id', c.id);
+                    if (!error) {
+                      count++;
+                      await supabase.from('activity_logs').insert({
+                        user_id: session?.user?.id, church_id: churchId, action: 'assign',
+                        entity_type: 'contact', entity_id: c.id,
+                        before_data: { numero_cuerda: c.numero_cuerda, cell_id: c.cell_id },
+                        after_data: { numero_cuerda: cuerdaNum, cell_id: cell.id, cell_name: cell.name },
+                      });
+                    }
+                  }
+                  showSuccess(`${count} contacto(s) autoasignados.`);
+                  setSelectedIds(new Set());
+                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                  setConfirmDialog(null);
+                }
                 else if (confirmDialog?.type === 'cuerda_only' && confirmDialog?.contactId && confirmDialog?.cuerdaNum) {
                   // Assign to cuerda only (no cell)
                   const zona = zonas?.find(z => z.id === confirmDialog.cuerdaZonaId);
