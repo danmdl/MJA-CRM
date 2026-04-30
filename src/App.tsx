@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import SetupAccount from "./pages/SetupAccount";
+import WelcomeMessageAlert from "./components/WelcomeMessageAlert";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
 import { usePermissions } from "./lib/permissions";
@@ -261,6 +262,7 @@ const App = () => (
                 <main className="flex-grow">
                   <AppRoutes />
                 </main>
+                <WelcomeMessageAlert />
               </div>
             </PasswordSetupGate>
           </ThemeProvider>
