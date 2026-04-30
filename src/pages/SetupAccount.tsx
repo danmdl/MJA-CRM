@@ -8,8 +8,10 @@ import { Eye, EyeOff } from 'lucide-react';
 
 const SetupAccount = () => {
   const navigate = useNavigate();
-  const [verifying, setVerifying] = useState(true);
   const [verifyError, setVerifyError] = useState('');
+  const [tokenHash, setTokenHash] = useState<string | null>(null);
+  const [tokenType, setTokenType] = useState<string | null>(null);
+  const [hasExistingSession, setHasExistingSession] = useState(false);
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -20,91 +22,36 @@ const SetupAccount = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const verify = async () => {
-      // Read token from URL — Supabase invite links have either:
-      // - hash: #access_token=xxx&type=invite (legacy)
-      // - search: ?token_hash=xxx&type=invite (new) or ?code=xxx (PKCE)
-      const hash = window.location.hash;
-      const search = window.location.search;
-      const hashParams = new URLSearchParams(hash.replace('#', ''));
-      const searchParams = new URLSearchParams(search);
+    // Check the URL for a token but DON'T consume it yet — only consume on form submit
+    // This way the user can refresh, close the tab, and come back, as long as the
+    // token hasn't been used yet (24h validity from Supabase).
+    const search = window.location.search;
+    const hash = window.location.hash;
+    const searchParams = new URLSearchParams(search);
+    const hashParams = new URLSearchParams(hash.replace('#', ''));
 
-      // Try PKCE flow first (most common with current Supabase)
-      const code = searchParams.get('code');
-      if (code) {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          setVerifyError('El link de invitación expiró o es inválido. Pedile a tu admin que te envíe uno nuevo.');
-          setVerifying(false);
-          return;
-        }
-        if (data.user) {
-          setEmail(data.user.email || '');
-          // Pre-fill names from user_metadata if available (set during invite)
-          const meta = data.user.user_metadata || {};
-          if (meta.first_name) setFirstName(meta.first_name);
-          if (meta.last_name) setLastName(meta.last_name);
-        }
-        setVerifying(false);
-        return;
-      }
+    const tHash = searchParams.get('token_hash') || hashParams.get('token_hash');
+    const tType = searchParams.get('type') || hashParams.get('type');
 
-      // Try token_hash flow (newer email templates)
-      const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash');
-      const type = searchParams.get('type') || hashParams.get('type');
-      if (tokenHash && (type === 'invite' || type === 'signup' || type === 'recovery')) {
-        const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as any });
-        if (error) {
-          setVerifyError('El link de invitación expiró o es inválido. Pedile a tu admin que te envíe uno nuevo.');
-          setVerifying(false);
-          return;
-        }
-        if (data.user) {
-          setEmail(data.user.email || '');
-          const meta = data.user.user_metadata || {};
-          if (meta.first_name) setFirstName(meta.first_name);
-          if (meta.last_name) setLastName(meta.last_name);
-        }
-        setVerifying(false);
-        return;
-      }
+    if (tHash && (tType === 'invite' || tType === 'signup' || tType === 'recovery')) {
+      setTokenHash(tHash);
+      setTokenType(tType);
+      return;
+    }
 
-      // Try legacy hash flow (#access_token=xxx)
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      if (accessToken && refreshToken) {
-        const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        if (error) {
-          setVerifyError('El link de invitación expiró o es inválido. Pedile a tu admin que te envíe uno nuevo.');
-          setVerifying(false);
-          return;
-        }
-        if (data.user) {
-          setEmail(data.user.email || '');
-          const meta = data.user.user_metadata || {};
-          if (meta.first_name) setFirstName(meta.first_name);
-          if (meta.last_name) setLastName(meta.last_name);
-        }
-        setVerifying(false);
-        return;
-      }
-
-      // No token in URL — check if there's already a session (came back via existing session)
-      const { data: { session } } = await supabase.auth.getSession();
+    // No fresh token — check if there's an existing session (user already verified
+    // before but didn't finish, or arrived here after a non-token recovery flow)
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setEmail(session.user.email || '');
         const meta = session.user.user_metadata || {};
         if (meta.first_name) setFirstName(meta.first_name);
         if (meta.last_name) setLastName(meta.last_name);
-        setVerifying(false);
-        return;
+        setHasExistingSession(true);
+      } else {
+        setVerifyError('Link inválido o expirado. Pedile a tu admin que te envíe una nueva invitación.');
       }
-
-      // Nothing — invalid URL
-      setVerifyError('Link inválido. Pedile a tu admin que te envíe una nueva invitación.');
-      setVerifying(false);
-    };
-    verify();
+    });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,10 +62,24 @@ const SetupAccount = () => {
     if (!firstName.trim()) { setError('Ingresá tu nombre.'); return; }
     setSubmitting(true);
     try {
-      // Set the password
+      // STEP 1: If we have a token from URL, verify it now (this consumes it)
+      if (tokenHash && tokenType && !hasExistingSession) {
+        const { error: otpError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: tokenType as any,
+        });
+        if (otpError) {
+          setError('El link expiró o ya fue usado. Pedile a tu admin que te envíe una nueva invitación.');
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // STEP 2: Set the password
       const { error: pwError } = await supabase.auth.updateUser({ password });
       if (pwError) { setError(pwError.message); setSubmitting(false); return; }
-      // Update profile with name + mark as completed
+
+      // STEP 3: Update profile with name + mark as completed
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { error: profileError } = await supabase.from('profiles').update({
@@ -136,17 +97,6 @@ const SetupAccount = () => {
     }
   };
 
-  if (verifying) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 mx-auto border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Verificando invitación...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (verifyError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -158,6 +108,15 @@ const SetupAccount = () => {
           <p className="text-muted-foreground">{verifyError}</p>
           <Button variant="outline" onClick={() => navigate('/login')}>Ir al inicio de sesión</Button>
         </div>
+      </div>
+    );
+  }
+
+  // Don't show the form until we have either a token or an existing session
+  if (!tokenHash && !hasExistingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 mx-auto border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -174,10 +133,12 @@ const SetupAccount = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 bg-card border rounded-lg p-6">
-          <div>
-            <label className="text-sm font-medium block mb-1.5">Email</label>
-            <Input value={email} disabled className="bg-muted" />
-          </div>
+          {email && (
+            <div>
+              <label className="text-sm font-medium block mb-1.5">Email</label>
+              <Input value={email} disabled className="bg-muted" />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
