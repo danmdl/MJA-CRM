@@ -16,7 +16,7 @@ interface NavItemConfig {
 const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeeBaseDatos, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv } = usePermissions();
 
   // Detect if we're inside a specific church
   const churchMatch = useMatch('/admin/churches/:churchId/*');
@@ -72,6 +72,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
         ...(canUseTemplates() ? [{ to: '/admin/templates', emoji: '📝', label: 'Templates' }] : []),
+        ...(canImportCsv() ? [{ to: '/admin/csv-merger', emoji: '🔗', label: 'Unir columnas CSV' }] : []),
         ...(profile?.role !== 'conector' ? [{ to: '/admin/notifications', emoji: '🔔', label: 'Notificaciones' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
@@ -93,6 +94,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
       title: 'Gestión',
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
+        ...(canImportCsv() ? [{ to: '/admin/csv-merger', emoji: '🔗', label: 'Unir columnas CSV' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },

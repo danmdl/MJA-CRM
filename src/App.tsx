@@ -132,6 +132,7 @@ const PermissionsDashboard = lazyRetry(() => import("./pages/admin/PermissionsDa
 const InfoPage = lazyRetry(() => import("./pages/admin/InfoPage"));
 const NotificationsPage = lazyRetry(() => import("./pages/admin/NotificationsPage"));
 const TemplatesPage = lazyRetry(() => import("./pages/admin/TemplatesPage"));
+const CsvColumnMergerPage = lazyRetry(() => import("./pages/admin/CsvColumnMergerPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -211,6 +212,7 @@ const AppRoutes = () => {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
         <Route path="templates" element={<TemplatesPage />} />
+        <Route path="csv-merger" element={<CsvColumnMergerPage />} />
         <Route path="info" element={<InfoPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
 
