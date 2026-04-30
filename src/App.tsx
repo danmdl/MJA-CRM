@@ -125,6 +125,8 @@ const HistorialPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/
 const PapeleraPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/PapeleraPage"));
 const ValidatorPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/ValidatorPage"));
 const HogaresDePazPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/HogaresDePazPage"));
+const AsistenciaPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/AsistenciaPage"));
+const EventosPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/EventosPage"));
 const LoginManagementPage = lazyRetry(() => import("./pages/admin/LoginManagementPage"));
 const LogsPage = lazyRetry(() => import("./pages/admin/LogsPage"));
 const ZonasPage = lazyRetry(() => import("./pages/admin/ZonasPage"));
@@ -238,6 +240,8 @@ const AppRoutes = () => {
           <Route path="papelera" element={<PapeleraPage />} />
           <Route path="validator" element={<ValidatorPage />} />
           <Route path="hogares" element={<HogaresDePazPage />} />
+          <Route path="asistencia" element={<AsistenciaPage />} />
+          <Route path="eventos" element={<EventosPage />} />
           <Route index element={<Navigate to="overview" replace />} />
         </Route>
       </Route>

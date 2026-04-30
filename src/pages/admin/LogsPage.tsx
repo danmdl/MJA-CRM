@@ -152,7 +152,7 @@ const LogsPage = () => {
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [showResolved, setShowResolved] = useState(false);
-  const [view, setView] = useState<'errors' | 'activity'>('errors');
+  const [view, setView] = useState<'errors' | 'activity'>('activity');
   const [activityFilter, setActivityFilter] = useState<'all' | 'login' | 'create' | 'update' | 'delete' | 'assign'>('all');
   const queryClient = useQueryClient();
 
@@ -356,13 +356,9 @@ const LogsPage = () => {
                     const groups: any[][] = [];
                     (activity || []).forEach((row: any) => {
                       const last = groups[groups.length - 1];
-                      const hourBucket = new Date(row.created_at);
-                      hourBucket.setMinutes(0, 0, 0);
-                      const rowKey = `${row.user_id}|${row.action}|${hourBucket.toISOString()}`;
+                      const rowKey = `${row.user_id}|${row.action}`;
                       if (last && last.length > 0) {
-                        const lastBucket = new Date(last[0].created_at);
-                        lastBucket.setMinutes(0, 0, 0);
-                        const lastKey = `${last[0].user_id}|${last[0].action}|${lastBucket.toISOString()}`;
+                        const lastKey = `${last[0].user_id}|${last[0].action}`;
                         if (lastKey === rowKey) {
                           last.push(row);
                           return;

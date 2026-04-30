@@ -36,6 +36,8 @@ export interface PermissionData {
   can_see_procesos: boolean;
   can_auto_assign: boolean;
   can_filter_all_contacts: boolean;
+  can_see_asistencia: boolean;
+  can_see_eventos: boolean;
 }
 
 // Role hierarchy: higher index = higher privilege
@@ -124,6 +126,8 @@ export const usePermissions = () => {
   const canSeeProcesos = () => hasPermission('can_see_procesos');
   const canAutoAssign = () => hasPermission('can_auto_assign');
   const canFilterAllContacts = () => hasPermission('can_filter_all_contacts');
+  const canSeeAsistencia = () => hasPermission('can_see_asistencia');
+  const canSeeEventos = () => hasPermission('can_see_eventos');
 
   // Only admin can access permissions management
   const canAccessPermissions = () => profile?.role === 'admin';
@@ -172,6 +176,8 @@ export const usePermissions = () => {
     canSeeProcesos,
     canAutoAssign,
     canFilterAllContacts,
+    canSeeAsistencia,
+    canSeeEventos,
     canAccessPermissions,
     canManageUser,
   };
