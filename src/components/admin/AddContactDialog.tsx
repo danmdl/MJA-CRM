@@ -533,14 +533,14 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '16px 24px', borderTop: '1px solid hsl(240,3.7%,15.9%)', flexShrink: 0 }}>
-            <Button type="button" variant="ghost" onClick={() => { onOpenChange(false); }} disabled={loading}>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-6 py-4 border-t shrink-0">
+            <Button type="button" variant="ghost" onClick={() => { onOpenChange(false); }} disabled={loading} className="w-full sm:w-auto">
               Cancelar
             </Button>
-            <Button type="button" variant="outline" disabled={loading || !firstName.trim() || !sexo} onClick={(e) => handleSubmit(e as any, true)}>
+            <Button type="button" variant="outline" disabled={loading || !firstName.trim() || !sexo} onClick={(e) => handleSubmit(e as any, true)} className="w-full sm:w-auto">
               {loading ? 'Guardando...' : 'Guardar y agregar otro'}
             </Button>
-            <Button type="submit" disabled={loading || !firstName.trim() || !sexo}>
+            <Button type="submit" disabled={loading || !firstName.trim() || !sexo} className="w-full sm:w-auto">
               {loading ? 'Creando...' : 'Crear Contacto'}
             </Button>
           </div>
