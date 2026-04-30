@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Columns3, Download, Upload } from 'lucide-react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { showSuccess, showError } from '@/utils/toast';
 import {
   Select,
@@ -19,15 +20,58 @@ import {
 const SEPARATOR = ', '; // Coma + espacio. Decisión confirmada por Dan.
 const PREVIEW_ROWS = 3;
 
+type Row = Record<string, string>;
+type FileKind = 'csv' | 'xlsx' | 'unknown';
+
+const detectKind = (file: File): FileKind => {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.csv')) return 'csv';
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) return 'xlsx';
+  return 'unknown';
+};
+
+const parseCsv = (file: File): Promise<{ headers: string[]; rows: Row[] }> =>
+  new Promise((resolve, reject) => {
+    Papa.parse<Row>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        resolve({
+          headers: results.meta.fields || [],
+          rows: (results.data as Row[]) || [],
+        });
+      },
+      error: (err) => reject(err),
+    });
+  });
+
+const parseXlsx = async (file: File): Promise<{ headers: string[]; rows: Row[] }> => {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return { headers: [], rows: [] };
+  const sheet = workbook.Sheets[firstSheetName];
+  // defval: '' so missing cells become empty strings; raw: false so dates/numbers
+  // come out as the displayed string (matches what the user sees in Excel).
+  const json = XLSX.utils.sheet_to_json<Row>(sheet, { defval: '', raw: false });
+  if (json.length === 0) return { headers: [], rows: [] };
+  // Preserve column order from the sheet header row, not from the first data row's keys.
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false });
+  const headerRow = (aoa[0] as unknown[] | undefined) || [];
+  const headers = headerRow.map((h) => String(h ?? '')).filter(Boolean);
+  return { headers, rows: json };
+};
+
 const CsvColumnMergerPage = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [fileKind, setFileKind] = useState<FileKind>('unknown');
   const [headers, setHeaders] = useState<string[]>([]);
-  const [previewRows, setPreviewRows] = useState<Record<string, string>[]>([]);
+  const [allRows, setAllRows] = useState<Row[]>([]);
   const [colA, setColA] = useState<string | null>(null);
   const [colB, setColB] = useState<string | null>(null);
   const [newColName, setNewColName] = useState<string>('');
   const [newColTouched, setNewColTouched] = useState(false);
-  const [processedData, setProcessedData] = useState<string | null>(null);
+  const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(false);
   const [outputFileName, setOutputFileName] = useState<string>('merged.csv');
 
@@ -39,57 +83,67 @@ const CsvColumnMergerPage = () => {
     }
   }, [colA, colB, newColTouched]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
-
-    setFile(selectedFile);
-    setOutputFileName(selectedFile.name.replace(/\.csv$/i, '_merged.csv'));
-    setProcessedData(null);
+  const resetState = () => {
+    setProcessedBlob(null);
     setColA(null);
     setColB(null);
     setNewColName('');
     setNewColTouched(false);
     setHeaders([]);
-    setPreviewRows([]);
+    setAllRows([]);
+  };
 
-    // Read headers + a few preview rows
-    Papa.parse<Record<string, string>>(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      preview: PREVIEW_ROWS + 1,
-      complete: (results) => {
-        if (results.meta.fields && results.meta.fields.length > 0) {
-          setHeaders(results.meta.fields);
-          setPreviewRows((results.data as Record<string, string>[]).slice(0, PREVIEW_ROWS));
-        } else {
-          showError('No se pudieron leer las columnas del archivo.');
-          setHeaders([]);
-        }
-      },
-      error: (error) => {
-        console.error('Error parsing CSV:', error);
-        showError('Error al leer el archivo CSV.');
-        setHeaders([]);
-      },
-    });
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+
+    const kind = detectKind(selectedFile);
+    if (kind === 'unknown') {
+      showError('Formato no soportado. Subí un archivo .csv, .xlsx o .xls.');
+      event.target.value = '';
+      return;
+    }
+
+    setFile(selectedFile);
+    setFileKind(kind);
+    const ext = kind === 'xlsx' ? '.xlsx' : '.csv';
+    setOutputFileName(selectedFile.name.replace(/\.(csv|xlsx|xls)$/i, `_merged${ext}`));
+    resetState();
+
+    setLoading(true);
+    try {
+      const { headers: hdrs, rows } = kind === 'csv'
+        ? await parseCsv(selectedFile)
+        : await parseXlsx(selectedFile);
+      if (hdrs.length === 0) {
+        showError('No se pudieron leer las columnas del archivo.');
+      } else {
+        setHeaders(hdrs);
+        setAllRows(rows);
+      }
+    } catch (err) {
+      console.error('Error parsing file:', err);
+      showError('Error al leer el archivo.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const mergeValues = (a: string | undefined, b: string | undefined): string => {
-    const partA = (a ?? '').trim();
-    const partB = (b ?? '').trim();
+    const partA = (a ?? '').toString().trim();
+    const partB = (b ?? '').toString().trim();
     if (partA && partB) return `${partA}${SEPARATOR}${partB}`;
     return partA || partB; // si una está vacía, devolvemos la otra sin separador
   };
 
   const previewMerged = useMemo(() => {
-    if (!colA || !colB || previewRows.length === 0) return [];
-    return previewRows.map((row) => mergeValues(row[colA], row[colB]));
-  }, [colA, colB, previewRows]);
+    if (!colA || !colB || allRows.length === 0) return [];
+    return allRows.slice(0, PREVIEW_ROWS).map((row) => mergeValues(row[colA], row[colB]));
+  }, [colA, colB, allRows]);
 
-  const handleProcessCsv = () => {
+  const handleProcess = () => {
     if (!file) {
-      showError('Por favor, seleccioná un archivo CSV.');
+      showError('Por favor, seleccioná un archivo.');
       return;
     }
     if (!colA || !colB) {
@@ -107,35 +161,43 @@ const CsvColumnMergerPage = () => {
     }
 
     setLoading(true);
-    setProcessedData(null);
+    setProcessedBlob(null);
 
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const data = results.data as Record<string, string>[];
-        const merged = data.map((row) => ({
-          ...row,
-          [finalColName]: mergeValues(row[colA], row[colB]),
-        }));
+    try {
+      const merged = allRows.map((row) => ({
+        ...row,
+        [finalColName]: mergeValues(row[colA], row[colB]),
+      }));
+
+      let blob: Blob;
+      if (fileKind === 'csv') {
         const csv = Papa.unparse(merged);
-        setProcessedData(csv);
-        showSuccess(`Listo. Se agregó la columna "${finalColName}" con ${merged.length} filas.`);
-        setLoading(false);
-      },
-      error: (error) => {
-        console.error('Error parsing CSV:', error);
-        showError('Error al procesar el archivo CSV.');
-        setLoading(false);
-      },
-    });
+        blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      } else {
+        // Build worksheet with explicit header order so the new column lands
+        // at the end and original columns keep their original order.
+        const finalHeaders = [...headers, finalColName];
+        const sheet = XLSX.utils.json_to_sheet(merged, { header: finalHeaders });
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1');
+        const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+        blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      }
+
+      setProcessedBlob(blob);
+      showSuccess(`Listo. Se agregó la columna "${finalColName}" con ${merged.length} filas.`);
+    } catch (err) {
+      console.error('Error processing file:', err);
+      showError('Error al procesar el archivo.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDownload = () => {
-    if (!processedData) return;
-    const blob = new Blob([processedData], { type: 'text/csv;charset=utf-8;' });
+    if (!processedBlob) return;
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = URL.createObjectURL(processedBlob);
     link.setAttribute('download', outputFileName);
     document.body.appendChild(link);
     link.click();
@@ -144,7 +206,7 @@ const CsvColumnMergerPage = () => {
 
   return (
     <div className="p-4 sm:p-6">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-6">Unificar columnas de CSV</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">Unificar columnas</h1>
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -152,18 +214,18 @@ const CsvColumnMergerPage = () => {
             Unir dos columnas en una
           </CardTitle>
           <CardDescription>
-            Subí un CSV, elegí dos columnas (por ejemplo, calle y barrio) y se genera una nueva columna con los valores
-            unificados separados por coma. Las columnas originales se mantienen.
+            Subí un archivo CSV o Excel (.xlsx), elegí dos columnas (por ejemplo, calle y barrio) y se genera una nueva
+            columna con los valores unificados separados por coma. Las columnas originales se mantienen.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="csv-file">Archivo CSV</Label>
+            <Label htmlFor="csv-file">Archivo (.csv, .xlsx o .xls)</Label>
             <Input
               id="csv-file"
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               onChange={handleFileChange}
               disabled={loading}
             />
@@ -239,7 +301,7 @@ const CsvColumnMergerPage = () => {
 
         <CardFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between">
           <Button
-            onClick={handleProcessCsv}
+            onClick={handleProcess}
             disabled={loading || !file || !colA || !colB || colA === colB}
             className="w-full sm:w-auto"
           >
@@ -250,10 +312,10 @@ const CsvColumnMergerPage = () => {
               </>
             )}
           </Button>
-          {processedData && (
+          {processedBlob && (
             <Button onClick={handleDownload} disabled={loading} variant="outline" className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" />
-              Descargar CSV
+              Descargar {fileKind === 'xlsx' ? '.xlsx' : '.csv'}
             </Button>
           )}
         </CardFooter>
