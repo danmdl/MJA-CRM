@@ -24,7 +24,19 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
 
   // For single-church users, always use their assigned church
   const singleChurchId = !canSeeAllChurches() ? profile?.church_id : null;
-  const currentChurchId = singleChurchId || activeChurchId;
+
+  // Remember last church visited so the sidebar keeps the church context
+  // when navigating to non-church routes like /admin/logs or /admin/messages.
+  // Falls back to null only when the user has never been inside a church
+  // in this session.
+  React.useEffect(() => {
+    if (activeChurchId) {
+      sessionStorage.setItem('last-church-id', activeChurchId);
+    }
+  }, [activeChurchId]);
+
+  const lastChurchId = typeof window !== 'undefined' ? sessionStorage.getItem('last-church-id') : null;
+  const currentChurchId = singleChurchId || activeChurchId || lastChurchId;
 
   // Fetch church name when we have a church context
   const { data: churchData } = useQuery({
