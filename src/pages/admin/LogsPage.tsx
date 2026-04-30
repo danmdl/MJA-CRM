@@ -97,6 +97,57 @@ const LogRow = ({ log, onResolve }: { log: LogEntry; onResolve: (id: string) => 
   );
 };
 
+const ActivityGroupRow = ({ group, name, email, actionColors }: { group: any[]; name: string; email: string; actionColors: Record<string, string>; }) => {
+  const [expanded, setExpanded] = useState(false);
+  const first = group[0]; // newest in the group (since data comes desc)
+  const last = group[group.length - 1]; // oldest in the group
+  const isGroup = group.length > 1;
+
+  return (
+    <>
+      <TableRow className={isGroup ? 'cursor-pointer hover:bg-muted/30' : ''} onClick={() => isGroup && setExpanded(v => !v)}>
+        <TableCell className="w-8">
+          {isGroup ? (
+            <button className="text-muted-foreground hover:text-foreground">
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          ) : null}
+        </TableCell>
+        <TableCell className="font-mono text-xs">
+          {isGroup ? (
+            <div>
+              <div>{formatART(first.created_at)}</div>
+              <div className="text-muted-foreground">↳ {formatART(last.created_at).split(' ')[1]}</div>
+            </div>
+          ) : (
+            formatART(first.created_at)
+          )}
+        </TableCell>
+        <TableCell>
+          <div className="text-sm">{name || email || 'Usuario'}</div>
+          {name && email && <div className="text-xs text-muted-foreground">{email}</div>}
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <Badge className={`${actionColors[first.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{first.action}</Badge>
+            {isGroup && <span className="text-xs text-muted-foreground">×{group.length}</span>}
+          </div>
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground">{first.entity_type || '—'}</TableCell>
+      </TableRow>
+      {isGroup && expanded && group.map((row: any) => (
+        <TableRow key={row.id} className="bg-muted/10">
+          <TableCell></TableCell>
+          <TableCell className="font-mono text-xs pl-6 text-muted-foreground">↳ {formatART(row.created_at)}</TableCell>
+          <TableCell className="text-xs text-muted-foreground">{name || email || 'Usuario'}</TableCell>
+          <TableCell><Badge className={`${actionColors[row.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{row.action}</Badge></TableCell>
+          <TableCell className="text-xs text-muted-foreground">{row.entity_type || '—'}</TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+};
+
 const LogsPage = () => {
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
@@ -282,6 +333,7 @@ const LogsPage = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>Hora (ART)</TableHead>
                   <TableHead>Usuario</TableHead>
                   <TableHead>Acción</TableHead>
@@ -290,11 +342,10 @@ const LogsPage = () => {
               </TableHeader>
               <TableBody>
                 {(activity || []).length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin actividad registrada.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Sin actividad registrada.</TableCell></TableRow>
                 ) : (
-                  (activity || []).map((row: any) => {
-                    const name = row.profiles ? [row.profiles.first_name, row.profiles.last_name].filter(Boolean).join(' ') : '';
-                    const email = row.profiles?.email || '';
+                  (() => {
+                    // Group consecutive rows by user_id + action + same hour bucket
                     const actionColors: Record<string, string> = {
                       login: 'bg-blue-500/15 text-blue-400',
                       create: 'bg-green-500/15 text-green-400',
@@ -302,20 +353,38 @@ const LogsPage = () => {
                       delete: 'bg-red-500/15 text-red-400',
                       assign: 'bg-purple-500/15 text-purple-400',
                     };
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-mono text-xs">{formatART(row.created_at)}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">{name || email || 'Usuario'}</div>
-                          {name && email && <div className="text-xs text-muted-foreground">{email}</div>}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={`${actionColors[row.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{row.action}</Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{row.entity_type || '—'}</TableCell>
-                      </TableRow>
-                    );
-                  })
+                    const groups: any[][] = [];
+                    (activity || []).forEach((row: any) => {
+                      const last = groups[groups.length - 1];
+                      const hourBucket = new Date(row.created_at);
+                      hourBucket.setMinutes(0, 0, 0);
+                      const rowKey = `${row.user_id}|${row.action}|${hourBucket.toISOString()}`;
+                      if (last && last.length > 0) {
+                        const lastBucket = new Date(last[0].created_at);
+                        lastBucket.setMinutes(0, 0, 0);
+                        const lastKey = `${last[0].user_id}|${last[0].action}|${lastBucket.toISOString()}`;
+                        if (lastKey === rowKey) {
+                          last.push(row);
+                          return;
+                        }
+                      }
+                      groups.push([row]);
+                    });
+                    return groups.map((group, gIdx) => {
+                      const first = group[0];
+                      const name = first.profiles ? [first.profiles.first_name, first.profiles.last_name].filter(Boolean).join(' ') : '';
+                      const email = first.profiles?.email || '';
+                      return (
+                        <ActivityGroupRow
+                          key={`${first.id}-group`}
+                          group={group}
+                          name={name}
+                          email={email}
+                          actionColors={actionColors}
+                        />
+                      );
+                    });
+                  })()
                 )}
               </TableBody>
             </Table>
