@@ -148,13 +148,18 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
 
     getSessionAndProfile();
 
+    let lastLoggedUserId: string | null = null;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
         // Silently refresh profile without showing loading screen
         fetchProfile(session);
-        // Log login event
-        if (_event === 'SIGNED_IN') {
+        // Log login event — but only for genuinely new logins, not token refreshes.
+        // Supabase fires SIGNED_IN both on real login AND on token refresh (every hour).
+        // Track the last logged user_id and only insert if it's a different user or
+        // first login of this session.
+        if (_event === 'SIGNED_IN' && lastLoggedUserId !== session.user.id) {
+          lastLoggedUserId = session.user.id;
           supabase.from('activity_logs').insert({
             user_id: session.user.id,
             church_id: null,
@@ -166,6 +171,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
       } else {
         setProfile(null);
         setLoading(false);
+        lastLoggedUserId = null;
         // If user was signed out (session expired, manual logout, etc.)
         // redirect to login to prevent stale UI
         if (_event === 'SIGNED_OUT') {
