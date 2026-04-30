@@ -46,14 +46,17 @@ const AdminLayout = () => {
         />
       )}
 
-      {/* Sidebar — hidden on mobile unless open */}
+      {/* Sidebar — hidden on mobile unless open. On lg+ it's positioned in flow (relative). */}
       <div style={{
         position: 'fixed' as const,
         top: 0, left: 0, bottom: 0,
+        width: 220,
         zIndex: 50,
-        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-220px)',
         transition: 'transform 0.25s ease',
-      }} className="lg:!relative lg:!transform-none lg:!translate-x-0 lg:!z-auto">
+        pointerEvents: sidebarOpen ? 'auto' : 'none',
+        overflow: 'hidden',
+      }} className="lg:!relative lg:!transform-none lg:!translate-x-0 lg:!z-auto lg:!pointer-events-auto">
         <Sidebar onNavigate={() => setSidebarOpen(false)} />
       </div>
 
