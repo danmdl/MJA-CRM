@@ -21,6 +21,8 @@ const SetupAccount = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const [isRecovery, setIsRecovery] = useState(false);
+
   useEffect(() => {
     // Check the URL for a token but DON'T consume it yet — only consume on form submit
     // This way the user can refresh, close the tab, and come back, as long as the
@@ -36,18 +38,37 @@ const SetupAccount = () => {
     if (tHash && (tType === 'invite' || tType === 'signup' || tType === 'recovery')) {
       setTokenHash(tHash);
       setTokenType(tType);
+      if (tType === 'recovery') setIsRecovery(true);
       return;
     }
 
-    // No fresh token — check if there's an existing session (user already verified
-    // before but didn't finish, or arrived here after a non-token recovery flow)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // No fresh token — check if there's an existing session.
+    // This happens in two scenarios:
+    //   1. User arrived via a recovery/invite link that went through PKCE
+    //      auto-exchange (?code=xxx). The Supabase client created a session
+    //      and cleaned the URL by the time we mount.
+    //   2. User has an active session and navigated here manually.
+    // In both cases we need to know if it's a recovery or first-time setup.
+    // We check the user's profile_completed: if false → first time (invite),
+    // if true → recovery (just need new password).
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setEmail(session.user.email || '');
         const meta = session.user.user_metadata || {};
         if (meta.first_name) setFirstName(meta.first_name);
         if (meta.last_name) setLastName(meta.last_name);
         setHasExistingSession(true);
+
+        // Check if this is a recovery (profile already completed)
+        const { data: profile } = await supabase.from('profiles')
+          .select('profile_completed, first_name, last_name')
+          .eq('id', session.user.id)
+          .single();
+        if (profile?.profile_completed) {
+          setIsRecovery(true);
+          if (profile.first_name) setFirstName(profile.first_name);
+          if (profile.last_name) setLastName(profile.last_name);
+        }
       } else {
         setVerifyError('Link inválido o expirado. Pedile a tu admin que te envíe una nueva invitación.');
       }
@@ -59,7 +80,7 @@ const SetupAccount = () => {
     setError('');
     if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return; }
     if (password !== confirmPassword) { setError('Las contraseñas no coinciden.'); return; }
-    if (!firstName.trim()) { setError('Ingresá tu nombre.'); return; }
+    if (!isRecovery && !firstName.trim()) { setError('Ingresá tu nombre.'); return; }
     setSubmitting(true);
     try {
       // STEP 1: If we have a token from URL, verify it now (this consumes it)
@@ -79,15 +100,17 @@ const SetupAccount = () => {
       const { error: pwError } = await supabase.auth.updateUser({ password });
       if (pwError) { setError(pwError.message); setSubmitting(false); return; }
 
-      // STEP 3: Update profile with name + mark as completed
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { error: profileError } = await supabase.from('profiles').update({
-          first_name: firstName.trim(),
-          last_name: lastName.trim() || null,
-          profile_completed: true,
-        }).eq('id', user.id);
-        if (profileError) { setError(profileError.message); setSubmitting(false); return; }
+      // STEP 3: Update profile only for first-time setup (invite flow), not recovery
+      if (!isRecovery) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { error: profileError } = await supabase.from('profiles').update({
+            first_name: firstName.trim(),
+            last_name: lastName.trim() || null,
+            profile_completed: true,
+          }).eq('id', user.id);
+          if (profileError) { setError(profileError.message); setSubmitting(false); return; }
+        }
       }
       // Done — redirect to app
       window.location.href = '/';
@@ -128,8 +151,10 @@ const SetupAccount = () => {
           <div className="w-14 h-14 mx-auto mb-3" style={{ filter: 'drop-shadow(0 0 14px rgba(255,194,51,0.6))' }}>
             <img src="/logo.png" alt="MJA" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold">Bienvenido/a a MJA CRM</h1>
-          <p className="text-muted-foreground text-sm mt-1">Completá tus datos para crear tu cuenta.</p>
+          <h1 className="text-2xl font-bold">{isRecovery ? 'Cambiar contraseña' : 'Bienvenido/a a MJA CRM'}</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {isRecovery ? 'Ingresá tu nueva contraseña.' : 'Completá tus datos para crear tu cuenta.'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 bg-card border rounded-lg p-6">
@@ -140,16 +165,18 @@ const SetupAccount = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium block mb-1.5">Nombre <span className="text-red-500">*</span></label>
-              <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Juan" disabled={submitting} autoComplete="given-name" />
+          {!isRecovery && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium block mb-1.5">Nombre <span className="text-red-500">*</span></label>
+                <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Juan" disabled={submitting} autoComplete="given-name" />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1.5">Apellido</label>
+                <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Pérez" disabled={submitting} autoComplete="family-name" />
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium block mb-1.5">Apellido</label>
-              <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Pérez" disabled={submitting} autoComplete="family-name" />
-            </div>
-          </div>
+          )}
 
           <div>
             <label className="text-sm font-medium block mb-1.5">Crear contraseña <span className="text-red-500">*</span></label>

@@ -31,6 +31,7 @@ import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsAppComposeDialog';
+import BulkWhatsAppDialog from '@/components/admin/BulkWhatsAppDialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 
@@ -109,6 +110,7 @@ const SemilleroPage = () => {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [mapContact, setMapContact] = useState<{ name: string; address: string; sugCell: { name: string; address: string | null; lat: number | null; lng: number | null; cuerdaNumero?: string; meetingDay?: string | null; meetingTime?: string | null } | null } | null>(null);
   const [whatsappCompose, setWhatsappCompose] = useState<{ contactId: string; name: string; firstName: string; lastName: string; phone: string } | null>(null);
+  const [bulkWhatsAppOpen, setBulkWhatsAppOpen] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
