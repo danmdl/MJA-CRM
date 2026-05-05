@@ -423,14 +423,14 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
               </select>
             </div>
 
-            {/* Fecha de Contacto - auto today, readonly */}
+            {/* Fecha de Contacto - defaults to today, editable */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Fecha de Contacto</label>
               <input
                 type="date"
                 value={fechaContacto}
-                readOnly
-                className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-default"
+                onChange={(e) => setFechaContacto(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </div>
 
