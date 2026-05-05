@@ -151,7 +151,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     queryKey: ['leaders', churchId, !!session?.access_token],
     queryFn: async () => {
       if (session?.access_token) {
-        const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`;
+        const edgeFunctionUrl = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2`;
         const resp = await fetch(edgeFunctionUrl, {
           method: 'POST',
           headers: {

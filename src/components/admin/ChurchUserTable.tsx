@@ -37,7 +37,7 @@ interface User {
 }
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
-  const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions', {
+  const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
     body: JSON.stringify({ action: 'listChurchUsers', churchId }),
@@ -100,12 +100,17 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   }, [users, searchTerm]);
 
   const callEdge = async (body: object) => {
-    const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions', {
+    const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
       body: JSON.stringify(body),
     });
-    if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Error.'); }
+    if (!response.ok) {
+      let msg = 'Error.';
+      try { const e = await response.json(); msg = e?.error || msg; }
+      catch { try { const t = await response.text(); if (t) msg = t; } catch {} }
+      throw new Error(msg);
+    }
     return response.json();
   };
 
@@ -404,7 +409,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
             onClick={async () => {
               if (!resetDialogUser || !session?.access_token) return;
               setResettingPw(true);
-              const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions', {
+              const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ action: 'resetUserPassword', userId: resetDialogUser.id, newPassword }),

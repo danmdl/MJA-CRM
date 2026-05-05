@@ -79,7 +79,7 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
   const { data: leaders } = useQuery<Leader[]>({
     queryKey: ['cell-leaders', churchId, !!session?.access_token],
     queryFn: async () => {
-      const resp = await fetch(`https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions`, {
+      const resp = await fetch(`https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ action: 'listChurchUsers', churchId }),
