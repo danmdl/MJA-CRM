@@ -409,6 +409,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             cell_id: contact.cell_id,
             zona_id: (contact as any).zona_id || null,
             date_of_birth: contact.date_of_birth || null,
+            fecha_contacto: contact.fecha_contacto || null,
             sexo: contact.sexo || null,
             estado_civil: contact.estado_civil || null,
             numero_cuerda: contact.numero_cuerda || null,
@@ -614,6 +615,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                       {(() => { if (!contact.date_of_birth) return ''; const d = new Date(contact.date_of_birth!); const age = Math.abs(new Date(Date.now() - d.getTime()).getUTCFullYear() - 1970); return Number.isFinite(age) ? `${age}a` : ''; })()}
                     </span>
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha de contacto</label>
+                  <Input type="date" value={contact.fecha_contacto || ''} onChange={(e) => setContact({ ...contact, fecha_contacto: e.target.value || null })} />
                 </div>
               </div>
 

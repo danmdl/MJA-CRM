@@ -495,8 +495,8 @@ const SemilleroPage = () => {
       });
     } else if (sortBy === 'fecha') {
       filtered = [...filtered].sort((a, b) => {
-        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+        const at = a.fecha_contacto ? new Date(a.fecha_contacto).getTime() : 0;
+        const bt = b.fecha_contacto ? new Date(b.fecha_contacto).getTime() : 0;
         return sortDir === 'asc' ? at - bt : bt - at;
       });
     }
@@ -1110,7 +1110,7 @@ const SemilleroPage = () => {
 
                         {/* Fecha (created_at) */}
                         <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums" style={{ width: colWidths.fechaContacto }}>
-                          {c.created_at ? new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
+                          {c.fecha_contacto ? new Date(c.fecha_contacto).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                         </td>
 
                         {/* Sugerencia / Célula asignada */}
