@@ -5,7 +5,6 @@ import { usePermissions, ROLE_LABELS } from '@/lib/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import NotificationBell from '@/components/admin/NotificationBell';
-import PendingLeaderMatches from '@/components/admin/PendingLeaderMatches';
 
 interface NavItemConfig {
   to: string;
@@ -188,9 +187,6 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
           <span>Todas las iglesias</span>
         </button>
       )}
-
-      {/* Pending leader matches */}
-      <PendingLeaderMatches />
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>

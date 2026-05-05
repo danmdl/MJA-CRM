@@ -38,7 +38,10 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
     }
   };
 
-  // Check if any cell's leader_name matches this profile's name
+  // Check if any cell's leader_name matches this profile's name and auto-assign.
+  // No confirmation prompt — if Mauro Avalos is logged in and Mauro Avalos is the
+  // leader_name on a cell, he IS that leader. Edge case of two people with the
+  // same name in the same church is rare enough to handle manually.
   const checkLeaderMatches = async (profileId: string, firstName: string, lastName: string | null, churchId: string) => {
     try {
       // Get cells with leader_name for this church that don't have an encargado yet
@@ -54,24 +57,13 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
       const profileName = normalize(`${firstName} ${lastName || ''}`);
       const profileFirst = normalize(firstName);
 
-      // Check for existing pending matches to avoid duplicates
-      const { data: existing } = await supabase
-        .from('pending_leader_matches')
-        .select('cell_id')
-        .eq('profile_id', profileId);
-      const existingCellIds = new Set((existing || []).map(e => e.cell_id));
-
       for (const cell of cells) {
-        if (!cell.leader_name || existingCellIds.has(cell.id)) continue;
+        if (!cell.leader_name) continue;
         const cellLeader = normalize(cell.leader_name);
         // Match: full name matches, or first name matches when leader_name is a single word
         if (cellLeader === profileName || (cellLeader === profileFirst && !cellLeader.includes(' '))) {
-          await supabase.from('pending_leader_matches').insert({
-            profile_id: profileId,
-            cell_id: cell.id,
-            matched_name: cell.leader_name,
-            status: 'pending',
-          });
+          // Auto-assign: link the cell directly to this user
+          await supabase.from('cells').update({ encargado_id: profileId }).eq('id', cell.id);
         }
       }
     } catch { /* silent — don't break login flow */ }
