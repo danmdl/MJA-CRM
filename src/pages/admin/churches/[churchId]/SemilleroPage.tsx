@@ -1592,6 +1592,40 @@ const SemilleroPage = () => {
         }}
       />
 
+      {/* Bulk WhatsApp dialog - up to 5 contacts at once */}
+      <BulkWhatsAppDialog
+        open={bulkWhatsAppOpen}
+        onOpenChange={setBulkWhatsAppOpen}
+        contacts={(allContacts || []).filter(c => selectedIds.has(c.id)).map(c => ({
+          id: c.id,
+          first_name: c.first_name,
+          last_name: c.last_name,
+          phone: c.phone,
+        }))}
+        churchId={churchId}
+        onSent={async (sentContactIds, message, templateName) => {
+          // Log each WhatsApp send to contact history
+          try {
+            const session = (await supabase.auth.getSession()).data.session;
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+            const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+            const note = templateName
+              ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}" (envío masivo).`
+              : `WhatsApp enviado a las ${time} (envío masivo, sin plantilla).`;
+            await Promise.all(sentContactIds.map(contactId =>
+              fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
+                body: JSON.stringify({
+                  contactId, churchId, contact_date: today, contact_method: 'WhatsApp', notes: note,
+                }),
+              })
+            ));
+          } catch (e) { console.error('Failed to log bulk WhatsApp:', e); }
+        }}
+      />
+
       {/* Floating action bar - appears at bottom of viewport when contacts are selected.
           Solves the problem of having to scroll back to the top to find the delete
           button when the user selects a contact at the bottom of a long list. */}
@@ -1606,6 +1640,20 @@ const SemilleroPage = () => {
           >
             Limpiar
           </button>
+          {canSendWhatsapp() && visibleSelectedCount <= 5 && (
+            <Button
+              size="sm"
+              onClick={() => setBulkWhatsAppOpen(true)}
+              className="gap-1.5 bg-[#25D366] hover:bg-[#20BD5A] text-white"
+            >
+              <WhatsAppIcon className="h-4 w-4" /> Enviar WhatsApp
+            </Button>
+          )}
+          {canSendWhatsapp() && visibleSelectedCount > 5 && (
+            <span className="text-xs text-amber-500 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/30">
+              Máx 5 para WhatsApp
+            </span>
+          )}
           {canEditDeleteContacts() && (
             <Button
               size="sm"
