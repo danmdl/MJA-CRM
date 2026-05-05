@@ -1110,7 +1110,12 @@ const SemilleroPage = () => {
 
                         {/* Fecha (created_at) */}
                         <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums" style={{ width: colWidths.fechaContacto }}>
-                          {c.fecha_contacto ? new Date(c.fecha_contacto).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
+                          {c.fecha_contacto ? (() => {
+                            // Parse YYYY-MM-DD as local date to avoid UTC offset shifting
+                            const parts = String(c.fecha_contacto).slice(0, 10).split('-');
+                            if (parts.length !== 3) return '—';
+                            return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+                          })() : '—'}
                         </td>
 
                         {/* Sugerencia / Célula asignada */}
