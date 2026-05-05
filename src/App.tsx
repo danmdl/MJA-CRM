@@ -50,13 +50,33 @@ const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
 class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; isRetrying: boolean }> {
   constructor(props: any) { super(props); this.state = { hasError: false, isRetrying: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error: any) {
+  componentDidCatch(error: any, errorInfo: any) {
     // If it's a chunk load error, reload silently
     if (error?.message?.includes('Loading chunk') || error?.message?.includes('Failed to fetch') || error?.name === 'ChunkLoadError') {
       this.setState({ isRetrying: true });
       window.location.reload();
       return;
     }
+    // For other errors, log to client_logs so they show up in /admin/logs
+    try {
+      import('@/integrations/supabase/client').then(({ supabase }) => {
+        supabase.auth.getUser().then(({ data }: any) => {
+          supabase.from('client_logs').insert({
+            level: 'error',
+            action: 'react_error_boundary',
+            error_message: error?.message || String(error),
+            user_id: data?.user?.id || null,
+            user_email: data?.user?.email || null,
+            context: {
+              page_url: window.location.href,
+              user_agent: navigator.userAgent,
+              stack: (error?.stack || '').slice(0, 5000),
+              componentStack: (errorInfo?.componentStack || '').slice(0, 2000),
+            },
+          }).then(() => {});
+        });
+      }).catch(() => {});
+    } catch { /* don't break further */ }
   }
   render() {
     if (this.state.hasError) {

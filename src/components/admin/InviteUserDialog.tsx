@@ -90,18 +90,18 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
           </div>
           <div>
             <label className="text-sm font-medium">Rol</label>
-            <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un rol" />
-              </SelectTrigger>
-              <SelectContent>
-                {assignableRoles.map((roleOption) => (
-                  <SelectItem key={roleOption} value={roleOption}>
-                    {ROLE_LABELS[roleOption] || roleOption}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as UserRole)}
+              disabled={loading}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {assignableRoles.map((roleOption) => (
+                <option key={roleOption} value={roleOption}>
+                  {ROLE_LABELS[roleOption] || roleOption}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
