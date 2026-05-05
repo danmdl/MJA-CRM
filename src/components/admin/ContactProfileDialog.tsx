@@ -428,7 +428,12 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       } else {
         showSuccess('Contacto actualizado con éxito.');
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-        safeClose();
+        // Mark current state as saved so hasUnsavedChanges becomes false
+        // and safeClose doesn't open the unsaved-changes dialog
+        if (contact) setOriginalContact(JSON.stringify(contact));
+        // Use forceClose since we just saved everything
+        setShowContactMap(false);
+        setTimeout(() => onOpenChange(false), 50);
       }
     } finally {
       setSaving(false);
