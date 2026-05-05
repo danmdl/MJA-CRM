@@ -30,6 +30,7 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [numeroCuerda, setNumeroCuerda] = useState('');
+  const [sinCuerda, setSinCuerda] = useState(false);
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
 
@@ -46,6 +47,10 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) { showError('Por favor, introduce un correo electrónico'); return; }
+    if (!sinCuerda && !numeroCuerda.trim()) {
+      showError('Ingresá un número de cuerda o tildá "Sin cuerda".');
+      return;
+    }
     setLoading(true);
     try {
       if (!session?.access_token) { showError('No hay sesión activa.'); setLoading(false); return; }
@@ -54,14 +59,14 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ email, role, churchId, first_name: firstName, last_name: lastName, phone, numero_cuerda: numeroCuerda }),
+        body: JSON.stringify({ email, role, churchId, first_name: firstName, last_name: lastName, phone, numero_cuerda: sinCuerda ? null : numeroCuerda.trim() }),
       });
       const data = await response.json();
       if (!response.ok) {
         showError(data.error || 'Error al enviar invitación.');
       } else {
         showSuccess('¡Invitación enviada con éxito!');
-        setEmail(''); setRole('conector'); setFirstName(''); setLastName(''); setPhone(''); setNumeroCuerda('');
+        setEmail(''); setRole('conector'); setFirstName(''); setLastName(''); setPhone(''); setNumeroCuerda(''); setSinCuerda(false);
         queryClient.invalidateQueries({ queryKey: ['users'] });
         if (churchId) queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] });
         setTimeout(() => onOpenChange(false), 50);
@@ -118,8 +123,27 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="5491122334455" disabled={loading} />
           </div>
           <div>
-            <label className="text-sm font-medium">Número de Cuerda</label>
-            <Input value={numeroCuerda} onChange={(e) => setNumeroCuerda(e.target.value)} placeholder="Ej: 202" disabled={loading} />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium">
+                Número de Cuerda {!sinCuerda && <span className="text-red-500">*</span>}
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sinCuerda}
+                  onChange={(e) => { setSinCuerda(e.target.checked); if (e.target.checked) setNumeroCuerda(''); }}
+                  disabled={loading}
+                  className="rounded border-input"
+                />
+                Sin cuerda
+              </label>
+            </div>
+            <Input
+              value={numeroCuerda}
+              onChange={(e) => setNumeroCuerda(e.target.value)}
+              placeholder="Ej: 202"
+              disabled={loading || sinCuerda}
+            />
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setTimeout(() => onOpenChange(false), 50)} disabled={loading}>Cancelar</Button>
