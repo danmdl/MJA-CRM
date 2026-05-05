@@ -38,7 +38,7 @@ import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 // ─── Types ───────────────────────────────────────────────────────
 interface Zona { id: string; nombre: string; }
 interface Barrio { id: string; nombre: string; zona_id: string; }
-interface Cuerda { id: string; numero: string; zona_id: string; }
+interface Cuerda { id: string; numero: string; zona_id: string; is_church_cuerda?: boolean; }
 interface Cell {
   id: string; name: string; church_id: string; cuerda_id: string | null;
   address: string | null; lat: number | null; lng: number | null;
@@ -197,7 +197,7 @@ const SemilleroPage = () => {
     queryKey: ['cuerdas-pool', churchId],
     queryFn: async () => {
       if (!zonas?.length) return [];
-      const { data } = await supabase.from('cuerdas').select('id, numero, zona_id').in('zona_id', zonas.map(z => z.id));
+      const { data } = await supabase.from('cuerdas').select('id, numero, zona_id, is_church_cuerda').in('zona_id', zonas.map(z => z.id));
       return data || [];
     },
     enabled: !!zonas?.length,
@@ -1256,8 +1256,15 @@ const SemilleroPage = () => {
                                 )}
                                 {sugCell && isExternal && (
                                   <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
-                                    await supabase.from('contacts').update({ is_external: true }).eq('id', c.id);
-                                    showSuccess('Contacto movido al Semillero Externo.');
+                                    // Externo flow: mark as external AND reassign to the church-cuerda
+                                    // (the special cuerda whose numero is the church name).
+                                    // This way Externos belong to the church as a whole, not to the
+                                    // numerical cuerda they were originally in.
+                                    const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
+                                    const update: any = { is_external: true };
+                                    if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
+                                    await supabase.from('contacts').update(update).eq('id', c.id);
+                                    showSuccess('Contacto movido al Semillero Externo (cuerda iglesia).');
                                     queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                                   }}>
                                     <ExternalLink className="h-3 w-3 mr-1" /> Externo
