@@ -506,6 +506,13 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 </Button>
               </div>
 
+              {/* Creation date (read-only, system-generated) */}
+              {contact.created_at && (
+                <div className="text-xs text-muted-foreground border-l-2 border-primary/30 pl-2">
+                  Contacto creado el {new Date(contact.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })} a las {new Date(contact.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+
               {/* Row 1: Nombre / Apellido / Teléfono */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ContactInfoField label="Nombre" value={contact.first_name} onChange={(v) => setContact({ ...contact, first_name: v })} />
