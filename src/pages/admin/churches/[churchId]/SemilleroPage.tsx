@@ -1182,6 +1182,7 @@ const SemilleroPage = () => {
                                     <Zap className="h-3 w-3 mr-1" /> Asignar
                                   </Button>
                                 )}
+                                {canSeeContactsFromAllCuerdas && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
@@ -1245,6 +1246,7 @@ const SemilleroPage = () => {
                                     })()}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                                )}
                                 <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
                                   await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
                                   showSuccess('Contacto devuelto al Semillero Sin Asignar.');
@@ -1270,6 +1272,7 @@ const SemilleroPage = () => {
                                     <ExternalLink className="h-3 w-3 mr-1" /> Externo
                                   </Button>
                                 )}
+                                {canSeeContactsFromAllCuerdas && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm" className="h-7 text-xs px-2"><ChevronDown className="h-3 w-3 mr-1" /> Cuerda</Button>
@@ -1290,6 +1293,7 @@ const SemilleroPage = () => {
                                     })}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                                )}
                                 <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help ml-1">Sin dirección</Badge></TooltipTrigger>
                                   <TooltipContent><p className="text-xs">Sin dirección no se puede sugerir célula automáticamente.</p></TooltipContent></Tooltip>
                               </div>
@@ -1319,6 +1323,7 @@ const SemilleroPage = () => {
                                     <ExternalLink className="h-3 w-3 mr-1" /> Externo
                                   </Button>
                                 )}
+                                {canSeeContactsFromAllCuerdas && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
@@ -1382,6 +1387,7 @@ const SemilleroPage = () => {
                                     })()}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                                )}
                               </div>
                             )}
                           </td>
