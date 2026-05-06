@@ -651,58 +651,6 @@ const SemilleroPage = () => {
     onError: (err: any) => showError(err.message),
   });
 
-  // ─── Cell dropdown items sorted by distance ────────────────────
-  const getCellDropdownItems = useCallback((contact: Contact) => {
-    const sugZona = detectZonaForContact(contact);
-    const sorted = getCellsByDistance(contact, sugZona);
-    // Also add cells from other zones
-    const allSorted = getCellsByDistance(contact, null);
-    const inZoneIds = new Set(sorted.map(c => c.id));
-    const otherCells = allSorted.filter(c => !inZoneIds.has(c.id));
-    // Cuerda isolation: non-global users only see cells of their own cuerda
-    // here. Suggesting cells of other cuerdas would let them reassign across
-    // cuerdas, which is what the Externo button is for. Admin/general/pastor/
-    // supervisor see everything.
-    if (!canSeeContactsFromAllCuerdas && userCuerdaNumero) {
-      const cuerdaIdsInUserCuerda = new Set(
-        (cuerdas || []).filter(cr => cr.numero === userCuerdaNumero).map(cr => cr.id)
-      );
-      const filterByCuerda = (cell: Cell) => cuerdaIdsInUserCuerda.has(cell.cuerda_id);
-      return {
-        inZone: sorted.filter(filterByCuerda),
-        otherZone: otherCells.filter(filterByCuerda),
-      };
-    }
-    return { inZone: sorted, otherZone: otherCells };
-  }, [detectZonaForContact, getCellsByDistance, canSeeContactsFromAllCuerdas, userCuerdaNumero, cuerdas]);
-
-  const getCellLabel = (cell: Cell) => {
-    const cuerda = cuerdas?.find(cr => cr.id === cell.cuerda_id);
-    const zona = cuerda ? zonas?.find(z => z.id === cuerda.zona_id) : null;
-    return { name: cell.name, cuerda: cuerda?.numero, zona: zona?.nombre };
-  };
-
-  // The list of cuerdas a user is allowed to assign a contact to. Two rules:
-  //   1. Cuerda isolation: non-global users (anyone other than admin/general/
-  //      pastor/supervisor) can only assign to their OWN cuerda. Cross-cuerda
-  //      assignment isn't a feature — that's what the "Externo" button is for,
-  //      it pushes the contact to the church-cuerda.
-  //   2. Sex prefix: 1xx are male cuerdas, 2xx are female. A female contact
-  //      can't go to a male cuerda and vice versa.
-  // Used by all the "Asignar a cuerda" dropdowns inside the rows.
-  const getAssignableCuerdas = useCallback((contact: Contact) => {
-    return (cuerdas || []).filter(cr => {
-      if (!canSeeContactsFromAllCuerdas && userCuerdaNumero) {
-        if (cr.numero !== userCuerdaNumero) return false;
-      }
-      const prefix = parseInt(cr.numero.charAt(0));
-      const sexo = contact.sexo?.toLowerCase();
-      if (sexo === 'femenino' && prefix === 1) return false;
-      if (sexo === 'masculino' && prefix === 2) return false;
-      return true;
-    });
-  }, [cuerdas, canSeeContactsFromAllCuerdas, userCuerdaNumero]);
-
   // ─── Render ────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
@@ -1182,71 +1130,6 @@ const SemilleroPage = () => {
                                     <Zap className="h-3 w-3 mr-1" /> Asignar
                                   </Button>
                                 )}
-                                {canSeeContactsFromAllCuerdas && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
-                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
-                                    {getAssignableCuerdas(c).map(cr => {
-                                      const zona = zonas?.find(z => z.id === cr.zona_id);
-                                      return (
-                                        <DropdownMenuItem key={`cuerda-ext-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
-                                          type: 'cuerda_only', contactId: c.id, cellId: '', cellName: `Cuerda ${cr.numero}`,
-                                          cuerdaNum: cr.numero, zonaName: zona?.nombre, cuerdaZonaId: zona?.id,
-                                        })}>
-                                          <span className="font-mono font-medium">{cr.numero}</span>
-                                          {zona && <span className="text-[10px] text-muted-foreground ml-1.5">{zona.nombre}</span>}
-                                        </DropdownMenuItem>
-                                      );
-                                    })}
-                                    <DropdownMenuSeparator />
-                                    {(() => {
-                                      const { inZone, otherZone } = getCellDropdownItems(c);
-                                      return (
-                                        <>
-                                          {inZone.length > 0 && (
-                                            <>
-                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Células cercanas</DropdownMenuLabel>
-                                              {inZone.map(cell => {
-                                                const info = getCellLabel(cell);
-                                                return (
-                                                  <DropdownMenuItem key={cell.id} className="text-xs" onClick={() => setConfirmDialog({
-                                                    type: 'manual', contactId: c.id, cellId: cell.id, cellName: cell.name,
-                                                    cuerdaNum: info.cuerda, zonaName: info.zona,
-                                                  })}>
-                                                    <span className="font-medium">{cell.name}</span>
-                                                    {info.cuerda && <Badge variant="secondary" className="ml-1.5 text-[9px] font-mono">{info.cuerda}</Badge>}
-                                                  </DropdownMenuItem>
-                                                );
-                                              })}
-                                            </>
-                                          )}
-                                          {otherZone.length > 0 && (
-                                            <>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-orange-400 py-1">Otras zonas</DropdownMenuLabel>
-                                              {otherZone.slice(0, 10).map(cell => {
-                                                const info = getCellLabel(cell);
-                                                return (
-                                                  <DropdownMenuItem key={cell.id} className="text-xs" onClick={() => setConfirmDialog({
-                                                    type: 'manual', contactId: c.id, cellId: cell.id, cellName: cell.name,
-                                                    cuerdaNum: info.cuerda, zonaName: info.zona,
-                                                  })}>
-                                                    <span>{cell.name}</span>
-                                                    {info.zona && <span className="text-[10px] text-orange-400 ml-1">{info.zona}</span>}
-                                                  </DropdownMenuItem>
-                                                );
-                                              })}
-                                            </>
-                                          )}
-                                        </>
-                                      );
-                                    })()}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                                )}
                                 <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
                                   await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
                                   showSuccess('Contacto devuelto al Semillero Sin Asignar.');
@@ -1271,28 +1154,6 @@ const SemilleroPage = () => {
                                   }}>
                                     <ExternalLink className="h-3 w-3 mr-1" /> Externo
                                   </Button>
-                                )}
-                                {canSeeContactsFromAllCuerdas && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-7 text-xs px-2"><ChevronDown className="h-3 w-3 mr-1" /> Cuerda</Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
-                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar a cuerda</DropdownMenuLabel>
-                                    {getAssignableCuerdas(c).map(cr => {
-                                      const zona = zonas?.find(z => z.id === cr.zona_id);
-                                      return (
-                                        <DropdownMenuItem key={`cuerda-noaddr-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
-                                          type: 'cuerda_only', contactId: c.id, cellId: '', cellName: `Cuerda ${cr.numero}`,
-                                          cuerdaNum: cr.numero, zonaName: zona?.nombre, cuerdaZonaId: zona?.id,
-                                        })}>
-                                          <span>{cr.is_church_cuerda ? `🏛️ ${cr.numero}` : `Cuerda ${cr.numero}`}</span>
-                                          {zona && !cr.is_church_cuerda && <span className="text-[10px] text-muted-foreground ml-1">{zona.nombre}</span>}
-                                        </DropdownMenuItem>
-                                      );
-                                    })}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
                                 )}
                                 <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help ml-1">Sin dirección</Badge></TooltipTrigger>
                                   <TooltipContent><p className="text-xs">Sin dirección no se puede sugerir célula automáticamente.</p></TooltipContent></Tooltip>
@@ -1322,71 +1183,6 @@ const SemilleroPage = () => {
                                   }}>
                                     <ExternalLink className="h-3 w-3 mr-1" /> Externo
                                   </Button>
-                                )}
-                                {canSeeContactsFromAllCuerdas && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-7 text-xs px-1.5"><ChevronDown className="h-3 w-3" /></Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
-                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
-                                    {getAssignableCuerdas(c).map(cr => {
-                                      const zona = zonas?.find(z => z.id === cr.zona_id);
-                                      return (
-                                        <DropdownMenuItem key={`cuerda-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
-                                          type: 'cuerda_only', contactId: c.id, cellId: '', cellName: `Cuerda ${cr.numero}`,
-                                          cuerdaNum: cr.numero, zonaName: zona?.nombre, cuerdaZonaId: zona?.id,
-                                        })}>
-                                          <span className="font-mono font-medium">{cr.numero}</span>
-                                          {zona && <span className="text-[10px] text-muted-foreground ml-1.5">{zona.nombre}</span>}
-                                        </DropdownMenuItem>
-                                      );
-                                    })}
-                                    <DropdownMenuSeparator />
-                                    {(() => {
-                                      const { inZone, otherZone } = getCellDropdownItems(c);
-                                      return (
-                                        <>
-                                          {inZone.length > 0 && (
-                                            <>
-                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Células cercanas</DropdownMenuLabel>
-                                              {inZone.map(cell => {
-                                                const info = getCellLabel(cell);
-                                                return (
-                                                  <DropdownMenuItem key={cell.id} className="text-xs" onClick={() => setConfirmDialog({
-                                                    type: 'manual', contactId: c.id, cellId: cell.id, cellName: cell.name,
-                                                    cuerdaNum: info.cuerda, zonaName: info.zona,
-                                                  })}>
-                                                    <span className="font-medium">{cell.name}</span>
-                                                    {info.cuerda && <Badge variant="secondary" className="ml-1.5 text-[9px] font-mono">{info.cuerda}</Badge>}
-                                                  </DropdownMenuItem>
-                                                );
-                                              })}
-                                            </>
-                                          )}
-                                          {otherZone.length > 0 && (
-                                            <>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-orange-400 py-1">Otras zonas</DropdownMenuLabel>
-                                              {otherZone.slice(0, 10).map(cell => {
-                                                const info = getCellLabel(cell);
-                                                return (
-                                                  <DropdownMenuItem key={cell.id} className="text-xs" onClick={() => setConfirmDialog({
-                                                    type: 'manual', contactId: c.id, cellId: cell.id, cellName: cell.name,
-                                                    cuerdaNum: info.cuerda, zonaName: info.zona,
-                                                  })}>
-                                                    <span>{cell.name}</span>
-                                                    {info.zona && <span className="text-[10px] text-orange-400 ml-1">{info.zona}</span>}
-                                                  </DropdownMenuItem>
-                                                );
-                                              })}
-                                            </>
-                                          )}
-                                        </>
-                                      );
-                                    })()}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
                                 )}
                               </div>
                             )}
