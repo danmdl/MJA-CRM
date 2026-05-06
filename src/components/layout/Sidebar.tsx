@@ -12,7 +12,7 @@ interface NavItemConfig {
   label: string;
 }
 
-const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
+const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpenSearch?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
   const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas } = usePermissions();
@@ -160,6 +160,37 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
           <NotificationBell />
         </div>
       </div>
+
+      {/* Buscar contactos — visible from any page. Same dialog the topbar
+          and Cmd/Ctrl+K open. Lives here so desktop users (who don't see
+          the topbar inside a church) can still get to it. */}
+      {onOpenSearch && (
+        <button
+          onClick={() => { onOpenSearch(); onNavigate?.(); }}
+          style={{
+            margin: '10px 8px 0',
+            padding: '7px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 8,
+            background: '#111113',
+            color: '#a1a1aa',
+            fontSize: 12,
+            cursor: 'pointer',
+            width: 'calc(100% - 16px)',
+          }}
+          title="Buscar contactos (Ctrl/Cmd + K)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <span style={{ flex: 1, textAlign: 'left' }}>Buscar contactos</span>
+          <span style={{ fontSize: 10, color: '#71717a' }}>⌘K</span>
+        </button>
+      )}
 
       {/* Back to churches button — only for multi-church users inside a church */}
       {isInsideChurch && canSeeAllChurches() && (

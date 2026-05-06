@@ -1,9 +1,10 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import { Outlet, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Search } from 'lucide-react';
 import UpdateBanner from '@/components/UpdateBanner';
+import GlobalContactSearch from '@/components/admin/GlobalContactSearch';
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/admin/dashboard') return 'Dashboard';
@@ -28,10 +29,26 @@ const AdminLayout = () => {
   const { pathname } = useLocation();
   const title = getPageTitle(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   // Inside a specific church the ChurchDetailsLayout already shows the church
   // name + tabs in a compact row, so we hide the redundant top-bar title to
   // save vertical space.
   const isInsideChurch = /^\/admin\/churches\/[^/]+\//.test(pathname);
+
+  // Global keyboard shortcut: Cmd+K (mac) / Ctrl+K (win/linux) opens the
+  // contact search from anywhere in the admin area. preventDefault is
+  // important — Cmd+K is also the browser's "focus search bar" on some
+  // browsers and we want our shortcut to win inside the app.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(s => !s);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#09090b' }}>
@@ -60,13 +77,13 @@ const AdminLayout = () => {
         pointerEvents: sidebarOpen ? 'auto' : 'none',
         overflow: 'hidden',
       }} className="lg:!relative lg:!transform-none lg:!translate-x-0 lg:!z-auto lg:!pointer-events-auto">
-        <Sidebar onNavigate={() => setSidebarOpen(false)} />
+        <Sidebar onNavigate={() => setSidebarOpen(false)} onOpenSearch={() => setSearchOpen(true)} />
       </div>
 
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         {/* Topbar - hidden on desktop when inside a church (church layout has its own header).
-            On mobile we keep a slim row just for the hamburger button. */}
+            On mobile we keep a slim row just for the hamburger button + search. */}
         <div
           className={isInsideChurch ? 'lg:hidden' : ''}
           style={{
@@ -94,6 +111,25 @@ const AdminLayout = () => {
           <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa', flexShrink: 0 }}>
             {title}
           </span>
+
+          {/* Search trigger — pushes to the right edge of the topbar. On
+              desktop the sidebar has its own button; this one is mainly
+              for mobile where the sidebar is a drawer. */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            title="Buscar contactos (Ctrl/Cmd + K)"
+            style={{
+              marginLeft: 'auto',
+              height: 32, padding: '0 10px', borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: '#111113', display: 'flex', alignItems: 'center',
+              gap: 6, cursor: 'pointer', color: '#a1a1aa', flexShrink: 0,
+            }}
+          >
+            <Search size={14} />
+            <span style={{ fontSize: 12 }} className="hidden sm:inline">Buscar</span>
+            <span style={{ fontSize: 10, color: '#71717a' }} className="hidden sm:inline">⌘K</span>
+          </button>
         </div>
 
         {/* Page content */}
@@ -101,6 +137,10 @@ const AdminLayout = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Global contact search — accessible via Cmd/Ctrl+K from anywhere in
+          the admin area, the topbar Buscar button, or the Sidebar entry. */}
+      <GlobalContactSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   );
 };
