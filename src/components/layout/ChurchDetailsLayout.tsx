@@ -100,38 +100,35 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Church header - compact on mobile */}
-      <div className="border-b bg-background px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-bold tracking-tight truncate">
-            {nameLoading ? <Skeleton className="h-6 w-40" /> : churchData?.name || "Iglesia"}
-          </h2>
-        </div>
-      </div>
-
-      {/* Scrollable tabs - important on mobile */}
+      {/* Church header + tabs combined into a single compact row */}
       <div className="border-b bg-background">
-        <div className="overflow-x-auto">
-          <Tabs
-            value={activeTab}
-            onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchId}/${val}`))}
-            className="w-full px-3"
-          >
-            <TabsList className="mb-0 w-max">
-              {canSeeOverview && <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>}
-              {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🌱 Semillero</TabsTrigger>}
-              {canSeeProcesos() && <TabsTrigger value="procesos" className="text-xs sm:text-sm px-2 sm:px-3">⚡ Procesos</TabsTrigger>}
-              {canSeeCuerdas() && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
-              {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
-              {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
-              {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
-              {canSeeMapa() && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
-              {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
-              {canSeeBaseDatos() && <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Datos Globales</TabsTrigger>}
-              {canSeeValidador() && <TabsTrigger value="validator" className="text-xs sm:text-sm px-2 sm:px-3">🛡️ Validador</TabsTrigger>}
-              {canSeePapelera() && <TabsTrigger value="papelera" className="text-xs sm:text-sm px-2 sm:px-3">🗑️ Papelera</TabsTrigger>}
-            </TabsList>
-          </Tabs>
+        <div className="flex items-center gap-3 px-3 sm:px-4">
+          <h2 className="text-base sm:text-lg font-bold tracking-tight whitespace-nowrap py-2">
+            {nameLoading ? <Skeleton className="h-5 w-32" /> : churchData?.name || "Iglesia"}
+          </h2>
+          <div className="h-6 w-px bg-border shrink-0" />
+          <div className="flex-1 overflow-x-auto">
+            <Tabs
+              value={activeTab}
+              onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchId}/${val}`))}
+              className="w-full"
+            >
+              <TabsList className="mb-0 w-max">
+                {canSeeOverview && <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>}
+                {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🌱 Semillero</TabsTrigger>}
+                {canSeeProcesos() && <TabsTrigger value="procesos" className="text-xs sm:text-sm px-2 sm:px-3">⚡ Procesos</TabsTrigger>}
+                {canSeeCuerdas() && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
+                {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
+                {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
+                {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
+                {canSeeMapa() && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
+                {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
+                {canSeeBaseDatos() && <TabsTrigger value="database" className="text-xs sm:text-sm px-2 sm:px-3">Datos Globales</TabsTrigger>}
+                {canSeeValidador() && <TabsTrigger value="validator" className="text-xs sm:text-sm px-2 sm:px-3">🛡️ Validador</TabsTrigger>}
+                {canSeePapelera() && <TabsTrigger value="papelera" className="text-xs sm:text-sm px-2 sm:px-3">🗑️ Papelera</TabsTrigger>}
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
       </div>
 

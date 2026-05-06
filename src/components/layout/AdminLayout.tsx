@@ -29,6 +29,10 @@ const AdminLayout = () => {
   const { pathname } = useLocation();
   const title = getPageTitle(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Inside a specific church the ChurchDetailsLayout already shows the church
+  // name + tabs in a compact row, so we hide the redundant top-bar title to
+  // save vertical space.
+  const isInsideChurch = /^\/admin\/churches\/[^/]+\//.test(pathname);
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#09090b' }}>
@@ -62,14 +66,18 @@ const AdminLayout = () => {
 
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        {/* Topbar */}
-        <div style={{
-          height: 52, flexShrink: 0,
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          display: 'flex', alignItems: 'center',
-          padding: '0 16px', gap: 12,
-          background: '#09090b',
-        }}>
+        {/* Topbar - hidden on desktop when inside a church (church layout has its own header).
+            On mobile we keep a slim row just for the hamburger button. */}
+        <div
+          className={isInsideChurch ? 'lg:hidden' : ''}
+          style={{
+            height: 52, flexShrink: 0,
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            display: 'flex', alignItems: 'center',
+            padding: '0 16px', gap: 12,
+            background: '#09090b',
+          }}
+        >
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setSidebarOpen(v => !v)}
@@ -90,7 +98,7 @@ const AdminLayout = () => {
         </div>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '16px' }} className="lg:p-6">
+        <main style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className={isInsideChurch ? 'lg:p-4' : 'lg:p-6'}>
           <Outlet />
         </main>
       </div>
