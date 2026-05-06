@@ -420,6 +420,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             estado_seguimiento: contact.estado_seguimiento || 'nuevo',
             observaciones: contact.observaciones || null,
             pedido_de_oracion: contact.pedido_de_oracion || null,
+            conector: contact.conector || null,
             lat: (contact as any).lat || null,
             lng: (contact as any).lng || null,
           }
@@ -711,6 +712,19 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   </Select>
                 </div>
                 <SelectField label="Líder de Célula" value={contact.leader_assigned} onChange={(v) => setContact({ ...contact, leader_assigned: v })} options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))} placeholder="Sin líder" />
+              </div>
+
+              {/* Conector — quien hizo el primer contacto. Free text to keep
+                  it flexible (sometimes it's a person's name, sometimes 'evento
+                  X' or 'campaña Y'). Editable always; survives reassignments. */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conector</label>
+                <input
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  value={contact.conector || ''}
+                  onChange={(e) => setContact({ ...contact, conector: e.target.value || null })}
+                  placeholder="Quién hizo el primer contacto"
+                />
               </div>
 
               {/* Referente (readonly — resolved from cuerda) */}

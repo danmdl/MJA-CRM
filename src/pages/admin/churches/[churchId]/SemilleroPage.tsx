@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown,
+  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -143,11 +143,25 @@ const SemilleroPage = () => {
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 34, nombre: 130, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145,
+    cuerda: 34, nombre: 130, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145, conector: 110,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
   };
+
+  // Optional columns that the user can toggle on. Default OFF so the table
+  // stays narrow on common screens; users who want them flip them in the
+  // toolbar dropdown and the choice persists in localStorage.
+  // Right now the only optional column is "Conector" (from contact.conector,
+  // a free-text field set by the connector who first met the person).
+  const [showConectorCol, setShowConectorCol] = useState<boolean>(() => {
+    try { return localStorage.getItem('semillero.showConectorCol') === '1'; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('semillero.showConectorCol', showConectorCol ? '1' : '0'); }
+    catch { /* localStorage unavailable, no-op */ }
+  }, [showConectorCol]);
 
   // Assignment permission comes from canAssignContacts() via usePermissions
   const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
@@ -744,6 +758,22 @@ const SemilleroPage = () => {
             <Upload className="h-4 w-4" /> Importar
           </Button>
         )}
+        {/* Optional columns toggle. Currently only Conector but easy to grow:
+            add another entry to the dropdown and another <td> in the row. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 px-2" title="Mostrar/ocultar columnas">
+              <Columns3 className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Columnas opcionales</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowConectorCol(v => !v); }} className="gap-2 cursor-pointer">
+              <input type="checkbox" readOnly checked={showConectorCol} className="rounded border-input pointer-events-none" />
+              <span className="text-sm">Conector</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {canAddContacts() && (
           <Button size="sm" onClick={() => setAddContactOpen(true)} className="gap-1.5">
             <PlusCircle className="h-4 w-4" /> Crear Contacto
@@ -948,6 +978,9 @@ const SemilleroPage = () => {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </ResizableHeader>
+                    {showConectorCol && (
+                      <ResizableHeader width={colWidths.conector} onResize={resizeCol('conector')}>Conector</ResizableHeader>
+                    )}
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>
                       <button
@@ -1075,6 +1108,18 @@ const SemilleroPage = () => {
                             return <span className="text-[11px] text-foreground truncate block">{resp.first_name} {resp.last_name}</span>;
                           })()}
                         </td>
+
+                        {/* Conector — opt-in column toggled in toolbar.
+                            Free text from contact.conector. */}
+                        {showConectorCol && (
+                          <td className="px-2 py-1.5" style={{ width: colWidths.conector }}>
+                            {c.conector ? (
+                              <span className="text-[11px] text-foreground truncate block" title={c.conector}>{c.conector}</span>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground italic">—</span>
+                            )}
+                          </td>
+                        )}
 
                         {/* Dirección + Ver en mapa */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.direccion }}>
