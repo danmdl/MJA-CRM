@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     const { data: callerProfile } = await supabaseAdmin
       .from('profiles')
-      .select('role, church_id, first_name, last_name')
+      .select('role, church_id, first_name, last_name, numero_cuerda')
       .eq('id', userAuth.user.id)
       .single();
 
@@ -98,6 +98,29 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (cuerdaRow?.is_church_cuerda) {
         return new Response(JSON.stringify({ error: 'Solo un administrador puede asignar usuarios a la cuerda de la iglesia.' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Cross-cuerda invite restriction. Below-supervisor roles can only
+    // invite people to their OWN cuerda — same logic as the contact
+    // cuerda-isolation rule. supervisor / pastor / general / admin can
+    // invite to any cuerda. The frontend hides the dropdown options
+    // and the 'Sin cuerda' checkbox for these users; this rejects a
+    // hand-crafted POST that bypasses the form.
+    const SUPERVISOR_AND_ABOVE = ['supervisor', 'pastor', 'general', 'admin'];
+    const callerCanInviteAnyCuerda = SUPERVISOR_AND_ABOVE.includes(callerProfile.role);
+    if (!callerCanInviteAnyCuerda) {
+      if (!numero_cuerda) {
+        return new Response(JSON.stringify({ error: 'Solo podés invitar usuarios a tu propia cuerda. "Sin cuerda" no está permitido.' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (numero_cuerda !== callerProfile.numero_cuerda) {
+        return new Response(JSON.stringify({ error: 'Solo podés invitar usuarios a tu propia cuerda.' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

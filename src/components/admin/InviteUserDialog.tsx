@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,24 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   const queryClient = useQueryClient();
   const { session, profile } = useSession();
 
+  // Pre-fill cuerda with the caller's own cuerda when the dialog opens —
+  // useful both for below-supervisor users (who can ONLY invite there)
+  // and as a sensible default for supervisor+ inviters in their cuerda.
+  useEffect(() => {
+    if (open && profile?.numero_cuerda && !numeroCuerda) {
+      setNumeroCuerda(profile.numero_cuerda);
+    }
+    if (!open) {
+      // Reset on close so reopening with a different church/role doesn't
+      // hold a stale value (e.g. admin reopens after switching churches).
+      setNumeroCuerda(profile?.numero_cuerda || '');
+      setSinCuerda(false);
+    }
+  // We deliberately don't depend on numeroCuerda — that would re-set on
+  // every keystroke. Run only on open/profile change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, profile?.numero_cuerda]);
+
   const myLevel = getRoleLevel(profile?.role || '');
 
   // Cuerdas list for the dropdown. Joined to zonas to filter by churchId.
@@ -64,8 +82,30 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
     staleTime: 60_000,
   });
 
-  // Filter church-cuerda out when the inviter isn't admin.
-  const cuerdaOptions = (cuerdas || []).filter(c => profile?.role === 'admin' || !c.is_church_cuerda);
+  // Filter rules for the cuerda dropdown:
+  //   1. Church-cuerdas (is_church_cuerda=true) only show for admins.
+  //      Anyone else assigning to the church-cuerda would silently
+  //      expand the authority bucket that distributes contacts.
+  //   2. Below supervisor (referente, encargado, consolidador, conector,
+  //      anfitrion) can only invite to their OWN cuerda. Cross-cuerda
+  //      invites aren't a feature for them — same logic as the contact
+  //      cross-cuerda restriction. Supervisor and above (pastor,
+  //      general, admin) can invite to any cuerda.
+  const SUPERVISOR_AND_ABOVE: UserRole[] = ['supervisor', 'pastor', 'general', 'admin'];
+  const callerCanInviteAnyCuerda = SUPERVISOR_AND_ABOVE.includes(profile?.role as UserRole);
+  const callerCuerdaNumero = profile?.numero_cuerda || null;
+  const cuerdaOptions = (cuerdas || []).filter(c => {
+    if (c.is_church_cuerda && profile?.role !== 'admin') return false;
+    if (!callerCanInviteAnyCuerda) {
+      return callerCuerdaNumero != null && c.numero === callerCuerdaNumero;
+    }
+    return true;
+  });
+
+  // For below-supervisor users, lock the form to their cuerda. The
+  // 'Sin cuerda' checkbox is also hidden for them, since they're only
+  // ever inviting people INTO their cuerda.
+  const cuerdaIsLocked = !callerCanInviteAnyCuerda;
 
   // Roles available to assign: same level or below current user's level.
   // A referente can invite another referente, but not a supervisor.
@@ -158,21 +198,25 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
               <label className="text-sm font-medium">
                 Número de Cuerda {!sinCuerda && <span className="text-red-500">*</span>}
               </label>
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={sinCuerda}
-                  onChange={(e) => { setSinCuerda(e.target.checked); if (e.target.checked) setNumeroCuerda(''); }}
-                  disabled={loading}
-                  className="rounded border-input"
-                />
-                Sin cuerda
-              </label>
+              {/* 'Sin cuerda' is only meaningful for supervisor+ inviters.
+                  Below-supervisor users are locked to their own cuerda. */}
+              {!cuerdaIsLocked && (
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={sinCuerda}
+                    onChange={(e) => { setSinCuerda(e.target.checked); if (e.target.checked) setNumeroCuerda(''); }}
+                    disabled={loading}
+                    className="rounded border-input"
+                  />
+                  Sin cuerda
+                </label>
+              )}
             </div>
             <Select
               value={numeroCuerda || undefined}
               onValueChange={(v) => setNumeroCuerda(v)}
-              disabled={loading || sinCuerda}
+              disabled={loading || sinCuerda || cuerdaIsLocked}
             >
               <SelectTrigger>
                 <SelectValue placeholder={cuerdaOptions.length === 0 ? 'No hay cuerdas configuradas' : 'Seleccionar cuerda...'} />
@@ -192,6 +236,11 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
                 ))}
               </SelectContent>
             </Select>
+            {cuerdaIsLocked && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Solo podés invitar a tu propia cuerda.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setTimeout(() => onOpenChange(false), 50)} disabled={loading}>Cancelar</Button>
