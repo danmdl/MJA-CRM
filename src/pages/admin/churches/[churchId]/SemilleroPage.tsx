@@ -874,12 +874,22 @@ const SemilleroPage = () => {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {(() => {
-                            // Build unique responsable list from current contacts
+                            // Build unique responsable list, but apply the SAME strict
+                            // cuerda visibility rule used by filteredContacts. Otherwise
+                            // a referente of cuerda 202 would see responsables of cuerdas
+                            // 101, 301, etc. — leaks responsables across cuerdas.
+                            // Only admin/general/pastor/supervisor (canSeeAllCuerdas) see all.
+                            const userId = session?.user?.id;
+                            const visible = (allContacts || []).filter(c => {
+                              if (canSeeAllCuerdas) return true;
+                              if (userCuerdaNumero) return c.numero_cuerda === userCuerdaNumero;
+                              return c.responsable_id === userId;
+                            });
                             const creatorIds = new Set<string>();
-                            (allContacts || []).forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
+                            visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
                             const creators = Array.from(creatorIds)
                               .map(id => ({ id, profile: profileById.get(id) }))
-                              .filter(c => c.profile && c.id !== session?.user?.id)
+                              .filter(c => c.profile && c.id !== userId)
                               .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
                             return creators.map(c => (
                               <DropdownMenuItem key={c.id} onClick={() => setFilterResponsable(c.id)} className={filterResponsable === c.id ? 'bg-accent' : ''}>
