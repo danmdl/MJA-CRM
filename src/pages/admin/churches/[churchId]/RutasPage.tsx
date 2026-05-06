@@ -115,15 +115,24 @@ const RutasPage = () => {
     });
   };
 
+  const [onlyWithNumber, setOnlyWithNumber] = useState(true);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return contacts || [];
     return (contacts || []).filter(c => {
-      const name = `${c.first_name} ${c.last_name || ''}`.toLowerCase();
-      const addr = (c.address || '').toLowerCase();
-      return name.includes(term) || addr.includes(term);
+      // Filter by address with street number when toggle is on.
+      // Heuristic: address must contain at least one digit (most ARG addresses
+      // have a street number like 'Av Corrientes 4000'). Without a number,
+      // the geocoded lat/lng is just an area centroid which makes routes useless.
+      if (onlyWithNumber && !/\d/.test(c.address || '')) return false;
+      if (term) {
+        const name = `${c.first_name} ${c.last_name || ''}`.toLowerCase();
+        const addr = (c.address || '').toLowerCase();
+        if (!name.includes(term) && !addr.includes(term)) return false;
+      }
+      return true;
     });
-  }, [contacts, search]);
+  }, [contacts, search, onlyWithNumber]);
 
   const selectedContacts = useMemo(
     () => (contacts || []).filter(c => selectedIds.has(c.id)),
@@ -419,7 +428,7 @@ const RutasPage = () => {
                 </button>
               )}
             </div>
-            <div className="relative mb-3">
+            <div className="relative mb-2">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search}
@@ -428,6 +437,15 @@ const RutasPage = () => {
                 className="pl-9 h-9"
               />
             </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground mb-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={onlyWithNumber}
+                onChange={(e) => setOnlyWithNumber(e.target.checked)}
+                className="rounded border-input"
+              />
+              Solo direcciones con número (recomendado para rutas precisas)
+            </label>
             <div className="max-h-[400px] overflow-y-auto border rounded">
               {isLoading ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">Cargando...</div>

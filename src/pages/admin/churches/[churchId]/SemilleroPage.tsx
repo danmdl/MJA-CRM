@@ -419,9 +419,9 @@ const SemilleroPage = () => {
       if (externalIds.has(c.id)) return;
       if (!canSeeAllCuerdas) {
         if (userCuerdaNumero) {
-          if (c.numero_cuerda !== userCuerdaNumero && c.responsable_id !== userId && c.created_by !== userId) return;
+          if (c.numero_cuerda !== userCuerdaNumero) return;
         } else {
-          if (c.responsable_id !== userId && c.created_by !== userId) return;
+          if (c.responsable_id !== userId) return;
         }
       }
       unassigned++;
@@ -447,24 +447,21 @@ const SemilleroPage = () => {
     } else {
       filtered = [];
     }
-    // Visibility rules for non-global users:
-    // - If they have a cuerda: see contacts of their cuerda + contacts they created + contacts they're responsible for
-    // - If they DON'T have a cuerda: only see contacts they created or are responsible for
-    // This prevents users from seeing/editing contacts that belong to other cuerdas
+    // Visibility rules for non-global users (strict cuerda-based):
+    // - If they have a cuerda: see ONLY contacts of their cuerda. Period.
+    //   No exceptions for created_by or responsable_id (otherwise referentes
+    //   could see contacts they assigned to people in other cuerdas, which
+    //   leaked across cuerdas).
+    // - If they DON'T have a cuerda: see ONLY contacts where they are
+    //   responsable_id (the contacts that were specifically given to them).
+    //   created_by is NOT enough (a conector might have created hundreds of
+    //   contacts now in different cuerdas — they shouldn't see those anymore).
     if (!canSeeAllCuerdas) {
       const userId = session?.user?.id;
       if (userCuerdaNumero) {
-        filtered = filtered.filter(c =>
-          c.numero_cuerda === userCuerdaNumero ||
-          c.responsable_id === userId ||
-          c.created_by === userId
-        );
+        filtered = filtered.filter(c => c.numero_cuerda === userCuerdaNumero);
       } else {
-        // No cuerda assigned — only see own contacts
-        filtered = filtered.filter(c =>
-          c.responsable_id === userId ||
-          c.created_by === userId
-        );
+        filtered = filtered.filter(c => c.responsable_id === userId);
       }
     }
     if (searchTerm) {
@@ -1729,7 +1726,17 @@ const SemilleroPage = () => {
               <option value="">Seleccionar responsable...</option>
               <option value="__none__">— Sin responsable (limpiar)</option>
               {(teamMembers || [])
-                .filter(m => m.id)
+                .filter(m => {
+                  if (!m.id) return false;
+                  // Non-global users can only assign to people in their own cuerda.
+                  // This prevents a referente of cuerda 202 from assigning a contact
+                  // to a referente of cuerda 101.
+                  if (!canSeeAllCuerdas) {
+                    if (!userCuerdaNumero) return false;
+                    return m.numero_cuerda === userCuerdaNumero;
+                  }
+                  return true;
+                })
                 .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
                 .map(m => (
                   <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
