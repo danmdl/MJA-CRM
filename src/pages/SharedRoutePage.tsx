@@ -23,6 +23,9 @@ const SharedRoutePage = () => {
   const [route, setRoute] = useState<any | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [visited, setVisited] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState<string>('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const notesSaveTimer = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const customMarkers = useRef<any[]>([]);
@@ -40,6 +43,7 @@ const SharedRoutePage = () => {
       }
       setRoute(data);
       setVisited(data.visited || {});
+      setNotes(data.notes || '');
       // Fetch the contacts in order
       const { data: cs } = await supabase.from('contacts')
         .select('id, first_name, last_name, address, lat, lng')
@@ -133,6 +137,17 @@ const SharedRoutePage = () => {
     }
   };
 
+  const handleNotesChange = (value: string) => {
+    setNotes(value);
+    if (!route?.id) return;
+    if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
+    setSavingNotes(true);
+    notesSaveTimer.current = setTimeout(async () => {
+      await supabase.from('shared_routes').update({ notes: value }).eq('id', route.id);
+      setSavingNotes(false);
+    }, 800);
+  };
+
   const openInGoogleMaps = () => {
     if (!route || contacts.length === 0) return;
     const origin = `${route.start_lat},${route.start_lng}`;
@@ -166,7 +181,7 @@ const SharedRoutePage = () => {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-2 mb-2">
           <RouteIcon className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Ruta compartida</h1>
+          <h1 className="text-2xl font-bold">{route.name || 'Ruta compartida'}</h1>
         </div>
         <p className="text-xs text-muted-foreground mb-6">
           Expira el {new Date(route.expires_at).toLocaleDateString('es-AR')}. Marcá las visitas a medida que avanzás.
@@ -218,6 +233,26 @@ const SharedRoutePage = () => {
         </div>
 
         <div ref={mapRef} className="w-full h-[400px] sm:h-[500px] rounded-lg border" />
+
+        {/* Shared notes - everyone with this link can read/edit */}
+        <div className="border rounded-lg p-4 bg-card mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">Notas compartidas</h3>
+            <span className="text-[10px] text-muted-foreground">
+              {savingNotes ? 'Guardando...' : 'Guardado automáticamente'}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-2">
+            Cualquier persona con este link puede leer y editar estas notas.
+          </p>
+          <textarea
+            value={notes}
+            onChange={(e) => handleNotesChange(e.target.value)}
+            placeholder="Escribí acá observaciones, quién atendió en cada casa, qué cosas se hablaron, próximos pasos..."
+            rows={6}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-y min-h-[120px]"
+          />
+        </div>
       </div>
     </div>
   );

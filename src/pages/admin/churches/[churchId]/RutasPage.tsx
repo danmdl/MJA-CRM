@@ -76,6 +76,23 @@ const RutasPage = () => {
     staleTime: 5 * 60_000,
   });
 
+  // Fetch user's existing shared route projects (non-expired)
+  const { data: myRoutes } = useQuery<any[]>({
+    queryKey: ['my-shared-routes', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      const { data } = await supabase.from('shared_routes')
+        .select('id, share_token, name, created_at, expires_at, ordered_contact_ids, total_meters, total_seconds')
+        .eq('created_by', profile.id)
+        .eq('church_id', churchId!)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(20);
+      return data || [];
+    },
+    enabled: !!profile?.id && !!churchId,
+  });
+
   const useChurchAddress = async () => {
     if (!church?.address) {
       showError(`${church?.name || 'La iglesia'} no tiene una dirección configurada. Pedile a un admin que la cargue.`);
@@ -308,6 +325,10 @@ const RutasPage = () => {
 
   const handleShare = async () => {
     if (!routeData) return;
+    const defaultName = `Ruta ${new Date().toLocaleDateString('es-AR')} (${routeData.orderedContacts.length} paradas)`;
+    const projectName = window.prompt('Nombre del proyecto de ruta:', defaultName);
+    if (projectName === null) return; // user cancelled
+    const finalName = projectName.trim() || defaultName;
     setSharing(true);
     try {
       // Generate a random token (UUID-like)
@@ -315,6 +336,7 @@ const RutasPage = () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase.from('shared_routes').insert({
         share_token: token,
+        name: finalName,
         created_by: profile?.id,
         church_id: churchId,
         start_address: startAddress,
@@ -325,10 +347,12 @@ const RutasPage = () => {
         total_seconds: routeData.totalSeconds,
         expires_at: expiresAt,
         visited: {},
+        notes: '',
       });
       if (error) throw error;
       setShareToken(token);
-      showSuccess('Link de ruta generado. Expira en 7 días.');
+      queryClient.invalidateQueries({ queryKey: ['my-shared-routes', profile?.id] });
+      showSuccess(`Proyecto "${finalName}" creado. Link válido por 7 días.`);
     } catch (e: any) {
       showError(e.message || 'Error al generar el link.');
     } finally {
@@ -475,6 +499,47 @@ const RutasPage = () => {
 
         {/* Right: Map + result */}
         <div className="space-y-4">
+          {/* My active projects */}
+          {(myRoutes || []).length > 0 && (
+            <div className="border rounded-lg p-4 bg-card">
+              <h3 className="text-sm font-semibold mb-2">Mis proyectos de ruta activos</h3>
+              <p className="text-xs text-muted-foreground mb-3">Cada proyecto incluye un link compartible y notas colaborativas.</p>
+              <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                {(myRoutes || []).map((r: any) => {
+                  const url = `${window.location.origin}/r/${r.share_token}`;
+                  const expiresIn = Math.ceil((new Date(r.expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+                  return (
+                    <div key={r.id} className="flex items-center gap-2 p-2 rounded border bg-muted/20">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium truncate">{r.name || `Ruta sin nombre · ${(r.ordered_contact_ids || []).length} paradas`}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {(r.ordered_contact_ids || []).length} paradas · expira en {expiresIn} {expiresIn === 1 ? 'día' : 'días'}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => window.open(url, '_blank')} title="Abrir">
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
+                        navigator.clipboard.writeText(url);
+                        showSuccess('Link copiado');
+                      }} title="Copiar link">
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-300" onClick={async () => {
+                        if (!confirm(`¿Eliminar el proyecto "${r.name || 'sin nombre'}"?`)) return;
+                        await supabase.from('shared_routes').delete().eq('id', r.id);
+                        queryClient.invalidateQueries({ queryKey: ['my-shared-routes', profile?.id] });
+                        showSuccess('Proyecto eliminado.');
+                      }} title="Eliminar">
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {routeData ? (
             <>
               <div className="border rounded-lg p-4 bg-card">
