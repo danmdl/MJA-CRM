@@ -12,6 +12,17 @@ interface AddressAutocompleteProps {
   onChange: (address: string, lat?: number, lng?: number, barrio?: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  // Optional location bias for autocomplete predictions and for placeId
+  // geocoding. Pass the church's coords here so addresses near the
+  // church win over more popular hits in Capital or elsewhere. Without
+  // this, Google's autocomplete picks the most prominent match across
+  // Argentina, which is wrong when the church is e.g. in San Martín.
+  biasLat?: number | null;
+  biasLng?: number | null;
+  // Bias radius in meters. ~10 km by default — wide enough to cover the
+  // typical area a church serves but tight enough to keep Capital
+  // addresses out of the top results when the church is in GBA.
+  biasRadius?: number;
 }
 
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
@@ -40,6 +51,9 @@ const AddressAutocomplete = ({
   onChange,
   placeholder = 'Escribe la dirección...',
   disabled = false,
+  biasLat,
+  biasLng,
+  biasRadius = 10000,
 }: AddressAutocompleteProps) => {
   const [query, setQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -85,8 +99,25 @@ const AddressAutocomplete = ({
     debounceRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
       setLoading(true);
+      // Build the prediction request. componentRestrictions limits to
+      // Argentina; locationBias (if church coords are provided) tells
+      // Google to favor results within `biasRadius` meters of the church.
+      // It's a soft bias — addresses outside still come up if there's
+      // no better match nearby.
+      const request: any = {
+        input: q,
+        componentRestrictions: { country: 'ar' },
+        types: ['address'],
+      };
+      if (biasLat != null && biasLng != null && (window as any).google?.maps) {
+        const google = (window as any).google;
+        request.locationBias = new google.maps.Circle({
+          center: { lat: biasLat, lng: biasLng },
+          radius: biasRadius,
+        });
+      }
       autocompleteServiceRef.current.getPlacePredictions(
-        { input: q, componentRestrictions: { country: 'ar' }, types: ['address'] },
+        request,
         (predictions: any[], status: string) => {
           if (!mountedRef.current) return; // don't setState if unmounted
           setLoading(false);
@@ -99,7 +130,7 @@ const AddressAutocomplete = ({
         }
       );
     }, 300);
-  }, []);
+  }, [biasLat, biasLng, biasRadius]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);

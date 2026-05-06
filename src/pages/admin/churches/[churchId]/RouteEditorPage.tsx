@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, MessageCircle, Plus, RefreshCw } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
@@ -29,6 +30,8 @@ interface Contact {
 
 const RouteEditorPage = () => {
   const { churchId, projectId } = useParams<{ churchId: string; projectId: string }>();
+  // Bias address autocomplete toward the church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
   const navigate = useNavigate();
   const { profile } = useSession();
   const queryClient = useQueryClient();
@@ -657,6 +660,8 @@ const RouteEditorPage = () => {
                   if (lat && lng) { setStartLat(lat); setStartLng(lng); }
                 }}
                 placeholder="Escribí la dirección de partida..."
+                biasLat={churchCoords?.lat ?? null}
+                biasLng={churchCoords?.lng ?? null}
               />
               <div className="flex flex-wrap gap-2 mt-2">
                 <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs h-8">

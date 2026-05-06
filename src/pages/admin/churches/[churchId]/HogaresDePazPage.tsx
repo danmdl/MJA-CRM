@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Pencil, Plus, Home, MapPin, Trash2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 import { isWithinGBA } from '@/lib/geo-validation';
 import { useSession } from '@/hooks/use-session';
 
@@ -43,6 +44,8 @@ const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', '
 
 const HogaresDePazPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
+  // Bias address autocomplete toward the church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
   const { profile } = useSession();
   const queryClient = useQueryClient();
   const [editHogar, setEditHogar] = useState<Hogar | null>(null);
@@ -284,6 +287,8 @@ const HogaresDePazPage = () => {
                   }
                 }}
                 placeholder="Ej: Av Corrientes 4000, CABA"
+                biasLat={churchCoords?.lat ?? null}
+                biasLng={churchCoords?.lng ?? null}
               />
               <div className="flex items-center gap-2 mt-1">
                 <button type="button" className="text-[10px] text-primary hover:underline flex items-center gap-1" onClick={() => setShowMap(!showMap)}>

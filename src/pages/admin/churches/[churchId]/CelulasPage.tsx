@@ -9,6 +9,7 @@ import { Search, MapPin, Pencil, Lock, Unlock } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError } from '@/utils/toast';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 import { usePermissions } from '@/lib/permissions';
 import { useSession } from '@/hooks/use-session';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
@@ -34,6 +35,8 @@ interface CellRow {
 
 const CelulasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
+  // Bias address autocomplete toward the church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
   const queryClient = useQueryClient();
   const { canEditCelulas, canSeeBaseDatosTotal } = usePermissions();
   const { session, profile } = useSession();
@@ -284,6 +287,8 @@ const CelulasPage = () => {
                     } : null);
                   }}
                   placeholder="Ej: Av Corrientes 4000, CABA"
+                  biasLat={churchCoords?.lat ?? null}
+                  biasLng={churchCoords?.lng ?? null}
                 />
               </div>
 

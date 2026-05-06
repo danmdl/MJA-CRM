@@ -17,6 +17,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import AddressAutocomplete from './AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 
 const CELL_FIELDS = [
   { key: 'cuerda_numero', label: 'Número de Cuerda', required: true },
@@ -66,6 +67,8 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Bias address autocomplete toward the church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
 
   const resetState = () => {
     setStep('upload'); setFile(null); setCsvHeaders([]); setCsvData([]);
@@ -332,7 +335,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
                       <TableCell>
                         {editingAddress === i ? (
                           <div className="min-w-[220px]">
-                            <AddressAutocomplete value={c.address} onChange={(addr, lat, lng) => updateAddress(i, addr, lat, lng)} placeholder="Buscar dirección..." />
+                            <AddressAutocomplete value={c.address} onChange={(addr, lat, lng) => updateAddress(i, addr, lat, lng)} placeholder="Buscar dirección..." biasLat={churchCoords?.lat ?? null} biasLng={churchCoords?.lng ?? null} />
                           </div>
                         ) : (
                           <button className="text-xs text-left hover:underline flex items-center gap-1" onClick={() => setEditingAddress(i)}>

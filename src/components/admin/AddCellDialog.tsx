@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 import AddressAutocomplete from './AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 
 type Leader = { id: string; first_name: string | null; last_name: string | null; email?: string | null; };
 interface Cuerda { id: string; numero: string; zona_id: string; }
@@ -61,6 +62,9 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
     queryFn: async () => { const { data } = await supabase.from('zonas').select('id, nombre').eq('church_id', churchId).order('nombre'); return data || []; },
     enabled: !!churchId && open,
   });
+
+  // Bias address autocomplete toward church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
 
   const { data: cuerdas } = useQuery<Cuerda[]>({
     queryKey: ['cuerdas-dialog', churchId],
@@ -152,6 +156,8 @@ const AddCellDialog = ({ open, onOpenChange, churchId, initial }: AddCellDialogP
             <AddressAutocomplete
               value={address}
               onChange={(addr, alat, alng) => { setAddress(addr); if (alat !== undefined) setLat(alat); if (alng !== undefined) setLng(alng); }}
+              biasLat={churchCoords?.lat ?? null}
+              biasLng={churchCoords?.lng ?? null}
             />
           </div>
 

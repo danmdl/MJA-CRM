@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 import { ChevronLeft, MapPin, Route as RouteIcon, Search, Filter, X, List, Map as MapIcon, Navigation } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -27,6 +28,8 @@ interface Contact {
 
 const MapPickerPage = () => {
   const { churchId, projectId } = useParams<{ churchId: string; projectId: string }>();
+  // Bias address autocomplete toward the church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
   const navigate = useNavigate();
   const { profile } = useSession();
   const queryClient = useQueryClient();
@@ -473,6 +476,8 @@ const MapPickerPage = () => {
                 if (lat && lng) { setStartLat(lat); setStartLng(lng); }
               }}
               placeholder="Escribí la dirección de partida..."
+              biasLat={churchCoords?.lat ?? null}
+              biasLng={churchCoords?.lng ?? null}
             />
           </div>
           <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs h-8">

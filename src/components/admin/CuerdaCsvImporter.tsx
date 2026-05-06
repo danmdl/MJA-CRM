@@ -18,6 +18,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import AddressAutocomplete from './AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 
 // The fields we support mapping from CSV
 const CUERDA_FIELDS = [
@@ -62,6 +63,8 @@ const CuerdaCsvImporter = ({ open, onOpenChange, churchId, zonas, onSuccess }: C
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Bias address autocomplete toward the church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
 
   const resetState = () => {
     setStep('upload');
@@ -376,6 +379,8 @@ const CuerdaCsvImporter = ({ open, onOpenChange, churchId, zonas, onSuccess }: C
                               value={c.address}
                               onChange={(addr, lat, lng) => updateAddress(i, addr, lat, lng)}
                               placeholder="Buscar dirección..."
+                              biasLat={churchCoords?.lat ?? null}
+                              biasLng={churchCoords?.lng ?? null}
                             />
                           </div>
                         ) : (

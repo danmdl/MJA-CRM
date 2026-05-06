@@ -25,6 +25,7 @@ import UnifiedTimeline from './UnifiedTimeline';
 import ContactLogInline from './ContactLogInline';
 import { PIPELINE_STAGES } from './ContactPipelineBadge';
 import AddressAutocomplete from './AddressAutocomplete';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 
 interface Contact {
   id: string;
@@ -230,6 +231,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const [addLogOpen, setAddLogOpen] = useState(false);
   const [historySignal, setHistorySignal] = useState(0);
   const [transfers, setTransfers] = useState<any[]>([]);
+  // Used to bias the address autocomplete toward the church area.
+  const { data: churchCoords } = useChurchCoords(churchId);
   // On mobile, the Registros sidebar is hidden by default and toggled via a button.
   // On desktop the sidebar is always visible alongside the form.
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -547,6 +550,8 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     } as any));
                   }}
                   placeholder="Escribe la dirección..."
+                  biasLat={churchCoords?.lat ?? null}
+                  biasLng={churchCoords?.lng ?? null}
                 />
                 <div className="flex items-center gap-2">
                   <button

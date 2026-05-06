@@ -12,6 +12,7 @@ import { useSession } from '@/hooks/use-session';
 import { logEvent } from '@/utils/clientLogger';
 import AddressAutocomplete from './AddressAutocomplete';
 import { isWithinGBA as isWithinGBACheck } from '@/lib/geo-validation';
+import { useChurchCoords } from '@/hooks/use-church-coords';
 
 interface Cell {
   id: string;
@@ -146,6 +147,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     enabled: !!churchId,
     staleTime: 60_000,
   });
+
+  // Used to bias the address autocomplete toward the church area so
+  // ambiguous addresses don't default to Capital Federal.
+  const { data: churchCoords } = useChurchCoords(churchId);
 
   const { data: leaders, isLoading: isLoadingLeaders } = useQuery<Leader[]>({
     queryKey: ['leaders', churchId, !!session?.access_token],
@@ -465,6 +470,8 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
                 onChange={(addr, lat, lng) => { setAddress(addr || ''); if (lat != null && lng != null && isWithinGBACheck(lat, lng)) { setContactLat(lat); setContactLng(lng); } else if (lat != null) { setContactLat(null); setContactLng(null); } }}
                 placeholder="Ej: Av Corrientes 4000, CABA"
                 disabled={loading}
+                biasLat={churchCoords?.lat ?? null}
+                biasLng={churchCoords?.lng ?? null}
               />
             </div>
 
