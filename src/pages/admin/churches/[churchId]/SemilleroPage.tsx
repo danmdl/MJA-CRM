@@ -31,6 +31,7 @@ import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsAppComposeDialog';
+import FilterTabsBar, { applyFilterTab, FilterTabFilters } from '@/components/admin/FilterTabsBar';
 import BulkWhatsAppDialog from '@/components/admin/BulkWhatsAppDialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
@@ -54,6 +55,7 @@ interface Contact {
   cell_id: string | null; estado_seguimiento?: string | null;
   lat?: number | null; lng?: number | null;
   sexo?: string | null;
+  estado_civil?: string | null;
   is_external?: boolean;
   responsable_id?: string | null;
   created_by?: string | null;
@@ -98,6 +100,8 @@ const SemilleroPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCuerda, setFilterCuerda] = useState<string>('');
   const [filterResponsable, setFilterResponsable] = useState<string>('');
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [activeTabFilters, setActiveTabFilters] = useState<FilterTabFilters>({});
   // Sort state: which column and direction. null = default order from query.
   const [sortBy, setSortBy] = useState<'nombre' | 'fecha' | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -150,26 +154,17 @@ const SemilleroPage = () => {
   const userCuerdaNumero = profile?.numero_cuerda || null;
   const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
-  // Per-user filter defaults: pre-load filterCuerda and filterResponsable based
-  // on the logged-in user's profile so they see THEIR cuerda and THEIR contacts
-  // by default. Conectores never see the responsable filter dropdown at all
-  // (the backend already filters their query to created_by = themselves), so
-  // for them we don't bother. Admins/generals/etc with no numero_cuerda assigned
-  // default to "Todas las cuerdas". Runs once per session, never overwrites
-  // user-driven changes.
+  // For users without canFilterAllContacts permission, force filter to their
+  // own contacts (security restriction). Admins/generals/etc with full filter
+  // permission start unfiltered — they use the FilterTabs system to slice data.
   useEffect(() => {
     if (filterDefaultsAppliedRef.current) return;
     if (!profile || !session?.user?.id) return;
-    if (profile.role !== 'conector') {
-      // Pre-load Cuerda filter to user's own cuerda (or leave empty = "Todas" if null)
-      if (userCuerdaNumero) {
-        setFilterCuerda(userCuerdaNumero);
-      }
-      // Pre-load Responsable filter to "my contacts"
+    if (profile.role !== 'conector' && !canFilterAllContacts()) {
       setFilterResponsable(session.user.id);
     }
     filterDefaultsAppliedRef.current = true;
-  }, [profile, session?.user?.id, userCuerdaNumero]);
+  }, [profile, session?.user?.id, canFilterAllContacts]);
 
   // ─── Data Fetching ─────────────────────────────────────────────
   // Zonas, barrios, cuerdas, cells: these change very rarely. 5 min staleTime
@@ -248,7 +243,7 @@ const SemilleroPage = () => {
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
       let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, is_external, responsable_id, created_by, created_at')
+        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, responsable_id, created_by, created_at')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
       if (profile?.role === 'conector') {
@@ -488,6 +483,10 @@ const SemilleroPage = () => {
     } else if (filterResponsable) {
       filtered = filtered.filter(c => c.responsable_id === filterResponsable);
     }
+    // Apply active tab filters (saved per-user filter combination)
+    if (activeTabId && Object.keys(activeTabFilters).length > 0) {
+      filtered = applyFilterTab(filtered, activeTabFilters);
+    }
     // Sorting - applied last so it ranks the final filtered set
     if (sortBy === 'nombre') {
       filtered = [...filtered].sort((a, b) => {
@@ -503,7 +502,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -783,47 +782,28 @@ const SemilleroPage = () => {
           {refreshing ? 'Actualizando...' : 'Actualizar'}
         </Button>
         <div className="flex-1" />
-        {profile?.role !== 'conector' && (
-          <>
-            {canFilterAllContacts() && (
-              <select className="h-8 text-xs border rounded px-2 bg-background" value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)}>
-                <option value="">Todas las cuerdas</option>
-                {[...new Set((allContacts || []).map(c => c.numero_cuerda).filter(Boolean))].sort().map(n => (
-                  <option key={n} value={n!}>Cuerda {n}</option>
-                ))}
-              </select>
-            )}
-            {canFilterAllContacts() ? (
-              <select className="h-8 text-xs border rounded px-2 bg-background max-w-[180px]" value={filterResponsable} onChange={e => setFilterResponsable(e.target.value)}>
-                <option value="">Todos los responsables</option>
-                {session?.user?.id && (
-                  <option value={session.user.id}>⭐ Mis contactos</option>
-                )}
-                <option value="__none__">Sin responsable</option>
-                {(() => {
-                  const creatorIds = new Set<string>();
-                  (allContacts || []).forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
-                  const creators = Array.from(creatorIds)
-                    .map(id => ({ id, profile: profileById.get(id) }))
-                    .filter(c => c.profile && c.id !== session?.user?.id)
-                    .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
-                  return creators.map(c => (
-                    <option key={c.id} value={c.id}>{c.profile!.first_name} {c.profile!.last_name}</option>
-                  ));
-                })()}
-              </select>
-            ) : (
-              <span className="h-8 flex items-center text-xs text-muted-foreground px-2 border rounded bg-muted/30">
-                Mis contactos
-              </span>
-            )}
-          </>
-        )}
         <div className="relative w-52 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
       </div>
+
+      {/* Filter tabs bar - per-user saved filter combinations */}
+      {profile?.role !== 'conector' && churchId && (
+        <div className="mb-3">
+          <FilterTabsBar
+            churchId={churchId}
+            activeTabId={activeTabId}
+            onActiveTabChange={(id, filters) => {
+              setActiveTabId(id);
+              setActiveTabFilters(filters);
+            }}
+            cuerdas={cuerdas || []}
+            teamMembers={teamMembers || []}
+            zonas={zonas || []}
+          />
+        </div>
+      )}
 
       {/* Recently imported contacts banner */}
       {recentImportIds.size > 0 && (
