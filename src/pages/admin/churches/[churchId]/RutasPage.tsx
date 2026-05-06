@@ -1,18 +1,27 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
-import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Clock } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Clock, List, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
+
+type CreateMode = 'contacts' | 'map';
 
 const RutasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const navigate = useNavigate();
   const { profile } = useSession();
   const queryClient = useQueryClient();
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [pendingMode, setPendingMode] = useState<CreateMode | null>(null);
+  const [projectName, setProjectName] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const { data: projects = [], isLoading } = useQuery<any[]>({
     queryKey: ['route-projects', profile?.id, churchId],
@@ -29,10 +38,21 @@ const RutasPage = () => {
     enabled: !!profile?.id && !!churchId,
   });
 
-  const handleCreate = async () => {
-    const name = window.prompt('Nombre del nuevo proyecto de ruta:', `Ruta ${new Date().toLocaleDateString('es-AR')}`);
-    if (name === null) return; // cancelled
-    const finalName = name.trim() || `Ruta ${new Date().toLocaleDateString('es-AR')}`;
+  const openCreateDialog = () => {
+    setPendingMode(null);
+    setProjectName('');
+    setCreateOpen(true);
+  };
+
+  const pickMode = (mode: CreateMode) => {
+    setPendingMode(mode);
+    setProjectName(`Ruta ${new Date().toLocaleDateString('es-AR')}`);
+  };
+
+  const confirmCreate = async () => {
+    if (!pendingMode) return;
+    const finalName = projectName.trim() || `Ruta ${new Date().toLocaleDateString('es-AR')}`;
+    setCreating(true);
     try {
       const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -49,9 +69,17 @@ const RutasPage = () => {
       if (error) throw error;
       showSuccess(`Proyecto "${finalName}" creado.`);
       queryClient.invalidateQueries({ queryKey: ['route-projects'] });
-      navigate(`/admin/churches/${churchId}/rutas/${data.id}`);
+      setCreateOpen(false);
+      // Navigate to the right editor depending on the mode the user picked
+      if (pendingMode === 'map') {
+        navigate(`/admin/churches/${churchId}/rutas/${data.id}/mapa`);
+      } else {
+        navigate(`/admin/churches/${churchId}/rutas/${data.id}`);
+      }
     } catch (e: any) {
       showError(e.message || 'Error al crear el proyecto.');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -81,7 +109,7 @@ const RutasPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* New project card */}
         <button
-          onClick={handleCreate}
+          onClick={openCreateDialog}
           className="group flex flex-col items-center justify-center min-h-[200px] border-2 border-dashed border-border rounded-lg p-6 hover:border-primary hover:bg-primary/5 transition-colors"
         >
           <div className="w-12 h-12 rounded-full bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center mb-3 transition-colors">
@@ -165,6 +193,81 @@ const RutasPage = () => {
           );
         })}
       </div>
+
+      {/* Mode-pick + name dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nuevo proyecto de ruta</DialogTitle>
+            <DialogDescription>
+              ¿Cómo querés elegir los contactos de esta ruta?
+            </DialogDescription>
+          </DialogHeader>
+
+          {!pendingMode ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={() => pickMode('contacts')}
+                className="group flex flex-col items-start text-left p-5 border-2 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+              >
+                <div className="w-11 h-11 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center mb-3 transition-colors">
+                  <List className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-sm font-semibold mb-1">A partir de contactos</div>
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  Buscá y elegí contactos de una lista. Ideal cuando ya sabés a quién querés visitar.
+                </div>
+              </button>
+
+              <button
+                onClick={() => pickMode('map')}
+                className="group flex flex-col items-start text-left p-5 border-2 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+              >
+                <div className="w-11 h-11 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center mb-3 transition-colors">
+                  <MapIcon className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-sm font-semibold mb-1">A partir del mapa</div>
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  Filtrá por fecha o responsable y elegí contactos cercanos clickeando en el mapa.
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="pt-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                {pendingMode === 'map' ? <MapIcon className="h-3.5 w-3.5" /> : <List className="h-3.5 w-3.5" />}
+                <span>
+                  Modo: <strong className="text-foreground">{pendingMode === 'map' ? 'a partir del mapa' : 'a partir de contactos'}</strong>
+                </span>
+                <button onClick={() => setPendingMode(null)} className="ml-auto text-xs underline hover:text-foreground">
+                  Cambiar
+                </button>
+              </div>
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Nombre del proyecto
+              </label>
+              <Input
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Ruta de hoy"
+                className="mt-1.5"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !creating) confirmCreate();
+                }}
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
+                  Cancelar
+                </Button>
+                <Button onClick={confirmCreate} disabled={creating}>
+                  {creating ? 'Creando...' : 'Crear y continuar'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
