@@ -3,7 +3,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, MapPin, Route as RouteIcon, AlertCircle } from 'lucide-react';
+import { ExternalLink, Route as RouteIcon, AlertCircle, MessageCircle, Copy } from 'lucide-react';
+import { showSuccess } from '@/utils/toast';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
@@ -80,7 +81,6 @@ const SharedRoutePage = () => {
         });
       }
 
-      // Compute directions
       const ds = new google.maps.DirectionsService();
       const dr = new google.maps.DirectionsRenderer({
         suppressMarkers: true,
@@ -131,7 +131,6 @@ const SharedRoutePage = () => {
     const next = { ...visited, [contactId]: !visited[contactId] };
     if (!next[contactId]) delete next[contactId];
     setVisited(next);
-    // Persist back (anyone with the link can update — RLS allows this)
     if (route?.id) {
       await supabase.from('shared_routes').update({ visited: next }).eq('id', route.id);
     }
@@ -158,6 +157,17 @@ const SharedRoutePage = () => {
     window.open(url, '_blank');
   };
 
+  const shareWhatsApp = () => {
+    const url = window.location.href;
+    const text = `${route?.name || 'Ruta compartida'}: ${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    showSuccess('Link copiado');
+  };
+
   const formatDuration = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -176,82 +186,95 @@ const SharedRoutePage = () => {
   );
   if (!route) return null;
 
+  const visitedCount = contacts.filter(c => visited[c.id]).length;
+
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 mb-2">
-          <RouteIcon className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">{route.name || 'Ruta compartida'}</h1>
-        </div>
-        <p className="text-xs text-muted-foreground mb-6">
-          Expira el {new Date(route.expires_at).toLocaleDateString('es-AR')}. Marcá las visitas a medida que avanzás.
-        </p>
-
-        <div className="border rounded-lg p-4 bg-card mb-4">
-          <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
-            <div className="bg-muted/30 rounded px-3 py-2">
-              <div className="text-muted-foreground">Distancia total</div>
-              <div className="font-semibold text-base">{route.total_meters ? (route.total_meters / 1000).toFixed(1) : '—'} km</div>
-            </div>
-            <div className="bg-muted/30 rounded px-3 py-2">
-              <div className="text-muted-foreground">Tiempo estimado</div>
-              <div className="font-semibold text-base">{route.total_seconds ? formatDuration(route.total_seconds) : '—'}</div>
-            </div>
+    <div className="min-h-screen bg-background p-3 sm:p-6">
+      <div className="max-w-[1800px] mx-auto">
+        {/* Header */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <RouteIcon className="h-6 w-6 text-primary shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">{route.name || 'Ruta compartida'}</h1>
+            <p className="text-[11px] text-muted-foreground">
+              Expira el {new Date(route.expires_at).toLocaleDateString('es-AR')}
+              {route.total_meters ? ` · ${(route.total_meters / 1000).toFixed(1)} km` : ''}
+              {route.total_seconds ? ` · ${formatDuration(route.total_seconds)}` : ''}
+              {contacts.length > 0 ? ` · ${visitedCount}/${contacts.length} visitadas` : ''}
+            </p>
           </div>
-          <Button size="sm" variant="outline" onClick={openInGoogleMaps} className="gap-2 w-full sm:w-auto">
-            <ExternalLink className="h-3 w-3" /> Abrir en Google Maps
-          </Button>
+          <div className="flex-1 min-w-0" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={openInGoogleMaps} className="gap-1.5">
+              <ExternalLink className="h-3.5 w-3.5" /> Google Maps
+            </Button>
+            <Button size="sm" variant="outline" onClick={shareWhatsApp} className="gap-1.5 border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300">
+              <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+            </Button>
+            <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
+              <Copy className="h-3.5 w-3.5" /> Copiar link
+            </Button>
+          </div>
         </div>
 
-        <div className="border rounded-lg p-4 bg-card mb-4">
-          <h3 className="text-sm font-semibold mb-3">Paradas ({contacts.length})</h3>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-[14px]">★</span>
-              <span className="font-medium">Partida</span>
-              <span className="text-muted-foreground truncate flex-1">— {route.start_address}</span>
-            </div>
-            {contacts.map((c, idx) => {
-              const isVisited = !!visited[c.id];
-              return (
-                <div key={c.id} className={`flex items-center gap-2 text-xs p-2 rounded border ${isVisited ? 'opacity-60' : 'border-transparent'}`}>
-                  <span className={`w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-[12px] ${isVisited ? 'bg-gray-500' : 'bg-primary'}`}>{idx + 1}</span>
-                  <div className={`flex-1 min-w-0 ${isVisited ? 'line-through' : ''}`}>
-                    <div className="font-medium truncate">{c.first_name} {c.last_name || ''}</div>
-                    <div className="text-muted-foreground truncate">{c.address}</div>
-                  </div>
-                  <button
-                    onClick={() => toggleVisited(c.id)}
-                    className={`text-[11px] px-3 py-1 rounded border whitespace-nowrap ${isVisited ? 'border-gray-500 text-gray-400' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
-                  >
-                    {isVisited ? '✓ Visitado' : 'Marcar'}
-                  </button>
+        {/* 3-column layout on desktop, stacks on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Stops */}
+          <div className="lg:col-span-4 border rounded-lg p-4 bg-card flex flex-col min-h-0">
+            <h3 className="text-sm font-semibold mb-3">Paradas ({contacts.length})</h3>
+            <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 240px)' }}>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-[14px] shrink-0">★</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">Partida</div>
+                  <div className="text-muted-foreground truncate">{route.start_address}</div>
                 </div>
-              );
-            })}
+              </div>
+              {contacts.map((c, idx) => {
+                const isVisited = !!visited[c.id];
+                return (
+                  <div key={c.id} className={`flex items-center gap-2 text-xs p-2 rounded border ${isVisited ? 'opacity-60 border-muted' : 'border-transparent hover:border-border'}`}>
+                    <span className={`w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-[12px] shrink-0 ${isVisited ? 'bg-gray-500' : 'bg-primary'}`}>{idx + 1}</span>
+                    <div className={`flex-1 min-w-0 ${isVisited ? 'line-through' : ''}`}>
+                      <div className="font-medium truncate">{c.first_name} {c.last_name || ''}</div>
+                      <div className="text-muted-foreground truncate">{c.address}</div>
+                    </div>
+                    <button
+                      onClick={() => toggleVisited(c.id)}
+                      className={`text-[11px] px-2.5 py-1 rounded border whitespace-nowrap shrink-0 ${isVisited ? 'border-gray-500 text-gray-400' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
+                    >
+                      {isVisited ? '✓' : 'Marcar'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        <div ref={mapRef} className="w-full h-[400px] sm:h-[500px] rounded-lg border" />
-
-        {/* Shared notes - everyone with this link can read/edit */}
-        <div className="border rounded-lg p-4 bg-card mt-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">Notas compartidas</h3>
-            <span className="text-[10px] text-muted-foreground">
-              {savingNotes ? 'Guardando...' : 'Guardado automáticamente'}
-            </span>
+          {/* Map */}
+          <div className="lg:col-span-5">
+            <div ref={mapRef} className="w-full rounded-lg border" style={{ height: 'calc(100vh - 200px)', minHeight: 400 }} />
           </div>
-          <p className="text-xs text-muted-foreground mb-2">
-            Cualquier persona con este link puede leer y editar estas notas.
-          </p>
-          <textarea
-            value={notes}
-            onChange={(e) => handleNotesChange(e.target.value)}
-            placeholder="Escribí acá observaciones, quién atendió en cada casa, qué cosas se hablaron, próximos pasos..."
-            rows={6}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-y min-h-[120px]"
-          />
+
+          {/* Notes */}
+          <div className="lg:col-span-3 border rounded-lg p-4 bg-card flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold">Notas compartidas</h3>
+              <span className="text-[10px] text-muted-foreground">
+                {savingNotes ? 'Guardando...' : 'Auto'}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Cualquiera con este link puede leer y editar.
+            </p>
+            <textarea
+              value={notes}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              placeholder="Escribí acá observaciones, quién atendió, qué se habló, próximos pasos..."
+              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+              style={{ minHeight: 'calc(100vh - 280px)' }}
+            />
+          </div>
         </div>
       </div>
     </div>

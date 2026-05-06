@@ -7,8 +7,9 @@ import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
-import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft } from 'lucide-react';
+import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, MessageCircle, Plus, RefreshCw } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 
@@ -31,22 +32,46 @@ const RouteEditorPage = () => {
   const navigate = useNavigate();
   const { profile } = useSession();
   const queryClient = useQueryClient();
+
+  // Selection / picker state — also driven from the edit dialog
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [startAddress, setStartAddress] = useState('');
   const [startLat, setStartLat] = useState<number | null>(null);
   const [startLng, setStartLng] = useState<number | null>(null);
-  const [routeData, setRouteData] = useState<any | null>(null);
-  const [calculating, setCalculating] = useState(false);
   const [filterResponsableId, setFilterResponsableId] = useState<string>('');
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
+  const [onlyWithNumber, setOnlyWithNumber] = useState(true);
+
+  // Route + visited + notes state
+  const [routeData, setRouteData] = useState<any | null>(null);
+  const [calculating, setCalculating] = useState(false);
+  const [visited, setVisited] = useState<Set<string>>(new Set());
+  const [sharing, setSharing] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const notesSaveTimer = useRef<any>(null);
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const directionsRenderer = useRef<any>(null);
+  const customMarkers = useRef<any[]>([]);
+  const projectHydratedRef = useRef(false);
+  const autoCalcedRef = useRef(false);
 
-  // Fetch contacts of this church with valid coordinates
-  const { data: contacts, isLoading } = useQuery<Contact[]>({
+  // Snapshot used to restore state if user cancels the edit dialog
+  const editSnapshotRef = useRef<{
+    selectedIds: Set<string>;
+    startAddress: string;
+    startLat: number | null;
+    startLng: number | null;
+  } | null>(null);
+
+  // ─── Queries ──────────────────────────────────────────────────────────
+  const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ['rutas-contacts', churchId, profile?.id, profile?.role, profile?.numero_cuerda],
     queryFn: async () => {
       let q = supabase.from('contacts')
@@ -55,9 +80,6 @@ const RouteEditorPage = () => {
         .is('deleted_at', null)
         .not('lat', 'is', null)
         .not('lng', 'is', null);
-      // Strict cuerda visibility: non-global users only see their cuerda's
-      // contacts. No created_by/responsable_id exceptions (matches new
-      // Semillero rule).
       if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
         if (profile.numero_cuerda) {
           q = q.eq('numero_cuerda', profile.numero_cuerda);
@@ -72,7 +94,6 @@ const RouteEditorPage = () => {
     staleTime: 60_000,
   });
 
-  // Team members for Responsable filter
   const { data: teamMembers = [] } = useQuery<{ id: string; first_name: string | null; last_name: string | null; numero_cuerda: string | null }[]>({
     queryKey: ['rutas-team', churchId],
     queryFn: async () => {
@@ -85,7 +106,6 @@ const RouteEditorPage = () => {
     staleTime: 5 * 60_000,
   });
 
-  // Fetch church info to enable "Use church address" button
   const { data: church } = useQuery<{ id: string; name: string; address: string | null }>({
     queryKey: ['church', churchId],
     queryFn: async () => {
@@ -96,73 +116,52 @@ const RouteEditorPage = () => {
     staleTime: 5 * 60_000,
   });
 
-  // Fetch user's existing shared route projects (non-expired)
-  // Load the existing project being edited.
   const { data: project, isLoading: projectLoading } = useQuery<any>({
     queryKey: ['route-project', projectId],
     queryFn: async () => {
       if (!projectId) return null;
-      const { data, error } = await supabase.from('shared_routes')
-        .select('*')
-        .eq('id', projectId)
-        .single();
+      const { data, error } = await supabase.from('shared_routes').select('*').eq('id', projectId).single();
       if (error) throw error;
       return data;
     },
     enabled: !!projectId,
   });
 
-  // When project loads, hydrate the editor state with whatever it has saved.
-  // If the project has ordered_contact_ids, pre-select those. If it has
-  // start_lat/lng, set them too. This makes the editor a true persistent
-  // workspace rather than a fresh-each-visit form.
-  //
-  // Important: do NOT latch on the first render when arriving from the map
-  // picker. The cache may briefly hold the pre-update version of the project
-  // (empty ordered_contact_ids, no start point) while the refetch is in
-  // flight. If we latch on that and skip later updates, the user lands on an
-  // empty editor even though the DB has the new picks. So: wait until the
-  // project actually has something to hydrate from before flipping the gate.
-  const projectHydratedRef = useRef(false);
-  const autoCalcedRef = useRef(false);
+  // ─── Hydration ────────────────────────────────────────────────────────
+  // Wait for the project to actually have data before latching the gate.
+  // Otherwise a stale empty cached version (e.g. right after creation in
+  // RutasPage, or before MapPicker's setQueryData lands) would cause us to
+  // hydrate empty and never re-hydrate.
   useEffect(() => {
     if (!project || projectHydratedRef.current) return;
     const hasStart = !!project.start_address || project.start_lat != null;
     const hasPicks = (project.ordered_contact_ids?.length ?? 0) > 0;
-    if (!hasStart && !hasPicks) return; // wait for real data
+    const hasNotes = !!project.notes;
+    const hasVisited = project.visited && Object.keys(project.visited).length > 0;
+    if (!hasStart && !hasPicks && !hasNotes && !hasVisited) return;
     projectHydratedRef.current = true;
     if (project.start_address) setStartAddress(project.start_address);
     if (project.start_lat) setStartLat(Number(project.start_lat));
     if (project.start_lng) setStartLng(Number(project.start_lng));
-    if (hasPicks) {
-      setSelectedIds(new Set(project.ordered_contact_ids));
+    if (hasPicks) setSelectedIds(new Set(project.ordered_contact_ids));
+    if (project.notes) setNotes(project.notes);
+    if (project.visited) {
+      const vSet = new Set<string>();
+      Object.entries(project.visited).forEach(([id, v]) => { if (v) vSet.add(id); });
+      setVisited(vSet);
     }
   }, [project]);
 
-  const useChurchAddress = async () => {
-    if (!church?.address) {
-      showError(`${church?.name || 'La iglesia'} no tiene una dirección configurada. Pedile a un admin que la cargue.`);
-      return;
-    }
-    if (!(window as any).google?.maps) {
-      showError('Esperá a que cargue el mapa y volvé a intentar.');
-      return;
-    }
-    const geocoder = new (window as any).google.maps.Geocoder();
-    geocoder.geocode({ address: church.address, region: 'AR' }, (results: any[], status: string) => {
-      if (status === 'OK' && results[0]) {
-        const loc = results[0].geometry.location;
-        setStartLat(loc.lat());
-        setStartLng(loc.lng());
-        setStartAddress(church.address!);
-      } else {
-        showError(`No se pudo geolocalizar la dirección: ${church.address}`);
-      }
-    });
-  };
+  // Load Google Maps once
+  useEffect(() => {
+    if ((window as any).google?.maps) return;
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places`;
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);
 
-  const [onlyWithNumber, setOnlyWithNumber] = useState(true);
-
+  // ─── Derived ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (contacts || []).filter(c => {
@@ -186,6 +185,12 @@ const RouteEditorPage = () => {
     [contacts, selectedIds]
   );
 
+  const visitedCount = useMemo(() => {
+    if (!routeData) return 0;
+    return routeData.orderedContacts.filter((c: Contact) => visited.has(c.id)).length;
+  }, [routeData, visited]);
+
+  // ─── Helpers ──────────────────────────────────────────────────────────
   const toggleContact = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
@@ -208,24 +213,34 @@ const RouteEditorPage = () => {
     );
   };
 
-  // Load Google Maps script when needed
-  useEffect(() => {
-    if ((window as any).google?.maps) return;
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places`;
-    script.async = true;
-    document.head.appendChild(script);
-  }, []);
+  const useChurchAddress = async () => {
+    if (!church?.address) {
+      showError(`${church?.name || 'La iglesia'} no tiene una dirección configurada.`);
+      return;
+    }
+    if (!(window as any).google?.maps) {
+      showError('Esperá a que cargue el mapa y volvé a intentar.');
+      return;
+    }
+    const geocoder = new (window as any).google.maps.Geocoder();
+    geocoder.geocode({ address: church.address, region: 'AR' }, (results: any[], status: string) => {
+      if (status === 'OK' && results[0]) {
+        const loc = results[0].geometry.location;
+        setStartLat(loc.lat());
+        setStartLng(loc.lng());
+        setStartAddress(church.address!);
+      } else {
+        showError(`No se pudo geolocalizar: ${church.address}`);
+      }
+    });
+  };
 
   const calculateRoute = async () => {
     if (selectedContacts.length === 0) { showError('Seleccioná al menos un contacto.'); return; }
     if (!startLat || !startLng) { showError('Ingresá un punto de partida.'); return; }
     setCalculating(true);
     setRouteData(null);
-    setShareToken(null);
-    setVisited(new Set());
 
-    // Wait for Google Maps to load
     const waitForGoogle = () => new Promise<void>((resolve) => {
       const check = () => {
         if ((window as any).google?.maps) { resolve(); return; }
@@ -238,20 +253,17 @@ const RouteEditorPage = () => {
     const google = (window as any).google;
     const directionsService = new google.maps.DirectionsService();
 
-    // Build waypoints from selected contacts
     const waypoints = selectedContacts.map(c => ({
       location: new google.maps.LatLng(c.lat!, c.lng!),
       stopover: true,
     }));
-
-    // Last contact is the destination, the rest are waypoints to optimize
     const lastWaypoint = waypoints.pop()!;
 
     directionsService.route(
       {
         origin: new google.maps.LatLng(startLat, startLng),
         destination: lastWaypoint.location,
-        waypoints: waypoints,
+        waypoints,
         optimizeWaypoints: true,
         travelMode: google.maps.TravelMode.DRIVING,
         region: 'AR',
@@ -262,41 +274,21 @@ const RouteEditorPage = () => {
           showError(`No se pudo calcular la ruta: ${status}`);
           return;
         }
-        // result.routes[0].waypoint_order tells us the new order
         const order = result.routes[0].waypoint_order as number[];
         const orderedContacts = [...order.map(i => selectedContacts[i]), selectedContacts[selectedContacts.length - 1]];
-
-        // Compute total distance + duration
         const legs = result.routes[0].legs;
         const totalMeters = legs.reduce((sum: number, l: any) => sum + l.distance.value, 0);
         const totalSeconds = legs.reduce((sum: number, l: any) => sum + l.duration.value, 0);
-
-        setRouteData({
-          result,
-          orderedContacts,
-          totalMeters,
-          totalSeconds,
-          legs,
-        });
+        setRouteData({ result, orderedContacts, totalMeters, totalSeconds, legs });
       }
     );
   };
 
-  const [visited, setVisited] = useState<Set<string>>(new Set());
-  const [shareToken, setShareToken] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
-  const [editingContactId, setEditingContactId] = useState<string | null>(null);
-  const customMarkers = useRef<any[]>([]);
-
-  // Auto-calculate the route once everything we need is hydrated.
-  // Triggered when arriving from MapPickerPage (which persists selected ids
-  // + start point), or when reopening a saved project. Runs at most once per
-  // page session — after that the user can recalculate manually if they edit
-  // the selection.
+  // Auto-calc on mount when project hydration brought selected + start
   useEffect(() => {
     if (autoCalcedRef.current) return;
     if (!projectHydratedRef.current) return;
-    if (!contacts || contacts.length === 0) return; // need contact data resolved
+    if (!contacts || contacts.length === 0) return;
     if (selectedIds.size === 0) return;
     if (!startLat || !startLng) return;
     if (routeData || calculating) return;
@@ -305,23 +297,11 @@ const RouteEditorPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, selectedIds, startLat, startLng, project]);
 
-  const toggleVisited = (contactId: string) => {
-    setVisited(prev => {
-      const next = new Set(prev);
-      if (next.has(contactId)) next.delete(contactId);
-      else next.add(contactId);
-      return next;
-    });
-    refreshMarkers();
-  };
-
   const refreshMarkers = () => {
     if (!routeData || !mapInstance.current) return;
     const google = (window as any).google;
-    // Clear old markers
     customMarkers.current.forEach(m => m.setMap(null));
     customMarkers.current = [];
-    // Start marker (green)
     customMarkers.current.push(new google.maps.Marker({
       position: { lat: startLat!, lng: startLng! },
       map: mapInstance.current,
@@ -336,7 +316,6 @@ const RouteEditorPage = () => {
       },
       title: 'Punto de partida',
     }));
-    // Numbered stops
     routeData.orderedContacts.forEach((c: Contact, idx: number) => {
       const isVisited = visited.has(c.id);
       customMarkers.current.push(new google.maps.Marker({
@@ -356,7 +335,7 @@ const RouteEditorPage = () => {
     });
   };
 
-  // Render map when routeData is set
+  // Render map when routeData changes
   useEffect(() => {
     if (!routeData || !mapRef.current) return;
     const google = (window as any).google;
@@ -381,30 +360,65 @@ const RouteEditorPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeData, startLat, startLng]);
 
-  // Re-color markers when visited state changes
+  // Re-color markers when visited changes
   useEffect(() => {
     refreshMarkers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visited]);
 
+  const toggleVisited = async (contactId: string) => {
+    const next = new Set(visited);
+    if (next.has(contactId)) next.delete(contactId);
+    else next.add(contactId);
+    setVisited(next);
+    // Persist immediately so the public viewers see it too. JSONB shape:
+    // { [contactId]: true }. We omit false entries to keep the object clean.
+    if (project?.id) {
+      const visitedObj: Record<string, boolean> = {};
+      next.forEach(id => { visitedObj[id] = true; });
+      await supabase.from('shared_routes').update({ visited: visitedObj }).eq('id', project.id);
+    }
+  };
+
+  const handleNotesChange = (value: string) => {
+    setNotes(value);
+    if (!project?.id) return;
+    if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
+    setSavingNotes(true);
+    notesSaveTimer.current = setTimeout(async () => {
+      await supabase.from('shared_routes').update({ notes: value }).eq('id', project.id);
+      setSavingNotes(false);
+    }, 800);
+  };
+
   const openInGoogleMaps = () => {
     if (!routeData) return;
     const origin = `${startLat},${startLng}`;
-    const destination = `${routeData.orderedContacts[routeData.orderedContacts.length - 1].lat},${routeData.orderedContacts[routeData.orderedContacts.length - 1].lng}`;
+    const last = routeData.orderedContacts[routeData.orderedContacts.length - 1];
+    const destination = `${last.lat},${last.lng}`;
     const waypoints = routeData.orderedContacts.slice(0, -1).map((c: Contact) => `${c.lat},${c.lng}`).join('|');
     const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${encodeURIComponent(waypoints)}&travelmode=driving`;
     window.open(url, '_blank');
+  };
+
+  const shareUrl = project?.share_token ? `${window.location.origin}/r/${project.share_token}` : '';
+
+  const shareWhatsApp = () => {
+    if (!shareUrl) return;
+    const text = `${project?.name || 'Ruta'}: ${shareUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const copyLink = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    showSuccess('Link copiado');
   };
 
   const handleShare = async () => {
     if (!routeData || !project) return;
     setSharing(true);
     try {
-      // Update the existing project row (the project was already created on
-      // the grid page when the user clicked "Nuevo proyecto"). Refresh expiry
-      // so the link is valid for another 60 days each time we save. Past 60
-      // days of inactivity, links auto-expire and projects drop out of the
-      // grid — keeps shared_routes from accumulating garbage.
       const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase.from('shared_routes')
         .update({
@@ -418,7 +432,6 @@ const RouteEditorPage = () => {
         })
         .eq('id', project.id);
       if (error) throw error;
-      setShareToken(project.share_token);
       queryClient.invalidateQueries({ queryKey: ['route-projects'] });
       queryClient.invalidateQueries({ queryKey: ['route-project', projectId] });
       showSuccess('Ruta guardada. Link válido por 60 días.');
@@ -436,9 +449,43 @@ const RouteEditorPage = () => {
     return `${m}min`;
   };
 
+  // ─── Edit dialog open/close ───────────────────────────────────────────
+  const openEditDialog = () => {
+    // Snapshot so we can restore on cancel
+    editSnapshotRef.current = {
+      selectedIds: new Set(selectedIds),
+      startAddress,
+      startLat,
+      startLng,
+    };
+    setEditDialogOpen(true);
+  };
+
+  const cancelEdit = () => {
+    if (editSnapshotRef.current) {
+      setSelectedIds(editSnapshotRef.current.selectedIds);
+      setStartAddress(editSnapshotRef.current.startAddress);
+      setStartLat(editSnapshotRef.current.startLat);
+      setStartLng(editSnapshotRef.current.startLng);
+    }
+    setEditDialogOpen(false);
+  };
+
+  const applyEditAndCalculate = async () => {
+    if (selectedIds.size === 0) { showError('Seleccioná al menos un contacto.'); return; }
+    if (!startLat || !startLng) { showError('Ingresá un punto de partida.'); return; }
+    setEditDialogOpen(false);
+    // Force recalc — this picks up whatever's in selectedIds + start state now
+    await calculateRoute();
+  };
+
+  // ─── Render ───────────────────────────────────────────────────────────
+  const hasRoute = !!routeData;
+
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-2">
+      {/* Header */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <button
           onClick={() => navigate(`/admin/churches/${churchId}/rutas`)}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -446,282 +493,302 @@ const RouteEditorPage = () => {
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <RouteIcon className="h-6 w-6 text-primary shrink-0" />
-        <h1 className="text-xl sm:text-2xl font-bold truncate flex-1 min-w-0">
-          {projectLoading ? 'Cargando...' : (project?.name || 'Proyecto sin nombre')}
-        </h1>
-        {project && (
-          <button
-            onClick={async () => {
-              const newName = window.prompt('Renombrar proyecto:', project.name || '');
-              if (!newName || newName === project.name) return;
-              await supabase.from('shared_routes').update({ name: newName.trim() }).eq('id', project.id);
-              queryClient.invalidateQueries({ queryKey: ['route-project', projectId] });
-              queryClient.invalidateQueries({ queryKey: ['route-projects'] });
-              showSuccess('Renombrado.');
-            }}
-            className="text-muted-foreground hover:text-foreground p-1.5 rounded hover:bg-muted shrink-0"
-            title="Renombrar"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-      <p className="text-muted-foreground text-sm mb-6">
-        Seleccioná contactos para calcular el orden óptimo de visita. Después podés compartir el link.
-      </p>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Selection */}
-        <div className="space-y-4">
-          {/* Starting point */}
-          <div className="border rounded-lg p-4 bg-card">
-            <div className="flex items-center gap-2 mb-3">
-              <MapPin className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Punto de partida</h3>
-            </div>
-            <AddressAutocomplete
-              value={startAddress}
-              onChange={(addr, lat, lng) => {
-                setStartAddress(addr);
-                if (lat && lng) { setStartLat(lat); setStartLng(lng); }
-              }}
-              placeholder="Escribí la dirección de partida..."
-            />
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs">
-                <Navigation className="h-3 w-3 mr-1" /> Usar mi ubicación
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={useChurchAddress} className="text-xs" disabled={!church?.address}>
-                <MapPin className="h-3 w-3 mr-1" /> Dirección de iglesia
-              </Button>
-              {startLat && startLng && (
-                <span className="text-xs text-muted-foreground self-center">
-                  ✓ Listo ({startLat.toFixed(4)}, {startLng.toFixed(4)})
-                </span>
-              )}
-            </div>
+        <RouteIcon className="h-5 w-5 text-primary shrink-0" />
+        <div className="min-w-0 flex-shrink">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold truncate">
+              {projectLoading ? 'Cargando...' : (project?.name || 'Proyecto sin nombre')}
+            </h1>
+            {project && (
+              <button
+                onClick={async () => {
+                  const newName = window.prompt('Renombrar proyecto:', project.name || '');
+                  if (!newName || newName === project.name) return;
+                  await supabase.from('shared_routes').update({ name: newName.trim() }).eq('id', project.id);
+                  queryClient.invalidateQueries({ queryKey: ['route-project', projectId] });
+                  queryClient.invalidateQueries({ queryKey: ['route-projects'] });
+                  showSuccess('Renombrado.');
+                }}
+                className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted shrink-0"
+                title="Renombrar"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-
-          {/* Contact selector */}
-          <div className="border rounded-lg p-4 bg-card">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">Contactos a visitar ({selectedIds.size})</h3>
-              {selectedIds.size > 0 && (
-                <button onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:text-foreground">
-                  Limpiar
-                </button>
-              )}
-            </div>
-            <div className="relative mb-2">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar por nombre o dirección..."
-                className="pl-9 h-9"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-              <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background">
-                <option value="">Todos los responsables</option>
-                <option value="__none__">Sin responsable</option>
-                {teamMembers
-                  .filter(m => {
-                    // Restrict to my own cuerda for non-global users (matches Semillero rule)
-                    if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
-                      return m.numero_cuerda === profile.numero_cuerda;
-                    }
-                    return true;
-                  })
-                  .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
-                  .map(m => (
-                    <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                  ))}
-              </select>
-              <div>
-                <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
-              </div>
-              <div>
-                <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground mb-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={onlyWithNumber}
-                onChange={(e) => setOnlyWithNumber(e.target.checked)}
-                className="rounded border-input"
-              />
-              Solo direcciones con número (recomendado para rutas precisas)
-            </label>
-            <div className="max-h-[400px] overflow-y-auto border rounded">
-              {isLoading ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">Cargando...</div>
-              ) : filtered.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">
-                  {search ? 'Sin resultados' : 'No hay contactos con dirección georreferenciada.'}
-                </div>
-              ) : (
-                filtered.map(c => {
-                  const isSelected = selectedIds.has(c.id);
-                  return (
-                    <div
-                      key={c.id}
-                      className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-muted/30 ${isSelected ? 'bg-primary/5' : ''}`}
-                    >
-                      <Checkbox checked={isSelected} onCheckedChange={() => toggleContact(c.id)} className="mt-0.5 cursor-pointer" />
-                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleContact(c.id)}>
-                        <div className="text-sm font-medium truncate">
-                          {c.first_name} {c.last_name || ''}
-                          {c.numero_cuerda && (
-                            <span className="ml-2 text-xs text-muted-foreground">· Cuerda {c.numero_cuerda}</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">{c.address || 'Sin dirección'}</div>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingContactId(c.id); }}
-                        className="text-muted-foreground hover:text-foreground p-1"
-                        title="Editar contacto (incluye dirección)"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Selected contacts list with quick remove */}
-          {selectedContacts.length > 0 && (
-            <div className="border rounded-lg p-3 bg-primary/5">
-              <div className="text-xs font-semibold mb-2 text-muted-foreground">Seleccionados ({selectedContacts.length}):</div>
-              <div className="flex flex-wrap gap-1.5">
-                {selectedContacts.map(c => (
-                  <div key={c.id} className="flex items-center gap-1 bg-card border rounded-full pl-3 pr-1 py-0.5 text-xs">
-                    <span>{c.first_name} {c.last_name || ''}</span>
-                    <button
-                      onClick={() => toggleContact(c.id)}
-                      className="ml-1 w-4 h-4 rounded-full bg-muted hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center"
-                      title="Quitar"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {hasRoute && (
+            <p className="text-[11px] text-muted-foreground">
+              {(routeData.totalMeters / 1000).toFixed(1)} km · {formatDuration(routeData.totalSeconds)} · {visitedCount}/{routeData.orderedContacts.length} visitadas
+            </p>
           )}
-
-          <Button
-            onClick={calculateRoute}
-            disabled={calculating || selectedIds.size === 0 || !startLat}
-            className="w-full"
-          >
-            {calculating ? 'Calculando ruta óptima...' : `Calcular ruta (${selectedIds.size} ${selectedIds.size === 1 ? 'parada' : 'paradas'})`}
-          </Button>
         </div>
 
-        {/* Right: Map + result */}
-        <div className="space-y-4">
-          {routeData ? (
-            <>
-              <div className="border rounded-lg p-4 bg-card">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold">Ruta óptima</h3>
-                  <Button size="sm" variant="outline" onClick={openInGoogleMaps}>
-                    <ExternalLink className="h-3 w-3 mr-1" /> Abrir en Google Maps
-                  </Button>
+        <div className="flex-1 min-w-0" />
+
+        {/* Action buttons (only shown when there's a route) */}
+        {hasRoute && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={openEditDialog} className="gap-1.5">
+              <Pencil className="h-3.5 w-3.5" /> Editar contactos
+            </Button>
+            <Button size="sm" variant="outline" onClick={openInGoogleMaps} className="gap-1.5">
+              <ExternalLink className="h-3.5 w-3.5" /> Google Maps
+            </Button>
+            {project?.share_token && (
+              <>
+                <Button size="sm" variant="outline" onClick={shareWhatsApp} className="gap-1.5 border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300">
+                  <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                </Button>
+                <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
+                  <Copy className="h-3.5 w-3.5" /> Copiar link
+                </Button>
+              </>
+            )}
+            <Button size="sm" onClick={handleShare} disabled={sharing} className="gap-1.5">
+              <Share2 className="h-3.5 w-3.5" /> {sharing ? 'Guardando...' : 'Guardar ruta'}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {hasRoute ? (
+        // ─── Calculated route view: 3 columns (matches public shared view) ───
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Stops */}
+          <div className="lg:col-span-4 border rounded-lg p-4 bg-card flex flex-col">
+            <h3 className="text-sm font-semibold mb-3">Paradas ({routeData.orderedContacts.length})</h3>
+            <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-[14px] shrink-0">★</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">Partida</div>
+                  <div className="text-muted-foreground truncate">{startAddress}</div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
-                  <div className="bg-muted/30 rounded px-3 py-2">
-                    <div className="text-muted-foreground">Distancia total</div>
-                    <div className="font-semibold text-base">{(routeData.totalMeters / 1000).toFixed(1)} km</div>
+              </div>
+              {routeData.orderedContacts.map((c: Contact, idx: number) => {
+                const isVisited = visited.has(c.id);
+                return (
+                  <div key={c.id} className={`flex items-center gap-2 text-xs p-2 rounded border ${isVisited ? 'opacity-60 border-muted' : 'border-transparent hover:border-border'}`}>
+                    <span className={`w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-[12px] shrink-0 ${isVisited ? 'bg-gray-500' : 'bg-primary'}`}>{idx + 1}</span>
+                    <div className={`flex-1 min-w-0 ${isVisited ? 'line-through' : ''}`}>
+                      <div className="font-medium truncate">{c.first_name} {c.last_name || ''}</div>
+                      <div className="text-muted-foreground truncate">{c.address}</div>
+                    </div>
+                    <button
+                      onClick={() => setEditingContactId(c.id)}
+                      className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted shrink-0"
+                      title="Editar contacto"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => toggleVisited(c.id)}
+                      className={`text-[11px] px-2.5 py-1 rounded border whitespace-nowrap shrink-0 ${isVisited ? 'border-gray-500 text-gray-400' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
+                    >
+                      {isVisited ? '✓' : 'Marcar'}
+                    </button>
                   </div>
-                  <div className="bg-muted/30 rounded px-3 py-2">
-                    <div className="text-muted-foreground">Tiempo estimado</div>
-                    <div className="font-semibold text-base">{formatDuration(routeData.totalSeconds)}</div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Map */}
+          <div className="lg:col-span-5">
+            <div ref={mapRef} className="w-full rounded-lg border" style={{ height: 'calc(100vh - 220px)', minHeight: 400 }} />
+          </div>
+
+          {/* Notes */}
+          <div className="lg:col-span-3 border rounded-lg p-4 bg-card flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold">Notas compartidas</h3>
+              <span className="text-[10px] text-muted-foreground">
+                {savingNotes ? 'Guardando...' : 'Auto'}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Cualquiera con el link puede leer y editar.
+            </p>
+            <textarea
+              value={notes}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              placeholder="Escribí acá observaciones, quién atendió, qué se habló, próximos pasos..."
+              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+              style={{ minHeight: 'calc(100vh - 300px)' }}
+            />
+          </div>
+        </div>
+      ) : (
+        // ─── Empty state: invite the user to add contacts ───────────────────
+        <div className="border-2 border-dashed border-border rounded-lg p-12 text-center flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 200px)' }}>
+          <RouteIcon className="h-12 w-12 text-muted-foreground/60 mb-3" />
+          <h2 className="text-base font-semibold mb-1">{calculating ? 'Calculando ruta...' : 'Ruta vacía'}</h2>
+          <p className="text-sm text-muted-foreground mb-5 max-w-md">
+            {calculating
+              ? 'Calculando el orden óptimo para visitar todos los contactos.'
+              : 'Agregá contactos a la ruta y un punto de partida para calcular el orden óptimo de visita.'}
+          </p>
+          {!calculating && (
+            <Button size="lg" onClick={openEditDialog} className="gap-2">
+              <Plus className="h-4 w-4" /> Agregar contactos
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Edit dialog: pick start point + select contacts */}
+      <Dialog open={editDialogOpen} onOpenChange={(o) => { if (!o) cancelEdit(); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b">
+            <DialogTitle>Editar contactos de la ruta</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Starting point */}
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                <MapPin className="h-3 w-3 text-primary" /> Punto de partida
+                {startLat && startLng && <span className="text-[10px] text-green-500 font-medium normal-case">✓ Listo</span>}
+              </label>
+              <AddressAutocomplete
+                value={startAddress}
+                onChange={(addr, lat, lng) => {
+                  setStartAddress(addr);
+                  if (lat && lng) { setStartLat(lat); setStartLng(lng); }
+                }}
+                placeholder="Escribí la dirección de partida..."
+              />
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs h-8">
+                  <Navigation className="h-3 w-3 mr-1" /> Mi ubicación
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={useChurchAddress} className="text-xs h-8" disabled={!church?.address}>
+                  <MapPin className="h-3 w-3 mr-1" /> Iglesia
+                </Button>
+              </div>
+            </div>
+
+            {/* Contact filters */}
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+                Contactos ({selectedIds.size} seleccionados)
+              </label>
+              <div className="relative mb-2">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar por nombre o dirección..."
+                  className="pl-9 h-9"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background">
+                  <option value="">Todos los responsables</option>
+                  <option value="__none__">Sin responsable</option>
+                  {teamMembers
+                    .filter(m => {
+                      if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
+                        return m.numero_cuerda === profile.numero_cuerda;
+                      }
+                      return true;
+                    })
+                    .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
+                    .map(m => (
+                      <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+                    ))}
+                </select>
+                <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
+                <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground mb-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={onlyWithNumber}
+                  onChange={(e) => setOnlyWithNumber(e.target.checked)}
+                  className="rounded border-input"
+                />
+                Solo direcciones con número (recomendado para rutas precisas)
+              </label>
+
+              <div className="max-h-[320px] overflow-y-auto border rounded">
+                {contactsLoading ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">Cargando...</div>
+                ) : filtered.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    {search ? 'Sin resultados' : 'No hay contactos georreferenciados.'}
                   </div>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-[12px]">★</span>
-                    <span className="font-medium">Punto de partida</span>
-                    <span className="text-muted-foreground truncate">— {startAddress}</span>
-                  </div>
-                  {routeData.orderedContacts.map((c: Contact, idx: number) => {
-                    const isVisited = visited.has(c.id);
+                ) : (
+                  filtered.map(c => {
+                    const isSelected = selectedIds.has(c.id);
                     return (
-                      <div key={c.id} className={`flex items-center gap-2 text-xs p-1.5 rounded ${isVisited ? 'opacity-50 line-through' : ''}`}>
-                        <span className={`w-6 h-6 rounded-full text-white flex items-center justify-center font-bold text-[10px] ${isVisited ? 'bg-gray-500' : 'bg-primary'}`}>{idx + 1}</span>
-                        <span className="font-medium truncate flex-1">{c.first_name} {c.last_name || ''}</span>
-                        <span className="text-muted-foreground truncate hidden sm:inline">— {c.address}</span>
+                      <div key={c.id} className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-muted/30 ${isSelected ? 'bg-primary/5' : ''}`}>
+                        <Checkbox checked={isSelected} onCheckedChange={() => toggleContact(c.id)} className="mt-0.5 cursor-pointer" />
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleContact(c.id)}>
+                          <div className="text-sm font-medium truncate">
+                            {c.first_name} {c.last_name || ''}
+                            {c.numero_cuerda && (
+                              <span className="ml-2 text-xs text-muted-foreground">· Cuerda {c.numero_cuerda}</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">{c.address || 'Sin dirección'}</div>
+                        </div>
                         <button
-                          onClick={() => setEditingContactId(c.id)}
-                          className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
-                          title="Editar contacto (incluye dirección)"
+                          onClick={(e) => { e.stopPropagation(); setEditingContactId(c.id); }}
+                          className="text-muted-foreground hover:text-foreground p-1"
+                          title="Editar contacto"
                         >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => toggleVisited(c.id)}
-                          className={`text-[10px] px-2 py-0.5 rounded border ${isVisited ? 'border-gray-500 text-gray-400 hover:bg-gray-500/10' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
-                          title={isVisited ? 'Marcar como no visitado' : 'Marcar como visitado'}
-                        >
-                          {isVisited ? '✓ Visitado' : 'Marcar visitado'}
+                          <Pencil className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     );
-                  })}
-                </div>
-                {/* Save + share link */}
-                <div className="mt-4 pt-3 border-t space-y-2">
-                  <Button size="sm" onClick={handleShare} disabled={sharing} className="w-full gap-2">
-                    <Share2 className="h-3 w-3" /> {sharing ? 'Guardando...' : 'Guardar ruta y refrescar link (60 días)'}
-                  </Button>
-                  {project?.share_token && (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={`${window.location.origin}/r/${project.share_token}`}
-                        readOnly
-                        className="text-xs h-8"
-                        onClick={(e) => (e.target as HTMLInputElement).select()}
-                      />
-                      <Button size="sm" variant="outline" onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/r/${project.share_token}`);
-                        showSuccess('Link copiado');
-                      }}>
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                  })
+                )}
               </div>
-              <div ref={mapRef} className="w-full h-[500px] rounded-lg border" />
-            </>
-          ) : (
-            <div className="border-2 border-dashed border-border rounded-lg p-12 text-center h-[400px] flex flex-col items-center justify-center">
-              <RouteIcon className="h-10 w-10 text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">Seleccioná contactos y un punto de partida</p>
-              <p className="text-xs text-muted-foreground mt-1">para ver la ruta óptima en el mapa.</p>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Edit contact dialog (for editing addresses without leaving Rutas) */}
+              {selectedContacts.length > 0 && (
+                <div className="mt-3 p-3 bg-primary/5 rounded border">
+                  <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                    Seleccionados ({selectedContacts.length}):
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedContacts.map(c => (
+                      <div key={c.id} className="flex items-center gap-1 bg-card border rounded-full pl-3 pr-1 py-0.5 text-xs">
+                        <span>{c.first_name} {c.last_name || ''}</span>
+                        <button
+                          onClick={() => toggleContact(c.id)}
+                          className="ml-1 w-4 h-4 rounded-full bg-muted hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center"
+                          title="Quitar"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t">
+            <Button variant="outline" onClick={cancelEdit}>Cancelar</Button>
+            <Button onClick={applyEditAndCalculate} disabled={selectedIds.size === 0 || !startLat} className="gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5" />
+              {hasRoute ? 'Recalcular ruta' : 'Calcular ruta'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit contact dialog */}
       {editingContactId && churchId && (
         <ContactProfileDialog
           open={!!editingContactId}
           onOpenChange={(o) => {
             if (!o) {
               setEditingContactId(null);
-              // Refresh contacts so any address change is reflected immediately,
-              // and trigger an auto-recalc so the route map+order picks up the
-              // new coordinates without the user having to click anything.
               queryClient.invalidateQueries({ queryKey: ['rutas-contacts', churchId] });
+              // Force a recalc so updated coordinates flow into the map
               setRouteData(null);
               autoCalcedRef.current = false;
             }
