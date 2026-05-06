@@ -539,7 +539,12 @@ const SemilleroPage = () => {
     if (filterConector === '__none__') {
       filtered = filtered.filter(c => !c.conector);
     } else if (filterConector) {
-      filtered = filtered.filter(c => c.conector === filterConector);
+      // Normalize-aware match so a filter set to "Camila Próspero" still
+      // catches rows stored as "Camila Prospero" (and vice versa). Same
+      // helper used by the dedupe in the dropdown — keeps both ends of
+      // the contract consistent.
+      const target = normalize(filterConector);
+      filtered = filtered.filter(c => c.conector && normalize(c.conector) === target);
     }
     // Apply active tab filters (saved per-user filter combination)
     if (activeTabId && Object.keys(activeTabFilters).length > 0) {
@@ -1011,14 +1016,42 @@ const SemilleroPage = () => {
                               // isolation automatically since allContacts is
                               // already filtered upstream by role + cuerda. No
                               // need to re-apply the visibility check here.
-                              const values = new Set<string>();
+                              //
+                              // Group by normalized form so accent / case
+                              // variants ("Camila Próspero" vs "Camila Prospero",
+                              // "Agustina" vs "Agustína") don't show up as
+                              // separate entries. For each group we pick one
+                              // canonical representative by counting how often
+                              // each raw spelling appears and taking the most
+                              // common; the chosen one is what's displayed AND
+                              // what gets passed to setFilterConector. The row
+                              // filter itself is normalize-aware, so the choice
+                              // of representative doesn't change which rows
+                              // match — it only controls what label the user
+                              // sees in the dropdown and the active-filter pill.
+                              const groups = new Map<string, Map<string, number>>();
                               (allContacts || []).forEach(c => {
-                                if (c.conector && c.conector.trim()) values.add(c.conector.trim());
+                                const raw = c.conector?.trim();
+                                if (!raw) return;
+                                const key = normalize(raw);
+                                if (!key) return;
+                                const counts = groups.get(key) || new Map<string, number>();
+                                counts.set(raw, (counts.get(raw) || 0) + 1);
+                                groups.set(key, counts);
                               });
-                              return Array.from(values)
+                              const representatives: string[] = [];
+                              groups.forEach(counts => {
+                                let best: string | null = null;
+                                let bestCount = -1;
+                                counts.forEach((count, raw) => {
+                                  if (count > bestCount) { best = raw; bestCount = count; }
+                                });
+                                if (best) representatives.push(best);
+                              });
+                              return representatives
                                 .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
                                 .map(v => (
-                                  <DropdownMenuItem key={v} onClick={() => setFilterConector(v)} className={filterConector === v ? 'bg-accent' : ''}>
+                                  <DropdownMenuItem key={v} onClick={() => setFilterConector(v)} className={normalize(filterConector) === normalize(v) ? 'bg-accent' : ''}>
                                     {v}
                                   </DropdownMenuItem>
                                 ));
