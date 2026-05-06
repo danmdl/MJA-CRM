@@ -100,6 +100,10 @@ const SemilleroPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCuerda, setFilterCuerda] = useState<string>('');
   const [filterResponsable, setFilterResponsable] = useState<string>('');
+  // Filter by conector — same string-match pattern as filterResponsable but
+  // on contact.conector (free-text). '' = todos, '__none__' = sin conector
+  // (NULL or empty), anything else = exact-match the chosen value.
+  const [filterConector, setFilterConector] = useState<string>('');
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [activeTabFilters, setActiveTabFilters] = useState<FilterTabFilters>({});
   // Sort state: which column and direction. null = default order from query.
@@ -532,6 +536,11 @@ const SemilleroPage = () => {
     } else if (filterResponsable) {
       filtered = filtered.filter(c => c.responsable_id === filterResponsable);
     }
+    if (filterConector === '__none__') {
+      filtered = filtered.filter(c => !c.conector);
+    } else if (filterConector) {
+      filtered = filtered.filter(c => c.conector === filterConector);
+    }
     // Apply active tab filters (saved per-user filter combination)
     if (activeTabId && Object.keys(activeTabFilters).length > 0) {
       filtered = applyFilterTab(filtered, activeTabFilters);
@@ -551,7 +560,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -979,7 +988,44 @@ const SemilleroPage = () => {
                       </DropdownMenu>
                     </ResizableHeader>
                     {showConectorCol && (
-                      <ResizableHeader width={colWidths.conector} onResize={resizeCol('conector')}>Conector</ResizableHeader>
+                      <ResizableHeader width={colWidths.conector} onResize={resizeCol('conector')}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                              Conector
+                              <Filter className={`h-3 w-3 ${filterConector ? 'text-primary fill-primary/30' : 'opacity-60'}`} />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" collisionPadding={16} className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
+                            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Filtrar por conector</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => setFilterConector('')} className={filterConector === '' ? 'bg-accent' : ''}>
+                              Todos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilterConector('__none__')} className={filterConector === '__none__' ? 'bg-accent' : ''}>
+                              Sin conector
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {(() => {
+                              // Build the conector dropdown from the contacts the
+                              // user can already see — this respects cuerda
+                              // isolation automatically since allContacts is
+                              // already filtered upstream by role + cuerda. No
+                              // need to re-apply the visibility check here.
+                              const values = new Set<string>();
+                              (allContacts || []).forEach(c => {
+                                if (c.conector && c.conector.trim()) values.add(c.conector.trim());
+                              });
+                              return Array.from(values)
+                                .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+                                .map(v => (
+                                  <DropdownMenuItem key={v} onClick={() => setFilterConector(v)} className={filterConector === v ? 'bg-accent' : ''}>
+                                    {v}
+                                  </DropdownMenuItem>
+                                ));
+                            })()}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </ResizableHeader>
                     )}
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>
