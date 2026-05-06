@@ -685,7 +685,23 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     <SelectTrigger><SelectValue placeholder="Sin célula" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sin célula</SelectItem>
-                      {cells.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      {cells.map(c => {
+                        // Cells in the same cuerda share the same generic name
+                        // (e.g. four 'Célula Cuerda 204' for cuerda 204).
+                        // Surface the address + meeting day/time below so the
+                        // user can actually pick the right one.
+                        const subtitle = [c.address, c.meeting_day, c.meeting_time].filter(Boolean).join(' · ');
+                        return (
+                          <SelectItem key={c.id} value={c.id}>
+                            <div className="flex flex-col items-start py-0.5">
+                              <span>{c.name}</span>
+                              {subtitle && (
+                                <span className="text-[10px] text-muted-foreground leading-tight">{subtitle}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
