@@ -26,6 +26,7 @@ import ContactLogInline from './ContactLogInline';
 import { PIPELINE_STAGES } from './ContactPipelineBadge';
 import AddressAutocomplete from './AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
+import { normalizeName } from '@/lib/normalize';
 
 interface Contact {
   id: string;
@@ -420,7 +421,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
             estado_seguimiento: contact.estado_seguimiento || 'nuevo',
             observaciones: contact.observaciones || null,
             pedido_de_oracion: contact.pedido_de_oracion || null,
-            conector: contact.conector || null,
+            conector: normalizeName(contact.conector) || null,
             lat: (contact as any).lat || null,
             lng: (contact as any).lng || null,
           }
@@ -723,6 +724,14 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                   value={contact.conector || ''}
                   onChange={(e) => setContact({ ...contact, conector: e.target.value || null })}
+                  onBlur={(e) => {
+                    // Normalize on blur so the user sees the cleaned form
+                    // (Title Case, no accents) before they hit Save. The DB
+                    // trigger does the same thing on insert/update; this is
+                    // for visual consistency.
+                    const cleaned = normalizeName(e.target.value);
+                    setContact(prev => prev ? { ...prev, conector: cleaned || null } : prev);
+                  }}
                   placeholder="Quién hizo el primer contacto"
                 />
               </div>

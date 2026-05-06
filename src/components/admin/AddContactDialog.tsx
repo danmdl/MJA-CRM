@@ -13,6 +13,7 @@ import { logEvent } from '@/utils/clientLogger';
 import AddressAutocomplete from './AddressAutocomplete';
 import { isWithinGBA as isWithinGBACheck } from '@/lib/geo-validation';
 import { useChurchCoords } from '@/hooks/use-church-coords';
+import { normalizeName } from '@/lib/normalize';
 
 interface Cell {
   id: string;
@@ -113,9 +114,11 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   React.useEffect(() => {
     if (open) {
       setTimeout(() => firstNameRef.current?.focus(), 50);
-      // Auto-fill Conector with the logged-in user's full name
+      // Auto-fill Conector with the logged-in user's full name. Normalized
+      // so a user named "José" doesn't propagate the accent into every
+      // contact they create — matches the DB trigger output.
       const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
-      if (name) setConector(name);
+      if (name) setConector(normalizeName(name));
     } else {
       resetForm();
     }
