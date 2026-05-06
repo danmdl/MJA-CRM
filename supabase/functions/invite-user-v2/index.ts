@@ -83,6 +83,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Church-cuerda assignment is admin-only. The church-cuerda is the
+    // authority bucket that distributes contacts inside a church, so
+    // assigning a non-admin to it would let any inviter expand that
+    // authority without oversight. The frontend already filters the
+    // option out of the dropdown for non-admins; this is the
+    // server-side safety net.
+    if (numero_cuerda && churchId && callerProfile.role !== 'admin') {
+      const { data: cuerdaRow } = await supabaseAdmin
+        .from('cuerdas')
+        .select('is_church_cuerda, zonas!inner(church_id)')
+        .eq('numero', numero_cuerda)
+        .eq('zonas.church_id', churchId)
+        .maybeSingle();
+      if (cuerdaRow?.is_church_cuerda) {
+        return new Response(JSON.stringify({ error: 'Solo un administrador puede asignar usuarios a la cuerda de la iglesia.' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Build inviter name from caller profile (already loaded)
     const inviterName = `${callerProfile.first_name || ''} ${callerProfile.last_name || ''}`.trim() || null;
 

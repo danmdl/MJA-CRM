@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 import { getRoleLevel, ROLE_LABELS } from '@/lib/permissions';
 
@@ -35,6 +35,37 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
   const { session, profile } = useSession();
 
   const myLevel = getRoleLevel(profile?.role || '');
+
+  // Cuerdas list for the dropdown. Joined to zonas to filter by churchId.
+  // Church-cuerdas (the special is_church_cuerda=true row per iglesia)
+  // are only offered to admins — assigning a regular user to the
+  // church-cuerda would put them in the same authority bucket as the
+  // people who distribute contacts, which only admin should be able
+  // to grant.
+  const { data: cuerdas } = useQuery<Array<{ numero: string; is_church_cuerda: boolean; zona_nombre: string | null }>>({
+    queryKey: ['invite-cuerdas', churchId],
+    queryFn: async () => {
+      if (!churchId) return [];
+      const { data: zonas } = await supabase.from('zonas').select('id, nombre').eq('church_id', churchId);
+      if (!zonas?.length) return [];
+      const zonaIdToNombre = new Map(zonas.map((z: any) => [z.id, z.nombre]));
+      const { data: rows } = await supabase
+        .from('cuerdas')
+        .select('numero, is_church_cuerda, zona_id')
+        .in('zona_id', zonas.map((z: any) => z.id))
+        .order('numero');
+      return (rows || []).map((c: any) => ({
+        numero: c.numero,
+        is_church_cuerda: !!c.is_church_cuerda,
+        zona_nombre: zonaIdToNombre.get(c.zona_id) || null,
+      }));
+    },
+    enabled: !!churchId && open,
+    staleTime: 60_000,
+  });
+
+  // Filter church-cuerda out when the inviter isn't admin.
+  const cuerdaOptions = (cuerdas || []).filter(c => profile?.role === 'admin' || !c.is_church_cuerda);
 
   // Roles available to assign: same level or below current user's level.
   // A referente can invite another referente, but not a supervisor.
@@ -138,12 +169,29 @@ const InviteUserDialog = ({ open, onOpenChange, churchId }: InviteUserDialogProp
                 Sin cuerda
               </label>
             </div>
-            <Input
-              value={numeroCuerda}
-              onChange={(e) => setNumeroCuerda(e.target.value)}
-              placeholder="Ej: 202"
+            <Select
+              value={numeroCuerda || undefined}
+              onValueChange={(v) => setNumeroCuerda(v)}
               disabled={loading || sinCuerda}
-            />
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={cuerdaOptions.length === 0 ? 'No hay cuerdas configuradas' : 'Seleccionar cuerda...'} />
+              </SelectTrigger>
+              <SelectContent>
+                {cuerdaOptions.map(c => (
+                  <SelectItem key={c.numero} value={c.numero}>
+                    <span className="flex items-center gap-1.5">
+                      {c.is_church_cuerda
+                        ? <span>🏛️ {c.numero}</span>
+                        : <span>Cuerda {c.numero}</span>}
+                      {c.zona_nombre && !c.is_church_cuerda && (
+                        <span className="text-xs text-muted-foreground">({c.zona_nombre})</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setTimeout(() => onOpenChange(false), 50)} disabled={loading}>Cancelar</Button>
