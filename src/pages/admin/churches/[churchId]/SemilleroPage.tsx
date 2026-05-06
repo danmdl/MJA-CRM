@@ -668,6 +668,27 @@ const SemilleroPage = () => {
     return { name: cell.name, cuerda: cuerda?.numero, zona: zona?.nombre };
   };
 
+  // The list of cuerdas a user is allowed to assign a contact to. Two rules:
+  //   1. Cuerda isolation: non-global users (anyone other than admin/general/
+  //      pastor/supervisor) can only assign to their OWN cuerda. Cross-cuerda
+  //      assignment isn't a feature — that's what the "Externo" button is for,
+  //      it pushes the contact to the church-cuerda.
+  //   2. Sex prefix: 1xx are male cuerdas, 2xx are female. A female contact
+  //      can't go to a male cuerda and vice versa.
+  // Used by all the "Asignar a cuerda" dropdowns inside the rows.
+  const getAssignableCuerdas = useCallback((contact: Contact) => {
+    return (cuerdas || []).filter(cr => {
+      if (!canSeeContactsFromAllCuerdas && userCuerdaNumero) {
+        if (cr.numero !== userCuerdaNumero) return false;
+      }
+      const prefix = parseInt(cr.numero.charAt(0));
+      const sexo = contact.sexo?.toLowerCase();
+      if (sexo === 'femenino' && prefix === 1) return false;
+      if (sexo === 'masculino' && prefix === 2) return false;
+      return true;
+    });
+  }, [cuerdas, canSeeContactsFromAllCuerdas, userCuerdaNumero]);
+
   // ─── Render ────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
@@ -787,22 +808,76 @@ const SemilleroPage = () => {
         </div>
       )}
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+      {/* Table. The checkbox column is rendered to the LEFT of the visual
+          card border via a flex layout: a slim vertical gutter holds the
+          checkboxes, and the Card holds the rest of the table. This way the
+          checkbox occupies the empty space at the left of the page instead
+          of stealing a column from the table content. Heights of the gutter
+          rows are kept in sync with the table rows by giving every row a
+          fixed height (h-[37px]) on both sides. */}
+      <div className="flex items-stretch gap-1.5">
+        {!isLoading && filteredContacts.length > 0 && (
+          <div className="flex flex-col shrink-0 select-none">
+            {/* Header */}
+            <div className="h-[37px] w-7 flex items-center justify-center border-b border-transparent">
+              <input
+                type="checkbox"
+                className="rounded border-input"
+                checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+                  else setSelectedIds(new Set());
+                }}
+              />
+            </div>
+            {/* One checkbox per visible row, kept aligned with the table rows
+                because both sides use h-[37px]. */}
+            {filteredContacts.map((c, idx) => (
+              <div key={c.id} className="h-[37px] w-7 flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  className="rounded border-input"
+                  checked={selectedIds.has(c.id)}
+                  onClick={(e) => {
+                    // Shift-click range select — same logic as the previous
+                    // in-table checkbox. Range inclusive both ends, direction
+                    // matches the action (select vs deselect) of the clicked row.
+                    const isShift = (e as any).nativeEvent?.shiftKey;
+                    if (isShift && lastClickedIdx !== null && lastClickedIdx !== idx) {
+                      e.preventDefault();
+                      const start = Math.min(lastClickedIdx, idx);
+                      const end = Math.max(lastClickedIdx, idx);
+                      const next = new Set(selectedIds);
+                      const willSelect = !selectedIds.has(c.id);
+                      for (let i = start; i <= end; i++) {
+                        const rowId = filteredContacts[i]?.id;
+                        if (!rowId) continue;
+                        if (willSelect) next.add(rowId); else next.delete(rowId);
+                      }
+                      setSelectedIds(next);
+                      setLastClickedIdx(idx);
+                    }
+                  }}
+                  onChange={(e) => {
+                    const next = new Set(selectedIds);
+                    if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                    setSelectedIds(next);
+                    setLastClickedIdx(idx);
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        <Card className="flex-1 min-w-0">
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
                 <thead>
-                  <tr className="border-b">
-                    <th className="px-1 py-2 w-6">
-                      <input type="checkbox" className="rounded border-input" checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0} onChange={(e) => {
-                        if (e.target.checked) setSelectedIds(new Set(filteredContacts.map(c => c.id)));
-                        else setSelectedIds(new Set());
-                      }} />
-                    </th>
+                  <tr className="border-b h-[37px]">
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>
                       <button
                         type="button"
@@ -932,46 +1007,7 @@ const SemilleroPage = () => {
                     const responsable = teamMembers?.find(m => m.id === c.responsable_id);
 
                     return (
-                      <tr key={c.id} className={`border-b transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
-                        {/* Selection checkbox - supports shift-click range select */}
-                        <td className="px-1 py-1.5 w-6">
-                          <input
-                            type="checkbox"
-                            className="rounded border-input"
-                            checked={selectedIds.has(c.id)}
-                            onClick={(e) => {
-                              // Shift-click: select the range from lastClickedIdx to current idx.
-                              // Range is INCLUSIVE on both ends. The action (select vs deselect)
-                              // matches the new state of the clicked checkbox, so shift-clicking
-                              // an unchecked one selects the range, and shift-clicking a checked
-                              // one deselects the range.
-                              const isShift = (e as any).nativeEvent?.shiftKey;
-                              if (isShift && lastClickedIdx !== null && lastClickedIdx !== idx) {
-                                e.preventDefault(); // we'll set the state ourselves
-                                const start = Math.min(lastClickedIdx, idx);
-                                const end = Math.max(lastClickedIdx, idx);
-                                const next = new Set(selectedIds);
-                                const willSelect = !selectedIds.has(c.id); // toggle direction based on the clicked row
-                                for (let i = start; i <= end; i++) {
-                                  const rowId = filteredContacts[i]?.id;
-                                  if (!rowId) continue;
-                                  if (willSelect) next.add(rowId); else next.delete(rowId);
-                                }
-                                setSelectedIds(next);
-                                setLastClickedIdx(idx);
-                              }
-                            }}
-                            onChange={(e) => {
-                              // Skip if the click handler already handled it (shift-click case).
-                              // Otherwise normal toggle behavior.
-                              const next = new Set(selectedIds);
-                              if (e.target.checked) next.add(c.id); else next.delete(c.id);
-                              setSelectedIds(next);
-                              setLastClickedIdx(idx);
-                            }}
-                          />
-                        </td>
-
+                      <tr key={c.id} className={`border-b h-[37px] transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
                         {/* Nombre (con ojo) */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.nombre }}>
                           <Tooltip>
@@ -1138,13 +1174,7 @@ const SemilleroPage = () => {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
                                     <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
-                                    {(cuerdas || []).filter(cr => {
-                                      const prefix = parseInt(cr.numero.charAt(0));
-                                      const sexo = c.sexo?.toLowerCase();
-                                      if (sexo === 'femenino' && prefix === 1) return false;
-                                      if (sexo === 'masculino' && prefix === 2) return false;
-                                      return true;
-                                    }).map(cr => {
+                                    {getAssignableCuerdas(c).map(cr => {
                                       const zona = zonas?.find(z => z.id === cr.zona_id);
                                       return (
                                         <DropdownMenuItem key={`cuerda-ext-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
@@ -1232,13 +1262,7 @@ const SemilleroPage = () => {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
                                     <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar a cuerda</DropdownMenuLabel>
-                                    {(cuerdas || []).filter(cr => {
-                                      const prefix = parseInt(cr.numero.charAt(0));
-                                      const sexo = c.sexo?.toLowerCase();
-                                      if (sexo === 'femenino' && prefix === 1) return false;
-                                      if (sexo === 'masculino' && prefix === 2) return false;
-                                      return true;
-                                    }).map(cr => {
+                                    {getAssignableCuerdas(c).map(cr => {
                                       const zona = zonas?.find(z => z.id === cr.zona_id);
                                       return (
                                         <DropdownMenuItem key={`cuerda-noaddr-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
@@ -1287,13 +1311,7 @@ const SemilleroPage = () => {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
                                     <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar solo a cuerda</DropdownMenuLabel>
-                                    {(cuerdas || []).filter(cr => {
-                                      const prefix = parseInt(cr.numero.charAt(0));
-                                      const sexo = c.sexo?.toLowerCase();
-                                      if (sexo === 'femenino' && prefix === 1) return false;
-                                      if (sexo === 'masculino' && prefix === 2) return false;
-                                      return true;
-                                    }).map(cr => {
+                                    {getAssignableCuerdas(c).map(cr => {
                                       const zona = zonas?.find(z => z.id === cr.zona_id);
                                       return (
                                         <DropdownMenuItem key={`cuerda-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
@@ -1363,6 +1381,7 @@ const SemilleroPage = () => {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Confirmation Dialog */}
       <Dialog open={!!confirmDialog} onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}>
