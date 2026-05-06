@@ -337,13 +337,26 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         }
         const { data: inserted, error } = await supabase.from(tableName).insert(recordsToInsert[i]).select().single();
         if (error) {
-          const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);
-          const valMatch = colMatch ? colMatch[1] : '';
-          setImportErrors(prev => [...prev, { 
-            row: i + 1, 
-            field: 'Error de inserción', 
-            value: valMatch, 
-            message: error.message 
+          // Duplicate phone errors come from a DB trigger with prefix "duplicate_phone:"
+          // Surface them as a clean "Teléfono duplicado" entry rather than the
+          // raw Postgres message.
+          let field = 'Error de inserción';
+          let value = '';
+          let message = error.message;
+          if (error.message?.includes('duplicate_phone')) {
+            field = 'Teléfono duplicado';
+            value = (recordsToInsert[i] as any)?.phone || '';
+            const m = error.message.match(/duplicate_phone:\s*(.*?)(?:\.|$)/);
+            message = m?.[1] || 'Ya existe un contacto con ese teléfono en esta iglesia.';
+          } else {
+            const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);
+            value = colMatch ? colMatch[1] : '';
+          }
+          setImportErrors(prev => [...prev, {
+            row: i + 1,
+            field,
+            value,
+            message,
           }]);
           // Store the original CSV row data for display
           failed.push({ row: i + 1, data: dataToImport[i] as Record<string, string> });
