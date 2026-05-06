@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, MapPin, Route as RouteIcon, Search, Filter, X, List, Map as MapIcon } from 'lucide-react';
+import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
+import { ChevronLeft, MapPin, Route as RouteIcon, Search, Filter, X, List, Map as MapIcon, Navigation } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
@@ -44,6 +45,10 @@ const MapPickerPage = () => {
   const [onlyWithNumber, setOnlyWithNumber] = useState(true);
   const [mobileView, setMobileView] = useState<'list' | 'map'>('map');
   const [saving, setSaving] = useState(false);
+  // Starting point — required before we can finalize the route
+  const [startAddress, setStartAddress] = useState('');
+  const [startLat, setStartLat] = useState<number | null>(null);
+  const [startLng, setStartLng] = useState<number | null>(null);
 
   // Load project (so we can save to it later + show its name)
   const { data: project } = useQuery<any>({
@@ -65,7 +70,21 @@ const MapPickerPage = () => {
     if (project.ordered_contact_ids?.length) {
       setSelectedIds(new Set(project.ordered_contact_ids));
     }
+    if (project.start_address) setStartAddress(project.start_address);
+    if (project.start_lat) setStartLat(Number(project.start_lat));
+    if (project.start_lng) setStartLng(Number(project.start_lng));
   }, [project]);
+
+  // Church (for "use church address" button)
+  const { data: church } = useQuery<{ id: string; name: string; address: string | null }>({
+    queryKey: ['church', churchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('churches').select('id, name, address').eq('id', churchId!).single();
+      return data as any;
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
 
   // Fetch contacts with valid coordinates, applying strict cuerda visibility
   // (matches Semillero / RouteEditor rule).
@@ -264,14 +283,26 @@ const MapPickerPage = () => {
       showError('Seleccioná al menos un contacto.');
       return;
     }
+    if (!startLat || !startLng) {
+      showError('Ingresá un punto de partida antes de crear la ruta.');
+      return;
+    }
     if (!project) return;
     setSaving(true);
     try {
-      // Save the picked contact ids to the project. We're not running the
-      // optimization yet — that happens on the next page. We just need to
-      // persist what was picked so RouteEditorPage can hydrate from it.
+      // Persist picks + starting point to the project. RouteEditorPage will
+      // hydrate from these and auto-calculate the optimal order on mount,
+      // so the user lands directly on the calculated-route view. Bump expiry
+      // to 60 days from now (was 7d when row was first created).
+      const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase.from('shared_routes')
-        .update({ ordered_contact_ids: Array.from(selectedIds) })
+        .update({
+          ordered_contact_ids: Array.from(selectedIds),
+          start_address: startAddress,
+          start_lat: startLat,
+          start_lng: startLng,
+          expires_at: expiresAt,
+        })
         .eq('id', project.id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['route-project', projectId] });
@@ -283,6 +314,43 @@ const MapPickerPage = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const useGeolocation = () => {
+    if (!navigator.geolocation) {
+      showError('Tu navegador no soporta geolocalización.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setStartLat(pos.coords.latitude);
+        setStartLng(pos.coords.longitude);
+        setStartAddress(`Mi ubicación (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
+      },
+      () => showError('No pudimos obtener tu ubicación.')
+    );
+  };
+
+  const useChurchAddress = async () => {
+    if (!church?.address) {
+      showError(`${church?.name || 'La iglesia'} no tiene una dirección configurada.`);
+      return;
+    }
+    if (!(window as any).google?.maps) {
+      showError('Esperá a que cargue el mapa y volvé a intentar.');
+      return;
+    }
+    const geocoder = new (window as any).google.maps.Geocoder();
+    geocoder.geocode({ address: church.address, region: 'AR' }, (results: any[], status: string) => {
+      if (status === 'OK' && results[0]) {
+        const loc = results[0].geometry.location;
+        setStartLat(loc.lat());
+        setStartLng(loc.lng());
+        setStartAddress(church.address!);
+      } else {
+        showError(`No se pudo geolocalizar: ${church.address}`);
+      }
+    });
   };
 
   return (
@@ -377,6 +445,35 @@ const MapPickerPage = () => {
         </div>
       </div>
 
+      {/* Starting point panel */}
+      <div className="border rounded-lg bg-card mb-3 p-2 sm:p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <MapPin className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs font-semibold">Punto de partida</span>
+          {startLat && startLng && (
+            <span className="text-[10px] text-green-500 font-medium">✓ Listo</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-1 min-w-[200px]">
+            <AddressAutocomplete
+              value={startAddress}
+              onChange={(addr, lat, lng) => {
+                setStartAddress(addr);
+                if (lat && lng) { setStartLat(lat); setStartLng(lng); }
+              }}
+              placeholder="Escribí la dirección de partida..."
+            />
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs h-8">
+            <Navigation className="h-3 w-3 mr-1" /> Mi ubicación
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={useChurchAddress} className="text-xs h-8" disabled={!church?.address}>
+            <MapPin className="h-3 w-3 mr-1" /> Iglesia
+          </Button>
+        </div>
+      </div>
+
       {/* Body: sidebar + map */}
       <div className="flex-1 flex gap-3 min-h-0">
         {/* Left sidebar: contact list */}
@@ -442,10 +539,15 @@ const MapPickerPage = () => {
           <div ref={mapRef} className="w-full h-full" />
           {/* Floating CTA */}
           {selectedIds.size > 0 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1">
+              {(!startLat || !startLng) && (
+                <span className="text-[11px] bg-yellow-500/90 text-yellow-950 px-2 py-0.5 rounded-full font-medium">
+                  Falta el punto de partida
+                </span>
+              )}
               <Button
                 onClick={proceedToRoute}
-                disabled={saving}
+                disabled={saving || !startLat || !startLng}
                 size="lg"
                 className="shadow-lg gap-2"
               >
@@ -459,8 +561,13 @@ const MapPickerPage = () => {
 
       {/* Mobile-only floating CTA when in list view */}
       {selectedIds.size > 0 && mobileView === 'list' && (
-        <div className="sm:hidden mt-3">
-          <Button onClick={proceedToRoute} disabled={saving} className="w-full gap-2">
+        <div className="sm:hidden mt-3 space-y-1">
+          {(!startLat || !startLng) && (
+            <div className="text-[11px] text-center bg-yellow-500/15 text-yellow-600 px-2 py-1 rounded">
+              Falta el punto de partida
+            </div>
+          )}
+          <Button onClick={proceedToRoute} disabled={saving || !startLat || !startLng} className="w-full gap-2">
             <RouteIcon className="h-4 w-4" />
             {saving ? 'Guardando...' : `Crear ruta con ${selectedIds.size}`}
           </Button>

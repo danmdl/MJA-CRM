@@ -55,7 +55,9 @@ const RutasPage = () => {
     setCreating(true);
     try {
       const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      // 60 days. Past that, links auto-expire and projects drop out of
+      // the grid — keeps shared_routes from accumulating garbage.
+      const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase.from('shared_routes').insert({
         share_token: token,
         name: finalName,

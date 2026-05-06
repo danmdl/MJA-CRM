@@ -117,6 +117,7 @@ const RouteEditorPage = () => {
   // start_lat/lng, set them too. This makes the editor a true persistent
   // workspace rather than a fresh-each-visit form.
   const projectHydratedRef = useRef(false);
+  const autoCalcedRef = useRef(false);
   useEffect(() => {
     if (!project || projectHydratedRef.current) return;
     projectHydratedRef.current = true;
@@ -277,6 +278,23 @@ const RouteEditorPage = () => {
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const customMarkers = useRef<any[]>([]);
 
+  // Auto-calculate the route once everything we need is hydrated.
+  // Triggered when arriving from MapPickerPage (which persists selected ids
+  // + start point), or when reopening a saved project. Runs at most once per
+  // page session — after that the user can recalculate manually if they edit
+  // the selection.
+  useEffect(() => {
+    if (autoCalcedRef.current) return;
+    if (!projectHydratedRef.current) return;
+    if (!contacts || contacts.length === 0) return; // need contact data resolved
+    if (selectedIds.size === 0) return;
+    if (!startLat || !startLng) return;
+    if (routeData || calculating) return;
+    autoCalcedRef.current = true;
+    calculateRoute();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts, selectedIds, startLat, startLng, project]);
+
   const toggleVisited = (contactId: string) => {
     setVisited(prev => {
       const next = new Set(prev);
@@ -374,8 +392,10 @@ const RouteEditorPage = () => {
     try {
       // Update the existing project row (the project was already created on
       // the grid page when the user clicked "Nuevo proyecto"). Refresh expiry
-      // so the link is valid for another 7 days each time we save.
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      // so the link is valid for another 60 days each time we save. Past 60
+      // days of inactivity, links auto-expire and projects drop out of the
+      // grid — keeps shared_routes from accumulating garbage.
+      const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase.from('shared_routes')
         .update({
           start_address: startAddress,
@@ -391,7 +411,7 @@ const RouteEditorPage = () => {
       setShareToken(project.share_token);
       queryClient.invalidateQueries({ queryKey: ['route-projects'] });
       queryClient.invalidateQueries({ queryKey: ['route-project', projectId] });
-      showSuccess('Ruta guardada. Link válido por 7 días.');
+      showSuccess('Ruta guardada. Link válido por 60 días.');
     } catch (e: any) {
       showError(e.message || 'Error al guardar la ruta.');
     } finally {
@@ -629,6 +649,13 @@ const RouteEditorPage = () => {
                         <span className="font-medium truncate flex-1">{c.first_name} {c.last_name || ''}</span>
                         <span className="text-muted-foreground truncate hidden sm:inline">— {c.address}</span>
                         <button
+                          onClick={() => setEditingContactId(c.id)}
+                          className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
+                          title="Editar contacto (incluye dirección)"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
                           onClick={() => toggleVisited(c.id)}
                           className={`text-[10px] px-2 py-0.5 rounded border ${isVisited ? 'border-gray-500 text-gray-400 hover:bg-gray-500/10' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
                           title={isVisited ? 'Marcar como no visitado' : 'Marcar como visitado'}
@@ -642,7 +669,7 @@ const RouteEditorPage = () => {
                 {/* Save + share link */}
                 <div className="mt-4 pt-3 border-t space-y-2">
                   <Button size="sm" onClick={handleShare} disabled={sharing} className="w-full gap-2">
-                    <Share2 className="h-3 w-3" /> {sharing ? 'Guardando...' : 'Guardar ruta y refrescar link (7 días)'}
+                    <Share2 className="h-3 w-3" /> {sharing ? 'Guardando...' : 'Guardar ruta y refrescar link (60 días)'}
                   </Button>
                   {project?.share_token && (
                     <div className="flex items-center gap-2">
@@ -681,8 +708,12 @@ const RouteEditorPage = () => {
           onOpenChange={(o) => {
             if (!o) {
               setEditingContactId(null);
-              // Refresh contacts so any address change is reflected immediately
+              // Refresh contacts so any address change is reflected immediately,
+              // and trigger an auto-recalc so the route map+order picks up the
+              // new coordinates without the user having to click anything.
               queryClient.invalidateQueries({ queryKey: ['rutas-contacts', churchId] });
+              setRouteData(null);
+              autoCalcedRef.current = false;
             }
           }}
           contactId={editingContactId}
