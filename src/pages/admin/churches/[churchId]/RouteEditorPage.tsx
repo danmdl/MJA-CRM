@@ -116,15 +116,25 @@ const RouteEditorPage = () => {
   // If the project has ordered_contact_ids, pre-select those. If it has
   // start_lat/lng, set them too. This makes the editor a true persistent
   // workspace rather than a fresh-each-visit form.
+  //
+  // Important: do NOT latch on the first render when arriving from the map
+  // picker. The cache may briefly hold the pre-update version of the project
+  // (empty ordered_contact_ids, no start point) while the refetch is in
+  // flight. If we latch on that and skip later updates, the user lands on an
+  // empty editor even though the DB has the new picks. So: wait until the
+  // project actually has something to hydrate from before flipping the gate.
   const projectHydratedRef = useRef(false);
   const autoCalcedRef = useRef(false);
   useEffect(() => {
     if (!project || projectHydratedRef.current) return;
+    const hasStart = !!project.start_address || project.start_lat != null;
+    const hasPicks = (project.ordered_contact_ids?.length ?? 0) > 0;
+    if (!hasStart && !hasPicks) return; // wait for real data
     projectHydratedRef.current = true;
     if (project.start_address) setStartAddress(project.start_address);
     if (project.start_lat) setStartLat(Number(project.start_lat));
     if (project.start_lng) setStartLng(Number(project.start_lng));
-    if (project.ordered_contact_ids?.length) {
+    if (hasPicks) {
       setSelectedIds(new Set(project.ordered_contact_ids));
     }
   }, [project]);

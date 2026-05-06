@@ -295,16 +295,26 @@ const MapPickerPage = () => {
       // so the user lands directly on the calculated-route view. Bump expiry
       // to 60 days from now (was 7d when row was first created).
       const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+      const updatePayload = {
+        ordered_contact_ids: Array.from(selectedIds),
+        start_address: startAddress,
+        start_lat: startLat,
+        start_lng: startLng,
+        expires_at: expiresAt,
+      };
       const { error } = await supabase.from('shared_routes')
-        .update({
-          ordered_contact_ids: Array.from(selectedIds),
-          start_address: startAddress,
-          start_lat: startLat,
-          start_lng: startLng,
-          expires_at: expiresAt,
-        })
+        .update(updatePayload)
         .eq('id', project.id);
       if (error) throw error;
+      // Pre-fill the cache so RouteEditorPage reads the new state immediately
+      // on mount instead of seeing the pre-update cached version. Without this,
+      // the editor latches its hydration onto stale empty data and the user
+      // lands on an empty form.
+      queryClient.setQueryData(['route-project', projectId], (old: any) => ({
+        ...(old || {}),
+        ...updatePayload,
+        id: project.id,
+      }));
       queryClient.invalidateQueries({ queryKey: ['route-project', projectId] });
       queryClient.invalidateQueries({ queryKey: ['route-projects'] });
       showSuccess(`${selectedIds.size} contacto${selectedIds.size === 1 ? '' : 's'} guardado${selectedIds.size === 1 ? '' : 's'}.`);
