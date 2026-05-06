@@ -662,63 +662,60 @@ const SemilleroPage = () => {
 
   // ─── Render ────────────────────────────────────────────────────
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2"><Users className="h-5 w-5" /> Semillero</h1>
-          <p className="text-muted-foreground text-xs mt-1">Asignación de contactos a células por cercanía</p>
+    <div className="space-y-4">
+      {/* Compact header: title + stats pills + actions + search, all in one
+          flex-wrap row. Stats pills are clickable and switch the active pool
+          just like the old big Cards did. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="mr-1">
+          <h1 className="text-xl font-bold flex items-center gap-2 leading-tight"><Users className="h-5 w-5" /> Semillero</h1>
+          <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">Asignación de contactos a células por cercanía</p>
         </div>
+
+        {/* Stats pills */}
+        <button
+          type="button"
+          onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}
+          className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'unassigned' ? 'border-primary bg-primary/10' : 'border-border hover:border-foreground/30'}`}
+          title="Pool de contactos sin asignar"
+        >
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Sin asignar</span>
+          <span className={`text-sm font-bold tabular-nums ${poolCounts.unassigned > 0 ? 'text-yellow-500' : 'text-muted-foreground'}`}>{isLoading ? '…' : poolCounts.unassigned}</span>
+          {poolCounts.unassigned > 0 && <AlertCircle className="h-3 w-3 text-yellow-500" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setActivePool('external'); setSearchTerm(''); }}
+          className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
+          title="Contactos cuya célula más cercana es de otra zona"
+        >
+          <span className="text-[10px] uppercase tracking-wider text-orange-400">Externo</span>
+          <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
+        </button>
+        {(filterCuerda || filterResponsable || searchTerm) && (
+          <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-blue-500/30 bg-blue-500/5">
+            <span className="text-[10px] uppercase tracking-wider text-blue-400">En filtro</span>
+            <span className="text-sm font-bold tabular-nums text-blue-400">{filteredContacts.length}</span>
+          </div>
+        )}
+        {visibleSelectedCount > 0 && (
+          <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-primary/40 bg-primary/10">
+            <span className="text-[10px] uppercase tracking-wider text-primary">Sel.</span>
+            <span className="text-sm font-bold tabular-nums text-primary">{visibleSelectedCount}</span>
+          </div>
+        )}
+
         {undoData && (
           <Button variant="outline" size="sm" onClick={() => undoMutation.mutate()} disabled={undoMutation.isPending} className="gap-1.5 border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300">
             <Undo2 className="h-4 w-4" /> Deshacer ({undoData.contactIds.length})
           </Button>
         )}
-      </div>
 
-      {/* Pool Cards — Sin asignar + Semillero Externo + counters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Card className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'unassigned' ? 'ring-2 ring-primary' : ''}`} onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}>
-          <CardContent className="pt-3 pb-3 px-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[11px] text-muted-foreground">Sin asignar</p>
-                <p className={`text-2xl font-bold tabular-nums ${poolCounts.unassigned > 0 ? 'text-yellow-500' : 'text-muted-foreground'}`}>{isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : poolCounts.unassigned}</p>
-              </div>
-              {poolCounts.unassigned > 0 && <AlertCircle className="h-6 w-6 text-yellow-500 opacity-70 ml-3" />}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={`cursor-pointer transition-all hover:border-foreground/20 ${activePool === 'external' ? 'ring-2 ring-orange-500' : ''} ${externalContacts.length > 0 ? 'border-orange-500/30' : ''}`} onClick={() => { setActivePool('external'); setSearchTerm(''); }}>
-          <CardContent className="pt-3 pb-3 px-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[11px] text-orange-400">Semillero Externo</p>
-                <p className={`text-2xl font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? <Skeleton className="h-7 w-8 inline-block" /> : externalContacts.length}</p>
-              </div>
-              {externalContacts.length > 0 && <ExternalLink className="h-5 w-5 text-orange-400 opacity-70 ml-3" />}
-            </div>
-          </CardContent>
-        </Card>
-        {visibleSelectedCount > 0 && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="pt-3 pb-3 px-4">
-              <p className="text-[11px] text-primary">Seleccionados</p>
-              <p className="text-2xl font-bold tabular-nums text-primary">{visibleSelectedCount}</p>
-            </CardContent>
-          </Card>
-        )}
-        {(filterCuerda || filterResponsable || searchTerm) && (
-          <Card className="border-blue-500/30 bg-blue-500/5">
-            <CardContent className="pt-3 pb-3 px-4">
-              <p className="text-[11px] text-blue-400">En este filtro</p>
-              <p className="text-2xl font-bold tabular-nums text-blue-400">{filteredContacts.length}</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+        {/* Spacer pushes actions to the right on wide viewports. On narrow
+            viewports flex-wrap takes over and everything stacks naturally. */}
+        <div className="flex-1 min-w-0" />
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2.5">
+        {/* Action buttons */}
         {activePool === 'unassigned' && canAutoAssign() && poolCounts.unassigned > 0 && (
           <Button size="sm" onClick={() => setConfirmDialog({ type: 'auto', preview: autoAssignPreview })} className="gap-1.5">
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
@@ -756,7 +753,7 @@ const SemilleroPage = () => {
         )}
         {canImportCsv() && (
           <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)} className="gap-1.5">
-            <Upload className="h-4 w-4" /> Importar Contactos
+            <Upload className="h-4 w-4" /> Importar
           </Button>
         )}
         {canAddContacts() && (
@@ -774,12 +771,10 @@ const SemilleroPage = () => {
           geocodedRef.current = false;
           showSuccess('Datos actualizados.');
           setRefreshing(false);
-        }} className="gap-1.5" title="Actualizar datos">
+        }} className="gap-1.5 px-2" title="Actualizar datos">
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Actualizando...' : 'Actualizar'}
         </Button>
-        <div className="flex-1" />
-        <div className="relative w-52 max-w-full">
+        <div className="relative w-44 sm:w-52 max-w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
