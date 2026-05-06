@@ -160,7 +160,7 @@ const SemilleroPage = () => {
   // Without this distinction, a referente with base_datos_total=true on the
   // permissions table sees the global "Sin asignar" count (e.g. 541) instead
   // of just their cuerda's count, defeating the cuerda isolation.
-  const canSeeAllCuerdas = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  const canSeeContactsFromAllCuerdas = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
   // For users without canFilterAllContacts permission, force filter to their
   // own contacts (security restriction). Admins/generals/etc with full filter
@@ -425,7 +425,7 @@ const SemilleroPage = () => {
     const userId = session?.user?.id;
     allContacts?.forEach(c => {
       if (externalIds.has(c.id)) return;
-      if (!canSeeAllCuerdas) {
+      if (!canSeeContactsFromAllCuerdas) {
         if (userCuerdaNumero) {
           if (c.numero_cuerda !== userCuerdaNumero) return;
         } else {
@@ -435,7 +435,7 @@ const SemilleroPage = () => {
       unassigned++;
     });
     return { unassigned };
-  }, [allContacts, canSeeAllCuerdas, userCuerdaNumero, externalIds, session?.user?.id]);
+  }, [allContacts, canSeeContactsFromAllCuerdas, userCuerdaNumero, externalIds, session?.user?.id]);
 
 
   // ─── Filtered contacts ─────────────────────────────────────────
@@ -464,7 +464,7 @@ const SemilleroPage = () => {
     //   responsable_id (the contacts that were specifically given to them).
     //   created_by is NOT enough (a conector might have created hundreds of
     //   contacts now in different cuerdas — they shouldn't see those anymore).
-    if (!canSeeAllCuerdas) {
+    if (!canSeeContactsFromAllCuerdas) {
       const userId = session?.user?.id;
       if (userCuerdaNumero) {
         filtered = filtered.filter(c => c.numero_cuerda === userCuerdaNumero);
@@ -507,7 +507,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -877,22 +877,33 @@ const SemilleroPage = () => {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {(() => {
-                            // Build unique responsable list, but apply the SAME strict
-                            // cuerda visibility rule used by filteredContacts. Otherwise
-                            // a referente of cuerda 202 would see responsables of cuerdas
-                            // 101, 301, etc. — leaks responsables across cuerdas.
-                            // Only admin/general/pastor/supervisor (canSeeAllCuerdas) see all.
+                            // Build the responsable filter list. Two layers of protection
+                            // for non-global users:
+                            //   1. Only consider contacts from the user's own cuerda — so
+                            //      we don't leak who the responsables in other cuerdas are.
+                            //   2. ALSO require that each responsable themselves belongs to
+                            //      the user's cuerda. Without this second check, a contact
+                            //      in cuerda 104 whose responsable_id was reassigned to a
+                            //      person in cuerda 105 (legacy data) would still leak that
+                            //      person's name into the dropdown.
+                            // Only admin/general/pastor/supervisor see everyone.
                             const userId = session?.user?.id;
                             const visible = (allContacts || []).filter(c => {
-                              if (canSeeAllCuerdas) return true;
+                              if (canSeeContactsFromAllCuerdas) return true;
                               if (userCuerdaNumero) return c.numero_cuerda === userCuerdaNumero;
                               return c.responsable_id === userId;
                             });
                             const creatorIds = new Set<string>();
                             visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
+                            const teamMemberById = new Map((teamMembers || []).map(m => [m.id, m]));
                             const creators = Array.from(creatorIds)
-                              .map(id => ({ id, profile: profileById.get(id) }))
-                              .filter(c => c.profile && c.id !== userId)
+                              .map(id => ({ id, profile: profileById.get(id), teamMember: teamMemberById.get(id) }))
+                              .filter(c => {
+                                if (!c.profile || c.id === userId) return false;
+                                if (canSeeContactsFromAllCuerdas) return true;
+                                if (!userCuerdaNumero) return false; // user has no cuerda — only Mis contactos applies
+                                return c.teamMember?.numero_cuerda === userCuerdaNumero;
+                              })
                               .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
                             return creators.map(c => (
                               <DropdownMenuItem key={c.id} onClick={() => setFilterResponsable(c.id)} className={filterResponsable === c.id ? 'bg-accent' : ''}>
@@ -933,7 +944,7 @@ const SemilleroPage = () => {
                           ? 'Sin resultados para tu búsqueda.'
                           : (filterCuerda || filterResponsable)
                             ? 'No hay contactos que coincidan con los filtros aplicados.'
-                            : !canSeeAllCuerdas && !userCuerdaNumero
+                            : !canSeeContactsFromAllCuerdas && !userCuerdaNumero
                               ? 'No tenés una cuerda asignada. Pedile a tu admin que te asigne una cuerda desde el panel de Equipo.'
                               : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Semillero Externo vacío.'}
                       </td>
@@ -1744,7 +1755,7 @@ const SemilleroPage = () => {
                   // Non-global users can only assign to people in their own cuerda.
                   // This prevents a referente of cuerda 202 from assigning a contact
                   // to a referente of cuerda 101.
-                  if (!canSeeAllCuerdas) {
+                  if (!canSeeContactsFromAllCuerdas) {
                     if (!userCuerdaNumero) return false;
                     return m.numero_cuerda === userCuerdaNumero;
                   }
