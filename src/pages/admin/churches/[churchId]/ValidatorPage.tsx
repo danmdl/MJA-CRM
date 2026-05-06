@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Crosshair } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Crosshair, ChevronDown, ChevronRight } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { isWithinGBA } from '@/lib/geo-validation';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
+import { useSession } from '@/hooks/use-session';
 
 interface Issue {
   id: string;
@@ -32,20 +33,75 @@ const CHECKS = [
 const ValidatorPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const navigate = useNavigate();
+  const { profile } = useSession();
   const [loading, setLoading] = useState(true);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [profileContactId, setProfileContactId] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<Date | null>(null);
+  // Collapsed state per group key. Errors stay expanded by default; warnings
+  // and info collapse so the page doesn't dump 130 'sin dirección' rows on
+  // first load. User can expand any group by clicking its header.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Cuerda isolation: same rule we apply elsewhere. Below supervisor (referente,
+  // encargado, consolidador, conector, anfitrion) only sees data tied to their
+  // own cuerda. Supervisor / pastor / general / admin see everything in the
+  // church.
+  const SUPERVISOR_AND_ABOVE = ['supervisor', 'pastor', 'general', 'admin'];
+  const canSeeAllCuerdas = SUPERVISOR_AND_ABOVE.includes(profile?.role || '');
+  const userCuerdaNumero = profile?.numero_cuerda || null;
 
   const runValidation = async () => {
     if (!churchId) return;
     setLoading(true);
     const found: Issue[] = [];
 
+    // For non-globals we filter contacts by numero_cuerda directly (it's a
+    // string column on contacts) and cells by cuerda_id (after resolving the
+    // user's numero -> cuerda row in this church). If the user has no cuerda
+    // and isn't supervisor+, the validator shows nothing — they shouldn't be
+    // chasing data outside their lane.
+    let userCuerdaIds: string[] | null = null;
+    if (!canSeeAllCuerdas) {
+      if (!userCuerdaNumero) {
+        setIssues([]);
+        setLastRun(new Date());
+        setLoading(false);
+        return;
+      }
+      const { data: zonasOfChurch } = await supabase.from('zonas').select('id').eq('church_id', churchId);
+      const zonaIds = (zonasOfChurch || []).map((z: any) => z.id);
+      if (zonaIds.length > 0) {
+        const { data: matchingCuerdas } = await supabase.from('cuerdas')
+          .select('id').eq('numero', userCuerdaNumero).in('zona_id', zonaIds);
+        userCuerdaIds = (matchingCuerdas || []).map((c: any) => c.id);
+      } else {
+        userCuerdaIds = [];
+      }
+    }
+    // Helper: starts a contacts query already filtered to this church + alive
+    // + the caller's cuerda when applicable. Saves repeating the same .eq()
+    // chain on every check.
+    const contactsBase = () => {
+      let q = supabase.from('contacts').select('*').eq('church_id', churchId).is('deleted_at', null);
+      if (!canSeeAllCuerdas && userCuerdaNumero) q = q.eq('numero_cuerda', userCuerdaNumero);
+      return q;
+    };
+    const cellsBase = () => {
+      let q = supabase.from('cells').select('*').eq('church_id', churchId).is('deleted_at', null);
+      if (!canSeeAllCuerdas) {
+        if (!userCuerdaIds || userCuerdaIds.length === 0) {
+          // No matching cuerda — make the query return nothing.
+          q = q.eq('id', '00000000-0000-0000-0000-000000000000');
+        } else {
+          q = q.in('cuerda_id', userCuerdaIds);
+        }
+      }
+      return q;
+    };
+
     // 1. Contacts without coordinates (have address but no lat/lng)
-    const { data: noCoords } = await supabase.from('contacts')
-      .select('id, first_name, last_name, address')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: noCoords } = await contactsBase()
       .not('address', 'is', null)
       .or('lat.is.null,lng.is.null');
     (noCoords || []).filter(c => c.address && c.address.trim()).forEach(c => {
@@ -54,9 +110,7 @@ const ValidatorPage = () => {
     });
 
     // 2. Contacts with bad coordinates (outside GBA)
-    const { data: allWithCoords } = await supabase.from('contacts')
-      .select('id, first_name, last_name, address, lat, lng')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: allWithCoords } = await contactsBase()
       .not('lat', 'is', null).not('lng', 'is', null);
     (allWithCoords || []).forEach(c => {
       if (!isWithinGBA(c.lat, c.lng)) {
@@ -66,9 +120,7 @@ const ValidatorPage = () => {
     });
 
     // 3. Contacts without sexo
-    const { data: noSexo } = await supabase.from('contacts')
-      .select('id, first_name, last_name')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: noSexo } = await contactsBase()
       .or('sexo.is.null,sexo.eq.');
     (noSexo || []).forEach(c => {
       found.push({ id: `no-sexo-${c.id}`, type: 'contacts_no_sexo', severity: 'warning', entity: 'contact', entityId: c.id,
@@ -76,9 +128,7 @@ const ValidatorPage = () => {
     });
 
     // 4. Contacts without address
-    const { data: noAddr } = await supabase.from('contacts')
-      .select('id, first_name, last_name')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: noAddr } = await contactsBase()
       .or('address.is.null,address.eq.');
     (noAddr || []).forEach(c => {
       found.push({ id: `no-addr-${c.id}`, type: 'contacts_no_address', severity: 'warning', entity: 'contact', entityId: c.id,
@@ -86,9 +136,7 @@ const ValidatorPage = () => {
     });
 
     // 5. Contacts without phone
-    const { data: noPhone } = await supabase.from('contacts')
-      .select('id, first_name, last_name')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: noPhone } = await contactsBase()
       .or('phone.is.null,phone.eq.');
     (noPhone || []).forEach(c => {
       found.push({ id: `no-phone-${c.id}`, type: 'contacts_no_phone', severity: 'info', entity: 'contact', entityId: c.id,
@@ -96,9 +144,7 @@ const ValidatorPage = () => {
     });
 
     // 6. Duplicate phones
-    const { data: allPhones } = await supabase.from('contacts')
-      .select('id, first_name, last_name, phone')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: allPhones } = await contactsBase()
       .not('phone', 'is', null);
     const phoneCounts = new Map<string, { count: number; contacts: typeof allPhones }>();
     (allPhones || []).forEach(c => {
@@ -119,9 +165,7 @@ const ValidatorPage = () => {
     });
 
     // 7. Cells without address
-    const { data: cellsNoAddr } = await supabase.from('cells')
-      .select('id, name')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: cellsNoAddr } = await cellsBase()
       .or('address.is.null,address.eq.');
     (cellsNoAddr || []).forEach(c => {
       found.push({ id: `cell-no-addr-${c.id}`, type: 'cells_no_address', severity: 'error', entity: 'cell', entityId: c.id,
@@ -129,9 +173,7 @@ const ValidatorPage = () => {
     });
 
     // 8. Cells with address but no coordinates
-    const { data: cellsNoCoords } = await supabase.from('cells')
-      .select('id, name, address')
-      .eq('church_id', churchId).is('deleted_at', null)
+    const { data: cellsNoCoords } = await cellsBase()
       .not('address', 'is', null)
       .or('lat.is.null,lng.is.null');
     (cellsNoCoords || []).filter(c => c.address && c.address.trim()).forEach(c => {
@@ -144,7 +186,23 @@ const ValidatorPage = () => {
     setLoading(false);
   };
 
-  useEffect(() => { runValidation(); }, [churchId]);
+  useEffect(() => { runValidation(); }, [churchId, canSeeAllCuerdas, userCuerdaNumero]);
+
+  // Whenever issues change, reset expanded set to just the error groups so
+  // the user immediately sees what's broken without scrolling through 130
+  // 'sin dirección' rows. Warnings/info collapse — click to expand.
+  useEffect(() => {
+    const errorKeys = CHECKS.filter(c => c.severity === 'error' && issues.some(i => i.type === c.key)).map(c => c.key);
+    setExpandedGroups(new Set(errorKeys));
+  }, [issues]);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const grouped = CHECKS.map(check => ({
     ...check,
@@ -256,10 +314,14 @@ const ValidatorPage = () => {
         </div>
       )}
 
-      {/* Issue groups */}
+      {/* Issue groups — collapsible. Header is always visible (icon + name +
+          count + chevron). Body of each group only renders when expanded so
+          DOM stays light even when there are 130 rows in a group. Errors
+          start expanded; warnings/info start collapsed. */}
       {!loading && grouped.map(group => {
         if (group.items.length === 0) return null;
         const Icon = group.icon;
+        const isOpen = expandedGroups.has(group.key);
         const sevColor = group.severity === 'error' ? 'text-red-500 border-red-500/30 bg-red-500/5'
           : group.severity === 'warning' ? 'text-yellow-500 border-yellow-500/30 bg-yellow-500/5'
           : 'text-blue-400 border-blue-400/30 bg-blue-400/5';
@@ -268,26 +330,32 @@ const ValidatorPage = () => {
           : 'bg-blue-400/15 text-blue-400';
 
         return (
-          <div key={group.key} className={`rounded-lg border p-4 ${sevColor}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <Icon className="h-4 w-4" />
-              <span className="text-sm font-semibold">{group.label}</span>
-              <Badge className={`text-[10px] ${badgeColor}`}>{group.items.length}</Badge>
-            </div>
-            <div className="space-y-1.5">
-              {group.items.map(item => (
-                <div key={item.id} className="flex items-center justify-between rounded px-3 py-2 bg-background/50 border border-border/50">
-                  <div className="min-w-0">
-                    <button
-                      className="text-sm font-medium text-primary hover:underline text-left"
-                      onClick={() => {
-                        if (item.entity === 'contact') setProfileContactId(item.entityId);
-                        else if (item.entity === 'cell') navigate(`/admin/churches/${churchId}/celulas`);
-                      }}
-                    >
-                      {item.name}
-                    </button>
-                    <span className="text-[10px] text-muted-foreground ml-2">{item.detail}</span>
+          <div key={group.key} className={`rounded-lg border ${sevColor}`}>
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.key)}
+              className="w-full flex items-center gap-2 px-4 py-3 hover:bg-foreground/5 transition-colors text-left"
+            >
+              {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-semibold flex-1 truncate">{group.label}</span>
+              <Badge className={`text-[10px] ${badgeColor} shrink-0`}>{group.items.length}</Badge>
+            </button>
+            {isOpen && (
+              <div className="px-4 pb-3 space-y-1.5 border-t border-current/20 pt-3">
+                {group.items.map(item => (
+                  <div key={item.id} className="flex items-center justify-between rounded px-3 py-2 bg-background/50 border border-border/50">
+                    <div className="min-w-0">
+                      <button
+                        className="text-sm font-medium text-primary hover:underline text-left"
+                        onClick={() => {
+                          if (item.entity === 'contact') setProfileContactId(item.entityId);
+                          else if (item.entity === 'cell') navigate(`/admin/churches/${churchId}/celulas`);
+                        }}
+                      >
+                        {item.name}
+                      </button>
+                      <span className="text-[10px] text-muted-foreground ml-2">{item.detail}</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {item.entity === 'contact' && (
@@ -324,6 +392,7 @@ const ValidatorPage = () => {
                 </div>
               ))}
             </div>
+            )}
           </div>
         );
       })}
