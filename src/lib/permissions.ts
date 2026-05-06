@@ -16,7 +16,6 @@ export interface PermissionData {
   edit_delete_contacts: boolean;
   edit_delete_members: boolean;
   base_datos_total: boolean;
-  can_see_base_datos: boolean;
   can_see_pool: boolean;
   can_edit_cuerda: boolean;
   can_see_celulas: boolean;
@@ -107,7 +106,6 @@ export const usePermissions = () => {
   const canEditDeleteContacts = () => hasPermission('edit_delete_contacts');
   const canEditDeleteMembers = () => hasPermission('edit_delete_members');
   const canSeeBaseDatosTotal = () => hasPermission('base_datos_total');
-  const canSeeBaseDatos = () => hasPermission('can_see_base_datos');
   const canSeePool = () => hasPermission('can_see_pool');
   const canEditCuerda = () => hasPermission('can_edit_cuerda');
   const canSeeCelulas = () => hasPermission('can_see_celulas');
@@ -158,7 +156,6 @@ export const usePermissions = () => {
     canEditDeleteContacts,
     canEditDeleteMembers,
     canSeeBaseDatosTotal,
-    canSeeBaseDatos,
     canSeePool,
     canEditCuerda,
     canSeeCelulas,

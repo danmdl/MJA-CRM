@@ -137,7 +137,6 @@ const ChurchesPage = lazyRetry(() => import("./pages/admin/ChurchesPage"));
 const ChurchOverviewPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/OverviewPage"));
 const CuerdasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CuerdasPage"));
 const MapaPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/MapaPage"));
-const ChurchDatabasePage = lazyRetry(() => import("./pages/admin/churches/[churchId]/DatabasePage"));
 const ChurchTeamPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/TeamPage"));
 const SemilleroPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/SemilleroPage"));
 const CelulasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CelulasPage"));
@@ -254,7 +253,6 @@ const AppRoutes = () => {
         {/* Nested routes for specific church details */}
         <Route path="churches/:churchId" element={<ChurchDetailsLayout><Outlet /></ChurchDetailsLayout>}>
           <Route path="overview" element={<ChurchOverviewPage />} />
-          <Route path="database" element={<ChurchDatabasePage />} />
           <Route path="team" element={<ChurchTeamPage />} />
           <Route path="cuerdas" element={<CuerdasPage />} />
           <Route path="mapa" element={<MapaPage />} />

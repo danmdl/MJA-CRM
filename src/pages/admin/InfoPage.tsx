@@ -68,14 +68,14 @@ const InfoPage = () => {
         </div>
       </section>
 
-      {/* Semillero + Datos Globales */}
+      {/* Semillero */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">¿Cómo funciona el Semillero y los Datos Globales?</h2>
+        <h2 className="text-lg font-semibold">¿Cómo funciona el Semillero?</h2>
         <div className="text-sm space-y-2 text-muted-foreground">
           <p>El <span className="text-foreground font-medium">Semillero</span> es la bandeja de entrada de contactos nuevos. Cuando un conector sale a la calle y conoce a alguien, crea el contacto ahí.</p>
-          <p>Los contactos en el Semillero están <span className="text-foreground font-medium">sin asignar</span> — no tienen célula ni cuerda todavía.</p>
-          <p>Un pastor, general o admin puede <span className="text-foreground font-medium">asignar</span> un contacto a una cuerda o célula. Al hacerlo, el contacto se mueve automáticamente a <span className="text-foreground font-medium">Datos Globales</span>.</p>
-          <p><span className="text-foreground font-medium">Datos Globales</span> muestra todos los contactos que ya fueron procesados y asignados. Cada usuario ve solamente los contactos de su cuerda, a menos que tenga permiso para ver todas.</p>
+          <p>Los contactos arrancan <span className="text-foreground font-medium">sin asignar</span> a una célula. Cada cuerda ve los contactos que les corresponden por su <span className="text-foreground font-medium">numero_cuerda</span>.</p>
+          <p>Si un contacto cae en otra zona, el referente lo manda a <span className="text-foreground font-medium">MJA</span> (la cuerda de la iglesia) para que el admin lo distribuya a la cuerda correcta.</p>
+          <p>Solo admin / general / pastor / supervisor pueden asignar contactos a una célula específica. El resto solo puede enviarlos a MJA.</p>
         </div>
       </section>
 

@@ -8,7 +8,6 @@ import UpdateBanner from '@/components/UpdateBanner';
 function getPageTitle(pathname: string): string {
   if (pathname === '/admin/dashboard') return 'Dashboard';
   if (pathname.includes('/overview')) return 'Vista General';
-  if (pathname.includes('/database')) return 'Datos Globales';
   if (pathname.includes('/team')) return 'Equipo';
   if (pathname.includes('/cuerdas')) return 'Cuerdas';
   if (pathname.includes('/pool')) return 'Semillero';

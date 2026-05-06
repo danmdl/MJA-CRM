@@ -155,11 +155,10 @@ const SemilleroPage = () => {
   // The Semillero is the user's "my cuerda" working view. Visibility here is
   // strictly role-based — admin/general/pastor/supervisor see everything,
   // anyone else (referente, encargado_de_celula, consolidador, conector,
-  // anfitrion) sees only their own cuerda. The `base_datos_total` permission
-  // does NOT widen Semillero — it gates the separate "Datos Globales" view.
-  // Without this distinction, a referente with base_datos_total=true on the
-  // permissions table sees the global "Sin asignar" count (e.g. 541) instead
-  // of just their cuerda's count, defeating the cuerda isolation.
+  // anfitrion) sees only their own cuerda. The base_datos_total permission
+  // gates wider visibility in Cuerdas/Células pages but does NOT widen the
+  // Semillero — that's role-based on purpose, so a referente with
+  // base_datos_total=true still only sees their cuerda's "Sin asignar" pool.
   const canSeeContactsFromAllCuerdas = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
   // For users without canFilterAllContacts permission, force filter to their

@@ -272,7 +272,7 @@ const CelulasPage = () => {
           </DialogHeader>
           {editCell && (
             <div className="space-y-4">
-              <p className="text-xs text-muted-foreground">Los cambios se reflejan en todas las solapas: Cuerdas, Mapa, Datos Globales y Pool.</p>
+              <p className="text-xs text-muted-foreground">Los cambios se reflejan en todas las solapas: Cuerdas, Mapa y Semillero.</p>
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Dirección</label>

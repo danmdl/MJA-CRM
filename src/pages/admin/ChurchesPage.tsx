@@ -69,10 +69,13 @@ const ChurchesPage = () => {
         [])) : 
     [];
 
-  // If user can't see all churches but has an assigned church_id, redirect directly to their church
+  // If user can't see all churches but has an assigned church_id, redirect
+  // directly to their church's Semillero. Used to redirect to /database
+  // (Datos Globales) but that solapa was retired — Semillero is the working
+  // landing page for everyone now.
   useEffect(() => {
     if (!isLoading && !isAdminOrGeneral && isChurchRole && profile?.church_id) {
-      navigate(`/admin/churches/${profile.church_id}/database`);
+      navigate(`/admin/churches/${profile.church_id}/pool`);
     }
   }, [isLoading, isAdminOrGeneral, isChurchRole, profile?.church_id, navigate]);
 
