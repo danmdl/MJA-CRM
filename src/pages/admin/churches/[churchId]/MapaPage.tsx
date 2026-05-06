@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Loader2, Search } from 'lucide-react';
+import { MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
@@ -78,7 +78,6 @@ const MapaPage = () => {
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
-  const [cuerdaSearch, setCuerdaSearch] = useState('');
 
   const { data: cells, isLoading } = useQuery<Cell[]>({
     queryKey: ['cells-map', churchId],
@@ -146,7 +145,6 @@ const MapaPage = () => {
     !c.cuerda_numero || !visibleCuerdas || visibleCuerdas.has(c.cuerda_numero)
   );
   const needsGeocode = (cells || []).filter(c => c.address && (!c.lat || !c.lng));
-  const noAddress = (cells || []).filter(c => !c.address);
 
   const [geocodeFailed, setGeocodeFailed] = useState<string[]>([]);
 
@@ -320,87 +318,59 @@ const MapaPage = () => {
   }, [mappableCellKey, isLoading, geocoding, cellContactCounts]);
 
   return (
-    <div className="h-full flex flex-col gap-3">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Mapa de Células</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {isLoading ? 'Cargando...' : geocoding
-            ? `Geocodificando direcciones... ${geocodeProgress.done}/${geocodeProgress.total}`
-            : `${mappableCells.length} célula(s) en el mapa${noAddress.length > 0 ? ` · ${noAddress.length} sin dirección` : ''}`
-          }
-        </p>
-      </div>
-
-      {/* Cuerda filter */}
-      {!isLoading && !geocoding && availableCuerdas.length > 1 && (() => {
-        // Group cuerdas by their last two digits (zona pairing: 101/201, 102/202, etc.)
-        const groups = new Map<string, string[]>();
-        availableCuerdas.forEach(num => {
-          const suffix = num.slice(-2);
-          if (!groups.has(suffix)) groups.set(suffix, []);
-          groups.get(suffix)!.push(num);
-        });
-        const sortedGroups = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-
+    <div className="h-full flex flex-col gap-2">
+      {/* Compact header. Title + count + cuerda chips all on the same row
+          (wraps to a second line when chips don't fit). The 'Cuerdas' card
+          and the 'sin dirección' banner that used to live here are gone —
+          they ate vertical space without adding much over the chips. */}
+      {!isLoading && !geocoding && availableCuerdas.length > 1 ? (() => {
         return (
-          <div className="rounded-lg border border-border bg-muted/10 px-3 py-2.5 space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">Cuerdas</span>
-                <span className="text-[10px] text-muted-foreground">({mappableCells.length}/{allMappable.length} en mapa)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                  <input
-                    className="h-6 w-28 pl-6 pr-2 text-[10px] rounded border border-border bg-background"
-                    placeholder="Buscar cuerda..."
-                    value={cuerdaSearch}
-                    onChange={e => setCuerdaSearch(e.target.value)}
-                  />
-                </div>
-                <button
-                  className="text-[10px] px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors text-muted-foreground"
-                  onClick={() => toggleAllCuerdas(visibleCuerdas?.size !== availableCuerdas.length)}
-                >
-                  {visibleCuerdas?.size === availableCuerdas.length ? 'Ninguna' : 'Todas'}
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1">
-              {availableCuerdas.filter(num => !cuerdaSearch || num.includes(cuerdaSearch)).map(num => {
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="text-lg sm:text-xl font-bold whitespace-nowrap">Mapa</h1>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {mappableCells.length}/{allMappable.length} células
+            </span>
+            <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0">
+              {availableCuerdas.map(num => {
                 const colors = cuerdaColorMap.get(num);
                 const isActive = visibleCuerdas?.has(num) ?? true;
                 return (
                   <button
                     key={num}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all ${isActive ? 'bg-muted/60 text-foreground' : 'opacity-30 text-muted-foreground'}`}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all ${isActive ? 'bg-muted/60 text-foreground' : 'opacity-30 text-muted-foreground'}`}
                     onClick={() => toggleCuerda(num)}
                   >
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colors?.fill || '#FFC233' }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors?.fill || '#FFC233' }} />
                     {num}
                   </button>
                 );
               })}
             </div>
+            <button
+              className="text-[10px] px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors text-muted-foreground whitespace-nowrap"
+              onClick={() => toggleAllCuerdas(visibleCuerdas?.size !== availableCuerdas.length)}
+            >
+              {visibleCuerdas?.size === availableCuerdas.length ? 'Ninguna' : 'Todas'}
+            </button>
           </div>
         );
-      })()}
+      })() : (
+        // Loading / geocoding state — just show the title row, no chips yet.
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg sm:text-xl font-bold">Mapa</h1>
+          <span className="text-xs text-muted-foreground">
+            {isLoading ? 'Cargando...' : geocoding
+              ? `Geocodificando... ${geocodeProgress.done}/${geocodeProgress.total}`
+              : `${mappableCells.length} en el mapa`
+            }
+          </span>
+        </div>
+      )}
 
       {geocoding && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-500/30 bg-blue-500/10 text-sm text-blue-400">
           <Loader2 className="h-4 w-4 animate-spin shrink-0" />
           <span>Convirtiendo direcciones en coordenadas para el mapa... {geocodeProgress.done}/{geocodeProgress.total}</span>
-        </div>
-      )}
-
-      {!isLoading && !geocoding && noAddress.length > 0 && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm text-amber-400">
-          <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-          <div>
-            <p>{noAddress.length} célula(s) sin dirección — no aparecen en el mapa:</p>
-            {noAddress.map((c: any) => <p key={c.id} className="text-xs mt-0.5">• {c.name || `Célula ${c.id.slice(0,6)}`}</p>)}
-          </div>
         </div>
       )}
 
