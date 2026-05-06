@@ -706,12 +706,6 @@ const SemilleroPage = () => {
             <span className="text-sm font-bold tabular-nums text-blue-400">{filteredContacts.length}</span>
           </div>
         )}
-        {visibleSelectedCount > 0 && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-primary/40 bg-primary/10">
-            <span className="text-[10px] uppercase tracking-wider text-primary">Sel.</span>
-            <span className="text-sm font-bold tabular-nums text-primary">{visibleSelectedCount}</span>
-          </div>
-        )}
 
         {undoData && (
           <Button variant="outline" size="sm" onClick={() => undoMutation.mutate()} disabled={undoMutation.isPending} className="gap-1.5 border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300">
@@ -723,40 +717,13 @@ const SemilleroPage = () => {
             viewports flex-wrap takes over and everything stacks naturally. */}
         <div className="flex-1 min-w-0" />
 
-        {/* Action buttons */}
+        {/* Action buttons. Bulk actions (autoasignar/asignar/eliminar/whatsapp
+            seleccionados) are NOT here on purpose — they live in the floating
+            action bar at the bottom so the header doesn't reflow / push the
+            table down every time the user (de)selects a contact. */}
         {activePool === 'unassigned' && canAutoAssign() && poolCounts.unassigned > 0 && (
           <Button size="sm" onClick={() => setConfirmDialog({ type: 'auto', preview: autoAssignPreview })} className="gap-1.5">
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
-          </Button>
-        )}
-        {visibleSelectedCount > 0 && canAssignContacts() && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => setConfirmDialog({ type: 'auto_selected' })}
-            className="gap-1.5"
-          >
-            <Zap className="h-4 w-4" /> Autoasignar seleccionados ({visibleSelectedCount})
-          </Button>
-        )}
-        {visibleSelectedCount > 0 && canEditDeleteContacts() && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => { setBulkAssignTargetId(''); setBulkAssignOpen(true); }}
-            className="gap-1.5"
-          >
-            <Users className="h-4 w-4" /> Asignar Responsable ({visibleSelectedCount})
-          </Button>
-        )}
-        {visibleSelectedCount > 0 && canEditDeleteContacts() && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setBulkDeleteOpen(true)}
-            className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-          >
-            <Trash2 className="h-4 w-4" /> Eliminar ({visibleSelectedCount})
           </Button>
         )}
         {canImportCsv() && (
@@ -1692,6 +1659,15 @@ const SemilleroPage = () => {
           >
             Limpiar
           </button>
+          {canAssignContacts() && (
+            <Button
+              size="sm"
+              onClick={() => setConfirmDialog({ type: 'auto_selected' })}
+              className="gap-1.5"
+            >
+              <Zap className="h-4 w-4" /> Autoasignar
+            </Button>
+          )}
           {canSendWhatsapp() && visibleSelectedCount <= 5 && (
             <Button
               size="sm"
