@@ -1222,8 +1222,51 @@ const SemilleroPage = () => {
                                 </Button>
                               </div>
                             ) : !hasAddress ? (
-                              <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help">Sin dirección</Badge></TooltipTrigger>
-                                <TooltipContent><p className="text-xs">Completá la dirección para asignar.</p></TooltipContent></Tooltip>
+                              <div className="flex items-center gap-1">
+                                {/* Without address we can't compute geo-suggested cell, but we can still
+                                    allow marking as Externo (which moves to church-cuerda) and
+                                    manual assignment via the dropdown. */}
+                                {!c.is_external && (
+                                  <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
+                                    const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
+                                    const update: any = { is_external: true };
+                                    if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
+                                    await supabase.from('contacts').update(update).eq('id', c.id);
+                                    showSuccess('Contacto movido al Semillero Externo (cuerda iglesia).');
+                                    queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                  }}>
+                                    <ExternalLink className="h-3 w-3 mr-1" /> Externo
+                                  </Button>
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-7 text-xs px-2"><ChevronDown className="h-3 w-3 mr-1" /> Cuerda</Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" collisionPadding={16} className="w-64 max-h-[min(340px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
+                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Asignar a cuerda</DropdownMenuLabel>
+                                    {(cuerdas || []).filter(cr => {
+                                      const prefix = parseInt(cr.numero.charAt(0));
+                                      const sexo = c.sexo?.toLowerCase();
+                                      if (sexo === 'femenino' && prefix === 1) return false;
+                                      if (sexo === 'masculino' && prefix === 2) return false;
+                                      return true;
+                                    }).map(cr => {
+                                      const zona = zonas?.find(z => z.id === cr.zona_id);
+                                      return (
+                                        <DropdownMenuItem key={`cuerda-noaddr-${cr.id}`} className="text-xs" onClick={() => setConfirmDialog({
+                                          type: 'cuerda_only', contactId: c.id, cellId: '', cellName: `Cuerda ${cr.numero}`,
+                                          cuerdaNum: cr.numero, zonaName: zona?.nombre, cuerdaZonaId: zona?.id,
+                                        })}>
+                                          <span>{cr.is_church_cuerda ? `🏛️ ${cr.numero}` : `Cuerda ${cr.numero}`}</span>
+                                          {zona && !cr.is_church_cuerda && <span className="text-[10px] text-muted-foreground ml-1">{zona.nombre}</span>}
+                                        </DropdownMenuItem>
+                                      );
+                                    })}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                                <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help ml-1">Sin dirección</Badge></TooltipTrigger>
+                                  <TooltipContent><p className="text-xs">Sin dirección no se puede sugerir célula automáticamente.</p></TooltipContent></Tooltip>
+                              </div>
                             ) : (
                               <div className="flex items-center gap-1">
                                 {sugCell && !isExternal && (

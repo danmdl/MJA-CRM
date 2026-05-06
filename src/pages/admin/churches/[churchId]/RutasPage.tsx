@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
-import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink } from 'lucide-react';
-import { showError } from '@/utils/toast';
+import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy } from 'lucide-react';
+import { showError, showSuccess } from '@/utils/toast';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
@@ -114,6 +114,8 @@ const RutasPage = () => {
     if (!startLat || !startLng) { showError('Ingresá un punto de partida.'); return; }
     setCalculating(true);
     setRouteData(null);
+    setShareToken(null);
+    setVisited(new Set());
 
     // Wait for Google Maps to load
     const waitForGoogle = () => new Promise<void>((resolve) => {
@@ -172,6 +174,62 @@ const RutasPage = () => {
     );
   };
 
+  const [visited, setVisited] = useState<Set<string>>(new Set());
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const customMarkers = useRef<any[]>([]);
+
+  const toggleVisited = (contactId: string) => {
+    setVisited(prev => {
+      const next = new Set(prev);
+      if (next.has(contactId)) next.delete(contactId);
+      else next.add(contactId);
+      return next;
+    });
+    refreshMarkers();
+  };
+
+  const refreshMarkers = () => {
+    if (!routeData || !mapInstance.current) return;
+    const google = (window as any).google;
+    // Clear old markers
+    customMarkers.current.forEach(m => m.setMap(null));
+    customMarkers.current = [];
+    // Start marker (green)
+    customMarkers.current.push(new google.maps.Marker({
+      position: { lat: startLat!, lng: startLng! },
+      map: mapInstance.current,
+      label: { text: '★', color: 'white', fontSize: '14px', fontWeight: 'bold' },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 14,
+        fillColor: '#10b981',
+        fillOpacity: 1,
+        strokeColor: 'white',
+        strokeWeight: 2,
+      },
+      title: 'Punto de partida',
+    }));
+    // Numbered stops
+    routeData.orderedContacts.forEach((c: Contact, idx: number) => {
+      const isVisited = visited.has(c.id);
+      customMarkers.current.push(new google.maps.Marker({
+        position: { lat: c.lat!, lng: c.lng! },
+        map: mapInstance.current,
+        label: { text: String(idx + 1), color: 'white', fontSize: '13px', fontWeight: 'bold' },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 14,
+          fillColor: isVisited ? '#6b7280' : '#FFC233',
+          fillOpacity: isVisited ? 0.6 : 1,
+          strokeColor: 'white',
+          strokeWeight: 2,
+        },
+        title: `${idx + 1}. ${c.first_name} ${c.last_name || ''}${isVisited ? ' (visitado)' : ''}`,
+      }));
+    });
+  };
+
   // Render map when routeData is set
   useEffect(() => {
     if (!routeData || !mapRef.current) return;
@@ -187,13 +245,21 @@ const RutasPage = () => {
         fullscreenControl: true,
       });
       directionsRenderer.current = new google.maps.DirectionsRenderer({
-        suppressMarkers: false,
+        suppressMarkers: true,
         polylineOptions: { strokeColor: '#FFC233', strokeWeight: 5 },
       });
       directionsRenderer.current.setMap(mapInstance.current);
     }
     directionsRenderer.current.setDirections(routeData.result);
+    refreshMarkers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeData, startLat, startLng]);
+
+  // Re-color markers when visited state changes
+  useEffect(() => {
+    refreshMarkers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visited]);
 
   const openInGoogleMaps = () => {
     if (!routeData) return;
@@ -202,6 +268,36 @@ const RutasPage = () => {
     const waypoints = routeData.orderedContacts.slice(0, -1).map((c: Contact) => `${c.lat},${c.lng}`).join('|');
     const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${encodeURIComponent(waypoints)}&travelmode=driving`;
     window.open(url, '_blank');
+  };
+
+  const handleShare = async () => {
+    if (!routeData) return;
+    setSharing(true);
+    try {
+      // Generate a random token (UUID-like)
+      const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from('shared_routes').insert({
+        share_token: token,
+        created_by: profile?.id,
+        church_id: churchId,
+        start_address: startAddress,
+        start_lat: startLat,
+        start_lng: startLng,
+        ordered_contact_ids: routeData.orderedContacts.map((c: Contact) => c.id),
+        total_meters: routeData.totalMeters,
+        total_seconds: routeData.totalSeconds,
+        expires_at: expiresAt,
+        visited: {},
+      });
+      if (error) throw error;
+      setShareToken(token);
+      showSuccess('Link de ruta generado. Expira en 7 días.');
+    } catch (e: any) {
+      showError(e.message || 'Error al generar el link.');
+    } finally {
+      setSharing(false);
+    }
   };
 
   const formatDuration = (seconds: number) => {
@@ -301,6 +397,27 @@ const RutasPage = () => {
             </div>
           </div>
 
+          {/* Selected contacts list with quick remove */}
+          {selectedContacts.length > 0 && (
+            <div className="border rounded-lg p-3 bg-primary/5">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">Seleccionados ({selectedContacts.length}):</div>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedContacts.map(c => (
+                  <div key={c.id} className="flex items-center gap-1 bg-card border rounded-full pl-3 pr-1 py-0.5 text-xs">
+                    <span>{c.first_name} {c.last_name || ''}</span>
+                    <button
+                      onClick={() => toggleContact(c.id)}
+                      className="ml-1 w-4 h-4 rounded-full bg-muted hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center"
+                      title="Quitar"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Button
             onClick={calculateRoute}
             disabled={calculating || selectedIds.size === 0 || !startLat}
@@ -333,17 +450,50 @@ const RutasPage = () => {
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-[10px]">A</span>
+                    <span className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-[12px]">★</span>
                     <span className="font-medium">Punto de partida</span>
                     <span className="text-muted-foreground truncate">— {startAddress}</span>
                   </div>
-                  {routeData.orderedContacts.map((c: Contact, idx: number) => (
-                    <div key={c.id} className="flex items-center gap-2 text-xs">
-                      <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-[10px]">{idx + 1}</span>
-                      <span className="font-medium truncate">{c.first_name} {c.last_name || ''}</span>
-                      <span className="text-muted-foreground truncate">— {c.address}</span>
+                  {routeData.orderedContacts.map((c: Contact, idx: number) => {
+                    const isVisited = visited.has(c.id);
+                    return (
+                      <div key={c.id} className={`flex items-center gap-2 text-xs p-1.5 rounded ${isVisited ? 'opacity-50 line-through' : ''}`}>
+                        <span className={`w-6 h-6 rounded-full text-white flex items-center justify-center font-bold text-[10px] ${isVisited ? 'bg-gray-500' : 'bg-primary'}`}>{idx + 1}</span>
+                        <span className="font-medium truncate flex-1">{c.first_name} {c.last_name || ''}</span>
+                        <span className="text-muted-foreground truncate hidden sm:inline">— {c.address}</span>
+                        <button
+                          onClick={() => toggleVisited(c.id)}
+                          className={`text-[10px] px-2 py-0.5 rounded border ${isVisited ? 'border-gray-500 text-gray-400 hover:bg-gray-500/10' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
+                          title={isVisited ? 'Marcar como no visitado' : 'Marcar como visitado'}
+                        >
+                          {isVisited ? '✓ Visitado' : 'Marcar visitado'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Share link button */}
+                <div className="mt-4 pt-3 border-t flex items-center gap-2">
+                  {!shareToken ? (
+                    <Button size="sm" variant="outline" onClick={handleShare} disabled={sharing} className="gap-2">
+                      <Share2 className="h-3 w-3" /> {sharing ? 'Generando...' : 'Compartir ruta (link público, 7 días)'}
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2 w-full">
+                      <Input
+                        value={`${window.location.origin}/r/${shareToken}`}
+                        readOnly
+                        className="text-xs h-8"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+                      <Button size="sm" variant="outline" onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/r/${shareToken}`);
+                        showSuccess('Link copiado');
+                      }}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
               <div ref={mapRef} className="w-full h-[500px] rounded-lg border" />

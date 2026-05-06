@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import SetupAccount from "./pages/SetupAccount";
+import SharedRoutePage from "./pages/SharedRoutePage";
 import WelcomeMessageAlert from "./components/WelcomeMessageAlert";
 import { SessionProvider } from "./components/SessionProvider";
 import { useSession } from "./hooks/use-session";
@@ -204,6 +205,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/setup-account" element={<SetupAccount />} />
+      <Route path="/r/:token" element={<SharedRoutePage />} />
 
       {/* Root route: redirect to /admin so the AdminRootRedirect can pick the
           right destination based on role. The old <Index /> 'Welcome' page was
@@ -304,9 +306,13 @@ const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
   // If still loading session/profile, don't flash anything
   if (loading) return null;
 
-  // Don't gate the dedicated setup page — it handles its own flow
-  if (typeof window !== 'undefined' && window.location.pathname === '/setup-account') {
-    return <>{children}</>;
+  // Don't gate the dedicated setup page or public shared routes — they handle
+  // their own flow and don't need auth.
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname;
+    if (path === '/setup-account' || path.startsWith('/r/')) {
+      return <>{children}</>;
+    }
   }
 
   // No session = not logged in, let the login page handle it
