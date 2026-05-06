@@ -266,6 +266,22 @@ const SemilleroPage = () => {
     refetchOnWindowFocus: true,
   });
 
+  // Church coords for geocoding bias. Without this, addresses like
+  // "Las Heras 645" get matched to the most popular hit (often Capital
+  // Federal) even though the church is in San Martín. Querying lat/lng
+  // here (added as columns to churches) lets us pass `bounds` to the
+  // geocoder so results near the church win.
+  const { data: church } = useQuery<{ id: string; address: string | null; lat: number | null; lng: number | null } | null>({
+    queryKey: ['church-coords', churchId],
+    queryFn: async () => {
+      if (!churchId) return null;
+      const { data } = await supabase.from('churches').select('id, address, lat, lng').eq('id', churchId).single();
+      return data as any;
+    },
+    enabled: !!churchId,
+    staleTime: 60 * 60_000,
+  });
+
   // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────
   const geocodedRef = useRef(false);
   useEffect(() => {
@@ -276,14 +292,29 @@ const SemilleroPage = () => {
     if (!(window as any).google?.maps) return;
 
     geocodedRef.current = true;
-    const geocoder = new (window as any).google.maps.Geocoder();
+    const google = (window as any).google;
+    const geocoder = new google.maps.Geocoder();
     let processed = 0;
+
+    // Build a ~10 km box around the church to bias geocode results.
+    // If the church doesn't have coords yet, we pass no bounds and
+    // fall back to the GBA validation below.
+    const churchBounds = (church?.lat != null && church?.lng != null)
+      ? new google.maps.LatLngBounds(
+          { lat: church.lat - 0.09, lng: church.lng - 0.09 }, // ~10 km SW
+          { lat: church.lat + 0.09, lng: church.lng + 0.09 }, // ~10 km NE
+        )
+      : null;
 
     toGeocode.forEach((contact, i) => {
       setTimeout(() => {
-        // Append ", Buenos Aires, Argentina" to improve geocode accuracy
+        // Append country/region tail to improve accuracy. The bounds box
+        // above is what biases the result toward the church area; it's
+        // not a hard restriction, so addresses outside still resolve.
         const searchAddr = `${contact.address}, Buenos Aires, Argentina`;
-        geocoder.geocode({ address: searchAddr }, async (results: any[], status: string) => {
+        const request: any = { address: searchAddr, region: 'AR' };
+        if (churchBounds) request.bounds = churchBounds;
+        geocoder.geocode(request, async (results: any[], status: string) => {
           if (status === 'OK' && results?.[0]?.geometry?.location) {
             const lat = results[0].geometry.location.lat();
             const lng = results[0].geometry.location.lng();
@@ -300,7 +331,7 @@ const SemilleroPage = () => {
         });
       }, i * 300);
     });
-  }, [allContacts, churchId, queryClient]);
+  }, [allContacts, churchId, queryClient, church?.lat, church?.lng]);
 
   // ─── Cell suggestion by distance ───────────────────────────────
   // First detect zona from barrio/address text, then find cells in that zona sorted by distance
@@ -990,7 +1021,7 @@ const SemilleroPage = () => {
                           {c.phone ? (() => {
                             const phoneOk = isValidArgentinePhone(c.phone);
                             return (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 justify-end">
                                 <span
                                   className={`hidden sm:inline text-[11px] tabular-nums font-medium truncate flex-1 ${phoneOk ? 'text-foreground' : 'text-red-500'}`}
                                   title={phoneOk ? undefined : 'Número incompleto o inválido'}
@@ -1019,7 +1050,11 @@ const SemilleroPage = () => {
                               </div>
                             );
                           })() : (
-                            <div className="flex items-center gap-1">
+                            // No phone — keep the Enviar button right-aligned so it lines
+                            // up vertically with the rows that DO have a phone. Without
+                            // this, the button slides to the left of the cell because the
+                            // phone-number span (which has flex-1) is missing.
+                            <div className="flex items-center gap-1 justify-end">
                               {canSendWhatsapp() && (
                                 <span
                                   className="flex items-center gap-0.5 shrink-0 text-red-500 cursor-not-allowed"
@@ -1073,7 +1108,14 @@ const SemilleroPage = () => {
                                 </button>
                               </div>
                             );
-                          })() : <span className="text-xs text-muted-foreground">—</span>}
+                          })() : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help">Sin dirección</Badge>
+                              </TooltipTrigger>
+                              <TooltipContent><p className="text-xs">Sin dirección no se puede sugerir célula automáticamente.</p></TooltipContent>
+                            </Tooltip>
+                          )}
                         </td>
 
                         {/* Fecha (created_at) */}
@@ -1160,24 +1202,22 @@ const SemilleroPage = () => {
                                 <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
                               </Button>
                             ) : !hasAddress ? (
-                              <div className="flex items-center gap-1">
-                                {/* Without address we can't compute a geo suggestion, but
-                                    Enviar a MJA still works (pushes to church-cuerda). */}
-                                {!c.is_external && (
-                                  <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
-                                    const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
-                                    const update: any = { is_external: true };
-                                    if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
-                                    await supabase.from('contacts').update(update).eq('id', c.id);
-                                    showSuccess('Contacto enviado a MJA.');
-                                    queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                                  }}>
-                                    <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
-                                  </Button>
-                                )}
-                                <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help ml-1">Sin dirección</Badge></TooltipTrigger>
-                                  <TooltipContent><p className="text-xs">Sin dirección no se puede sugerir célula automáticamente.</p></TooltipContent></Tooltip>
-                              </div>
+                              // Without address we can't compute a geo suggestion, but
+                              // Enviar a MJA still works (pushes to church-cuerda).
+                              // The 'Sin dirección' badge lives in the Dirección column,
+                              // not here — keeps the Asignar column cleaner.
+                              !c.is_external ? (
+                                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
+                                  const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
+                                  const update: any = { is_external: true };
+                                  if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
+                                  await supabase.from('contacts').update(update).eq('id', c.id);
+                                  showSuccess('Contacto enviado a MJA.');
+                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                }}>
+                                  <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
+                                </Button>
+                              ) : null
                             ) : (
                               <div className="flex items-center gap-1">
                                 {sugCell && !isExternal && (
