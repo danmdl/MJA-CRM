@@ -659,8 +659,22 @@ const SemilleroPage = () => {
     const allSorted = getCellsByDistance(contact, null);
     const inZoneIds = new Set(sorted.map(c => c.id));
     const otherCells = allSorted.filter(c => !inZoneIds.has(c.id));
+    // Cuerda isolation: non-global users only see cells of their own cuerda
+    // here. Suggesting cells of other cuerdas would let them reassign across
+    // cuerdas, which is what the Externo button is for. Admin/general/pastor/
+    // supervisor see everything.
+    if (!canSeeContactsFromAllCuerdas && userCuerdaNumero) {
+      const cuerdaIdsInUserCuerda = new Set(
+        (cuerdas || []).filter(cr => cr.numero === userCuerdaNumero).map(cr => cr.id)
+      );
+      const filterByCuerda = (cell: Cell) => cuerdaIdsInUserCuerda.has(cell.cuerda_id);
+      return {
+        inZone: sorted.filter(filterByCuerda),
+        otherZone: otherCells.filter(filterByCuerda),
+      };
+    }
     return { inZone: sorted, otherZone: otherCells };
-  }, [detectZonaForContact, getCellsByDistance]);
+  }, [detectZonaForContact, getCellsByDistance, canSeeContactsFromAllCuerdas, userCuerdaNumero, cuerdas]);
 
   const getCellLabel = (cell: Cell) => {
     const cuerda = cuerdas?.find(cr => cr.id === cell.cuerda_id);
