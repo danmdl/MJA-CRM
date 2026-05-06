@@ -31,15 +31,17 @@ interface WhatsAppTemplate {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contactId?: string;
   contactName: string;
   contactFirstName: string;
   contactLastName: string;
   contactPhone: string;
+  contactPedidoDeOracion?: string | null;
   churchId?: string;
   onSent?: (message: string, templateName: string | null) => void;
 }
 
-const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstName, contactLastName, contactPhone, churchId, onSent }: Props) => {
+const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, contactFirstName, contactLastName, contactPhone, contactPedidoDeOracion: propPedido, churchId, onSent }: Props) => {
   const { session, profile } = useSession();
   const { canUseTemplates } = usePermissions();
   const userId = session?.user?.id;
@@ -47,6 +49,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
   const [selectedTemplateName, setSelectedTemplateName] = useState<string | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
+  const [fetchedPedido, setFetchedPedido] = useState<string | null>(null);
   const [saveMode, setSaveMode] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
@@ -90,6 +93,20 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
     if (open) fetchChurchData();
   }, [open, churchId, profile?.church_id]);
 
+  // Fetch pedido_de_oracion for the contact when dialog opens (if not passed in props)
+  useEffect(() => {
+    if (!open || !contactId || propPedido !== undefined) {
+      setFetchedPedido(null);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase.from('contacts').select('pedido_de_oracion').eq('id', contactId).single();
+      setFetchedPedido(data?.pedido_de_oracion || null);
+    })();
+  }, [open, contactId, propPedido]);
+
+  const effectivePedido = propPedido !== undefined ? propPedido : fetchedPedido;
+
   // Replace variables in a message body. Used at SEND time so values are
   // always fresh (no race with async church data fetch) and so users can
   // insert variables mid-edit and have them resolved on send.
@@ -99,7 +116,8 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
       .replace(/\{nombre\.usuario\}/gi, profile?.first_name || '')
       .replace(/\{direccion\.iglesia\}/gi, churchData?.address || '')
       .replace(/\{website\.iglesia\}/gi, churchData?.website || '')
-      .replace(/\{horarios\.iglesia\}/gi, churchData?.hours || '');
+      .replace(/\{horarios\.iglesia\}/gi, churchData?.hours || '')
+      .replace(/\{pedido\.oracion\}/gi, effectivePedido || '');
   };
 
   // Load templates
@@ -267,6 +285,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactName, contactFirstNa
                 { key: 'direccion.iglesia', label: 'Dirección Iglesia' },
                 { key: 'website.iglesia', label: 'Website Iglesia' },
                 { key: 'horarios.iglesia', label: 'Horarios Iglesia' },
+                { key: 'pedido.oracion', label: 'Pedido de Oración' },
               ].map(v => (
                 <button
                   key={v.key}

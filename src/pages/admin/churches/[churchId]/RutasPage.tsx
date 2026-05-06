@@ -1,15 +1,16 @@
 "use client";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
-import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy } from 'lucide-react';
+import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
+import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
@@ -27,6 +28,7 @@ interface Contact {
 const RutasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [startAddress, setStartAddress] = useState('');
@@ -62,6 +64,39 @@ const RutasPage = () => {
     enabled: !!churchId && !!profile,
     staleTime: 60_000,
   });
+
+  // Fetch church info to enable "Use church address" button
+  const { data: church } = useQuery<{ id: string; name: string; address: string | null }>({
+    queryKey: ['church', churchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('churches').select('id, name, address').eq('id', churchId!).single();
+      return data as any;
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
+
+  const useChurchAddress = async () => {
+    if (!church?.address) {
+      showError(`${church?.name || 'La iglesia'} no tiene una dirección configurada. Pedile a un admin que la cargue.`);
+      return;
+    }
+    if (!(window as any).google?.maps) {
+      showError('Esperá a que cargue el mapa y volvé a intentar.');
+      return;
+    }
+    const geocoder = new (window as any).google.maps.Geocoder();
+    geocoder.geocode({ address: church.address, region: 'AR' }, (results: any[], status: string) => {
+      if (status === 'OK' && results[0]) {
+        const loc = results[0].geometry.location;
+        setStartLat(loc.lat());
+        setStartLng(loc.lng());
+        setStartAddress(church.address!);
+      } else {
+        showError(`No se pudo geolocalizar la dirección: ${church.address}`);
+      }
+    });
+  };
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -177,6 +212,7 @@ const RutasPage = () => {
   const [visited, setVisited] = useState<Set<string>>(new Set());
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const customMarkers = useRef<any[]>([]);
 
   const toggleVisited = (contactId: string) => {
@@ -334,9 +370,12 @@ const RutasPage = () => {
               }}
               placeholder="Escribí la dirección de partida..."
             />
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs">
                 <Navigation className="h-3 w-3 mr-1" /> Usar mi ubicación
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={useChurchAddress} className="text-xs" disabled={!church?.address}>
+                <MapPin className="h-3 w-3 mr-1" /> Dirección de iglesia
               </Button>
               {startLat && startLng && (
                 <span className="text-xs text-muted-foreground self-center">
@@ -376,12 +415,12 @@ const RutasPage = () => {
                 filtered.map(c => {
                   const isSelected = selectedIds.has(c.id);
                   return (
-                    <label
+                    <div
                       key={c.id}
-                      className={`flex items-start gap-3 p-3 border-b last:border-b-0 cursor-pointer hover:bg-muted/30 ${isSelected ? 'bg-primary/5' : ''}`}
+                      className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-muted/30 ${isSelected ? 'bg-primary/5' : ''}`}
                     >
-                      <Checkbox checked={isSelected} onCheckedChange={() => toggleContact(c.id)} className="mt-0.5" />
-                      <div className="flex-1 min-w-0">
+                      <Checkbox checked={isSelected} onCheckedChange={() => toggleContact(c.id)} className="mt-0.5 cursor-pointer" />
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleContact(c.id)}>
                         <div className="text-sm font-medium truncate">
                           {c.first_name} {c.last_name || ''}
                           {c.numero_cuerda && (
@@ -390,7 +429,14 @@ const RutasPage = () => {
                         </div>
                         <div className="text-xs text-muted-foreground truncate">{c.address || 'Sin dirección'}</div>
                       </div>
-                    </label>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingContactId(c.id); }}
+                        className="text-muted-foreground hover:text-foreground p-1"
+                        title="Editar contacto (incluye dirección)"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   );
                 })
               )}
@@ -507,6 +553,22 @@ const RutasPage = () => {
           )}
         </div>
       </div>
+
+      {/* Edit contact dialog (for editing addresses without leaving Rutas) */}
+      {editingContactId && churchId && (
+        <ContactProfileDialog
+          open={!!editingContactId}
+          onOpenChange={(o) => {
+            if (!o) {
+              setEditingContactId(null);
+              // Refresh contacts so any address change is reflected immediately
+              queryClient.invalidateQueries({ queryKey: ['rutas-contacts', churchId] });
+            }
+          }}
+          contactId={editingContactId}
+          churchId={churchId}
+        />
+      )}
     </div>
   );
 };

@@ -1581,6 +1581,7 @@ const SemilleroPage = () => {
       <WhatsAppComposeDialog
         open={!!whatsappCompose}
         onOpenChange={(o) => { if (!o) setWhatsappCompose(null); }}
+        contactId={whatsappCompose?.contactId}
         contactName={whatsappCompose?.name || ''}
         contactFirstName={whatsappCompose?.firstName || ''}
         contactLastName={whatsappCompose?.lastName || ''}
