@@ -678,9 +678,9 @@ const SemilleroPage = () => {
           type="button"
           onClick={() => { setActivePool('external'); setSearchTerm(''); }}
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
-          title="Contactos cuya célula más cercana es de otra zona"
+          title="Contactos enviados a MJA (church-cuerda) para que distribuya"
         >
-          <span className="text-[10px] uppercase tracking-wider text-orange-400">Externo</span>
+          <span className="text-[10px] uppercase tracking-wider text-orange-400">MJA</span>
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
         {searchTerm && (
@@ -704,7 +704,7 @@ const SemilleroPage = () => {
             seleccionados) are NOT here on purpose — they live in the floating
             action bar at the bottom so the header doesn't reflow / push the
             table down every time the user (de)selects a contact. */}
-        {activePool === 'unassigned' && canAutoAssign() && poolCounts.unassigned > 0 && (
+        {activePool === 'unassigned' && canAutoAssign() && canSeeContactsFromAllCuerdas && poolCounts.unassigned > 0 && (
           <Button size="sm" onClick={() => setConfirmDialog({ type: 'auto', preview: autoAssignPreview })} className="gap-1.5">
             <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
           </Button>
@@ -950,7 +950,7 @@ const SemilleroPage = () => {
                             ? 'No hay contactos que coincidan con los filtros aplicados.'
                             : !canSeeContactsFromAllCuerdas && !userCuerdaNumero
                               ? 'No tenés una cuerda asignada. Pedile a tu admin que te asigne una cuerda desde el panel de Equipo.'
-                              : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Semillero Externo vacío.'}
+                              : activePool === 'unassigned' ? 'Todos asignados ✅' : 'Bandeja MJA vacía.'}
                       </td>
                     </tr>
                   )}
@@ -1115,14 +1115,21 @@ const SemilleroPage = () => {
                           </td>
                         )}
 
-                        {/* Assign button — only for contacts without a cell */}
+                        {/* Action buttons. Non-global users (referente, conector,
+                            etc.) only see 'Enviar a MJA'. The church-cuerda flow
+                            is the single way they hand off contacts, and only
+                            admin/general/pastor/supervisor (the church-cuerda
+                            authority) actually assigns to specific cells. */}
                         {isUnassignedView && canAssignContacts() && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
                             {c.cell_id ? (
                               <span className="text-[10px] text-blue-400">✓ Asignado</span>
                             ) : (c as any).is_external && activePool === 'external' ? (
                               <div className="flex items-center gap-1">
-                                {sugCell && (
+                                {/* Already in MJA pool. Globals can pull it back
+                                    into a specific cell; non-globals can only
+                                    return it to "Sin asignar". */}
+                                {canSeeContactsFromAllCuerdas && sugCell && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
                                     type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
@@ -1138,21 +1145,34 @@ const SemilleroPage = () => {
                                   <Undo2 className="h-3 w-3 mr-1" /> Devolver
                                 </Button>
                               </div>
+                            ) : !canSeeContactsFromAllCuerdas ? (
+                              // Non-globals: a single 'Enviar a MJA' action regardless of
+                              // whether the contact has an address or where the suggested
+                              // cell would be. Cross-cuerda is not their concern.
+                              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
+                                const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
+                                const update: any = { is_external: true };
+                                if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
+                                await supabase.from('contacts').update(update).eq('id', c.id);
+                                showSuccess('Contacto enviado a MJA.');
+                                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                              }}>
+                                <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
+                              </Button>
                             ) : !hasAddress ? (
                               <div className="flex items-center gap-1">
-                                {/* Without address we can't compute geo-suggested cell, but we can still
-                                    allow marking as Externo (which moves to church-cuerda) and
-                                    manual assignment via the dropdown. */}
+                                {/* Without address we can't compute a geo suggestion, but
+                                    Enviar a MJA still works (pushes to church-cuerda). */}
                                 {!c.is_external && (
                                   <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
                                     const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
                                     const update: any = { is_external: true };
                                     if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
                                     await supabase.from('contacts').update(update).eq('id', c.id);
-                                    showSuccess('Contacto movido al Semillero Externo (cuerda iglesia).');
+                                    showSuccess('Contacto enviado a MJA.');
                                     queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                                   }}>
-                                    <ExternalLink className="h-3 w-3 mr-1" /> Externo
+                                    <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
                                   </Button>
                                 )}
                                 <Tooltip><TooltipTrigger asChild><Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-600/30 cursor-help ml-1">Sin dirección</Badge></TooltipTrigger>
@@ -1170,18 +1190,14 @@ const SemilleroPage = () => {
                                 )}
                                 {sugCell && isExternal && (
                                   <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
-                                    // Externo flow: mark as external AND reassign to the church-cuerda
-                                    // (the special cuerda whose numero is the church name).
-                                    // This way Externos belong to the church as a whole, not to the
-                                    // numerical cuerda they were originally in.
                                     const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
                                     const update: any = { is_external: true };
                                     if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
                                     await supabase.from('contacts').update(update).eq('id', c.id);
-                                    showSuccess('Contacto movido al Semillero Externo (cuerda iglesia).');
+                                    showSuccess('Contacto enviado a MJA.');
                                     queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                                   }}>
-                                    <ExternalLink className="h-3 w-3 mr-1" /> Externo
+                                    <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
                                   </Button>
                                 )}
                               </div>
@@ -1494,13 +1510,36 @@ const SemilleroPage = () => {
           >
             Limpiar
           </button>
-          {canAssignContacts() && (
+          {canAssignContacts() && canSeeContactsFromAllCuerdas && (
             <Button
               size="sm"
               onClick={() => setConfirmDialog({ type: 'auto_selected' })}
               className="gap-1.5"
             >
               <Zap className="h-4 w-4" /> Autoasignar
+            </Button>
+          )}
+          {canAssignContacts() && !canSeeContactsFromAllCuerdas && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+              onClick={async () => {
+                // Bulk Enviar a MJA: same effect as the per-row button, repeated.
+                // Marks every selected contact as is_external=true and reassigns
+                // its numero_cuerda to the church-cuerda's numero.
+                const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
+                const ids = Array.from(selectedIds).filter(id => filteredContacts.some(fc => fc.id === id));
+                if (ids.length === 0) return;
+                const update: any = { is_external: true };
+                if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
+                await supabase.from('contacts').update(update).in('id', ids);
+                showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} enviado${ids.length === 1 ? '' : 's'} a MJA.`);
+                setSelectedIds(new Set());
+                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+              }}
+            >
+              <ExternalLink className="h-4 w-4" /> Enviar a MJA
             </Button>
           )}
           {canSendWhatsapp() && visibleSelectedCount <= 5 && (
