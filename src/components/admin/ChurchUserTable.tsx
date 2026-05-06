@@ -90,6 +90,23 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     enabled: !!session?.access_token && !!churchId,
   });
 
+  // Load cuerdas dynamically for THIS church (numerical cuerdas + church-cuerda).
+  // Previously the dropdown was hardcoded and only had MJA Central cuerdas, so
+  // members of other churches couldn't be assigned to their own cuerdas, and
+  // nobody could be assigned to the special church-cuerda.
+  const { data: cuerdas = [] } = useQuery<{ id: string; numero: string; is_church_cuerda: boolean; zona_nombre: string }[]>({
+    queryKey: ['cuerdas-for-edit', churchId],
+    queryFn: async () => {
+      const { data: zonas } = await supabase.from('zonas').select('id, nombre').eq('church_id', churchId);
+      if (!zonas?.length) return [];
+      const zonasMap = new Map(zonas.map(z => [z.id, z.nombre]));
+      const { data: cu } = await supabase.from('cuerdas').select('id, numero, zona_id, is_church_cuerda').in('zona_id', zonas.map(z => z.id)).order('numero');
+      return (cu || []).map(c => ({ id: c.id, numero: c.numero, is_church_cuerda: !!c.is_church_cuerda, zona_nombre: zonasMap.get(c.zona_id) || '' }));
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
+
   const filteredUsers = React.useMemo(() => {
     if (!users) return [];
     const term = norm(searchTerm);
@@ -338,17 +355,35 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
               onChange={e => setEditCuerda(e.target.value)}
             >
               <option value="">Sin cuerda</option>
-              <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
-              <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
-              <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
-              <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
-              <optgroup label="Chilavert"><option value="104">104</option><option value="204">204</option></optgroup>
-              <optgroup label="San Andrés"><option value="105">105</option><option value="205">205</option></optgroup>
-              <optgroup label="Migueletes"><option value="106">106</option><option value="206">206</option></optgroup>
-              <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
-              <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
-              <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
-              <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
+              {(() => {
+                // Group cuerdas by zona name. Church-cuerda goes first as a separate optgroup.
+                const churchCuerdas = cuerdas.filter(c => c.is_church_cuerda);
+                const numericalCuerdas = cuerdas.filter(c => !c.is_church_cuerda);
+                const byZona = new Map<string, typeof numericalCuerdas>();
+                numericalCuerdas.forEach(c => {
+                  const arr = byZona.get(c.zona_nombre) || [];
+                  arr.push(c);
+                  byZona.set(c.zona_nombre, arr);
+                });
+                return (
+                  <>
+                    {churchCuerdas.length > 0 && (
+                      <optgroup label="🏛️ Iglesia">
+                        {churchCuerdas.map(c => (
+                          <option key={c.id} value={c.numero}>{c.numero}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {Array.from(byZona.entries()).map(([zona, list]) => (
+                      <optgroup key={zona} label={zona}>
+                        {list.map(c => (
+                          <option key={c.id} value={c.numero}>{c.numero}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </>
+                );
+              })()}
             </select>
           </div>
         </div>
