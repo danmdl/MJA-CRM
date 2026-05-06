@@ -150,9 +150,17 @@ const SemilleroPage = () => {
   };
 
   // Assignment permission comes from canAssignContacts() via usePermissions
-  const { canSeeBaseDatosTotal, canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
+  const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
-  const canSeeAllCuerdas = canSeeBaseDatosTotal() || profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
+  // The Semillero is the user's "my cuerda" working view. Visibility here is
+  // strictly role-based — admin/general/pastor/supervisor see everything,
+  // anyone else (referente, encargado_de_celula, consolidador, conector,
+  // anfitrion) sees only their own cuerda. The `base_datos_total` permission
+  // does NOT widen Semillero — it gates the separate "Datos Globales" view.
+  // Without this distinction, a referente with base_datos_total=true on the
+  // permissions table sees the global "Sin asignar" count (e.g. 541) instead
+  // of just their cuerda's count, defeating the cuerda isolation.
+  const canSeeAllCuerdas = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
   // For users without canFilterAllContacts permission, force filter to their
   // own contacts (security restriction). Admins/generals/etc with full filter
@@ -692,7 +700,7 @@ const SemilleroPage = () => {
           <span className="text-[10px] uppercase tracking-wider text-orange-400">Externo</span>
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
-        {(filterCuerda || filterResponsable || searchTerm) && (
+        {searchTerm && (
           <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-blue-500/30 bg-blue-500/5">
             <span className="text-[10px] uppercase tracking-wider text-blue-400">En filtro</span>
             <span className="text-sm font-bold tabular-nums text-blue-400">{filteredContacts.length}</span>
