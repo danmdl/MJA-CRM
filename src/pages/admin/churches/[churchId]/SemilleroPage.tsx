@@ -636,10 +636,16 @@ const SemilleroPage = () => {
 
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
 
-  const poolCounts = useMemo(() => {
-    let unassigned = 0;
+  // How many contacts are autoassign-able for THIS user — visible to them
+  // and currently without a cell_id. Used by the "Autoasignar todos (N)"
+  // button label so the count matches what the action will actually do.
+  // Independent of active filters because the button operates over the
+  // entire pool, not the user's current view.
+  const autoassignableCount = useMemo(() => {
+    let n = 0;
     const userId = session?.user?.id;
     allContacts?.forEach(c => {
+      if (c.cell_id) return;
       if (externalIds.has(c.id)) return;
       if (!canSeeContactsFromAllCuerdas) {
         if (userCuerdaNumero) {
@@ -648,9 +654,9 @@ const SemilleroPage = () => {
           if (c.responsable_id !== userId) return;
         }
       }
-      unassigned++;
+      n++;
     });
-    return { unassigned };
+    return n;
   }, [allContacts, canSeeContactsFromAllCuerdas, userCuerdaNumero, externalIds, session?.user?.id]);
 
 
@@ -784,6 +790,21 @@ const SemilleroPage = () => {
   );
   const pageStart = filteredContacts.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
   const pageEnd = Math.min((safePage + 1) * PAGE_SIZE, filteredContacts.length);
+
+  // Count of duplicate-flagged contacts WITHIN the current filter context.
+  // Reflects what the user is actually looking at: pick Responsable=Mauro
+  // and the Duplicados pill says how many of Mauro's contacts are dups,
+  // not the global church number. When filterDuplicates is on, this equals
+  // filteredContacts.length (the table is already restricted to dups), so
+  // the pill keeps a consistent "what you see" semantic both states.
+  const dupsInFilteredView = useMemo(() => {
+    if (!duplicateNameIds.size) return 0;
+    let n = 0;
+    for (const c of filteredContacts) {
+      if (duplicateNameIds.has(c.id)) n++;
+    }
+    return n;
+  }, [filteredContacts, duplicateNameIds]);
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
@@ -933,10 +954,10 @@ const SemilleroPage = () => {
           type="button"
           onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'unassigned' ? 'border-primary bg-primary/10' : 'border-border hover:border-foreground/30'}`}
-          title="Total de contactos visibles para vos en esta vista del Semillero"
+          title="Total de contactos en la lista actual (después de aplicar todos los filtros activos)"
         >
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground">En lista</span>
-          <span className={`text-sm font-bold tabular-nums ${poolCounts.unassigned > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : poolCounts.unassigned}</span>
+          <span className={`text-sm font-bold tabular-nums ${filteredContacts.length > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : filteredContacts.length}</span>
         </button>
         <button
           type="button"
@@ -948,21 +969,23 @@ const SemilleroPage = () => {
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
         {/* Duplicates toggle — narrows the table to rows whose normalized
-            full name appears more than once. Same set as the amber dot
-            renders. Only shown when there's at least one duplicate to
-            see, so the toolbar stays clean for empty churches. */}
-        {duplicateNameIds.size > 0 && (
+            full name appears more than once. The count reflects dups
+            WITHIN the current filter context, not the church-wide total —
+            so picking Responsable=Mauro updates the pill to Mauro's dup
+            count, not all of MJA Central. Hidden entirely when there are
+            no dups in the current view, so the toolbar stays clean. */}
+        {dupsInFilteredView > 0 || filterDuplicates ? (
           <button
             type="button"
             onClick={() => setFilterDuplicates(v => !v)}
             className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${filterDuplicates ? 'border-amber-500 bg-amber-500/10' : 'border-amber-500/30 hover:border-amber-500/60'}`}
-            title={filterDuplicates ? 'Mostrar todos los contactos' : 'Mostrar solo posibles duplicados (mismo nombre y apellido)'}
+            title={filterDuplicates ? 'Mostrar todos los contactos del filtro' : 'Mostrar solo posibles duplicados (mismo nombre y apellido) dentro del filtro actual'}
           >
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
             <span className="text-[10px] uppercase tracking-wider text-amber-400">{filterDuplicates ? 'Mostrando dups' : 'Duplicados'}</span>
-            <span className="text-sm font-bold tabular-nums text-amber-400">{duplicateNameIds.size}</span>
+            <span className="text-sm font-bold tabular-nums text-amber-400">{dupsInFilteredView}</span>
           </button>
-        )}
+        ) : null}
         {searchTerm && (
           <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-blue-500/30 bg-blue-500/5">
             <span className="text-[10px] uppercase tracking-wider text-blue-400">En filtro</span>
@@ -984,9 +1007,9 @@ const SemilleroPage = () => {
             seleccionados) are NOT here on purpose — they live in the floating
             action bar at the bottom so the header doesn't reflow / push the
             table down every time the user (de)selects a contact. */}
-        {activePool === 'unassigned' && canAutoAssign() && canSeeContactsFromAllCuerdas && poolCounts.unassigned > 0 && (
+        {activePool === 'unassigned' && canAutoAssign() && canSeeContactsFromAllCuerdas && autoassignableCount > 0 && (
           <Button size="sm" onClick={() => setConfirmDialog({ type: 'auto', preview: autoAssignPreview })} className="gap-1.5">
-            <Zap className="h-4 w-4" /> Autoasignar todos ({poolCounts.unassigned})
+            <Zap className="h-4 w-4" /> Autoasignar todos ({autoassignableCount})
           </Button>
         )}
         {canImportCsv() && (
