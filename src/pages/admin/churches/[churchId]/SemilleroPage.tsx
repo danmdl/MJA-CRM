@@ -1646,11 +1646,34 @@ const SemilleroPage = () => {
               onClick={async () => {
                 setDeleting(true);
                 const ids = Array.from(selectedIds);
-                const { error } = await supabase.from('contacts')
-                  .update({ deleted_at: new Date().toISOString(), deleted_by: session?.user?.id || null })
-                  .in('id', ids);
+                const nowIso = new Date().toISOString();
+                const userId = session?.user?.id || null;
+                // Bulk-delete in chunks. Sending 1138 ids as a single
+                // PostgREST .in() call builds a query string of ~42KB
+                // (each UUID is 36 chars), and the server rejects it
+                // with a 400 Bad Request. Chunk size 200 keeps each URL
+                // around 7-8KB, which is well inside any sane limit.
+                const CHUNK = 200;
+                let failed = 0;
+                let firstError: string | null = null;
+                for (let i = 0; i < ids.length; i += CHUNK) {
+                  const slice = ids.slice(i, i + CHUNK);
+                  const { error } = await supabase
+                    .from('contacts')
+                    .update({ deleted_at: nowIso, deleted_by: userId })
+                    .in('id', slice);
+                  if (error) {
+                    failed += slice.length;
+                    if (!firstError) firstError = error.message;
+                  }
+                }
                 setDeleting(false);
-                if (error) { showError(error.message); return; }
+                if (failed > 0) {
+                  showError(`No se pudieron eliminar ${failed} contacto(s). ${firstError || ''}`);
+                  // Still refetch — partial deletes did succeed.
+                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                  return;
+                }
                 showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}.`);
                 setSelectedIds(new Set());
                 setBulkDeleteOpen(false);
