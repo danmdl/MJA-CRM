@@ -77,21 +77,39 @@ const RouteEditorPage = () => {
   const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ['rutas-contacts', churchId, profile?.id, profile?.role, profile?.numero_cuerda],
     queryFn: async () => {
-      let q = supabase.from('contacts')
-        .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, created_by, fecha_contacto')
-        .eq('church_id', churchId!)
-        .is('deleted_at', null)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null);
-      if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
-        if (profile.numero_cuerda) {
-          q = q.eq('numero_cuerda', profile.numero_cuerda);
-        } else {
-          q = q.eq('responsable_id', profile.id);
+      // Same .range() pagination as MapPickerPage / SemilleroPage. .limit(2000)
+      // alone hits the Supabase 1000-row response cap and silently drops
+      // the rest. Visibility gate is re-applied per page so non-globals
+      // never see other cuerdas regardless of how many pages we walk.
+      const PAGE_SIZE = 1000;
+      const all: Contact[] = [];
+      for (let page = 0; ; page++) {
+        let q = supabase.from('contacts')
+          .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, created_by, fecha_contacto')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .order('id', { ascending: true })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
+          if (profile.numero_cuerda) {
+            q = q.eq('numero_cuerda', profile.numero_cuerda);
+          } else {
+            q = q.eq('responsable_id', profile.id);
+          }
         }
+        const { data, error } = await q;
+        if (error) {
+          console.error('[rutas-contacts] page', page, 'error', error);
+          break;
+        }
+        const rows = (data || []) as Contact[];
+        all.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        if (page >= 49) break;
       }
-      const { data } = await q.limit(2000);
-      return (data || []) as Contact[];
+      return all;
     },
     enabled: !!churchId && !!profile,
     staleTime: 60_000,

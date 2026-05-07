@@ -98,21 +98,49 @@ const MapPickerPage = () => {
   const { data: contacts, isLoading } = useQuery<Contact[]>({
     queryKey: ['mappicker-contacts', churchId, profile?.id, profile?.role, profile?.numero_cuerda],
     queryFn: async () => {
-      let q = supabase.from('contacts')
-        .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, fecha_contacto, sexo')
-        .eq('church_id', churchId!)
-        .is('deleted_at', null)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null);
-      if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
-        if (profile.numero_cuerda) {
-          q = q.eq('numero_cuerda', profile.numero_cuerda);
-        } else {
-          q = q.eq('responsable_id', profile.id);
+      // Same pagination strategy as SemilleroPage's allContacts query
+      // (see d039767 for the full story): Supabase silently caps each
+      // response at 1000 rows, .limit(N) can only narrow that, and an
+      // ORDER BY that has many tied values across pages is unstable. So
+      // we paginate explicitly with .range(start, end), order by id (a
+      // globally unique tiebreaker), and stop when a partial page comes
+      // back. The visibility filter (cuerda for non-globals) is applied
+      // on every page so the security cut still holds.
+      const PAGE_SIZE = 1000;
+      const all: Contact[] = [];
+      for (let page = 0; ; page++) {
+        let q = supabase.from('contacts')
+          .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, fecha_contacto, sexo')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .order('id', { ascending: true })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
+          // Non-globals only see their cuerda's contacts. If the user has
+          // no cuerda assigned, fall back to "the contacts I'm responsable
+          // for" so they're not stuck with an empty map. This mirrors the
+          // visibility gate in SemilleroPage.
+          if (profile.numero_cuerda) {
+            q = q.eq('numero_cuerda', profile.numero_cuerda);
+          } else {
+            q = q.eq('responsable_id', profile.id);
+          }
         }
+        const { data, error } = await q;
+        if (error) {
+          console.error('[mappicker-contacts] page', page, 'error', error);
+          break;
+        }
+        const rows = (data || []) as Contact[];
+        all.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        // Safety stop — 50k rows past which we assume something is wrong
+        // and don't keep spinning.
+        if (page >= 49) break;
       }
-      const { data } = await q.limit(2000);
-      return (data || []) as Contact[];
+      return all;
     },
     enabled: !!churchId && !!profile,
     staleTime: 60_000,
