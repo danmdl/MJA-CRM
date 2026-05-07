@@ -651,8 +651,18 @@ const SemilleroPage = () => {
         filtered = applyFilterTab(filtered, activeTabFilters);
       }
     }
-    // Sorting - applied last so it ranks the final filtered set
-    if (sortBy === 'nombre') {
+    // Sorting. When Duplicados toggle is on, we force-sort by normalized
+    // name regardless of what the user's sort header was set to — there's
+    // no point seeing duplicate pairs scattered down the table when the
+    // whole reason for the toggle is comparing them. Outside that mode,
+    // honour whatever the user picked via the column headers.
+    if (filterDuplicates) {
+      filtered = [...filtered].sort((a, b) => {
+        const an = normalize(`${a.first_name || ''} ${a.last_name || ''}`.trim());
+        const bn = normalize(`${b.first_name || ''} ${b.last_name || ''}`.trim());
+        return an.localeCompare(bn);
+      });
+    } else if (sortBy === 'nombre') {
       filtered = [...filtered].sort((a, b) => {
         // normalize() strips accents + lowercases, so "Alexander Martínez"
         // and "Alexander Martinez" sort to the same key and end up next
