@@ -37,7 +37,7 @@ interface User {
 }
 
 const fetchChurchUsers = async (accessToken: string, churchId: string): Promise<User[]> => {
-  const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2', {
+  const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
     body: JSON.stringify({ action: 'listChurchUsers', churchId }),
@@ -64,6 +64,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const [editDialogUser, setEditDialogUser] = useState<User | null>(null);
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editCuerda, setEditCuerda] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -139,7 +140,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   }, [users, searchTerm, profile?.role, profile?.id, profile?.numero_cuerda]);
 
   const callEdge = async (body: object) => {
-    const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2', {
+    const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
       body: JSON.stringify(body),
@@ -183,12 +184,18 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   });
 
   const updateUserProfileMutation = useMutation({
-    mutationFn: async ({ userId, first_name, last_name, phone, numero_cuerda }: { userId: string; first_name: string; last_name: string; phone: string; numero_cuerda?: string | null }) => {
-      // Update name/phone via edge function
+    mutationFn: async ({ userId, first_name, last_name, phone, numero_cuerda, email, originalEmail }: { userId: string; first_name: string; last_name: string; phone: string; numero_cuerda?: string | null; email?: string; originalEmail?: string }) => {
+      // Update name/phone/cuerda via edge function
       await callEdge({ action: 'updateUserProfile', userId, first_name, last_name, phone, numero_cuerda });
       // Also update numero_cuerda directly (in case edge function doesn't support it yet)
       if (numero_cuerda !== undefined) {
         await supabase.from('profiles').update({ numero_cuerda: numero_cuerda || null }).eq('id', userId);
+      }
+      // Email change is a separate edge call — touches auth.users + profiles.email
+      // and validates uniqueness server-side. Only fire if the email actually
+      // changed (skip when the field was edited and reverted, or never touched).
+      if (email !== undefined && email.trim() && email.trim().toLowerCase() !== (originalEmail || '').toLowerCase()) {
+        await callEdge({ action: 'updateUserEmail', userId, email: email.trim() });
       }
     },
     onSuccess: () => { showSuccess('Perfil actualizado.'); queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] }); },
@@ -293,12 +300,12 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {user.status === 'invited' && canAddMembers() && (
+                        {!user.profile_completed && canAddMembers() && (
                           <DropdownMenuItem onClick={() => resendInviteMutation.mutate({ email: user.email!, role: user.role })}>
                             <Send className="mr-2 h-4 w-4" /> Reenviar Invitación
                           </DropdownMenuItem>
                         )}
-                        {user.status === 'invited' && canAddMembers() && (
+                        {!user.profile_completed && canAddMembers() && (
                           <DropdownMenuItem onClick={() => generateInviteLinkMutation.mutate({ email: user.email!, role: user.role })}>
                             <Copy className="mr-2 h-4 w-4" /> Copiar Enlace de Invitación
                           </DropdownMenuItem>
@@ -308,6 +315,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                             setEditDialogUser(user);
                             setEditFirstName(user.first_name || '');
                             setEditLastName(user.last_name || '');
+                            setEditEmail(user.email || '');
                             setEditPhone('');
                             setEditCuerda(user.numero_cuerda || '');
                           }}>
@@ -352,7 +360,6 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Editar Usuario</DialogTitle>
-          <p className="text-sm text-muted-foreground">{editDialogUser?.email}</p>
         </DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -364,6 +371,15 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
               <Label>Apellido</Label>
               <Input value={editLastName} onChange={e => setEditLastName(e.target.value)} placeholder="Apellido" />
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Email</Label>
+            <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="usuario@dominio.com" />
+            {editEmail.trim().toLowerCase() !== (editDialogUser?.email || '').toLowerCase() && (
+              <p className="text-[11px] text-amber-400">
+                Vas a cambiar el email de inicio de sesión. El usuario se autenticará con el nuevo email.
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Teléfono</Label>
@@ -423,6 +439,8 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                   last_name: editLastName.trim(),
                   phone: editPhone.trim(),
                   numero_cuerda: editCuerda || null,
+                  email: editEmail,
+                  originalEmail: editDialogUser.email,
                 });
                 setTimeout(() => setEditDialogUser(null), 50);
               } finally {
@@ -466,7 +484,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
             onClick={async () => {
               if (!resetDialogUser || !session?.access_token) return;
               setResettingPw(true);
-              const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2', {
+              const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ action: 'resetUserPassword', userId: resetDialogUser.id, newPassword }),

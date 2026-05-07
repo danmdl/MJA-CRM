@@ -345,7 +345,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   const fetchLeadersAndCells = async () => {
     try {
       if (session?.access_token) {
-        const resp = await fetch(`https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2`, {
+        const resp = await fetch(`https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

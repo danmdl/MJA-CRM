@@ -44,7 +44,7 @@ const passwordResetSchema = z.object({
 });
 
 const fetchUsers = async (accessToken: string): Promise<User[]> => {
-  const url = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2`;
+  const url = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -97,7 +97,7 @@ const UserTable = () => {
   }, [churches]);
 
   const callEdge = async (body: object) => {
-    const url = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2`;
+    const url = `https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },

@@ -7,11 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 
 export interface FilterTabFilters {
+  // Legacy single-cuerda field. Older saved tabs only have this one. New
+  // saves always write `cuerdas` (array) instead, but reads accept either.
   cuerda?: string;
+  // Multi-select cuerda filter. Empty array or undefined = all cuerdas.
+  cuerdas?: string[];
   responsable?: string;
   sexo?: string;
   estadoCivil?: string;
@@ -194,26 +199,57 @@ interface FilterTabDialogProps {
 
 const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, teamMembers, zonas, onClose, onSaved }: FilterTabDialogProps) => {
   const [name, setName] = useState(tab?.name || '');
-  const [filters, setFilters] = useState<FilterTabFilters>(tab?.filters || {});
+  // Local copy of filters. We migrate the legacy single `cuerda` field into
+  // the new `cuerdas` array on init so the multi-select picker shows the
+  // correct selection for older saved tabs.
+  const [filters, setFilters] = useState<FilterTabFilters>(() => {
+    const init: FilterTabFilters = { ...(tab?.filters || {}) };
+    if (!init.cuerdas && init.cuerda) init.cuerdas = [init.cuerda];
+    delete init.cuerda;
+    return init;
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setName(tab?.name || '');
-    setFilters(tab?.filters || {});
+    const init: FilterTabFilters = { ...(tab?.filters || {}) };
+    if (!init.cuerdas && init.cuerda) init.cuerdas = [init.cuerda];
+    delete init.cuerda;
+    setFilters(init);
   }, [tab]);
 
   const setF = (key: keyof FilterTabFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value || undefined }));
   };
 
+  const toggleCuerda = (numero: string) => {
+    setFilters(prev => {
+      const current = prev.cuerdas || [];
+      const next = current.includes(numero) ? current.filter(n => n !== numero) : [...current, numero];
+      return { ...prev, cuerdas: next.length ? next : undefined };
+    });
+  };
+
+  const selectedCuerdaCount = filters.cuerdas?.length || 0;
+  const cuerdaButtonLabel = selectedCuerdaCount === 0
+    ? 'Todas'
+    : selectedCuerdaCount === 1
+      ? `Cuerda ${filters.cuerdas![0]}`
+      : `${selectedCuerdaCount} cuerdas`;
+
   const handleSave = async () => {
     if (!name.trim()) { showError('Ingresá un nombre para la solapa.'); return; }
     setSaving(true);
     try {
-      // Strip empty filter values before saving
+      // Strip empty filter values + the legacy `cuerda` field before saving.
+      // We always persist as `cuerdas` going forward, even for single-value
+      // selections, so reads only ever need to handle the array shape.
       const cleaned: FilterTabFilters = {};
       Object.entries(filters).forEach(([k, v]) => {
-        if (v !== '' && v !== undefined && v !== null) (cleaned as any)[k] = v;
+        if (k === 'cuerda') return; // never write the legacy field
+        if (v === '' || v === undefined || v === null) return;
+        if (Array.isArray(v) && v.length === 0) return;
+        (cleaned as any)[k] = v;
       });
 
       if (tab) {
@@ -267,10 +303,34 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cuerda</Label>
-              <select value={filters.cuerda || ''} onChange={e => setF('cuerda', e.target.value)} className={selectClass}>
-                <option value="">Todas</option>
-                {cuerdas.map(c => <option key={c.id} value={c.numero}>{c.numero}</option>)}
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm hover:bg-muted/40"
+                  >
+                    <span className={selectedCuerdaCount === 0 ? 'text-muted-foreground' : ''}>{cuerdaButtonLabel}</span>
+                    <ChevronDown className="h-4 w-4 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" collisionPadding={16} className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-56 overflow-y-auto">
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Cuerdas</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={(e) => { e.preventDefault(); setFilters(prev => ({ ...prev, cuerdas: undefined })); }}>
+                    Todas (limpiar)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {cuerdas.map(c => (
+                    <DropdownMenuCheckboxItem
+                      key={c.id}
+                      checked={(filters.cuerdas || []).includes(c.numero)}
+                      onCheckedChange={() => toggleCuerda(c.numero)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {c.numero}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Responsable</Label>
@@ -361,8 +421,16 @@ const selectClass = "flex h-9 w-full rounded-md border border-input bg-backgroun
 
 // Apply filters to a contact list
 export function applyFilterTab(contacts: any[], filters: FilterTabFilters): any[] {
+  // Build the active cuerda set once. New tabs save into `cuerdas` (array);
+  // older tabs only have `cuerda` (string) — read both so legacy saves keep
+  // working without a one-off migration.
+  const cuerdaSet: Set<string> | null = (() => {
+    if (filters.cuerdas && filters.cuerdas.length > 0) return new Set(filters.cuerdas);
+    if (filters.cuerda) return new Set([filters.cuerda]);
+    return null;
+  })();
   return contacts.filter(c => {
-    if (filters.cuerda && c.numero_cuerda !== filters.cuerda) return false;
+    if (cuerdaSet && !cuerdaSet.has(c.numero_cuerda || '')) return false;
     if (filters.responsable === '__none__') {
       if (c.responsable_id) return false;
     } else if (filters.responsable && c.responsable_id !== filters.responsable) return false;
