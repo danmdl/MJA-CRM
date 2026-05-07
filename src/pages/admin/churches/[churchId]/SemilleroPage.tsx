@@ -1037,6 +1037,23 @@ const SemilleroPage = () => {
                             const creatorIds = new Set<string>();
                             visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
                             const teamMemberById = new Map((teamMembers || []).map(m => [m.id, m]));
+                            // TEMP DEBUG — remove once Dan confirms the dropdown is fixed.
+                            // The data layer has 5 distinct responsables in MJA Central but
+                            // the dropdown was rendering only 1. Logs here surface where
+                            // the others are getting dropped.
+                            console.log('[ResponsableFilter]', {
+                              role: profile?.role,
+                              canSeeContactsFromAllCuerdas,
+                              userCuerdaNumero,
+                              userId,
+                              allContactsCount: allContacts?.length,
+                              visibleCount: visible.length,
+                              creatorIdsCount: creatorIds.size,
+                              creatorIds: Array.from(creatorIds),
+                              teamMembersCount: teamMembers?.length,
+                              teamMembersIds: (teamMembers || []).map(m => m.id),
+                              profileByIdExtendedKeys: Array.from(profileByIdExtended.keys()),
+                            });
                             const creators = Array.from(creatorIds)
                               .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
@@ -1046,6 +1063,7 @@ const SemilleroPage = () => {
                                 return c.teamMember?.numero_cuerda === userCuerdaNumero;
                               })
                               .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
+                            console.log('[ResponsableFilter] final creators:', creators.map(c => ({ id: c.id, name: `${c.profile?.first_name} ${c.profile?.last_name}` })));
                             return creators.map(c => (
                               <DropdownMenuItem key={c.id} onClick={() => setFilterResponsable(c.id)} className={filterResponsable === c.id ? 'bg-accent' : ''}>
                                 {c.profile!.first_name} {c.profile!.last_name}
