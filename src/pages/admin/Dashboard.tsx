@@ -61,8 +61,8 @@ const Dashboard = () => {
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
       const [contacts, cells, churches] = await Promise.all([
-        supabase.from('contacts').select('id', { count: 'exact', head: true }),
-        supabase.from('cells').select('id', { count: 'exact', head: true }),
+        supabase.from('contacts').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+        supabase.from('cells').select('id', { count: 'exact', head: true }).is('deleted_at', null),
         supabase.from('churches').select('id', { count: 'exact', head: true }),
       ]);
       return {
@@ -79,6 +79,7 @@ const Dashboard = () => {
       const { data } = await supabase
         .from('contacts')
         .select('id, first_name, last_name, email, phone, created_at')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(5);
       return (data ?? []) as any[];
