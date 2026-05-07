@@ -320,6 +320,49 @@ const SemilleroPage = () => {
     return dups;
   }, [allContacts]);
 
+  // ─── Extra responsable lookup ──────────────────────────────────────────────
+  // teamMembers is scoped to this church. When a contact's responsable_id
+  // points at someone OUTSIDE the church (admin global with church_id NULL,
+  // cross-church supervisor, legacy assignment), profileById can't resolve
+  // it and the dropdown silently drops them. This top-up query loads
+  // exactly those missing ids and produces an extended map that the filter
+  // dropdown reads from. The original profileById is left alone — that one
+  // backs other parts of the page (table cells, etc.) and doesn't need the
+  // extra rows.
+  const missingResponsableIds = useMemo(() => {
+    if (!allContacts?.length || !teamMembers) return [] as string[];
+    const known = new Set(teamMembers.map(m => m.id));
+    const missing = new Set<string>();
+    allContacts.forEach(c => {
+      if (c.responsable_id && !known.has(c.responsable_id)) missing.add(c.responsable_id);
+    });
+    return Array.from(missing);
+  }, [allContacts, teamMembers]);
+
+  const { data: extraResponsableProfiles } = useQuery<Array<{ id: string; first_name: string | null; last_name: string | null }>>({
+    queryKey: ['extra-responsable-profiles', missingResponsableIds.slice().sort().join(',')],
+    queryFn: async () => {
+      if (missingResponsableIds.length === 0) return [];
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', missingResponsableIds);
+      return data || [];
+    },
+    enabled: missingResponsableIds.length > 0,
+    staleTime: 5 * 60_000,
+  });
+
+  // Extended map used ONLY by the Responsable filter dropdown render.
+  // Everything else still uses profileById to avoid behavior changes.
+  const profileByIdExtended = useMemo(() => {
+    const m = new Map<string, { first_name: string; last_name: string }>(profileById);
+    (extraResponsableProfiles || []).forEach(p =>
+      m.set(p.id, { first_name: p.first_name || '', last_name: p.last_name || '' })
+    );
+    return m;
+  }, [profileById, extraResponsableProfiles]);
+
   // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────
   const geocodedRef = useRef(false);
   useEffect(() => {
@@ -995,7 +1038,7 @@ const SemilleroPage = () => {
                             visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
                             const teamMemberById = new Map((teamMembers || []).map(m => [m.id, m]));
                             const creators = Array.from(creatorIds)
-                              .map(id => ({ id, profile: profileById.get(id), teamMember: teamMemberById.get(id) }))
+                              .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
                                 if (!c.profile || c.id === userId) return false;
                                 if (canSeeContactsFromAllCuerdas) return true;
