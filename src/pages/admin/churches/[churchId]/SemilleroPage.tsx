@@ -267,16 +267,40 @@ const SemilleroPage = () => {
   const { data: allContacts, isLoading } = useQuery<Contact[]>({
     queryKey: ['pool-all-contacts', churchId],
     queryFn: async () => {
-      let q = supabase.from('contacts')
-        .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, responsable_id, created_by, created_at')
-        .eq('church_id', churchId!)
-        .is('deleted_at', null);
-      if (profile?.role === 'conector') {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) q = q.eq('created_by', user.id);
+      // Supabase silently caps queries at 1000 rows. .limit(2000) doesn't
+      // override the server default — it just sets a smaller cap if the
+      // server's already lower. With 1680+ contacts in MJA Central, the
+      // first 1000 by fecha_contacto DESC happened to all share the same
+      // responsable (Micaela), so the Responsable filter dropdown showed
+      // only her — and the "SIN ASIGNAR" counter at the top capped at 1000.
+      // Paginate explicitly with .range() until we've drained the table.
+      const PAGE_SIZE = 1000;
+      const all: Contact[] = [];
+      for (let page = 0; ; page++) {
+        let q = supabase.from('contacts')
+          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, responsable_id, created_by, created_at')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null)
+          .order('fecha_contacto', { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (profile?.role === 'conector') {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) q = q.eq('created_by', user.id);
+        }
+        const { data, error } = await q;
+        if (error) {
+          console.error('[pool-all-contacts] page', page, 'error', error);
+          break;
+        }
+        const rows = (data || []) as Contact[];
+        all.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        // Safety stop — if a church somehow has 50k+ contacts, we don't
+        // want this hook to spin forever. 10 pages = 10,000 rows is well
+        // beyond any realistic Semillero size.
+        if (page >= 9) break;
       }
-      const { data } = await q.order('fecha_contacto', { ascending: false }).limit(2000);
-      return (data || []) as Contact[];
+      return all;
     },
     enabled: !!churchId,
     staleTime: 30_000,
@@ -1037,23 +1061,6 @@ const SemilleroPage = () => {
                             const creatorIds = new Set<string>();
                             visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
                             const teamMemberById = new Map((teamMembers || []).map(m => [m.id, m]));
-                            // TEMP DEBUG — remove once Dan confirms the dropdown is fixed.
-                            // The data layer has 5 distinct responsables in MJA Central but
-                            // the dropdown was rendering only 1. Logs here surface where
-                            // the others are getting dropped.
-                            console.log('[ResponsableFilter]', {
-                              role: profile?.role,
-                              canSeeContactsFromAllCuerdas,
-                              userCuerdaNumero,
-                              userId,
-                              allContactsCount: allContacts?.length,
-                              visibleCount: visible.length,
-                              creatorIdsCount: creatorIds.size,
-                              creatorIds: Array.from(creatorIds),
-                              teamMembersCount: teamMembers?.length,
-                              teamMembersIds: (teamMembers || []).map(m => m.id),
-                              profileByIdExtendedKeys: Array.from(profileByIdExtended.keys()),
-                            });
                             const creators = Array.from(creatorIds)
                               .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
@@ -1063,7 +1070,6 @@ const SemilleroPage = () => {
                                 return c.teamMember?.numero_cuerda === userCuerdaNumero;
                               })
                               .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
-                            console.log('[ResponsableFilter] final creators:', creators.map(c => ({ id: c.id, name: `${c.profile?.first_name} ${c.profile?.last_name}` })));
                             return creators.map(c => (
                               <DropdownMenuItem key={c.id} onClick={() => setFilterResponsable(c.id)} className={filterResponsable === c.id ? 'bg-accent' : ''}>
                                 {c.profile!.first_name} {c.profile!.last_name}
