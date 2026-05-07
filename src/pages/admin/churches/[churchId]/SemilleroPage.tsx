@@ -640,8 +640,12 @@ const SemilleroPage = () => {
     // Sorting - applied last so it ranks the final filtered set
     if (sortBy === 'nombre') {
       filtered = [...filtered].sort((a, b) => {
-        const an = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
-        const bn = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+        // normalize() strips accents + lowercases, so "Alexander Martínez"
+        // and "Alexander Martinez" sort to the same key and end up next
+        // to each other in the table — useful for spotting the 'dup'
+        // pill rows without scrolling.
+        const an = normalize(`${a.first_name || ''} ${a.last_name || ''}`.trim());
+        const bn = normalize(`${b.first_name || ''} ${b.last_name || ''}`.trim());
         return sortDir === 'asc' ? an.localeCompare(bn) : bn.localeCompare(an);
       });
     } else if (sortBy === 'fecha') {
