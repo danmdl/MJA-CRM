@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, MapPin, Pencil, Lock, Unlock } from 'lucide-react';
+import { Search, MapPin, Pencil, Lock, Unlock, PlusCircle, Upload, Trash2 } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError } from '@/utils/toast';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
@@ -14,6 +14,8 @@ import { usePermissions } from '@/lib/permissions';
 import { useSession } from '@/hooks/use-session';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import { Textarea } from '@/components/ui/textarea';
+import AddCellDialog from '@/components/admin/AddCellDialog';
+import CellCsvImporter from '@/components/admin/CellCsvImporter';
 
 interface CellRow {
   id: string;
@@ -38,7 +40,7 @@ const CelulasPage = () => {
   // Bias address autocomplete toward the church area.
   const { data: churchCoords } = useChurchCoords(churchId);
   const queryClient = useQueryClient();
-  const { canEditCelulas, canSeeBaseDatosTotal } = usePermissions();
+  const { canEditCelulas, canSeeBaseDatosTotal, canEditCuerdas, canAddUsers } = usePermissions();
   const { session, profile } = useSession();
   const [search, setSearch] = useState('');
   const [zonaFilter, setZonaFilter] = useState<string>('all');
@@ -47,6 +49,8 @@ const CelulasPage = () => {
   const [closeDialog, setCloseDialog] = useState<{ id: string; name: string } | null>(null);
   const [closeReason, setCloseReason] = useState('');
   const [mapCell, setMapCell] = useState<{ name: string; address: string; lat: number | null; lng: number | null } | null>(null);
+  const [addCellOpen, setAddCellOpen] = useState(false);
+  const [csvImporterOpen, setCsvImporterOpen] = useState(false);
 
   // If user doesn't have "see all" permission, only show their cuerda
   const userCuerda = profile?.numero_cuerda;
@@ -93,6 +97,44 @@ const CelulasPage = () => {
     enabled: !!churchId,
   });
 
+  // Needed for AddCellDialog (cuerda picker) and CellCsvImporter
+  const { data: cuerdasList } = useQuery<{ id: string; numero: string; zona_id: string }[]>({
+    queryKey: ['cuerdas-celulas-page', churchId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('cuerdas')
+        .select('id, numero, zona_id, zonas!inner(church_id)')
+        .eq('zonas.church_id', churchId!)
+        .order('numero');
+      return (data || []).map((c: any) => ({ id: c.id, numero: c.numero, zona_id: c.zona_id }));
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
+
+  // Needed for the CSV importer leader dropdown
+  const { data: profilesMap } = useQuery<Record<string, string>>({
+    queryKey: ['profilesMap-celulas', churchId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('church_id', churchId!);
+      const map: Record<string, string> = {};
+      (data || []).forEach((p: any) => {
+        map[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email || 'Sin nombre';
+      });
+      return map;
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
+
+  const leadersList = useMemo(() => {
+    if (!profilesMap) return [];
+    return Object.entries(profilesMap).map(([id, name]) => ({ id, name }));
+  }, [profilesMap]);
+
   const zonas = useMemo(() => {
     const set = new Set<string>();
     (cells || []).forEach(c => { if (c.zona_nombre) set.add(c.zona_nombre); });
@@ -126,6 +168,23 @@ const CelulasPage = () => {
   }, [filtered]);
 
   const missingCount = (cells || []).filter(c => !c.address).length;
+
+  // Admin only: delete every cell in the church (after double confirm)
+  const deleteAllCells = async () => {
+    const count = cells?.length || 0;
+    if (count === 0) return;
+    if (!window.confirm(`¿BORRAR TODAS las ${count} células de esta iglesia? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`CONFIRMACIÓN FINAL: ¿Estás seguro de borrar las ${count} células? Los contactos asignados quedarán sin célula.`)) return;
+    await supabase.from('contacts').update({ cell_id: null }).eq('church_id', churchId!).not('cell_id', 'is', null);
+    const { error } = await supabase.from('cells').delete().eq('church_id', churchId!);
+    if (error) { showError(error.message); return; }
+    showSuccess(`${count} células eliminadas.`);
+    queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+    queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
+    queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
+    queryClient.invalidateQueries({ queryKey: ['cell-contact-counts', churchId] });
+    queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+  };
 
   const handleSave = async () => {
     if (!editCell) return;
@@ -178,9 +237,24 @@ const CelulasPage = () => {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold">Células</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {missingCount > 0 && <span className="text-xs text-red-400">{missingCount} sin dirección</span>}
           <span className="text-sm text-muted-foreground">{filtered.length} de {(cells || []).length}</span>
+          {profile?.role === 'admin' && (cells?.length || 0) > 0 && (
+            <Button variant="outline" size="sm" className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={deleteAllCells}>
+              <Trash2 className="mr-1.5 h-4 w-4" /> Borrar todas las células
+            </Button>
+          )}
+          {(canEditCuerdas() || canAddUsers()) && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
+                <Upload className="mr-1.5 h-4 w-4" /> Importar Células
+              </Button>
+              <Button size="sm" onClick={() => setAddCellOpen(true)}>
+                <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Célula
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -497,6 +571,38 @@ const CelulasPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Create cell dialog */}
+      <AddCellDialog
+        open={addCellOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAddCellOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+            queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
+            queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
+            queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+          } else {
+            setAddCellOpen(o);
+          }
+        }}
+        churchId={churchId!}
+      />
+
+      {/* Bulk CSV importer */}
+      <CellCsvImporter
+        open={csvImporterOpen}
+        onOpenChange={setCsvImporterOpen}
+        churchId={churchId!}
+        cuerdas={cuerdasList || []}
+        leaders={leadersList}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+        }}
+      />
     </div>
   );
 };

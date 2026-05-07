@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown,
+  Users, AlertCircle, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -165,23 +165,28 @@ const SemilleroPage = () => {
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 34, nombre: 130, dup: 44, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145, conector: 110,
+    check: 34, cuerda: 60, nombre: 130, dup: 44, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145, conector: 110,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
   };
 
-  // Optional columns that the user can toggle on. Default OFF so the table
-  // stays narrow on common screens; users who want them flip them in the
-  // toolbar dropdown and the choice persists in localStorage.
-  // Right now the only optional column is "Conector" (from contact.conector,
-  // a free-text field set by the connector who first met the person).
-  // Conector column is always shown now. The previous opt-in toggle is gone
-  // — Dan asked for the column to live in the table by default since
-  // every Semillero workflow uses the conector field. The state is kept
-  // (not removed) so a future "hide column" UI can flip it back without
-  // changing the table render code, but it always reads true today.
-  const [showConectorCol] = useState<boolean>(true);
+  // Optional columns the user can toggle from the "Columnas" dropdown in the
+  // toolbar. Defaults are OFF for cuerda (most users only care about their
+  // own cuerda anyway) and ON for conector (every Semillero workflow uses
+  // it). Both choices persist in localStorage so the table stays the way
+  // each user left it.
+  const [showConectorCol, setShowConectorCol] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const v = window.localStorage.getItem('semillero.showConectorCol');
+    return v === null ? true : v === '1';
+  });
+  const [showCuerdaCol, setShowCuerdaCol] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('semillero.showCuerdaCol') === '1';
+  });
+  useEffect(() => { try { window.localStorage.setItem('semillero.showConectorCol', showConectorCol ? '1' : '0'); } catch {} }, [showConectorCol]);
+  useEffect(() => { try { window.localStorage.setItem('semillero.showCuerdaCol', showCuerdaCol ? '1' : '0'); } catch {} }, [showCuerdaCol]);
 
   // Assignment permission comes from canAssignContacts() via usePermissions
   const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
@@ -1101,6 +1106,24 @@ const SemilleroPage = () => {
             <PlusCircle className="h-4 w-4" /> Crear Contacto
           </Button>
         )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost" className="gap-1.5 px-2" title="Mostrar / ocultar columnas">
+              <Columns3 className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" collisionPadding={16}>
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Columnas</DropdownMenuLabel>
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); setShowCuerdaCol(v => !v); }} className="gap-2">
+              <span className="w-4 inline-flex justify-center">{showCuerdaCol ? '✓' : ''}</span>
+              <span>Número de cuerda</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); setShowConectorCol(v => !v); }} className="gap-2">
+              <span className="w-4 inline-flex justify-center">{showConectorCol ? '✓' : ''}</span>
+              <span>Conector</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button size="sm" variant="ghost" disabled={refreshing} onClick={async () => {
           setRefreshing(true);
           await queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
@@ -1167,85 +1190,42 @@ const SemilleroPage = () => {
         </div>
       )}
 
-      {/* Table. The checkbox column is rendered to the LEFT of the visual
-          card border via a flex layout: a slim vertical gutter holds the
-          checkboxes, and the Card holds the rest of the table. This way the
-          checkbox occupies the empty space at the left of the page instead
-          of stealing a column from the table content. Heights of the gutter
-          rows are kept in sync with the table rows by giving every row a
-          fixed height (h-[37px]) on both sides. */}
-      <div className="flex items-stretch gap-1.5">
-        {!isLoading && filteredContacts.length > 0 && (
-          <div className="flex flex-col shrink-0 select-none">
-            {/* Header */}
-            <div className="h-[37px] w-7 flex items-center justify-center border-b border-transparent">
-              <input
-                type="checkbox"
-                className="rounded border-input"
-                checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0}
-                onChange={(e) => {
-                  if (e.target.checked) setSelectedIds(new Set(filteredContacts.map(c => c.id)));
-                  else setSelectedIds(new Set());
-                }}
-              />
-            </div>
-            {/* One checkbox per visible row, kept aligned with the table rows
-                because both sides use h-[37px]. We render against
-                visibleContacts (not filteredContacts) so the checkbox
-                gutter matches the table — both stop at renderLimit. */}
-            {visibleContacts.map((c, idx) => (
-              <div key={c.id} className="h-[37px] w-7 flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  className="rounded border-input"
-                  checked={selectedIds.has(c.id)}
-                  onClick={(e) => {
-                    // Shift-click range select — same logic as the previous
-                    // in-table checkbox. Range inclusive both ends, direction
-                    // matches the action (select vs deselect) of the clicked row.
-                    const isShift = (e as any).nativeEvent?.shiftKey;
-                    if (isShift && lastClickedIdx !== null && lastClickedIdx !== idx) {
-                      e.preventDefault();
-                      const start = Math.min(lastClickedIdx, idx);
-                      const end = Math.max(lastClickedIdx, idx);
-                      const next = new Set(selectedIds);
-                      const willSelect = !selectedIds.has(c.id);
-                      for (let i = start; i <= end; i++) {
-                        const rowId = filteredContacts[i]?.id;
-                        if (!rowId) continue;
-                        if (willSelect) next.add(rowId); else next.delete(rowId);
-                      }
-                      setSelectedIds(next);
-                      setLastClickedIdx(idx);
-                    }
-                  }}
-                  onChange={(e) => {
-                    const next = new Set(selectedIds);
-                    if (e.target.checked) next.add(c.id); else next.delete(c.id);
-                    setSelectedIds(next);
-                    setLastClickedIdx(idx);
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-        <Card className="flex-1 min-w-0">
-          <CardContent className="p-0">
-            {/* Top pagination — same controls as the bottom of the card.
-                Renders only when there's more than one page. The border-t
-                inside the controls visually separates them from whatever's
-                above; with paginationControls also at the bottom of the
-                card, the user can flip pages from either end without
-                scrolling. */}
-            {paginationControls}
-            {isLoading ? (
-              <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+      {/* Table. Checkbox is the first column inside the table itself so
+          rows and checkboxes line up automatically — no manual height
+          syncing, and the last row's checkbox can never get pushed out
+          of the visible area by the surrounding pagination. */}
+      <Card>
+        <CardContent className="p-0">
+          {/* Top pagination — same controls as the bottom of the card.
+              Renders only when there's more than one page. The border-t
+              inside the controls visually separates them from whatever's
+              above; with paginationControls also at the bottom of the
+              card, the user can flip pages from either end without
+              scrolling. */}
+          {paginationControls}
+          {isLoading ? (
+            <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
                 <thead>
                   <tr className="border-b h-[37px]">
+                    <th className="px-2" style={{ width: colWidths.check }}>
+                      <input
+                        type="checkbox"
+                        className="rounded border-input align-middle"
+                        checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                      />
+                    </th>
+                    {showCuerdaCol && (
+                      <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Cuerda</span>
+                      </ResizableHeader>
+                    )}
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>
                       <button
                         type="button"
@@ -1489,6 +1469,50 @@ const SemilleroPage = () => {
 
                     return (
                       <tr key={c.id} className={`border-b h-[37px] transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
+                        {/* Per-row checkbox. Inline with the table so it
+                            stays aligned with its row no matter what
+                            paginators or pool banners render above. */}
+                        <td className="px-2 align-middle" style={{ width: colWidths.check }}>
+                          <input
+                            type="checkbox"
+                            className="rounded border-input align-middle"
+                            checked={selectedIds.has(c.id)}
+                            onClick={(e) => {
+                              // Shift-click range select. Range inclusive both ends,
+                              // direction matches the action (select vs deselect)
+                              // of the clicked row.
+                              const isShift = (e as any).nativeEvent?.shiftKey;
+                              if (isShift && lastClickedIdx !== null && lastClickedIdx !== idx) {
+                                e.preventDefault();
+                                const start = Math.min(lastClickedIdx, idx);
+                                const end = Math.max(lastClickedIdx, idx);
+                                const next = new Set(selectedIds);
+                                const willSelect = !selectedIds.has(c.id);
+                                for (let i = start; i <= end; i++) {
+                                  const rowId = filteredContacts[i]?.id;
+                                  if (!rowId) continue;
+                                  if (willSelect) next.add(rowId); else next.delete(rowId);
+                                }
+                                setSelectedIds(next);
+                                setLastClickedIdx(idx);
+                              }
+                            }}
+                            onChange={(e) => {
+                              const next = new Set(selectedIds);
+                              if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                              setSelectedIds(next);
+                              setLastClickedIdx(idx);
+                            }}
+                          />
+                        </td>
+
+                        {/* Cuerda — opt-in column toggled in toolbar. */}
+                        {showCuerdaCol && (
+                          <td className="px-2 py-1.5 tabular-nums text-xs text-muted-foreground" style={{ width: colWidths.cuerda }}>
+                            {c.numero_cuerda || <span className="italic">—</span>}
+                          </td>
+                        )}
+
                         {/* Nombre (con ojo) */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.nombre }}>
                           <Tooltip>
@@ -1787,7 +1811,6 @@ const SemilleroPage = () => {
           {paginationControls}
         </CardContent>
       </Card>
-      </div>
 
       {/* Confirmation Dialog */}
       <Dialog open={!!confirmDialog} onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}>

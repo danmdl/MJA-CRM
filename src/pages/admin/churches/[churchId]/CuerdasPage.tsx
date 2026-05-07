@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import {
   ChevronDown, ChevronRight, MapPin, Clock, Users, UserCheck, Home,
-  Upload, Search, PlusCircle, MoreHorizontal, Trash2,
+  Search, PlusCircle, MoreHorizontal, Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -32,7 +32,6 @@ import {
 import AddCellDialog from '@/components/admin/AddCellDialog';
 import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
 import ManageCellAttendeesDialog from '@/components/admin/ManageCellAttendeesDialog';
-import CellCsvImporter from '@/components/admin/CellCsvImporter';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface Cuerda {
@@ -59,8 +58,6 @@ const CuerdasPage = () => {
 
   const [expandedCuerda, setExpandedCuerda] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [csvImporterOpen, setCsvImporterOpen] = useState(false);
-  const [addCellOpen, setAddCellOpen] = useState(false);
   const [editingCell, setEditingCell] = useState<Cell | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [attendeesFor, setAttendeesFor] = useState<string | null>(null);
@@ -198,12 +195,6 @@ const CuerdasPage = () => {
     return cells.filter(c => !assignedIds.has(c.id) && !c.cuerda_id);
   }, [cells, cuerdaTree]);
 
-  // Leaders list for CSV importer
-  const leadersList = useMemo(() => {
-    if (!profilesMap) return [];
-    return Object.entries(profilesMap).map(([id, name]) => ({ id, name }));
-  }, [profilesMap]);
-
   // ─── Actions ───────────────────────────────────────────────────
   const deleteCell = async (id: string) => {
     if (!window.confirm('¿Eliminar esta célula?')) return;
@@ -223,21 +214,6 @@ const CuerdasPage = () => {
     else {
       showSuccess(`Cuerda #${numero} eliminada.`);
       queryClient.invalidateQueries({ queryKey: ['cuerdas', churchId] });
-      queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
-    }
-  };
-
-  // Admin only: delete all cells in the church
-  const deleteAllCells = async () => {
-    const count = cells?.length || 0;
-    if (!window.confirm(`¿BORRAR TODAS las ${count} células de esta iglesia? Esta acción no se puede deshacer.`)) return;
-    if (!window.confirm(`CONFIRMACIÓN FINAL: ¿Estás seguro de borrar las ${count} células? Los contactos asignados quedarán sin célula.`)) return;
-    // Unlink contacts first
-    await supabase.from('contacts').update({ cell_id: null }).eq('church_id', churchId!).not('cell_id', 'is', null);
-    const { error } = await supabase.from('cells').delete().eq('church_id', churchId!);
-    if (error) showError(error.message);
-    else {
-      showSuccess(`${count} células eliminadas.`);
       queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
     }
   };
@@ -277,25 +253,10 @@ const CuerdasPage = () => {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {profile?.role === 'admin' && (cells?.length || 0) > 0 && (
-            <Button variant="outline" size="sm" className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={deleteAllCells}>
-              <Trash2 className="mr-1.5 h-4 w-4" /> Borrar todas las células
-            </Button>
-          )}
           {canManageCuerdas && (
             <Button variant="outline" size="sm" onClick={() => setAddCuerdaOpen(true)}>
               <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Cuerda
             </Button>
-          )}
-          {(canEditCuerdas() || canAddUsers()) && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
-                <Upload className="mr-1.5 h-4 w-4" /> Importar Células
-              </Button>
-              <Button size="sm" onClick={() => setAddCellOpen(true)}>
-                <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Célula
-              </Button>
-            </>
           )}
         </div>
       </div>
@@ -515,10 +476,9 @@ const CuerdasPage = () => {
 
       {/* ─── Dialogs ──────────────────────────────────────────── */}
       <AddCellDialog
-        open={addCellOpen || !!editingCell}
+        open={!!editingCell}
         onOpenChange={(o) => {
-          if (!o) { setAddCellOpen(false); setEditingCell(null); queryClient.invalidateQueries({ queryKey: ['cells', churchId] }); }
-          else if (!editingCell) setAddCellOpen(o);
+          if (!o) { setEditingCell(null); queryClient.invalidateQueries({ queryKey: ['cells', churchId] }); }
         }}
         churchId={churchId!}
         initial={editingCell ? {
@@ -548,15 +508,6 @@ const CuerdasPage = () => {
         }}
         churchId={churchId!}
         cellId={attendeesFor || ''}
-      />
-
-      <CellCsvImporter
-        open={csvImporterOpen}
-        onOpenChange={setCsvImporterOpen}
-        churchId={churchId!}
-        cuerdas={cuerdas || []}
-        leaders={leadersList}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['cells', churchId] })}
       />
 
       {/* Add Cuerda Dialog */}
