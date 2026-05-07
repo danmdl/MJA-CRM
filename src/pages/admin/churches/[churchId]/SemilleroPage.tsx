@@ -34,6 +34,7 @@ import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsApp
 import FilterTabsBar, { applyFilterTab, FilterTabFilters } from '@/components/admin/FilterTabsBar';
 import BulkWhatsAppDialog from '@/components/admin/BulkWhatsAppDialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
+import DuplicateMergeDialog from '@/components/admin/DuplicateMergeDialog';
 import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -125,6 +126,9 @@ const SemilleroPage = () => {
   const [whatsappCompose, setWhatsappCompose] = useState<{ contactId: string; name: string; firstName: string; lastName: string; phone: string } | null>(null);
   const [bulkWhatsAppOpen, setBulkWhatsAppOpen] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
+  // When non-null, the duplicate merge dialog is open and the array contains
+  // every contact in the same name-group as the one the user clicked on.
+  const [mergeGroup, setMergeGroup] = useState<Contact[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'auto' | 'manual' | 'cuerda_only' | 'auto_selected';
@@ -328,14 +332,38 @@ const SemilleroPage = () => {
     staleTime: 60 * 60_000,
   });
 
+  // Pairs the user has confirmed are NOT duplicates (despite same name).
+  // Loaded once per church; the duplicate detector below subtracts these
+  // from the set of "interesting" pairs before deciding which contacts to
+  // light up with the amber dot.
+  const { data: dedupeDismissals } = useQuery<Array<{ contact_id_a: string; contact_id_b: string }>>({
+    queryKey: ['dedupe-dismissals', churchId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('contact_dedupe_dismissals')
+        .select('contact_id_a, contact_id_b');
+      return (data || []) as any[];
+    },
+    enabled: !!churchId,
+    staleTime: 60_000,
+  });
+
   // ─── Real duplicates: same first_name+last_name within this church ──────────
   // Builds a Set of contact ids whose normalized full name appears more than
-  // once in the church's contacts. Used to render a "duplicado" pill next
-  // to the name in the table. Computed against the full allContacts list
-  // (not just the filtered view) so the marker stays accurate even when a
-  // filter hides one half of a duplicate pair.
-  const duplicateNameIds = useMemo(() => {
-    if (!allContacts?.length) return new Set<string>();
+  // once in the church's contacts AND there's at least one PAIR of contacts
+  // in their name-group that the user hasn't dismissed as "different people".
+  // Used to render the amber dot pill next to the name in the table and to
+  // power the Duplicados filter toggle. Computed against the full
+  // allContacts list (not just the filtered view) so the marker stays
+  // accurate even when a filter hides one half of a pair.
+  //
+  // Also computes duplicateGroups so the merge dialog can pull up every
+  // contact that shares a name with the one the user clicked.
+  const { duplicateNameIds, duplicateGroupByContactId } = useMemo(() => {
+    const idSet = new Set<string>();
+    const byContact = new Map<string, string[]>(); // contact id → all ids in same name-group (incl. itself)
+    if (!allContacts?.length) return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
+    // 1) Group all contacts by normalized full name.
     const groups = new Map<string, string[]>();
     allContacts.forEach(c => {
       const full = normalize(`${c.first_name || ''} ${c.last_name || ''}`).replace(/\s+/g, ' ').trim();
@@ -344,10 +372,35 @@ const SemilleroPage = () => {
       arr.push(c.id);
       groups.set(full, arr);
     });
-    const dups = new Set<string>();
-    groups.forEach(ids => { if (ids.length > 1) ids.forEach(id => dups.add(id)); });
-    return dups;
-  }, [allContacts]);
+    // 2) Build a fast lookup of dismissed pairs. The table stores them with
+    //    the lower UUID first (CHECK constraint), so we lookup the same way.
+    const dismissedKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+    const dismissed = new Set<string>();
+    (dedupeDismissals || []).forEach(d => dismissed.add(dismissedKey(d.contact_id_a, d.contact_id_b)));
+    // 3) For each name-group of size 2+, walk every pair. If at least one
+    //    pair is NOT dismissed, every id in that group counts as a duplicate.
+    //    If EVERY pair is dismissed (the user already resolved all of them
+    //    as different people), the group falls out entirely.
+    groups.forEach(ids => {
+      if (ids.length < 2) return;
+      let anyLive = false;
+      for (let i = 0; i < ids.length && !anyLive; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          if (!dismissed.has(dismissedKey(ids[i], ids[j]))) {
+            anyLive = true;
+            break;
+          }
+        }
+      }
+      if (anyLive) {
+        ids.forEach(id => {
+          idSet.add(id);
+          byContact.set(id, ids);
+        });
+      }
+    });
+    return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
+  }, [allContacts, dedupeDismissals]);
 
   // ─── Extra responsable lookup ──────────────────────────────────────────────
   // teamMembers is scoped to this church. When a contact's responsable_id
@@ -1290,14 +1343,25 @@ const SemilleroPage = () => {
                             {duplicateNameIds.has(c.id) && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <span
-                                    className="shrink-0 inline-block rounded-full bg-amber-500 cursor-help"
-                                    style={{ width: 6, height: 6 }}
-                                  >
-                                  </span>
+                                  <button
+                                    type="button"
+                                    className="shrink-0 inline-block rounded-full bg-amber-500 hover:bg-amber-400 cursor-pointer transition-colors ring-0 hover:ring-2 hover:ring-amber-500/40"
+                                    style={{ width: 8, height: 8 }}
+                                    onClick={(e) => {
+                                      // Open the merge dialog for the entire
+                                      // name-group this contact belongs to —
+                                      // the dialog needs every duplicate, not
+                                      // just the one that was clicked.
+                                      e.stopPropagation();
+                                      const groupIds = duplicateGroupByContactId.get(c.id) || [c.id];
+                                      const groupContacts = (allContacts || []).filter(x => groupIds.includes(x.id));
+                                      if (groupContacts.length >= 2) setMergeGroup(groupContacts);
+                                    }}
+                                    aria-label="Resolver duplicado"
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p className="text-xs">Posible duplicado: otro contacto en esta iglesia tiene el mismo nombre y apellido.</p>
+                                  <p className="text-xs">Posible duplicado. Click para resolver (mergear o marcar como personas distintas).</p>
                                 </TooltipContent>
                               </Tooltip>
                             )}
@@ -1772,6 +1836,22 @@ const SemilleroPage = () => {
           if (!o) queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
         }}
         churchId={churchId!}
+      />
+
+      {/* Duplicate merge dialog — opened by clicking the amber dot on a row.
+          On resolve (merge or dismiss) we invalidate both the contacts pool
+          and the dismissals query so the table updates and the dot recomputes
+          correctly without a manual refresh. */}
+      <DuplicateMergeDialog
+        open={!!mergeGroup}
+        onOpenChange={(o) => { if (!o) setMergeGroup(null); }}
+        group={(mergeGroup || []) as any}
+        userId={session?.user?.id || null}
+        onResolved={() => {
+          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          queryClient.invalidateQueries({ queryKey: ['dedupe-dismissals', churchId] });
+          setSelectedIds(new Set()); // mergees might be in selection — drop ghosts
+        }}
       />
 
       {/* Contact Map Dialog */}
