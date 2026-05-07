@@ -1204,8 +1204,8 @@ const SemilleroPage = () => {
                     return (
                       <tr key={c.id} className={`border-b h-[37px] transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
                         {/* Nombre (con ojo) */}
-                        <td className="px-2 py-1.5 align-middle" style={{ width: colWidths.nombre }}>
-                          <div className="flex items-center gap-1.5 leading-tight">
+                        <td className="px-2 py-1.5" style={{ width: colWidths.nombre }}>
+                          <div className="flex items-center gap-1.5">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium min-w-0" onClick={() => setSelectedContactId(c.id)}>
@@ -1218,12 +1218,14 @@ const SemilleroPage = () => {
                             {duplicateNameIds.has(c.id) && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <span className="shrink-0 inline-flex items-center leading-none px-1.5 py-px rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-help">
-                                    dup
+                                  <span
+                                    className="shrink-0 inline-block rounded-full bg-amber-500 cursor-help"
+                                    style={{ width: 6, height: 6 }}
+                                  >
                                   </span>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p className="text-xs">Otro contacto en esta iglesia tiene el mismo nombre y apellido. Posible duplicado.</p>
+                                  <p className="text-xs">Posible duplicado: otro contacto en esta iglesia tiene el mismo nombre y apellido.</p>
                                 </TooltipContent>
                               </Tooltip>
                             )}
