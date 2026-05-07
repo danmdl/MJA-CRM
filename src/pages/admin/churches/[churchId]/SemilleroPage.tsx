@@ -1083,10 +1083,32 @@ const SemilleroPage = () => {
                             //      person's name into the dropdown.
                             // Only admin/general/pastor/supervisor see everyone.
                             const userId = session?.user?.id;
+                            // Build the visible set the same way the row pipeline
+                            // does — but skip the Responsable filter itself so the
+                            // dropdown doesn't collapse to just the selected name.
+                            // This way picking a Cuerda or Conector narrows what
+                            // responsables you can choose from to the ones who
+                            // actually have contacts under the active criteria.
                             const visible = (allContacts || []).filter(c => {
-                              if (canSeeContactsFromAllCuerdas) return true;
-                              if (userCuerdaNumero) return c.numero_cuerda === userCuerdaNumero;
-                              return c.responsable_id === userId;
+                              if (!canSeeContactsFromAllCuerdas) {
+                                if (userCuerdaNumero) {
+                                  if (c.numero_cuerda !== userCuerdaNumero) return false;
+                                } else if (c.responsable_id !== userId) {
+                                  return false;
+                                }
+                              }
+                              if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
+                              if (filterConector === '__none__' && c.conector) return false;
+                              if (filterConector && filterConector !== '__none__') {
+                                if (!c.conector || normalize(c.conector) !== normalize(filterConector)) return false;
+                              }
+                              if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
+                              if (searchTerm.trim()) {
+                                const s = normalize(searchTerm);
+                                const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
+                                if (!hay.includes(s)) return false;
+                              }
+                              return true;
                             });
                             const creatorIds = new Set<string>();
                             visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
@@ -1128,12 +1150,27 @@ const SemilleroPage = () => {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {(() => {
-                              // Build the conector dropdown from the contacts the
-                              // user can already see — this respects cuerda
-                              // isolation automatically since allContacts is
-                              // already filtered upstream by role + cuerda. No
-                              // need to re-apply the visibility check here.
-                              //
+                              // Build the conector dropdown from contacts that
+                              // already pass every OTHER active filter (Cuerda,
+                              // Responsable, search, etc.) — but NOT the
+                              // conector filter itself, otherwise the dropdown
+                              // would collapse to just the selected value.
+                              // This way picking a Responsable narrows what
+                              // names you see here to the conectors who
+                              // actually feed that responsable.
+                              const baseSet = (allContacts || []).filter(c => {
+                                if (!canSeeContactsFromAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return false;
+                                if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
+                                if (filterResponsable === '__none__' && c.responsable_id) return false;
+                                if (filterResponsable && filterResponsable !== '__none__' && c.responsable_id !== filterResponsable) return false;
+                                if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
+                                if (searchTerm.trim()) {
+                                  const s = normalize(searchTerm);
+                                  const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
+                                  if (!hay.includes(s)) return false;
+                                }
+                                return true;
+                              });
                               // Group by normalized form so accent / case
                               // variants ("Camila Próspero" vs "Camila Prospero",
                               // "Agustina" vs "Agustína") don't show up as
@@ -1147,7 +1184,7 @@ const SemilleroPage = () => {
                               // match — it only controls what label the user
                               // sees in the dropdown and the active-filter pill.
                               const groups = new Map<string, Map<string, number>>();
-                              (allContacts || []).forEach(c => {
+                              baseSet.forEach(c => {
                                 const raw = c.conector?.trim();
                                 if (!raw) return;
                                 const key = normalize(raw);
