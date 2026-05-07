@@ -287,11 +287,25 @@ const SemilleroPage = () => {
     queryFn: async () => {
       // Supabase silently caps queries at 1000 rows. .limit(2000) doesn't
       // override the server default — it just sets a smaller cap if the
+      // Supabase silently caps queries at 1000 rows. .limit(2000) doesn't
+      // override the server default — it just sets a smaller cap if the
       // server's already lower. With 1680+ contacts in MJA Central, the
       // first 1000 by fecha_contacto DESC happened to all share the same
       // responsable (Micaela), so the Responsable filter dropdown showed
       // only her — and the "SIN ASIGNAR" counter at the top capped at 1000.
       // Paginate explicitly with .range() until we've drained the table.
+      //
+      // CRITICAL: order has to be stable across pages. fecha_contacto alone
+      // is NOT — when CSV imports stamp thousands of rows with the same
+      // timestamp, postgres returns those rows in arbitrary order, and the
+      // arbitrary order is not consistent between two .range() calls. The
+      // result is that page 2 starts somewhere unpredictable inside the
+      // tied block: some rows show up twice, others never. (Dan's MJA
+      // Central had 2983/3525 rows tied on fecha_contacto after a big
+      // import, and the client was only receiving ~600 of the 3525 alive
+      // rows because of this.) Adding `id` as a secondary sort gives every
+      // row a globally unique position, which is the only way .range()
+      // pagination is correct.
       const PAGE_SIZE = 1000;
       const all: Contact[] = [];
       for (let page = 0; ; page++) {
@@ -300,6 +314,7 @@ const SemilleroPage = () => {
           .eq('church_id', churchId!)
           .is('deleted_at', null)
           .order('fecha_contacto', { ascending: false })
+          .order('id', { ascending: true })
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         if (profile?.role === 'conector') {
           const { data: { user } } = await supabase.auth.getUser();
@@ -313,12 +328,25 @@ const SemilleroPage = () => {
         const rows = (data || []) as Contact[];
         all.push(...rows);
         if (rows.length < PAGE_SIZE) break;
-        // Safety stop — if a church somehow has 50k+ contacts, we don't
-        // want this hook to spin forever. 10 pages = 10,000 rows is well
-        // beyond any realistic Semillero size.
-        if (page >= 9) break;
+        // Safety stop — bumped from 10 → 50 pages so churches that grow
+        // past 10k contacts still load completely. 50k rows is well past
+        // anything plausible; the real protection is the staleTime on
+        // this query so we don't refetch on every render.
+        if (page >= 49) break;
       }
-      return all;
+      // Belt-and-suspenders dedupe by id. With the (fecha_contacto, id)
+      // ordering above .range() pagination should already be exact, but
+      // if the server ever returns the same row in two pages (race
+      // between INSERTs and our pagination, etc.) this keeps the client
+      // count honest.
+      const seen = new Set<string>();
+      const unique: Contact[] = [];
+      for (const r of all) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        unique.push(r);
+      }
+      return unique;
     },
     enabled: !!churchId,
     staleTime: 30_000,
