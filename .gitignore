@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Project uses pnpm exclusively — npm/yarn lockfiles must never be committed
+package-lock.json
+yarn.lock
