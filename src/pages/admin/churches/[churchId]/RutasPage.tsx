@@ -23,15 +23,29 @@ const RutasPage = () => {
   const [creating, setCreating] = useState(false);
 
   const { data: projects = [], isLoading } = useQuery<any[]>({
-    queryKey: ['route-projects', profile?.id, churchId],
+    queryKey: ['route-projects', churchId, profile?.id, profile?.role, profile?.numero_cuerda],
     queryFn: async () => {
       if (!profile?.id) return [];
-      const { data } = await supabase.from('shared_routes')
-        .select('id, share_token, name, created_at, expires_at, ordered_contact_ids, total_meters, total_seconds, start_address')
-        .eq('created_by', profile.id)
+      // Routes are visible at the cuerda level — a referente in cuerda
+      // 202 sees every route created by anyone in cuerda 202 (including
+      // their own), but NOT routes from cuerda 105 or any other.
+      // Globals (admin/general/pastor/supervisor) see every route in the
+      // church regardless of cuerda. Users without a cuerda assigned fall
+      // back to "only my own routes" so they at least see their work.
+      const isGlobal = profile.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+      let q = supabase.from('shared_routes')
+        .select('id, share_token, name, created_at, expires_at, ordered_contact_ids, total_meters, total_seconds, start_address, created_by, numero_cuerda')
         .eq('church_id', churchId!)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
+      if (!isGlobal) {
+        if (profile.numero_cuerda) {
+          q = q.eq('numero_cuerda', profile.numero_cuerda);
+        } else {
+          q = q.eq('created_by', profile.id);
+        }
+      }
+      const { data } = await q;
       return data || [];
     },
     enabled: !!profile?.id && !!churchId,
@@ -58,6 +72,13 @@ const RutasPage = () => {
         name: finalName,
         created_by: profile?.id,
         church_id: churchId,
+        // Stamp the route with the creator's cuerda so visibility lookups
+        // (the list query above) can filter by cuerda without joining
+        // profiles. If the user has no cuerda assigned, the field stays
+        // null — the list query treats null as "only the creator sees it"
+        // for non-globals, which keeps the route accessible to its
+        // creator without leaking it cross-cuerda.
+        numero_cuerda: profile?.numero_cuerda || null,
         ordered_contact_ids: [],
         expires_at: expiresAt,
         visited: {},
