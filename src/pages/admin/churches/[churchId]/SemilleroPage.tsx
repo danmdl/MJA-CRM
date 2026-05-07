@@ -104,6 +104,11 @@ const SemilleroPage = () => {
   // on contact.conector (free-text). '' = todos, '__none__' = sin conector
   // (NULL or empty), anything else = exact-match the chosen value.
   const [filterConector, setFilterConector] = useState<string>('');
+  // Toggle that narrows the table to rows whose normalized full name
+  // appears more than once in this church's contacts. Same set as the
+  // amber dot pill renders — when this is on, you only see the
+  // contacts marked as possible duplicates.
+  const [filterDuplicates, setFilterDuplicates] = useState<boolean>(false);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [activeTabFilters, setActiveTabFilters] = useState<FilterTabFilters>({});
   // Sort state: which column and direction. null = default order from query.
@@ -633,6 +638,11 @@ const SemilleroPage = () => {
       const target = normalize(filterConector);
       filtered = filtered.filter(c => c.conector && normalize(c.conector) === target);
     }
+    // Duplicate-only view: keep only rows flagged with the amber dot
+    // (their normalized full name matches another contact in this church).
+    if (filterDuplicates) {
+      filtered = filtered.filter(c => duplicateNameIds.has(c.id));
+    }
     // Apply active tab filters (saved per-user filter combination)
     if (activeTabId && Object.keys(activeTabFilters).length > 0) {
       filtered = applyFilterTab(filtered, activeTabFilters);
@@ -656,7 +666,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -832,6 +842,22 @@ const SemilleroPage = () => {
           <span className="text-[10px] uppercase tracking-wider text-orange-400">MJA</span>
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
+        {/* Duplicates toggle — narrows the table to rows whose normalized
+            full name appears more than once. Same set as the amber dot
+            renders. Only shown when there's at least one duplicate to
+            see, so the toolbar stays clean for empty churches. */}
+        {duplicateNameIds.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilterDuplicates(v => !v)}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${filterDuplicates ? 'border-amber-500 bg-amber-500/10' : 'border-amber-500/30 hover:border-amber-500/60'}`}
+            title={filterDuplicates ? 'Mostrar todos los contactos' : 'Mostrar solo posibles duplicados (mismo nombre y apellido)'}
+          >
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <span className="text-[10px] uppercase tracking-wider text-amber-400">{filterDuplicates ? 'Mostrando dups' : 'Duplicados'}</span>
+            <span className="text-sm font-bold tabular-nums text-amber-400">{duplicateNameIds.size}</span>
+          </button>
+        )}
         {searchTerm && (
           <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-blue-500/30 bg-blue-500/5">
             <span className="text-[10px] uppercase tracking-wider text-blue-400">En filtro</span>
