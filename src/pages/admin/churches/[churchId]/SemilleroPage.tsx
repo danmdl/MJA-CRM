@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
+  Users, AlertCircle, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -110,15 +110,15 @@ const SemilleroPage = () => {
   // amber dot pill renders — when this is on, you only see the
   // contacts marked as possible duplicates.
   const [filterDuplicates, setFilterDuplicates] = useState<boolean>(false);
-  // Render budget — caps how many rows of filteredContacts actually hit the
-  // DOM. The table renders into a single non-virtualized <table>, which
-  // means every row materializes a checkbox + name button + WhatsApp button
-  // + dropdowns + tooltips. With 1700+ contacts that's ~10-15k DOM nodes
-  // and the browser layout cost shows up as click/scroll lag. We cap at 300
-  // by default and let the user click "Cargar más" if they want the full
-  // list. Filters reset the cap because the user just narrowed the data
-  // and the new filtered list is almost always under 300 anyway.
-  const [renderLimit, setRenderLimit] = useState<number>(300);
+  // Pagination — pages of 200 contacts. The table is non-virtualized, so
+  // dropping a thousand+ <tr>s into the DOM at once added noticeable click
+  // and scroll lag. Pagination keeps the rendered set small while still
+  // letting the user reach any contact via the page controls. The user is
+  // taken back to page 0 whenever the filtered set changes shape (filter,
+  // search, pool switch, etc.) — landing on page 5 of a freshly-narrowed
+  // 80-row result would be jarring.
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const PAGE_SIZE = 200;
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [activeTabFilters, setActiveTabFilters] = useState<FilterTabFilters>({});
   // Sort state: which column and direction. null = default order from query.
@@ -764,23 +764,26 @@ const SemilleroPage = () => {
     return count;
   }, [selectedIds, filteredContacts]);
 
-  // Reset the render budget whenever the filtered set changes shape — the
-  // user narrowed/expanded the data, and any "Cargar más" they had clicked
-  // doesn't apply to a different set of rows. Keeps the budget at 300 as
-  // long as the filter is doing its job; users only see the button when a
-  // single view actually contains 300+ rows.
+  // Reset to page 0 whenever the filtered set changes shape — staying on
+  // page 5 after the user filters down to 80 rows would just show an empty
+  // page and force them to navigate back.
   useEffect(() => {
-    setRenderLimit(300);
+    setCurrentPage(0);
   }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, activePool, activeTabId]);
 
-  // Slice we actually render. Everything past renderLimit is held back
-  // until the user opts in. The arithmetic is cheap; the DOM cost was the
-  // problem.
+  const totalPages = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE));
+  // Clamp the current page in case the data shrank below where we are
+  // (race between filteredContacts updating and the useEffect above firing).
+  const safePage = Math.min(currentPage, totalPages - 1);
+  // Slice we actually render — only the current page worth of rows. Both
+  // the floating checkbox column and the table render against this so they
+  // stay in sync.
   const visibleContacts = useMemo(
-    () => filteredContacts.slice(0, renderLimit),
-    [filteredContacts, renderLimit]
+    () => filteredContacts.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE),
+    [filteredContacts, safePage]
   );
-  const hasMore = filteredContacts.length > renderLimit;
+  const pageStart = filteredContacts.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
+  const pageEnd = Math.min((safePage + 1) * PAGE_SIZE, filteredContacts.length);
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
@@ -1655,26 +1658,60 @@ const SemilleroPage = () => {
                       </tr>
                     );
                   })}
-                  {/* Load-more footer. Renders only when the filtered set
-                      has rows beyond what's currently in the DOM. Doubles
-                      the budget on each click; usually one click covers
-                      whatever the user was after. */}
-                  {hasMore && (
-                    <tr className="border-b">
-                      <td colSpan={20} className="text-center py-4">
-                        <button
-                          type="button"
-                          onClick={() => setRenderLimit(n => n + 500)}
-                          className="text-xs text-primary hover:underline"
-                          title={`${filteredContacts.length - renderLimit} contactos más sin mostrar`}
-                        >
-                          Mostrando {renderLimit} de {filteredContacts.length}. Cargar 500 más →
-                        </button>
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
+            </div>
+          )}
+          {/* Pagination controls. Visible only when the filtered set is
+              bigger than one page. Centers the page indicator with prev /
+              next on the sides and double-arrows for first / last. Buttons
+              are disabled at the edges so accidental clicks don't loop. */}
+          {!isLoading && totalPages > 1 && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-t text-xs">
+              <div className="text-muted-foreground tabular-nums">
+                Mostrando <span className="font-semibold text-foreground">{pageStart.toLocaleString('es-AR')}–{pageEnd.toLocaleString('es-AR')}</span> de {filteredContacts.length.toLocaleString('es-AR')}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(0)}
+                  disabled={safePage === 0}
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Primera página"
+                >
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  disabled={safePage === 0}
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Página anterior"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <span className="px-2 tabular-nums text-muted-foreground">
+                  Página <span className="font-semibold text-foreground">{safePage + 1}</span> de {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={safePage >= totalPages - 1}
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Página siguiente"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages - 1)}
+                  disabled={safePage >= totalPages - 1}
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Última página"
+                >
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           )}
         </CardContent>
