@@ -62,10 +62,10 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 
 export const usePermissions = () => {
-  const { profile } = useSession();
+  const { profile, loading: profileLoading } = useSession();
   const queryClient = useQueryClient();
 
-  const { data: permissions, isLoading } = useQuery<PermissionData[]>({
+  const { data: permissions, isLoading: permsLoading } = useQuery<PermissionData[]>({
     queryKey: ['permissions'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -81,6 +81,16 @@ export const usePermissions = () => {
     staleTime: 0,              // Always re-fetch permissions (no cache)
     refetchInterval: 30_000,   // Poll every 30s to catch admin changes
   });
+
+  // True once we have BOTH the user's profile (so we know their role) and
+  // the permissions table (so we can answer hasPermission). Until then,
+  // every permission check returns false because hasPermission needs both
+  // of those to make a real decision — which means the sidebar would
+  // render with EVERY can-* check failing and look completely empty,
+  // exactly the bug Dan saw on referente login. Sidebar (and anywhere
+  // else that gates a whole section by permissions) should wait on this
+  // flag before deciding nothing is allowed.
+  const permissionsReady = !profileLoading && !permsLoading && !!profile && !!permissions;
 
   const getPermissionForRole = (role: string): PermissionData | undefined => {
     return permissions?.find(p => p.role === role);
@@ -141,7 +151,8 @@ export const usePermissions = () => {
 
   return {
     permissions,
-    isLoading,
+    isLoading: permsLoading,
+    permissionsReady,
     getPermissionForRole,
     hasPermission,
     canSeeAllChurches,

@@ -15,7 +15,7 @@ interface NavItemConfig {
 const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpenSearch?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas, permissionsReady } = usePermissions();
 
   // Detect if we're inside a specific church
   const churchMatch = useMatch('/admin/churches/:churchId/*');
@@ -222,7 +222,30 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {filteredSections.map(({ title, items }) => (
+        {!permissionsReady ? (
+          // Skeleton: profile + permissions still loading. Without this gate
+          // every can* function returns false and the sidebar renders with
+          // no nav items at all — the bug Dan saw on referente login. A
+          // tiny set of placeholder rows is friendlier than an empty
+          // sidebar; the real items pop in within a few hundred ms once
+          // the queries resolve.
+          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[0, 1, 2, 3, 4].map(i => (
+              <div
+                key={i}
+                style={{
+                  height: 24,
+                  borderRadius: 6,
+                  background: 'rgba(255,255,255,0.04)',
+                  // Stagger so the rows shimmer a bit instead of looking
+                  // dead. Pure visual.
+                  opacity: 0.6 - i * 0.08,
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          filteredSections.map(({ title, items }) => (
           <div key={title}>
             <div style={{
               fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
@@ -257,7 +280,8 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
               </NavLink>
             ))}
           </div>
-        ))}
+        ))
+        )}
       </nav>
 
       {/* User pill */}
