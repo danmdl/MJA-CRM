@@ -19,7 +19,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
+  Users, AlertCircle, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -165,7 +165,7 @@ const SemilleroPage = () => {
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    cuerda: 34, nombre: 130, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145, conector: 110,
+    cuerda: 34, nombre: 130, dup: 44, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145, conector: 110,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -176,14 +176,12 @@ const SemilleroPage = () => {
   // toolbar dropdown and the choice persists in localStorage.
   // Right now the only optional column is "Conector" (from contact.conector,
   // a free-text field set by the connector who first met the person).
-  const [showConectorCol, setShowConectorCol] = useState<boolean>(() => {
-    try { return localStorage.getItem('semillero.showConectorCol') === '1'; }
-    catch { return false; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('semillero.showConectorCol', showConectorCol ? '1' : '0'); }
-    catch { /* localStorage unavailable, no-op */ }
-  }, [showConectorCol]);
+  // Conector column is always shown now. The previous opt-in toggle is gone
+  // — Dan asked for the column to live in the table by default since
+  // every Semillero workflow uses the conector field. The state is kept
+  // (not removed) so a future "hide column" UI can flip it back without
+  // changing the table render code, but it always reads true today.
+  const [showConectorCol] = useState<boolean>(true);
 
   // Assignment permission comes from canAssignContacts() via usePermissions
   const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
@@ -966,6 +964,59 @@ const SemilleroPage = () => {
   });
 
   // ─── Render ────────────────────────────────────────────────────
+  // Pagination block, declared once and rendered both above and below the
+  // table so the user can flip pages without scrolling the whole list.
+  // Hidden when the filtered set fits in a single page so the toolbar
+  // doesn't get visually busy for small results.
+  const paginationControls = !isLoading && totalPages > 1 ? (
+    <div className="flex items-center justify-between gap-2 px-3 py-2 border-t text-xs">
+      <div className="text-muted-foreground tabular-nums">
+        Mostrando <span className="font-semibold text-foreground">{pageStart.toLocaleString('es-AR')}–{pageEnd.toLocaleString('es-AR')}</span> de {filteredContacts.length.toLocaleString('es-AR')}
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setCurrentPage(0)}
+          disabled={safePage === 0}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Primera página"
+        >
+          <ChevronsLeft className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+          disabled={safePage === 0}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Página anterior"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        <span className="px-2 tabular-nums text-muted-foreground">
+          Página <span className="font-semibold text-foreground">{safePage + 1}</span> de {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+          disabled={safePage >= totalPages - 1}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Página siguiente"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setCurrentPage(totalPages - 1)}
+          disabled={safePage >= totalPages - 1}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Última página"
+        >
+          <ChevronsRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-4">
       {/* Compact header: title + stats pills + actions + search, all in one
@@ -1045,22 +1096,6 @@ const SemilleroPage = () => {
             <Upload className="h-4 w-4" /> Importar
           </Button>
         )}
-        {/* Optional columns toggle. Currently only Conector but easy to grow:
-            add another entry to the dropdown and another <td> in the row. */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1.5 px-2" title="Mostrar/ocultar columnas">
-              <Columns3 className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground py-1">Columnas opcionales</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowConectorCol(v => !v); }} className="gap-2 cursor-pointer">
-              <input type="checkbox" readOnly checked={showConectorCol} className="rounded border-input pointer-events-none" />
-              <span className="text-sm">Conector</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         {canAddContacts() && (
           <Button size="sm" onClick={() => setAddContactOpen(true)} className="gap-1.5">
             <PlusCircle className="h-4 w-4" /> Crear Contacto
@@ -1079,26 +1114,41 @@ const SemilleroPage = () => {
         }} className="gap-1.5 px-2" title="Actualizar datos">
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
-        <div className="relative w-44 sm:w-52 max-w-full">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-        </div>
       </div>
 
-      {/* Filter tabs bar - per-user saved filter combinations */}
+      {/* Search + filter tabs row. The search input lives on the LEFT
+          (where the "Todos" tab used to start) so the tabs sit visually
+          to its right — Dan asked for this layout so the search isn't
+          buried at the far end of the toolbar. */}
       {profile?.role !== 'conector' && churchId && (
+        <div className="mb-3 flex items-center gap-3 flex-wrap">
+          <div className="relative w-52 max-w-full shrink-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <FilterTabsBar
+              churchId={churchId}
+              activeTabId={activeTabId}
+              onActiveTabChange={(id, filters) => {
+                setActiveTabId(id);
+                setActiveTabFilters(filters);
+              }}
+              cuerdas={cuerdas || []}
+              teamMembers={teamMembers || []}
+              zonas={zonas || []}
+            />
+          </div>
+        </div>
+      )}
+      {/* Conectores get only the search input — they don't see the tab
+          system. Same look as above, just no tabs row. */}
+      {profile?.role === 'conector' && (
         <div className="mb-3">
-          <FilterTabsBar
-            churchId={churchId}
-            activeTabId={activeTabId}
-            onActiveTabChange={(id, filters) => {
-              setActiveTabId(id);
-              setActiveTabFilters(filters);
-            }}
-            cuerdas={cuerdas || []}
-            teamMembers={teamMembers || []}
-            zonas={zonas || []}
-          />
+          <div className="relative w-52 max-w-full">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
         </div>
       )}
 
@@ -1182,6 +1232,13 @@ const SemilleroPage = () => {
         )}
         <Card className="flex-1 min-w-0">
           <CardContent className="p-0">
+            {/* Top pagination — same controls as the bottom of the card.
+                Renders only when there's more than one page. The border-t
+                inside the controls visually separates them from whatever's
+                above; with paginationControls also at the bottom of the
+                card, the user can flip pages from either end without
+                scrolling. */}
+            {paginationControls}
             {isLoading ? (
               <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : (
@@ -1205,6 +1262,14 @@ const SemilleroPage = () => {
                           ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />)
                           : <ArrowUpDown className="h-3 w-3 opacity-40" />}
                       </button>
+                    </ResizableHeader>
+                    {/* Fixed-width Dup column. Renders the 'DUP' pill as
+                        a centered cell so every duplicate flag lines up
+                        vertically across rows regardless of name length.
+                        Click on the pill opens the merge dialog (same
+                        action the dot used to do). */}
+                    <ResizableHeader width={colWidths.dup} onResize={resizeCol('dup')}>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Dup</span>
                     </ResizableHeader>
                     <ResizableHeader width={colWidths.telefono} onResize={resizeCol('telefono')}>Teléfono</ResizableHeader>
                     <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>
@@ -1426,42 +1491,45 @@ const SemilleroPage = () => {
                       <tr key={c.id} className={`border-b h-[37px] transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
                         {/* Nombre (con ojo) */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.nombre }}>
-                          <div className="flex items-center gap-1.5">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium min-w-0 w-full" onClick={() => setSelectedContactId(c.id)}>
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <span className="truncate">{c.first_name} {c.last_name || ''}</span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent><p className="text-xs">Ver contacto</p></TooltipContent>
+                          </Tooltip>
+                        </td>
+
+                        {/* Dup column — fixed width so the pill renders in
+                            the same horizontal position on every row. Empty
+                            cell on contacts that aren't flagged. Click on
+                            the pill opens the merge dialog. */}
+                        <td className="px-2 py-1.5 text-center" style={{ width: colWidths.dup }}>
+                          {duplicateNameIds.has(c.id) && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium min-w-0" onClick={() => setSelectedContactId(c.id)}>
-                                  <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                  <span className="truncate">{c.first_name} {c.last_name || ''}</span>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center justify-center px-1.5 leading-none rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 hover:text-amber-200 cursor-pointer transition-colors"
+                                  style={{ height: 18 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const groupIds = duplicateGroupByContactId.get(c.id) || [c.id];
+                                    const groupContacts = (allContacts || []).filter(x => groupIds.includes(x.id));
+                                    if (groupContacts.length >= 2) setMergeGroup(groupContacts);
+                                  }}
+                                  aria-label="Resolver duplicado"
+                                >
+                                  Dup
                                 </button>
                               </TooltipTrigger>
-                              <TooltipContent><p className="text-xs">Ver contacto</p></TooltipContent>
+                              <TooltipContent>
+                                <p className="text-xs">Posible duplicado. Click para resolver (mergear o marcar como personas distintas).</p>
+                              </TooltipContent>
                             </Tooltip>
-                            {duplicateNameIds.has(c.id) && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="shrink-0 inline-block rounded-full bg-amber-500 hover:bg-amber-400 cursor-pointer transition-colors ring-0 hover:ring-2 hover:ring-amber-500/40"
-                                    style={{ width: 8, height: 8 }}
-                                    onClick={(e) => {
-                                      // Open the merge dialog for the entire
-                                      // name-group this contact belongs to —
-                                      // the dialog needs every duplicate, not
-                                      // just the one that was clicked.
-                                      e.stopPropagation();
-                                      const groupIds = duplicateGroupByContactId.get(c.id) || [c.id];
-                                      const groupContacts = (allContacts || []).filter(x => groupIds.includes(x.id));
-                                      if (groupContacts.length >= 2) setMergeGroup(groupContacts);
-                                    }}
-                                    aria-label="Resolver duplicado"
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="text-xs">Posible duplicado. Click para resolver (mergear o marcar como personas distintas).</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
+                          )}
                         </td>
 
                         {/* Teléfono + WhatsApp - on mobile we hide the number text and keep just the WhatsApp button to save horizontal space.
@@ -1713,58 +1781,10 @@ const SemilleroPage = () => {
               </table>
             </div>
           )}
-          {/* Pagination controls. Visible only when the filtered set is
-              bigger than one page. Centers the page indicator with prev /
-              next on the sides and double-arrows for first / last. Buttons
-              are disabled at the edges so accidental clicks don't loop. */}
-          {!isLoading && totalPages > 1 && (
-            <div className="flex items-center justify-between gap-2 px-3 py-2 border-t text-xs">
-              <div className="text-muted-foreground tabular-nums">
-                Mostrando <span className="font-semibold text-foreground">{pageStart.toLocaleString('es-AR')}–{pageEnd.toLocaleString('es-AR')}</span> de {filteredContacts.length.toLocaleString('es-AR')}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(0)}
-                  disabled={safePage === 0}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Primera página"
-                >
-                  <ChevronsLeft className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                  disabled={safePage === 0}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Página anterior"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <span className="px-2 tabular-nums text-muted-foreground">
-                  Página <span className="font-semibold text-foreground">{safePage + 1}</span> de {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={safePage >= totalPages - 1}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Página siguiente"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(totalPages - 1)}
-                  disabled={safePage >= totalPages - 1}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Última página"
-                >
-                  <ChevronsRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Pagination controls — same block rendered above the table too
+              (see paginationControls const below). Buttons are disabled at
+              the edges so accidental clicks don't loop. */}
+          {paginationControls}
         </CardContent>
       </Card>
       </div>
