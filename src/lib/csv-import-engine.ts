@@ -143,22 +143,21 @@ export const dryRunImport = ({
     }
 
     // Phone duplicate checks — both vs existing DB rows AND vs other rows in
-    // the same file. The DB trigger only catches the first kind; the second
-    // would land as constraint errors during insert. The sandbox catches
-    // both up front.
+    // the same file. Production no longer rejects either case (the DB
+    // trigger was dropped, the live importer accepts everything), so the
+    // sandbox shouldn't either. Both surface as non-fatal advertencias so
+    // the user can see them in the preview but the row count under
+    // "Importarían" matches what production would actually insert.
     if (tableName === 'contacts' && transformed.phone) {
       const normalized = normalizePhoneForDedupe(transformed.phone);
       if (normalized.length >= 8) {
         if (existingPhonesNormalized.has(normalized)) {
-          validationErrors.push({ field: 'Teléfono', value: String(transformed.phone), message: 'Ya existe un contacto con ese teléfono en esta iglesia.' });
+          validationErrors.push({ field: 'Teléfono', value: String(transformed.phone), message: 'Teléfono compartido con un contacto existente en esta iglesia (advertencia).' });
         } else {
           const duplicateRowIdxs = duplicatePhonesInFile.get(normalized) || [];
           if (duplicateRowIdxs.length > 1 && duplicateRowIdxs[0] !== idx) {
-            // First occurrence in the file would actually insert; subsequent
-            // ones would collide with that just-inserted row. Mark them as
-            // duplicates so the user sees both.
             const firstRow = duplicateRowIdxs[0] + 1;
-            validationErrors.push({ field: 'Teléfono', value: String(transformed.phone), message: `Teléfono duplicado en el archivo (también en fila ${firstRow}).` });
+            validationErrors.push({ field: 'Teléfono', value: String(transformed.phone), message: `Teléfono duplicado en el archivo (también en fila ${firstRow}) (advertencia).` });
           }
         }
       }
