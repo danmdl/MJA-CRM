@@ -36,6 +36,10 @@ const MapPickerPage = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersById = useRef<Map<string, any>>(new Map());
+  // Separate marker for the starting point, kept in its own ref so the
+  // contact-marker effect can rebuild without ever touching it. Updated
+  // by a dedicated effect that fires when startLat / startLng change.
+  const startMarkerRef = useRef<any>(null);
   const fittedRef = useRef(false);
   const projectHydratedRef = useRef(false);
 
@@ -278,8 +282,60 @@ const MapPickerPage = () => {
     return () => {
       markersById.current.forEach(m => m.setMap(null));
       markersById.current.clear();
+      if (startMarkerRef.current) {
+        startMarkerRef.current.setMap(null);
+        startMarkerRef.current = null;
+      }
     };
   }, []);
+
+  // Render / update / remove the starting-point marker on the map. Lives
+  // in its own effect (separate from the contact markers) so the contact
+  // pass doesn't accidentally wipe it out. Uses a blue pin path on a
+  // larger scale than the contact circles so it stands out as the route's
+  // origin. When the user picks a new start (typing an address, hitting
+  // 'Mi ubicación', or 'Iglesia') we also pan the map to the marker so
+  // they can see where the route is going to start from.
+  useEffect(() => {
+    const google = (window as any).google;
+    if (!google?.maps || !mapInstance.current) return;
+    if (startLat == null || startLng == null) {
+      if (startMarkerRef.current) {
+        startMarkerRef.current.setMap(null);
+        startMarkerRef.current = null;
+      }
+      return;
+    }
+    const position = { lat: startLat, lng: startLng };
+    const icon = {
+      // Standard Maps drop-pin path. Blue fill, white stroke for contrast
+      // against both light and dark map styles.
+      path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
+      fillColor: '#3B82F6',
+      fillOpacity: 1,
+      strokeColor: 'white',
+      strokeWeight: 2,
+      scale: 1.8,
+      anchor: new google.maps.Point(12, 24),
+    };
+    if (startMarkerRef.current) {
+      startMarkerRef.current.setPosition(position);
+      startMarkerRef.current.setIcon(icon);
+    } else {
+      startMarkerRef.current = new google.maps.Marker({
+        position,
+        map: mapInstance.current,
+        icon,
+        title: `Punto de partida: ${startAddress || ''}`,
+        zIndex: 1000,
+      });
+    }
+    // Recenter the map on the new starting point. Don't change zoom — if
+    // the user is mid-pan looking at a particular cluster of contacts,
+    // jumping the zoom would lose their place. A pan is enough to
+    // confirm "the start landed here".
+    mapInstance.current.panTo(position);
+  }, [startLat, startLng, startAddress]);
 
   const proceedToRoute = async () => {
     if (selectedIds.size === 0) {
@@ -390,18 +446,8 @@ const MapPickerPage = () => {
           </div>
         </div>
 
-        {/* Search lives right next to the title. Bounded width so it
-            doesn't eat the row, but still wide enough for typical
-            queries. */}
-        <div className="relative w-full sm:w-56 max-w-full shrink-0 sm:ml-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o dirección..."
-            className="pl-8 h-8 text-xs"
-          />
-        </div>
+        {/* Search lives in the sidebar header now (next to the contact
+            list it filters), so it's gone from this top row. */}
 
         {/* Filter dropdowns — same options as before, just sitting on the
             header row instead of their own card. */}
@@ -506,6 +552,22 @@ const MapPickerPage = () => {
       <div className="flex-1 flex gap-3 min-h-0">
         {/* Left sidebar: contact list */}
         <aside className={`${mobileView === 'list' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-72 lg:w-80 shrink-0 border rounded-lg bg-card overflow-hidden`}>
+          {/* Sidebar search — filters the list (and therefore the map
+              markers) by name or address. Lives here, attached to the
+              list it filters, instead of in the top toolbar where the
+              connection to "this is what's filtering my list" was less
+              obvious. */}
+          <div className="px-2 py-2 border-b bg-muted/30">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por nombre o dirección..."
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+          </div>
           <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30">
             <div className="text-xs">
               <span className="font-semibold">{filtered.length}</span>
