@@ -222,14 +222,10 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         .single();
 
       if (error) {
-        // The DB has a trigger that rejects same-phone duplicates within a
-        // church. Surface a clean message instead of the raw Postgres error.
-        if (error.message && error.message.includes('duplicate_phone')) {
-          const m = error.message.match(/duplicate_phone:\s*(.*?)(?:\.|$)/);
-          showError(m?.[1] || 'Ya existe un contacto con ese teléfono en esta iglesia.');
-        } else {
-          showError(`Error: ${error.message}`);
-        }
+        // Duplicate-phone trigger dropped — any error here is now a real
+        // insert failure (constraint violation, permission, etc.), so
+        // surface the raw message.
+        showError(`Error: ${error.message}`);
         await logEvent({
           action: 'create_contact',
           error,

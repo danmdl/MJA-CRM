@@ -430,12 +430,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         const msg = err.error || '';
-        if (msg.includes('duplicate_phone')) {
-          const m = msg.match(/duplicate_phone:\s*(.*?)(?:\.|$)/);
-          showError(m?.[1] || 'Ya existe un contacto con ese teléfono en esta iglesia.');
-        } else {
-          showError(msg || 'Error al actualizar el contacto.');
-        }
+        // Duplicate-phone trigger dropped — any error here is a real
+        // server-side failure, surface the message as-is.
+        showError(msg || 'Error al actualizar el contacto.');
       } else {
         showSuccess('Contacto actualizado con éxito.');
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });

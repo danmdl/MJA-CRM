@@ -324,6 +324,27 @@ const SemilleroPage = () => {
     staleTime: 60 * 60_000,
   });
 
+  // ─── Real duplicates: same first_name+last_name within this church ──────────
+  // Builds a Set of contact ids whose normalized full name appears more than
+  // once in the church's contacts. Used to render a "duplicado" pill next
+  // to the name in the table. Computed against the full allContacts list
+  // (not just the filtered view) so the marker stays accurate even when a
+  // filter hides one half of a duplicate pair.
+  const duplicateNameIds = useMemo(() => {
+    if (!allContacts?.length) return new Set<string>();
+    const groups = new Map<string, string[]>();
+    allContacts.forEach(c => {
+      const full = normalize(`${c.first_name || ''} ${c.last_name || ''}`).replace(/\s+/g, ' ').trim();
+      if (!full) return;
+      const arr = groups.get(full) || [];
+      arr.push(c.id);
+      groups.set(full, arr);
+    });
+    const dups = new Set<string>();
+    groups.forEach(ids => { if (ids.length > 1) ids.forEach(id => dups.add(id)); });
+    return dups;
+  }, [allContacts]);
+
   // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────
   const geocodedRef = useRef(false);
   useEffect(() => {
@@ -332,7 +353,6 @@ const SemilleroPage = () => {
     const toGeocode = allContacts.filter(c => c.address && (c.lat == null || c.lng == null));
     if (toGeocode.length === 0) return;
     if (!(window as any).google?.maps) return;
-
     geocodedRef.current = true;
     const google = (window as any).google;
     const geocoder = new google.maps.Geocoder();
@@ -1139,15 +1159,29 @@ const SemilleroPage = () => {
                       <tr key={c.id} className={`border-b h-[37px] transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
                         {/* Nombre (con ojo) */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.nombre }}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium" onClick={() => setSelectedContactId(c.id)}>
-                                <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                {c.first_name} {c.last_name || ''}
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent><p className="text-xs">Ver contacto</p></TooltipContent>
-                          </Tooltip>
+                          <div className="flex items-center gap-1.5">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium min-w-0" onClick={() => setSelectedContactId(c.id)}>
+                                  <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span className="truncate">{c.first_name} {c.last_name || ''}</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent><p className="text-xs">Ver contacto</p></TooltipContent>
+                            </Tooltip>
+                            {duplicateNameIds.has(c.id) && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-help">
+                                    dup
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">Otro contacto en esta iglesia tiene el mismo nombre y apellido. Posible duplicado.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
                         </td>
 
                         {/* Teléfono + WhatsApp - on mobile we hide the number text and keep just the WhatsApp button to save horizontal space.

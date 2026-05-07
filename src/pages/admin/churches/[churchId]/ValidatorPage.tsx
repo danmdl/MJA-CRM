@@ -3,11 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Crosshair, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Users, Crosshair, ChevronDown, ChevronRight } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { isWithinGBA } from '@/lib/geo-validation';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import { useSession } from '@/hooks/use-session';
+import { normalize } from '@/lib/normalize';
 
 interface Issue {
   id: string;
@@ -25,7 +26,11 @@ const CHECKS = [
   { key: 'contacts_no_sexo', label: 'Contactos sin sexo definido', icon: User, severity: 'warning' as const, entity: 'contact' as const },
   { key: 'contacts_no_address', label: 'Contactos sin dirección', icon: MapPin, severity: 'warning' as const, entity: 'contact' as const },
   { key: 'contacts_no_phone', label: 'Contactos sin teléfono', icon: Phone, severity: 'info' as const, entity: 'contact' as const },
-  { key: 'contacts_duplicate_phone', label: 'Teléfonos duplicados', icon: Phone, severity: 'warning' as const, entity: 'contact' as const },
+  // Phone duplicates downgraded to 'info' — same phone is no longer a hard
+  // problem (the rejecting trigger was dropped). Real duplicates are
+  // people with the same name+last_name in the same church, tracked below.
+  { key: 'contacts_duplicate_phone', label: 'Teléfonos compartidos', icon: Phone, severity: 'info' as const, entity: 'contact' as const },
+  { key: 'contacts_duplicate_name', label: 'Posibles duplicados (mismo nombre)', icon: Users, severity: 'warning' as const, entity: 'contact' as const },
   { key: 'cells_no_address', label: 'Células sin dirección', icon: MapPin, severity: 'error' as const, entity: 'cell' as const },
   { key: 'cells_no_coords', label: 'Células con dirección pero sin coordenadas', icon: Crosshair, severity: 'error' as const, entity: 'cell' as const },
 ];
@@ -158,8 +163,33 @@ const ValidatorPage = () => {
     phoneCounts.forEach((v, phone) => {
       if (v.count > 1) {
         v.contacts!.forEach(c => {
-          found.push({ id: `dup-phone-${c!.id}`, type: 'contacts_duplicate_phone', severity: 'warning', entity: 'contact', entityId: c!.id,
+          found.push({ id: `dup-phone-${c!.id}`, type: 'contacts_duplicate_phone', severity: 'info', entity: 'contact', entityId: c!.id,
             name: `${c!.first_name} ${c!.last_name || ''}`.trim(), detail: `Teléfono ${c!.phone} compartido con ${v.count - 1} otro(s)` });
+        });
+      }
+    });
+
+    // 6b. Real duplicates: same first_name+last_name (normalized: lowercased,
+    // stripped of accents, whitespace collapsed). Two contacts with the same
+    // person's name in the same church are very likely the same person —
+    // worth surfacing as a warning so a leader can merge or correct.
+    const { data: allNames } = await contactsBase()
+      .select('id, first_name, last_name');
+    const nameGroups = new Map<string, { contacts: typeof allNames }>();
+    (allNames || []).forEach(c => {
+      const full = normalize(`${c.first_name || ''} ${c.last_name || ''}`).replace(/\s+/g, ' ').trim();
+      if (!full) return;
+      const entry = nameGroups.get(full) || { contacts: [] };
+      entry.contacts!.push(c);
+      nameGroups.set(full, entry);
+    });
+    nameGroups.forEach((v, fullNameKey) => {
+      if (v.contacts!.length > 1) {
+        v.contacts!.forEach(c => {
+          const others = v.contacts!.filter(x => x.id !== c.id).length;
+          found.push({ id: `dup-name-${c.id}`, type: 'contacts_duplicate_name', severity: 'warning', entity: 'contact', entityId: c.id,
+            name: `${c.first_name} ${c.last_name || ''}`.trim(),
+            detail: `Mismo nombre que ${others} otro(s) contacto(s) en esta iglesia` });
         });
       }
     });
