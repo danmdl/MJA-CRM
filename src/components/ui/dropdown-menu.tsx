@@ -81,7 +81,11 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      // Same touch-manipulation + cursor-pointer story as SelectItem.
+      // Dropdown items inside a Dialog (e.g. the Asignar célula menu in
+      // Semillero, the Acciones menu in ChurchUserTable) suffered from
+      // the same 300ms tap delay on mobile.
+      "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 touch-manipulation",
       inset && "pl-8",
       className,
     )}

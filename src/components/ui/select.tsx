@@ -17,7 +17,14 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      // touch-manipulation kills the 300ms double-tap-to-zoom delay
+      // on iOS / Android. Without it, the first tap on a Select inside a
+      // scrolling Dialog often gets eaten by the browser's gesture
+      // recognizer (waiting to see if a second tap is coming) and the
+      // dropdown never opens — exactly the bug Dan reported on the CSV
+      // importer mapping screen on Android Chrome. Pairing it with
+      // cursor-pointer makes the trigger feel clickable on mouse too.
+      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 cursor-pointer touch-manipulation",
       className,
     )}
     {...props}
@@ -116,7 +123,13 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      // cursor-default → cursor-pointer + touch-manipulation: same fix
+      // as SelectTrigger above. Items inside the dropdown were also
+      // suffering from the 300ms tap delay on mobile, so the user could
+      // tap an option and have nothing happen until they tapped a
+      // second time. With touch-manipulation the first tap fires the
+      // selection immediately.
+      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 touch-manipulation",
       className,
     )}
     {...props}
