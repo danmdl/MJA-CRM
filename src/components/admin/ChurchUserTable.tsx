@@ -116,23 +116,19 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     // doesn't change permissions or what add/edit they can do, so the
     // existing permission system stays untouched as Dan asked.
     //
-    // Special cases:
-    //  - The user themselves is always visible (so a referente without
-    //    a cuerda set still sees their own row and isn't stuck with an
-    //    empty list).
-    //  - Anyone in the same church-cuerda (the special is_church_cuerda
-    //    one) is also always visible — pastors/admins/general usually
-    //    live there and excluding them from a referente's view would
-    //    hide the people they need to escalate to.
+    // The user themselves is always visible (so a referente without a
+    // cuerda set still sees their own row and isn't stuck with an empty
+    // list). We do NOT include the church-cuerda anymore — it's
+    // considered a separate cuerda, just one whose members happen to
+    // see everything. From the referente's point of view it's not "their
+    // people", so it shouldn't show up in their team listing.
     const isGlobal = profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
     const myCuerda = profile?.numero_cuerda;
-    const churchCuerdaNumeros = new Set(cuerdas.filter(c => c.is_church_cuerda).map(c => c.numero));
     let visible = users;
     if (!isGlobal) {
       visible = users.filter(u =>
         u.id === profile?.id ||
-        (myCuerda && u.numero_cuerda === myCuerda) ||
-        (u.numero_cuerda && churchCuerdaNumeros.has(u.numero_cuerda))
+        (myCuerda && u.numero_cuerda === myCuerda)
       );
     }
     const term = norm(searchTerm);
@@ -140,7 +136,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     return visible.filter(u =>
       norm([u.first_name, u.last_name, u.email, u.role, u.numero_cuerda].join(' ')).includes(term)
     );
-  }, [users, searchTerm, profile?.role, profile?.id, profile?.numero_cuerda, cuerdas]);
+  }, [users, searchTerm, profile?.role, profile?.id, profile?.numero_cuerda]);
 
   const callEdge = async (body: object) => {
     const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v2', {
