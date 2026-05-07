@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mja-crm-v5';
+const CACHE_NAME = 'mja-crm-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

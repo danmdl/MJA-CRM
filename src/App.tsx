@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from "@vercel/analytics/react";
+import { useVersionCheck } from "./hooks/use-version-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import NotFound from "./pages/NotFound";
@@ -320,6 +321,14 @@ const AppRoutes = () => {
   );
 };
 
+// Tiny no-render component that just runs the version-check hook.
+// Lives at the App root so it ticks for every authenticated and
+// unauthenticated session — the toast is global anyway via Sonner.
+const VersionChecker = () => {
+  useVersionCheck();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -332,6 +341,7 @@ const App = () => (
           root is enough to instrument every page. Production-only by
           default; local dev runs get ignored. */}
       <Analytics />
+      <VersionChecker />
       <BrowserRouter>
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

@@ -14,6 +14,15 @@ export default defineConfig(() => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Inject a build timestamp so the app can compare what it was built
+  // with against what's currently being served. The version-check effect
+  // (see useVersionCheck) polls the live index.html for a different hash
+  // and prompts the user to reload when it sees one — this lets us catch
+  // the 'tab open for 8 hours, the user is on an old chunk' case that
+  // was making referentes see stale paginated counts.
+  define: {
+    __BUILD_ID__: JSON.stringify(String(Date.now())),
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
