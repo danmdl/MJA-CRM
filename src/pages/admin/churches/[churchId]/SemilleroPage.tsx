@@ -110,6 +110,15 @@ const SemilleroPage = () => {
   // amber dot pill renders — when this is on, you only see the
   // contacts marked as possible duplicates.
   const [filterDuplicates, setFilterDuplicates] = useState<boolean>(false);
+  // Render budget — caps how many rows of filteredContacts actually hit the
+  // DOM. The table renders into a single non-virtualized <table>, which
+  // means every row materializes a checkbox + name button + WhatsApp button
+  // + dropdowns + tooltips. With 1700+ contacts that's ~10-15k DOM nodes
+  // and the browser layout cost shows up as click/scroll lag. We cap at 300
+  // by default and let the user click "Cargar más" if they want the full
+  // list. Filters reset the cap because the user just narrowed the data
+  // and the new filtered list is almost always under 300 anyway.
+  const [renderLimit, setRenderLimit] = useState<number>(300);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [activeTabFilters, setActiveTabFilters] = useState<FilterTabFilters>({});
   // Sort state: which column and direction. null = default order from query.
@@ -353,19 +362,33 @@ const SemilleroPage = () => {
   // once in the church's contacts AND there's at least one PAIR of contacts
   // in their name-group that the user hasn't dismissed as "different people".
   // Used to render the amber dot pill next to the name in the table and to
-  // power the Duplicados filter toggle. Computed against the full
-  // allContacts list (not just the filtered view) so the marker stays
-  // accurate even when a filter hides one half of a pair.
+  // power the Duplicados filter toggle.
   //
-  // Also computes duplicateGroups so the merge dialog can pull up every
-  // contact that shares a name with the one the user clicked.
+  // Scoped to the contacts the CURRENT USER can see — non-globals only count
+  // duplicates within their own cuerda (or, if they have no cuerda, within
+  // the contacts where they're the responsable). A referente in cuerda 204
+  // shouldn't see "141 duplicados" if half of those are in cuerda 105 and
+  // they couldn't act on them anyway.
+  //
+  // Also computes duplicateGroupByContactId so the merge dialog can pull up
+  // every contact that shares a name with the one the user clicked.
   const { duplicateNameIds, duplicateGroupByContactId } = useMemo(() => {
     const idSet = new Set<string>();
     const byContact = new Map<string, string[]>(); // contact id → all ids in same name-group (incl. itself)
     if (!allContacts?.length) return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
-    // 1) Group all contacts by normalized full name.
+    const userId = session?.user?.id;
+    // Only consider contacts this user is allowed to see. Same gate the
+    // row pipeline applies to filteredContacts — keeps the dot count and
+    // the Duplicados pill in sync with the user's actual view.
+    const visible = allContacts.filter(c => {
+      if (canSeeContactsFromAllCuerdas) return true;
+      if (userCuerdaNumero) return c.numero_cuerda === userCuerdaNumero;
+      return c.responsable_id === userId;
+    });
+    if (visible.length === 0) return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
+    // 1) Group all visible contacts by normalized full name.
     const groups = new Map<string, string[]>();
-    allContacts.forEach(c => {
+    visible.forEach(c => {
       const full = normalize(`${c.first_name || ''} ${c.last_name || ''}`).replace(/\s+/g, ' ').trim();
       if (!full) return;
       const arr = groups.get(full) || [];
@@ -400,7 +423,7 @@ const SemilleroPage = () => {
       }
     });
     return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
-  }, [allContacts, dedupeDismissals]);
+  }, [allContacts, dedupeDismissals, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
 
   // ─── Extra responsable lookup ──────────────────────────────────────────────
   // teamMembers is scoped to this church. When a contact's responsable_id
@@ -741,6 +764,24 @@ const SemilleroPage = () => {
     return count;
   }, [selectedIds, filteredContacts]);
 
+  // Reset the render budget whenever the filtered set changes shape — the
+  // user narrowed/expanded the data, and any "Cargar más" they had clicked
+  // doesn't apply to a different set of rows. Keeps the budget at 300 as
+  // long as the filter is doing its job; users only see the button when a
+  // single view actually contains 300+ rows.
+  useEffect(() => {
+    setRenderLimit(300);
+  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, activePool, activeTabId]);
+
+  // Slice we actually render. Everything past renderLimit is held back
+  // until the user opts in. The arithmetic is cheap; the DOM cost was the
+  // problem.
+  const visibleContacts = useMemo(
+    () => filteredContacts.slice(0, renderLimit),
+    [filteredContacts, renderLimit]
+  );
+  const hasMore = filteredContacts.length > renderLimit;
+
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
 
@@ -889,11 +930,10 @@ const SemilleroPage = () => {
           type="button"
           onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'unassigned' ? 'border-primary bg-primary/10' : 'border-border hover:border-foreground/30'}`}
-          title="Pool de contactos sin asignar"
+          title="Total de contactos visibles para vos en esta vista del Semillero"
         >
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Sin asignar</span>
-          <span className={`text-sm font-bold tabular-nums ${poolCounts.unassigned > 0 ? 'text-yellow-500' : 'text-muted-foreground'}`}>{isLoading ? '…' : poolCounts.unassigned}</span>
-          {poolCounts.unassigned > 0 && <AlertCircle className="h-3 w-3 text-yellow-500" />}
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">En lista</span>
+          <span className={`text-sm font-bold tabular-nums ${poolCounts.unassigned > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : poolCounts.unassigned}</span>
         </button>
         <button
           type="button"
@@ -1046,8 +1086,10 @@ const SemilleroPage = () => {
               />
             </div>
             {/* One checkbox per visible row, kept aligned with the table rows
-                because both sides use h-[37px]. */}
-            {filteredContacts.map((c, idx) => (
+                because both sides use h-[37px]. We render against
+                visibleContacts (not filteredContacts) so the checkbox
+                gutter matches the table — both stop at renderLimit. */}
+            {visibleContacts.map((c, idx) => (
               <div key={c.id} className="h-[37px] w-7 flex items-center justify-center">
                 <input
                   type="checkbox"
@@ -1312,7 +1354,7 @@ const SemilleroPage = () => {
                       </td>
                     </tr>
                   )}
-                  {filteredContacts.map((c, idx) => {
+                  {visibleContacts.map((c, idx) => {
                     const sug = suggestions[c.id];
                     const sugCell = sug?.cell;
                     const sugCuerda = sug?.cuerda;
@@ -1613,6 +1655,24 @@ const SemilleroPage = () => {
                       </tr>
                     );
                   })}
+                  {/* Load-more footer. Renders only when the filtered set
+                      has rows beyond what's currently in the DOM. Doubles
+                      the budget on each click; usually one click covers
+                      whatever the user was after. */}
+                  {hasMore && (
+                    <tr className="border-b">
+                      <td colSpan={20} className="text-center py-4">
+                        <button
+                          type="button"
+                          onClick={() => setRenderLimit(n => n + 500)}
+                          className="text-xs text-primary hover:underline"
+                          title={`${filteredContacts.length - renderLimit} contactos más sin mostrar`}
+                        >
+                          Mostrando {renderLimit} de {filteredContacts.length}. Cargar 500 más →
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
