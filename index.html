@@ -1,8 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="es" translate="no">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- The two notranslate hints below are the fix for a class of crashes
+         we saw on Android Chrome ("Failed to execute 'removeChild' on
+         'Node'..."): Chrome auto-translates the page in the background,
+         which mutates the DOM under React's feet. When React then tries
+         to remove a node it owned (e.g. unmounting a Toaster, dismissing
+         a Sonner toast, closing a Select dropdown) the node is no longer
+         where React parked it and the whole subtree throws into the
+         ErrorBoundary, which is what made the user see the black "Error
+         al cargar la página" screen on mobile.
+         Combining `translate="no"` on <html>, the meta below, AND the
+         `notranslate` class on <body> gives us belt-and-suspenders
+         coverage across browsers — Chrome, Edge, and Yandex respect at
+         least one of them. -->
+    <meta name="google" content="notranslate" />
     <title>MJA CRM</title>
     <link rel="icon" href="/favicon.ico" type="image/x-icon" />
     <link rel="icon" href="/logo.png" type="image/png" />
@@ -15,7 +29,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MJA CRM" />
   </head>
-  <body>
+  <body class="notranslate">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>

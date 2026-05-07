@@ -58,6 +58,40 @@ class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, 
       window.location.reload();
       return;
     }
+    // removeChild crashes are almost always caused by browser auto-translate
+    // (Chrome on Android, mainly) mutating the DOM under React's feet. The
+    // error happens when React tries to unmount a node that the translator
+    // already replaced. The notranslate hints in index.html should prevent
+    // this from now on, but for users on older builds, on browsers that
+    // don't respect the hints, or on extensions that re-translate anyway,
+    // we recover by silently re-rendering instead of leaving them on the
+    // black "Error al cargar la página" screen. The error is still logged
+    // below so we can see if it keeps happening despite the fix.
+    if (
+      error?.name === 'NotFoundError' &&
+      typeof error?.message === 'string' &&
+      error.message.includes('removeChild')
+    ) {
+      // Reset the boundary so the children remount on the next tick.
+      // setTimeout instead of setState directly so React finishes the
+      // current commit phase before we tell it to retry.
+      setTimeout(() => this.setState({ hasError: false }), 0);
+      // Still log it so we know it's happening.
+      try {
+        import('@/integrations/supabase/client').then(({ supabase }) => {
+          supabase.from('client_logs').insert({
+            level: 'warning',
+            action: 'removeChild_recovered',
+            error_message: error?.message || String(error),
+            context: {
+              page_url: window.location.href,
+              user_agent: navigator.userAgent,
+            },
+          }).then(() => {});
+        }).catch(() => {});
+      } catch { /* swallow */ }
+      return;
+    }
     // For other errors, log to client_logs so they show up in /admin/logs
     try {
       import('@/integrations/supabase/client').then(({ supabase }) => {
