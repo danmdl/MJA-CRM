@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Analytics } from "@vercel/analytics/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import NotFound from "./pages/NotFound";
@@ -324,6 +325,13 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      {/* Vercel Web Analytics — counts visitors and page views with no
+          PII, no cookies, no consent banner needed. The component fires
+          a beacon on mount and on every route change (it picks up the
+          History API automatically), so dropping it once at the app
+          root is enough to instrument every page. Production-only by
+          default; local dev runs get ignored. */}
+      <Analytics />
       <BrowserRouter>
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
