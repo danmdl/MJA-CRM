@@ -116,14 +116,16 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
               anchor: new gmaps.Point(12, 24),
             },
             title: contactName,
-            zIndex: 10,
+            zIndex: 1000,
           });
 
-          // Blue info window for contact
+          // Blue info window for contact — open by default so the user
+          // sees both pins labeled the moment the dialog opens.
           const contactInfo = new gmaps.InfoWindow({
             maxWidth: 200,
             content: `<div style="font-family:system-ui,sans-serif;padding:0;color:#111;max-width:180px;"><div style="font-size:12px;font-weight:700;color:#1E40AF;">${contactName}</div><div style="font-size:10px;color:#777;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ${contactAddress}</div></div>`,
           });
+          contactInfo.open(map, contactMarker);
           contactMarker.addListener('click', () => contactInfo.open(map, contactMarker));
 
           // Gold pin for suggested cell with info window
@@ -153,16 +155,28 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
             });
             cellInfo.open(map, cellMarker);
 
-            // Fit bounds to show both markers with max zoom cap
+            // Fit bounds so BOTH pins are visible at the same time. The
+            // previous version capped zoom at 16 — when the contact and
+            // cell were geocoded close together (e.g. contact address is
+            // just a barrio centroid that lands near the cell) the cap
+            // zoomed in past the cell pin and the user only saw one of
+            // them. Now we cap at 14 so there's always plenty of context
+            // around both markers, and the padding keeps them away from
+            // the edges where the InfoWindow could clip them.
             const bounds = new gmaps.LatLngBounds();
             bounds.extend(contactPos);
             bounds.extend(cellPos);
-            map.fitBounds(bounds, { top: 60, right: 40, bottom: 40, left: 40 });
-            // Cap zoom so both pins are always visible even when very close
+            map.fitBounds(bounds, { top: 80, right: 60, bottom: 60, left: 60 });
             const listener = gmaps.event.addListener(map, 'idle', () => {
-              if (map.getZoom() > 16) map.setZoom(16);
+              if (map.getZoom() > 14) map.setZoom(14);
               gmaps.event.removeListener(listener);
             });
+          } else {
+            // No suggested cell — just center on the contact pin and let
+            // the user see where they are on the map. zoom 14 matches the
+            // both-pins case for visual consistency.
+            map.setZoom(14);
+            map.setCenter(contactPos);
           }
         });
       } catch (e) {
