@@ -237,44 +237,19 @@ const SemilleroPage = () => {
   });
 
   // Build a lookup map from teamMembers for resolving responsable names in
-  // the table cells and filter dropdowns. teamMembers only includes people
-  // assigned to THIS church, so anyone who's a responsable but lives in a
-  // different church (admins with church_id = NULL, supervisores cross-
-  // church, legacy data) wouldn't be findable. Layer in a second query
-  // that picks up exactly those missing responsible_ids — keeps the main
-  // teamMembers query small while making sure every name resolves.
-  const missingResponsableIds = React.useMemo(() => {
-    if (!allContacts?.length || !teamMembers) return [] as string[];
-    const knownIds = new Set(teamMembers.map(m => m.id));
-    const missing = new Set<string>();
-    allContacts.forEach(c => {
-      if (c.responsable_id && !knownIds.has(c.responsable_id)) missing.add(c.responsable_id);
-    });
-    return Array.from(missing);
-  }, [allContacts, teamMembers]);
-
-  const { data: extraResponsableProfiles } = useQuery<Array<{ id: string; first_name: string | null; last_name: string | null; numero_cuerda: string | null; church_id: string | null }>>({
-    queryKey: ['extra-responsable-profiles', missingResponsableIds.join(',')],
-    queryFn: async () => {
-      if (missingResponsableIds.length === 0) return [];
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, numero_cuerda, church_id')
-        .in('id', missingResponsableIds);
-      return data || [];
-    },
-    enabled: missingResponsableIds.length > 0,
-    staleTime: 5 * 60_000,
-  });
-
+  // the table cells and filter dropdowns. The previous version was a separate
+  // useQuery that fetched ALL profiles in the entire database with no filter
+  // (queryKey 'all-profiles-creator-lookup'), which was the main slowdown
+  // the user reported. The responsable_id field is only ever set to one of
+  // the 4 eligible roles (consolidador, encargado_de_celula, referente,
+  // supervisor) by the auto_assign_responsable trigger, and all of those roles
+  // belong to a specific church, so they're guaranteed to be in teamMembers.
+  // No need for a global profile lookup.
   const profileById = React.useMemo(() => {
     const m = new Map<string, { first_name: string; last_name: string }>();
     (teamMembers || []).forEach(p => m.set(p.id, { first_name: p.first_name, last_name: p.last_name }));
-    (extraResponsableProfiles || []).forEach(p =>
-      m.set(p.id, { first_name: p.first_name || '', last_name: p.last_name || '' })
-    );
     return m;
-  }, [teamMembers, extraResponsableProfiles]);
+  }, [teamMembers]);
 
   const { data: cells } = useQuery<Cell[]>({
     queryKey: ['cells-pool', churchId],
