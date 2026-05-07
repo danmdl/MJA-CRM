@@ -86,6 +86,7 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
         ...(canUseTemplates() ? [{ to: '/admin/templates', emoji: '📝', label: 'Templates' }] : []),
         ...(canImportCsv() ? [{ to: '/admin/csv-merger', emoji: '🔗', label: 'Unir columnas' }] : []),
+        ...(canAccessPermissions() ? [{ to: '/admin/csv-sandbox', emoji: '🧪', label: 'Sandbox CSV' }] : []),
         ...(profile?.role !== 'conector' ? [{ to: '/admin/notifications', emoji: '🔔', label: 'Notificaciones' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
@@ -108,6 +109,7 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
         ...(canImportCsv() ? [{ to: '/admin/csv-merger', emoji: '🔗', label: 'Unir columnas' }] : []),
+        ...(canAccessPermissions() ? [{ to: '/admin/csv-sandbox', emoji: '🧪', label: 'Sandbox CSV' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },

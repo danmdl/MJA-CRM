@@ -19,6 +19,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.includes('/mapa')) return 'Mapa';
   if (pathname.startsWith('/admin/churches')) return 'Ministerio';
   if (pathname === '/admin/permissions') return 'Permisos';
+  if (pathname === '/admin/csv-sandbox') return 'Sandbox CSV';
   if (pathname === '/admin/messages') return 'Mensajes';
   if (pathname === '/admin/notifications') return 'Notificaciones';
   if (pathname === '/admin/profile') return 'Perfil';
