@@ -30,18 +30,46 @@ interface ChurchCardProps {
 }
 
 const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId, currentUserRole }: ChurchCardProps) => {
+  // Cells: filter out soft-deleted ones. The previous version counted every
+  // cell including ones in the trash, which inflated the number on the card.
   const { data: cellsCount } = useQuery({
     queryKey: ['card-cells-count', church.id],
     queryFn: async () => {
-      const { count } = await supabase.from('cells').select('id', { count: 'exact', head: true }).eq('church_id', church.id);
+      const { count } = await supabase
+        .from('cells')
+        .select('id', { count: 'exact', head: true })
+        .eq('church_id', church.id)
+        .is('deleted_at', null);
       return count || 0;
     }
   });
 
-  const { data: membersInCells } = useQuery({
-    queryKey: ['card-members-count', church.id],
+  // Contacts: alive only. This is the metric that matters for measuring
+  // the church's reach — the Semillero plus everyone already assigned.
+  const { data: contactsCount } = useQuery({
+    queryKey: ['card-contacts-count', church.id],
     queryFn: async () => {
-      const { count } = await supabase.from('contacts').select('id', { count: 'exact', head: true }).eq('church_id', church.id).not('cell_id', 'is', null);
+      const { count } = await supabase
+        .from('contacts')
+        .select('id', { count: 'exact', head: true })
+        .eq('church_id', church.id)
+        .is('deleted_at', null);
+      return count || 0;
+    }
+  });
+
+  // Team members: profiles assigned to this church. The previous card
+  // showed "miembros" but was actually counting contacts with a cell_id,
+  // which is a different concept entirely (and was 4 for MJA Central
+  // when the team is 18 — confusing). Now it counts profiles, which is
+  // what the label implies.
+  const { data: teamCount } = useQuery({
+    queryKey: ['card-team-count', church.id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('church_id', church.id);
       return count || 0;
     }
   });
@@ -55,7 +83,7 @@ const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId
     <Card>
       <CardHeader>
         <CardTitle className="truncate">{church.name}</CardTitle>
-        <CardDescription>{cellsCount ?? 0} células · {membersInCells ?? 0} miembros</CardDescription>
+        <CardDescription>{cellsCount ?? 0} células · {contactsCount ?? 0} contactos · {teamCount ?? 0} en equipo</CardDescription>
       </CardHeader>
       <CardContent className="flex items-center justify-between">
         <Button asChild>
