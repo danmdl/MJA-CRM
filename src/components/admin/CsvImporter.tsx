@@ -384,7 +384,34 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       if (failed.length > 0) {
         setFailedContacts(failed);
       }
-      
+
+      // Persist the session so users (and supervisors) can see what happened
+      // later. Without this, anyone who closes the dialog loses the failure
+      // list — exactly what bit Micaela when ~200 of her rows were rejected.
+      // We zip the failed array with importErrors (collected per row earlier)
+      // to get the message alongside the raw row data.
+      try {
+        const errorByRow = new Map(importErrors.map(e => [e.row, e.message]));
+        const failuresPayload = failed.map(f => ({
+          row: f.row,
+          data: f.data,
+          message: errorByRow.get(f.row) || 'Error de inserción',
+        }));
+        await supabase.from('csv_import_logs').insert({
+          user_id: session?.user?.id,
+          church_id: churchId || null,
+          entity_type: tableName === 'contacts' ? 'contact' : tableName,
+          filename: file?.name || null,
+          total_rows: recordsToInsert.length,
+          success_count: successCount,
+          failure_count: failed.length,
+          failures: failuresPayload,
+        });
+      } catch (e) {
+        // Logging the import shouldn't fail the import itself — best effort.
+        console.error('[CsvImporter] failed to persist import log', e);
+      }
+
       if (successCount === 0 && failed.length > 0) {
         throw new Error(`No se pudo importar ningún contacto. ${failed.length} fila(s) con errores.`);
       }

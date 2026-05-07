@@ -7,6 +7,8 @@ import { Search } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CsvImportLogsView from '@/components/admin/CsvImportLogsView';
 
 interface LogEntry {
   id: string;
@@ -124,67 +126,83 @@ const HistorialPage = () => {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold">Historial de Actividad</h1>
-        <span className="text-sm text-muted-foreground">{filtered.length} registros</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => setFilterType('all')} className={`px-2.5 py-1 rounded text-xs border transition-colors ${filterType === 'all' ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>Todos</button>
-          {entityTypes.map(t => (
-            <button key={t} onClick={() => setFilterType(t === filterType ? 'all' : t)} className={`px-2.5 py-1 rounded text-xs border transition-colors ${filterType === t ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>{ENTITY_LABELS[t] || t}</button>
-          ))}
-        </div>
-      </div>
+      <Tabs defaultValue="actividad" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="actividad">Actividad</TabsTrigger>
+          <TabsTrigger value="importaciones">Importaciones CSV</TabsTrigger>
+        </TabsList>
 
-      <div className="space-y-2">
-        {filtered.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">Sin actividad registrada.</p>}
-        {filtered.map(log => {
-          const changes = getChangedFields(log.before_data, log.after_data);
-          const contactName = log.after_data
-            ? `${log.after_data.first_name || ''} ${log.after_data.last_name || ''}`.trim()
-            : '';
-
-          return (
-            <div key={log.id} className="p-3 rounded border hover:bg-muted/30 transition-colors">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">
-                    <span className="font-medium">{log.user_name}</span>
-                    {' '}
-                    <span className="text-muted-foreground">{ACTION_LABELS[log.action] || log.action}</span>
-                    {' '}
-                    <span className="text-muted-foreground">{ENTITY_LABELS[log.entity_type] || log.entity_type}</span>
-                    {contactName && <span className="font-medium"> — {contactName}</span>}
-                  </p>
-
-                  {changes.length > 0 && (
-                    <div className="mt-1.5 space-y-0.5">
-                      {changes.slice(0, 5).map((ch, i) => (
-                        <p key={i} className="text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/70">{formatFieldName(ch.field)}:</span>
-                          {' '}
-                          {ch.from != null && ch.from !== '' ? (
-                            <><span className="line-through opacity-50">{String(ch.from).slice(0, 40)}</span> → </>
-                          ) : null}
-                          <span>{ch.to != null ? String(ch.to).slice(0, 40) : '(vacío)'}</span>
-                        </p>
-                      ))}
-                      {changes.length > 5 && <p className="text-[10px] text-muted-foreground">+{changes.length - 5} campo(s) más</p>}
-                    </div>
-                  )}
-                </div>
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
-                  {format(new Date(log.created_at), "d MMM yy, HH:mm", { locale: es })}
-                </span>
-              </div>
+        <TabsContent value="actividad" className="space-y-4 mt-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground">{filtered.length} registros</span>
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-          );
-        })}
-      </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => setFilterType('all')} className={`px-2.5 py-1 rounded text-xs border transition-colors ${filterType === 'all' ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>Todos</button>
+              {entityTypes.map(t => (
+                <button key={t} onClick={() => setFilterType(t === filterType ? 'all' : t)} className={`px-2.5 py-1 rounded text-xs border transition-colors ${filterType === t ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>{ENTITY_LABELS[t] || t}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {filtered.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">Sin actividad registrada.</p>}
+            {filtered.map(log => {
+              const changes = getChangedFields(log.before_data, log.after_data);
+              const contactName = log.after_data
+                ? `${log.after_data.first_name || ''} ${log.after_data.last_name || ''}`.trim()
+                : '';
+
+              return (
+                <div key={log.id} className="p-3 rounded border hover:bg-muted/30 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm">
+                        <span className="font-medium">{log.user_name}</span>
+                        {' '}
+                        <span className="text-muted-foreground">{ACTION_LABELS[log.action] || log.action}</span>
+                        {' '}
+                        <span className="text-muted-foreground">{ENTITY_LABELS[log.entity_type] || log.entity_type}</span>
+                        {contactName && <span className="font-medium"> — {contactName}</span>}
+                      </p>
+
+                      {changes.length > 0 && (
+                        <div className="mt-1.5 space-y-0.5">
+                          {changes.slice(0, 5).map((ch, i) => (
+                            <p key={i} className="text-xs text-muted-foreground">
+                              <span className="font-medium text-foreground/70">{formatFieldName(ch.field)}:</span>
+                              {' '}
+                              {ch.from != null && ch.from !== '' ? (
+                                <><span className="line-through opacity-50">{String(ch.from).slice(0, 40)}</span> → </>
+                              ) : null}
+                              <span>{ch.to != null ? String(ch.to).slice(0, 40) : '(vacío)'}</span>
+                            </p>
+                          ))}
+                          {changes.length > 5 && <p className="text-[10px] text-muted-foreground">+{changes.length - 5} campo(s) más</p>}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+                      {format(new Date(log.created_at), "d MMM yy, HH:mm", { locale: es })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="importaciones" className="mt-0">
+          {/* List of every CSV import session for this church the user can see.
+              Click a row to expand and see the failed rows with their error
+              message + a 'Descargar CSV de fallidos' button. */}
+          {churchId && <CsvImportLogsView churchId={churchId} />}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
