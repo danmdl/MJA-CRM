@@ -367,25 +367,74 @@ const MapPickerPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)] min-h-[500px]">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3 px-1">
+    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[500px]">
+      {/* Header. Combines the project title with the responsable / sexo /
+          date filters on a single flex-wrap row when the viewport is wide
+          enough — they used to live in their own bar below, eating
+          another row of vertical space before the map. The search input
+          gets a tight max-width so it doesn't stretch across the whole
+          page (was flex-1 unbounded). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2 px-1">
         <button
           onClick={() => navigate(`/admin/churches/${churchId}/rutas`)}
-          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
           title="Volver a proyectos"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
         <RouteIcon className="h-5 w-5 text-primary shrink-0" />
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 shrink">
           <div className="text-base sm:text-lg font-semibold truncate">{project?.name || 'Selección por mapa'}</div>
-          <div className="text-xs text-muted-foreground hidden sm:block">
+          <div className="text-[11px] text-muted-foreground hidden lg:block">
             Filtrá los contactos, hacé click en los pines y armá tu ruta.
           </div>
         </div>
-        {/* Mobile view toggle */}
-        <div className="flex sm:hidden items-center bg-muted rounded-md p-0.5">
+
+        {/* Search lives right next to the title. Bounded width so it
+            doesn't eat the row, but still wide enough for typical
+            queries. */}
+        <div className="relative w-full sm:w-56 max-w-full shrink-0 sm:ml-2">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre o dirección..."
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+
+        {/* Filter dropdowns — same options as before, just sitting on the
+            header row instead of their own card. */}
+        <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background min-w-[140px] shrink-0">
+          <option value="">Todos los responsables</option>
+          <option value="__none__">Sin responsable</option>
+          {teamMembers
+            .filter(m => {
+              if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
+                return m.numero_cuerda === profile.numero_cuerda;
+              }
+              return true;
+            })
+            .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
+            .map(m => (
+              <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+            ))}
+        </select>
+        <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background shrink-0">
+          <option value="">Sexo: todos</option>
+          <option value="masculino">Masculino</option>
+          <option value="femenino">Femenino</option>
+        </select>
+        <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} title="Fecha contacto desde" className="h-8 text-xs border rounded px-2 bg-background shrink-0" />
+        <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} title="Fecha contacto hasta" className="h-8 text-xs border rounded px-2 bg-background shrink-0" />
+        {hasActiveFilters && (
+          <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 h-8 shrink-0">
+            <X className="h-3 w-3" /> Limpiar
+          </button>
+        )}
+
+        {/* Mobile view toggle stays at the right end of the row. */}
+        <div className="flex sm:hidden items-center bg-muted rounded-md p-0.5 ml-auto">
           <button
             onClick={() => setMobileView('map')}
             className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${mobileView === 'map' ? 'bg-background shadow' : 'text-muted-foreground'}`}
@@ -401,89 +450,53 @@ const MapPickerPage = () => {
         </div>
       </div>
 
-      {/* Filters bar */}
-      <div className="border rounded-lg bg-card mb-3 p-2 sm:p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por nombre o dirección..."
-              className="pl-8 h-8 text-xs"
-            />
-          </div>
-          <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background min-w-[140px]">
-            <option value="">Todos los responsables</option>
-            <option value="__none__">Sin responsable</option>
-            {teamMembers
-              .filter(m => {
-                if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
-                  return m.numero_cuerda === profile.numero_cuerda;
-                }
-                return true;
-              })
-              .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
-              .map(m => (
-                <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-              ))}
-          </select>
-          <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background">
-            <option value="">Sexo: todos</option>
-            <option value="masculino">Masculino</option>
-            <option value="femenino">Femenino</option>
-          </select>
-          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} title="Fecha contacto desde" className="h-8 text-xs border rounded px-2 bg-background" />
-          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} title="Fecha contacto hasta" className="h-8 text-xs border rounded px-2 bg-background" />
-          {hasActiveFilters && (
-            <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 h-8">
-              <X className="h-3 w-3" /> Limpiar
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5 mt-2">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Rápidos:</span>
-          <button onClick={() => setLastNDays(7)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted">Últimos 7 días</button>
-          <button onClick={() => setLastNDays(15)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted">Últimos 15 días</button>
-          <button onClick={() => setLastNDays(30)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted">Últimos 30 días</button>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer ml-auto select-none">
-            <input
-              type="checkbox"
-              checked={onlyWithNumber}
-              onChange={e => setOnlyWithNumber(e.target.checked)}
-              className="rounded border-input"
-            />
-            Solo direcciones con número
-          </label>
-        </div>
-      </div>
+      {/* Second row: quick date pills + 'Solo con número' + Starting point.
+          Punto de partida used to live in its own card below; now it
+          shares the row with the quick filters so the map starts higher
+          on the page. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3 px-1">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Rápidos:</span>
+        <button onClick={() => setLastNDays(7)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted shrink-0">7 días</button>
+        <button onClick={() => setLastNDays(15)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted shrink-0">15 días</button>
+        <button onClick={() => setLastNDays(30)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted shrink-0">30 días</button>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none shrink-0">
+          <input
+            type="checkbox"
+            checked={onlyWithNumber}
+            onChange={e => setOnlyWithNumber(e.target.checked)}
+            className="rounded border-input"
+          />
+          Solo con número
+        </label>
 
-      {/* Starting point panel */}
-      <div className="border rounded-lg bg-card mb-3 p-2 sm:p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <MapPin className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-semibold">Punto de partida</span>
-          {startLat && startLng && (
-            <span className="text-[10px] text-green-500 font-medium">✓ Listo</span>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex-1 min-w-[200px]">
+        {/* Punto de partida — inline on the second row. Label + address
+            input + the two preset buttons. The 'Listo' tick still surfaces
+            once a coordinate is set so the user knows the routing is
+            ready to compute. */}
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          <div className="flex items-center gap-1.5 text-xs shrink-0">
+            <MapPin className="h-3.5 w-3.5 text-primary" />
+            <span className="font-semibold">Partida:</span>
+            {startLat && startLng && (
+              <span className="text-[10px] text-green-500 font-medium">✓ Listo</span>
+            )}
+          </div>
+          <div className="w-56 max-w-full">
             <AddressAutocomplete
               value={startAddress}
               onChange={(addr, lat, lng) => {
                 setStartAddress(addr);
                 if (lat && lng) { setStartLat(lat); setStartLng(lng); }
               }}
-              placeholder="Escribí la dirección de partida..."
+              placeholder="Dirección de partida..."
               biasLat={churchCoords?.lat ?? null}
               biasLng={churchCoords?.lng ?? null}
             />
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs h-8">
+          <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs h-8 shrink-0">
             <Navigation className="h-3 w-3 mr-1" /> Mi ubicación
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={useChurchAddress} className="text-xs h-8" disabled={!church?.address}>
+          <Button type="button" size="sm" variant="outline" onClick={useChurchAddress} className="text-xs h-8 shrink-0" disabled={!church?.address}>
             <MapPin className="h-3 w-3 mr-1" /> Iglesia
           </Button>
         </div>
