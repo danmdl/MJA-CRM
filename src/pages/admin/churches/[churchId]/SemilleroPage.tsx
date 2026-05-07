@@ -612,44 +612,39 @@ const SemilleroPage = () => {
         filtered = filtered.filter(c => c.responsable_id === userId);
       }
     }
-    // Duplicate-only mode is exclusive: when on, ignore every other filter
-    // (search / cuerda / responsable / conector / saved tab) and just show
-    // the rows flagged with the amber dot. The visibility gate above still
-    // applies — non-globals stay clamped to their own cuerda for security
-    // reasons regardless of this toggle.
+    // When Duplicados toggle is on, narrow to the dup-flagged rows BUT
+    // keep the other active filters (Responsable, Cuerda, Conector, search)
+    // applied — so picking Responsable=Mauro and then Duplicados shows
+    // only Mauro's duplicates, not all of them. The visibility gate above
+    // still applies as the first cut for non-globals.
+    if (searchTerm) {
+      const s = normalize(searchTerm);
+      filtered = filtered.filter(c =>
+        normalize(c.first_name || '').includes(s) || normalize(c.last_name || '').includes(s) ||
+        normalize(c.address || '').includes(s) || normalize(c.barrio || '').includes(s) ||
+        normalize(c.phone || '').includes(s)
+      );
+    }
+    if (filterCuerda) {
+      filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
+    }
+    if (filterResponsable === '__none__') {
+      filtered = filtered.filter(c => !c.responsable_id);
+    } else if (filterResponsable) {
+      filtered = filtered.filter(c => c.responsable_id === filterResponsable);
+    }
+    if (filterConector === '__none__') {
+      filtered = filtered.filter(c => !c.conector);
+    } else if (filterConector) {
+      const target = normalize(filterConector);
+      filtered = filtered.filter(c => c.conector && normalize(c.conector) === target);
+    }
     if (filterDuplicates) {
       filtered = filtered.filter(c => duplicateNameIds.has(c.id));
-    } else {
-      if (searchTerm) {
-        const s = normalize(searchTerm);
-        filtered = filtered.filter(c =>
-          normalize(c.first_name || '').includes(s) || normalize(c.last_name || '').includes(s) ||
-          normalize(c.address || '').includes(s) || normalize(c.barrio || '').includes(s) ||
-          normalize(c.phone || '').includes(s)
-        );
-      }
-      if (filterCuerda) {
-        filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
-      }
-      if (filterResponsable === '__none__') {
-        filtered = filtered.filter(c => !c.responsable_id);
-      } else if (filterResponsable) {
-        filtered = filtered.filter(c => c.responsable_id === filterResponsable);
-      }
-      if (filterConector === '__none__') {
-        filtered = filtered.filter(c => !c.conector);
-      } else if (filterConector) {
-        // Normalize-aware match so a filter set to "Camila Próspero" still
-        // catches rows stored as "Camila Prospero" (and vice versa). Same
-        // helper used by the dedupe in the dropdown — keeps both ends of
-        // the contract consistent.
-        const target = normalize(filterConector);
-        filtered = filtered.filter(c => c.conector && normalize(c.conector) === target);
-      }
-      // Apply active tab filters (saved per-user filter combination)
-      if (activeTabId && Object.keys(activeTabFilters).length > 0) {
-        filtered = applyFilterTab(filtered, activeTabFilters);
-      }
+    }
+    // Apply active tab filters (saved per-user filter combination)
+    if (activeTabId && Object.keys(activeTabFilters).length > 0) {
+      filtered = applyFilterTab(filtered, activeTabFilters);
     }
     // Sorting. When Duplicados toggle is on, we force-sort by normalized
     // name regardless of what the user's sort header was set to — there's
