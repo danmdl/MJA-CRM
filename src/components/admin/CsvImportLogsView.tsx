@@ -17,6 +17,11 @@ interface ImportLog {
   success_count: number;
   failure_count: number;
   failures: Array<{ row: number; data: Record<string, string>; message: string }>;
+  // Snapshot of the original CSV row data for every successful insert.
+  // Null on rows written before this column existed (May 2026 and earlier);
+  // for those, the imported-contacts view falls back to the time-window
+  // reconstruction that queries the live contacts table.
+  imported_rows: Array<{ row: number; data: Record<string, any> }> | null;
   created_at: string;
   user_name?: string;
 }
@@ -37,20 +42,47 @@ interface Props {
 }
 
 // Reconstructs the list of contacts that came in via a specific import log
-// row. The csv_import_logs entry is written AFTER the contacts loop
-// finishes, so the log's created_at is roughly right after the last insert.
-// We pull every contact created by the same user inside a window that ends
-// at the log timestamp + a small buffer, then take the most-recent
-// success_count of them.
+// row. Two modes:
 //
-// Why a window instead of an exact join: the import doesn't tag each
-// contact with the import_log_id (it predates the log table). We could
-// migrate the schema and backfill, but the time-window approach gives an
-// answer for every existing log row without a DB change. The window is
-// generous enough (10 min before + 30 sec after) to comfortably capture
-// even slow imports of thousands of rows.
+//   1. Snapshot mode (imports written after the imported_rows column was
+//      added). The log row carries the exact CSV data that came in, so
+//      we render that directly. This is the AUTHORITATIVE view of "what
+//      the file said" — independent of any later edits, triggers, or
+//      migrations that may have changed the contacts since.
+//
+//   2. Reconstruction mode (legacy log rows where imported_rows is null).
+//      We query the live contacts table by created_by + a time window
+//      around the log timestamp, ordered most-recent-first, limited to
+//      success_count. This shows the CURRENT state of the contacts —
+//      which may differ from the original CSV if anything edited them
+//      after the import. Tagged in the UI so the user knows to read
+//      it accordingly.
 const ImportedContactsList = ({ log }: { log: ImportLog }) => {
-  const { data: contacts = [], isLoading } = useQuery<ImportedContact[]>({
+  const hasSnapshot = Array.isArray(log.imported_rows) && log.imported_rows.length > 0;
+
+  // Snapshot mode is purely client-side, no fetch needed. We still bring
+  // in the live contacts when we have a snapshot, but only to show the
+  // contact's CURRENT cuerda alongside the original — useful when a
+  // migration or trigger has changed it (e.g. the cuerda alignment fix).
+  const snapshotContactIds = hasSnapshot
+    ? (log.imported_rows || []).map(r => r.data?.id).filter(Boolean) as string[]
+    : [];
+
+  const { data: liveById = new Map<string, ImportedContact>(), isLoading: liveLoading } = useQuery<Map<string, ImportedContact>>({
+    queryKey: ['csv-import-live', log.id, snapshotContactIds.length],
+    queryFn: async () => {
+      if (snapshotContactIds.length === 0) return new Map();
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, phone, address, numero_cuerda, fecha_contacto, created_at')
+        .in('id', snapshotContactIds);
+      return new Map((data || []).map((c: ImportedContact) => [c.id, c]));
+    },
+    enabled: hasSnapshot,
+    staleTime: 60_000,
+  });
+
+  const { data: reconstructed = [], isLoading: reconstructedLoading } = useQuery<ImportedContact[]>({
     queryKey: ['csv-import-contacts', log.id],
     queryFn: async () => {
       const logTime = new Date(log.created_at).getTime();
@@ -64,45 +96,110 @@ const ImportedContactsList = ({ log }: { log: ImportLog }) => {
         .lte('created_at', windowEnd)
         .order('created_at', { ascending: false })
         .limit(Math.max(log.success_count, 1));
-      // We asked for the most recent first so we pick up the import block;
-      // re-flip so the user sees them in the order they were inserted (the
-      // file's row order).
       return (data || []).reverse() as ImportedContact[];
     },
-    // Only run when this log row is expanded — keeps the page light when
-    // there are 50 imports listed and the user only opens one.
+    enabled: !hasSnapshot,
     staleTime: 60_000,
   });
 
+  const isLoading = hasSnapshot ? liveLoading : reconstructedLoading;
   if (isLoading) {
     return <div className="text-sm text-muted-foreground py-4">Cargando contactos importados...</div>;
   }
 
-  if (contacts.length === 0) {
+  if (hasSnapshot) {
+    const rows = log.imported_rows || [];
+    if (rows.length === 0) {
+      return <div className="text-sm text-muted-foreground py-2">Este import no tiene filas registradas.</div>;
+    }
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+            <Users className="h-3 w-3" />
+            {rows.length} contacto{rows.length === 1 ? '' : 's'} cargado{rows.length === 1 ? '' : 's'}
+          </span>
+          <span className="text-[10px] text-muted-foreground italic">
+            Datos del archivo original; la columna "Cuerda actual" puede diferir si fue editada.
+          </span>
+        </div>
+        <div className="rounded border border-border/50 bg-background/50 max-h-[400px] overflow-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-background/95 backdrop-blur z-10">
+              <tr className="border-b border-border/50">
+                <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-10">#</th>
+                <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Nombre</th>
+                <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Teléfono</th>
+                <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Dirección</th>
+                <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-20">Cuerda CSV</th>
+                <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-20">Cuerda actual</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const d = r.data || {};
+                // Pull values from the CSV columns that the importer wrote
+                // through to the contact. The keys here match the
+                // dataToImport[i] shape in CsvImporter — original CSV
+                // headers, lowercased.
+                const csvName = [d.first_name || d.nombre, d.last_name || d.apellido].filter(Boolean).join(' ');
+                const csvPhone = d.phone || d.telefono;
+                const csvAddress = d.address || d.direccion || d.domicilio;
+                const csvCuerda = d.numero_cuerda || d.cuerda;
+                const live = d.id ? liveById.get(d.id) : null;
+                const liveCuerda = live?.numero_cuerda;
+                const cuerdaChanged = csvCuerda && liveCuerda && String(csvCuerda) !== String(liveCuerda);
+                return (
+                  <tr key={i} className="border-b border-border/30 last:border-b-0 hover:bg-muted/20">
+                    <td className="px-2 py-1.5 align-top text-muted-foreground tabular-nums">{r.row}</td>
+                    <td className="px-2 py-1.5 align-top">{csvName || <span className="text-muted-foreground italic">sin nombre</span>}</td>
+                    <td className="px-2 py-1.5 align-top tabular-nums">{csvPhone || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="px-2 py-1.5 align-top">{csvAddress || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="px-2 py-1.5 align-top tabular-nums">{csvCuerda || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="px-2 py-1.5 align-top tabular-nums">
+                      {liveCuerda ? (
+                        <span className={cuerdaChanged ? 'text-amber-400' : ''} title={cuerdaChanged ? `Cambió de ${csvCuerda} a ${liveCuerda}` : undefined}>
+                          {liveCuerda}{cuerdaChanged && <span className="ml-1">⚠</span>}
+                        </span>
+                      ) : live === null ? (
+                        <span className="text-muted-foreground">eliminado</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for legacy logs without a snapshot.
+  if (reconstructed.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-2">
         No pudimos recuperar la lista de contactos para este import.
       </div>
     );
   }
-
-  // Soft warning if the count we recovered doesn't match what the log
-  // claims succeeded. Could mean some contacts were soft-deleted later, or
-  // that the user did manual creates inside the same window. Either way
-  // we'd rather show what we found and label the discrepancy than hide it.
-  const mismatch = contacts.length !== log.success_count;
-
+  const mismatch = reconstructed.length !== log.success_count;
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
           <Users className="h-3 w-3" />
-          {contacts.length} contacto{contacts.length === 1 ? '' : 's'} cargado{contacts.length === 1 ? '' : 's'}
+          {reconstructed.length} contacto{reconstructed.length === 1 ? '' : 's'} cargado{reconstructed.length === 1 ? '' : 's'}
           {mismatch && (
             <span className="text-amber-400 ml-1">
               (el log indica {log.success_count}; algunos pueden haber sido eliminados después)
             </span>
           )}
+        </span>
+        <span className="text-[10px] text-muted-foreground italic">
+          Estado actual de los contactos. Para imports más viejos no guardamos snapshot del archivo original.
         </span>
       </div>
       <div className="rounded border border-border/50 bg-background/50 max-h-[400px] overflow-auto">
@@ -117,7 +214,7 @@ const ImportedContactsList = ({ log }: { log: ImportLog }) => {
             </tr>
           </thead>
           <tbody>
-            {contacts.map((c, i) => (
+            {reconstructed.map((c, i) => (
               <tr key={c.id} className="border-b border-border/30 last:border-b-0 hover:bg-muted/20">
                 <td className="px-2 py-1.5 align-top text-muted-foreground tabular-nums">{i + 1}</td>
                 <td className="px-2 py-1.5 align-top">
@@ -146,7 +243,7 @@ const CsvImportLogsView = ({ churchId }: Props) => {
     queryFn: async () => {
       const { data: rows } = await supabase
         .from('csv_import_logs')
-        .select('id, user_id, church_id, entity_type, filename, total_rows, success_count, failure_count, failures, created_at')
+        .select('id, user_id, church_id, entity_type, filename, total_rows, success_count, failure_count, failures, imported_rows, created_at')
         .eq('church_id', churchId)
         .order('created_at', { ascending: false })
         .limit(50);

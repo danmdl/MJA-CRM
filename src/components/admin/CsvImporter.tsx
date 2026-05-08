@@ -328,6 +328,14 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       // Insert records individually to track exactly which ones fail
       const failed: {row: number, data: Record<string, string>}[] = [];
       const importedIds: string[] = [];
+      // Snapshot of the original CSV row data for every successful insert,
+      // so we can persist it on the import log for later forensic viewing.
+      // Without this, when a trigger or migration later changes the
+      // contact's columns (e.g. the cuerda alignment migration moved
+      // Micaela's contacts from 104 → 204), Historial only sees the
+      // current value and the user can't tell what the file actually
+      // said. The snapshot answers "what came in" independently.
+      const importedRows: Array<{ row: number; data: Record<string, any> }> = [];
       let successCount = 0;
       
       for (let i = 0; i < recordsToInsert.length; i++) {
@@ -352,7 +360,19 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
           await logEvent({ action: 'csv_import', error, payload: { row: i + 1, church_id: churchId }, context: { church_id: churchId } });
         } else {
           successCount++;
-          if (inserted) importedIds.push(inserted.id);
+          if (inserted) {
+            importedIds.push(inserted.id);
+            // Capture both the original CSV row (dataToImport[i]) and the
+            // contact's id so the Historial view can hard-link rather
+            // than reconstruct via time-window heuristics. Storing the
+            // full row keeps "what the file said" pinned permanently —
+            // even if every column on the contact gets edited later, the
+            // import log still shows the original.
+            importedRows.push({
+              row: i + 1,
+              data: { id: inserted.id, ...dataToImport[i] },
+            });
+          }
           // Log every successful import to activity_logs so it appears in Historial.
           // Without this, bulk-imported contacts were invisible in the historial view
           // even though they existed in the contacts table.
@@ -395,6 +415,12 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
           success_count: successCount,
           failure_count: failed.length,
           failures: failuresPayload,
+          // Store the original CSV row data for every successful insert,
+          // pinned to the contact's id so we can render the historical
+          // view independent of whatever happens to the contact later.
+          // This is what lets Historial answer "what did the file say?"
+          // versus "what does the contact look like now?".
+          imported_rows: importedRows,
         });
       } catch (e) {
         // Logging the import shouldn't fail the import itself — best effort.
