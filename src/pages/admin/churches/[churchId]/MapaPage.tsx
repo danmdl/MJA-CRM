@@ -1,14 +1,17 @@
 "use client";
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Loader2 } from 'lucide-react';
+import { MapPin, Loader2, Users, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
+import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
+import { isWithinGBA } from '@/lib/geo-validation';
+import { useSession } from '@/hooks/use-session';
 
 interface Cell {
   id: string;
@@ -21,6 +24,16 @@ interface Cell {
   leader_name: string | null;
   anfitrion_name: string | null;
   cuerda_numero: string | null;
+}
+
+interface ContactPin {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  address: string | null;
+  lat: number;
+  lng: number;
+  numero_cuerda: string | null;
 }
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
@@ -80,12 +93,45 @@ const geocodeAddress = async (
 
 const MapaPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
+  const { profile } = useSession();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const queryClient = useQueryClient();
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  // Contact profile dialog target — shared with the 'contacts' view mode
+  // for when the user clicks a contact marker on the map.
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+
+  // Two view modes share this page now:
+  //   - 'cells' (default): paints cells on the map. Clicking a marker
+  //     opens the cell info window with leader / schedule / Ver
+  //     detalles button. Same behavior the page has always had.
+  //   - 'contacts': paints every contact with coords as a small dot.
+  //     Color encodes alignment quality:
+  //       * yellow = inside GBA bounding box, looks correct
+  //       * red = inside CABA's bounding box AND the address text
+  //         doesn't mention CABA / Capital. These are the
+  //         miscoded contacts the locality bug stranded in
+  //         Capital. Lets the user spot them visually.
+  //       * orange-red = outside GBA entirely (almost certainly
+  //         wrong, likely needs manual address fix)
+  //     Clicking opens the contact profile dialog.
+  // Mode persists in URL hash so reloading keeps the state.
+  const [viewMode, setViewMode] = useState<'cells' | 'contacts'>(() => {
+    if (typeof window === 'undefined') return 'cells';
+    return window.location.hash === '#contacts' ? 'contacts' : 'cells';
+  });
+  useEffect(() => {
+    if (viewMode === 'contacts') {
+      window.location.hash = '#contacts';
+    } else if (window.location.hash === '#contacts') {
+      // Clear the hash without scrolling. history.replaceState avoids
+      // pushing a new entry for what's effectively a no-op nav.
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, [viewMode]);
 
   const { data: cells, isLoading } = useQuery<Cell[]>({
     queryKey: ['cells-map', churchId],
@@ -135,20 +181,76 @@ const MapaPage = () => {
     enabled: !!churchId,
     staleTime: 60_000,
   });
-  const availableCuerdas = React.useMemo(() => {
+
+  // Contacts-with-coords query — only fires when the user picks the
+  // 'contacts' view mode. Same paginated walk as RouteEditorPage and
+  // SemilleroPage to get past the 1000-row API cap. Visibility gate
+  // mirrors Semillero's: globals see everything, below-supervisor users
+  // see only their own cuerda's contacts.
+  const { data: mapContacts, isLoading: contactsLoading } = useQuery<ContactPin[]>({
+    queryKey: ['contacts-map', churchId, profile?.id, profile?.role, profile?.numero_cuerda],
+    queryFn: async () => {
+      const PAGE_SIZE = 1000;
+      const all: ContactPin[] = [];
+      for (let page = 0; ; page++) {
+        let q = supabase.from('contacts')
+          .select('id, first_name, last_name, address, lat, lng, numero_cuerda')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .order('id', { ascending: true })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
+          if (profile.numero_cuerda) {
+            q = q.eq('numero_cuerda', profile.numero_cuerda);
+          } else {
+            q = q.eq('responsable_id', profile.id);
+          }
+        }
+        const { data, error } = await q;
+        if (error) {
+          console.error('[contacts-map] page', page, 'error', error);
+          break;
+        }
+        const rows = (data || []) as ContactPin[];
+        all.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        if (page >= 49) break; // 50k cap, way beyond expected size
+      }
+      return all;
+    },
+    enabled: !!churchId && !!profile && viewMode === 'contacts',
+    staleTime: 60_000,
+  });
+  // Cuerdas displayed in the chip filter row come from whichever data
+  // set is being shown right now (cells or contacts). When the user
+  // toggles to 'contacts', any cuerdas that have contacts but no cells
+  // become available chips, and vice-versa.
+  const availableCuerdas = useMemo(() => {
     const nums = new Set<string>();
-    (cells || []).forEach(c => { if (c.cuerda_numero) nums.add(c.cuerda_numero); });
+    if (viewMode === 'cells') {
+      (cells || []).forEach(c => { if (c.cuerda_numero) nums.add(c.cuerda_numero); });
+    } else {
+      (mapContacts || []).forEach(c => { if (c.numero_cuerda) nums.add(c.numero_cuerda); });
+    }
     return Array.from(nums).sort((a, b) => Number(a) - Number(b));
-  }, [cells]);
+  }, [cells, mapContacts, viewMode]);
 
   // Which cuerdas are visible — starts with all selected
   const [visibleCuerdas, setVisibleCuerdas] = useState<Set<string> | null>(null);
-  // Initialize once when cuerdas data loads
+  // Initialize once when cuerdas data loads. Also re-initialize when
+  // switching modes so a brand-new cuerda set doesn't get filtered to
+  // nothing accidentally.
+  const lastModeRef = useRef(viewMode);
   React.useEffect(() => {
-    if (availableCuerdas.length > 0 && visibleCuerdas === null) {
+    if (availableCuerdas.length === 0) return;
+    const modeChanged = lastModeRef.current !== viewMode;
+    lastModeRef.current = viewMode;
+    if (visibleCuerdas === null || modeChanged) {
       setVisibleCuerdas(new Set(availableCuerdas));
     }
-  }, [availableCuerdas]);
+  }, [availableCuerdas, viewMode]);
 
   const toggleCuerda = (num: string) => {
     setVisibleCuerdas(prev => {
@@ -167,6 +269,38 @@ const MapaPage = () => {
     !c.cuerda_numero || !visibleCuerdas || visibleCuerdas.has(c.cuerda_numero)
   );
   const needsGeocode = (cells || []).filter(c => c.address && (!c.lat || !c.lng));
+
+  // Mappable contacts (only relevant in 'contacts' view mode). Same
+  // cuerda visibility filter as cells.
+  const mappableContacts = useMemo(() => {
+    return (mapContacts || []).filter(c =>
+      !c.numero_cuerda || !visibleCuerdas || visibleCuerdas.has(c.numero_cuerda)
+    );
+  }, [mapContacts, visibleCuerdas]);
+
+  // Classifies a contact's coordinates into one of three buckets so we
+  // can color-code markers in 'contacts' view. The user spotted that
+  // many contacts ended up geocoded into Capital Federal even though
+  // their addresses were clearly elsewhere — this turns that pattern
+  // into a visual signal.
+  //
+  //   'good'  → coords inside GBA, looks correct (yellow)
+  //   'caba'  → coords inside CABA's bounding box AND address text
+  //             doesn't mention CABA / Capital — a misalignment
+  //             suspect (red)
+  //   'far'   → coords outside GBA entirely — almost certainly wrong
+  //             (orange-red)
+  const classifyContactCoords = (c: ContactPin): 'good' | 'caba' | 'far' => {
+    if (!isWithinGBA(c.lat, c.lng)) return 'far';
+    // CABA bounding box (same one used in the bulk re-geocode tool)
+    const inCABA = c.lat >= -34.71 && c.lat <= -34.50 && c.lng >= -58.55 && c.lng <= -58.33;
+    if (inCABA) {
+      const norm = (c.address || '').toLowerCase();
+      const mentions = norm.includes('caba') || norm.includes('capital') || norm.includes('ciudad autonoma') || norm.includes('ciudad autónoma');
+      if (!mentions) return 'caba';
+    }
+    return 'good';
+  };
 
   const [geocodeFailed, setGeocodeFailed] = useState<string[]>([]);
 
@@ -225,11 +359,23 @@ const MapaPage = () => {
     return map;
   }, [availableCuerdas]);
 
+  // Stable key for the contacts view that changes when ANY contact's
+  // position or visibility changes. Mirrors mappableCellKey above.
+  const mappableContactKey = mappableContacts.map(c => `${c.id}:${c.lat}:${c.lng}`).join(',');
+
   useEffect(() => {
     if (!mapRef.current || isLoading || geocoding) return;
+    if (viewMode === 'contacts' && contactsLoading) return;
 
-    // If no cells to show (e.g. "Ninguna" filter), clear the map
-    if (!mappableCells.length) {
+    // Pick the data set for the current view mode.
+    const itemsForMap: Array<{ lat: number; lng: number }> =
+      viewMode === 'cells'
+        ? mappableCells.map(c => ({ lat: c.lat!, lng: c.lng! }))
+        : mappableContacts;
+
+    // Empty state — clear the map and let the JSX show the "nothing to
+    // see" panel.
+    if (!itemsForMap.length) {
       if (mapInstanceRef.current) {
         mapInstanceRef.current = null;
         mapRef.current!.innerHTML = '';
@@ -245,7 +391,7 @@ const MapaPage = () => {
         mapRef.current!.innerHTML = '';
       }
 
-      const center = { lat: mappableCells[0].lat!, lng: mappableCells[0].lng! };
+      const center = { lat: itemsForMap[0].lat, lng: itemsForMap[0].lng };
       const map = new gmaps.Map(mapRef.current, {
         center,
         zoom: 13,
@@ -274,61 +420,122 @@ const MapaPage = () => {
       const bounds = new gmaps.LatLngBounds();
       const infoWindow = new gmaps.InfoWindow();
 
-      // Global callback for info window "Ver detalles" button
+      // Global callbacks for info window action buttons.
       (window as any).__openCellDetails = (cellId: string) => {
         setSelectedCellId(cellId);
       };
+      (window as any).__openContactDetails = (contactId: string) => {
+        setSelectedContactId(contactId);
+        infoWindow.close();
+      };
 
-      mappableCells.forEach(cell => {
-        const leader = cell.leader_name || 'Sin líder';
-        const anfitrion = cell.anfitrion_name || '';
-        const schedule = [cell.meeting_day, cell.meeting_time].filter(Boolean).join(' · ') || 'Sin horario';
-        const cuerdaLabel = cell.cuerda_numero ? `Cuerda ${cell.cuerda_numero}` : '';
-        const pos = { lat: cell.lat!, lng: cell.lng! };
-        const contactCount = cellContactCounts?.[cell.id] || 0;
+      if (viewMode === 'cells') {
+        // ─── CELLS MODE ────────────────────────────────────────────────
+        mappableCells.forEach(cell => {
+          const leader = cell.leader_name || 'Sin líder';
+          const anfitrion = cell.anfitrion_name || '';
+          const schedule = [cell.meeting_day, cell.meeting_time].filter(Boolean).join(' · ') || 'Sin horario';
+          const cuerdaLabel = cell.cuerda_numero ? `Cuerda ${cell.cuerda_numero}` : '';
+          const pos = { lat: cell.lat!, lng: cell.lng! };
+          const contactCount = cellContactCounts?.[cell.id] || 0;
 
-        // Color by cuerda, fallback to gold
-        const colors = cell.cuerda_numero ? cuerdaColorMap.get(cell.cuerda_numero) : null;
-        const fillColor = colors?.fill || '#FFC233';
-        const strokeColor = colors?.stroke || '#B8720A';
+          // Color by cuerda, fallback to gold
+          const colors = cell.cuerda_numero ? cuerdaColorMap.get(cell.cuerda_numero) : null;
+          const fillColor = colors?.fill || '#FFC233';
+          const strokeColor = colors?.stroke || '#B8720A';
 
-        const markerIcon = {
-          path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
-          fillColor,
-          fillOpacity: 1,
-          strokeColor,
-          strokeWeight: 1.5,
-          scale: 1.6,
-          anchor: new gmaps.Point(12, 24),
-        };
+          const markerIcon = {
+            path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
+            fillColor,
+            fillOpacity: 1,
+            strokeColor,
+            strokeWeight: 1.5,
+            scale: 1.6,
+            anchor: new gmaps.Point(12, 24),
+          };
 
-        const marker = new gmaps.Marker({
-          position: pos,
-          map,
-          icon: markerIcon,
-          title: cell.name,
+          const marker = new gmaps.Marker({
+            position: pos,
+            map,
+            icon: markerIcon,
+            title: cell.name,
+          });
+
+          marker.addListener('click', () => {
+            infoWindow.setContent(`
+              <div style="font-family:system-ui,sans-serif;min-width:220px;padding:4px 0;color:#111;">
+                <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${cell.name}</div>
+                ${cuerdaLabel ? `<div style="font-size:12px;color:#555;margin-bottom:2px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fillColor};margin-right:4px;vertical-align:middle;"></span>${cuerdaLabel}</div>` : ''}
+                <div style="font-size:12px;color:#555;margin-bottom:2px;">👤 Líder: ${leader}</div>
+                ${anfitrion ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🏠 Anfitrión: ${anfitrion}</div>` : ''}
+                <div style="font-size:12px;color:#555;margin-bottom:2px;">🕐 ${schedule}</div>
+                <div style="font-size:12px;color:#555;margin-bottom:2px;">👥 ${contactCount} persona${contactCount !== 1 ? 's' : ''}</div>
+                ${cell.address ? `<div style="font-size:11px;color:#777;margin-top:4px;">📍 ${cell.address}</div>` : ''}
+                <div style="margin-top:8px;"><button onclick="window.__openCellDetails('${cell.id}')" style="background:#FFC233;color:#000;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Ver detalles</button></div>
+              </div>
+            `);
+            infoWindow.open(map, marker);
+          });
+
+          bounds.extend(pos);
         });
+      } else {
+        // ─── CONTACTS MODE ─────────────────────────────────────────────
+        // Smaller circle markers (vs cells' drop-pin) so a thousand pins
+        // don't overwhelm the map. Color by classification: yellow for
+        // good, red for misaligned-into-CABA, dark-orange for outside-
+        // GBA. The user uses this view specifically to spot reds.
+        mappableContacts.forEach(contact => {
+          const pos = { lat: contact.lat, lng: contact.lng };
+          const cls = classifyContactCoords(contact);
+          const fillColor =
+            cls === 'caba' ? '#ef4444' :
+            cls === 'far'  ? '#dc2626' :
+            '#FFC233';
+          const strokeColor =
+            cls === 'caba' ? '#7f1d1d' :
+            cls === 'far'  ? '#7f1d1d' :
+            '#B8720A';
 
-        marker.addListener('click', () => {
-          infoWindow.setContent(`
-            <div style="font-family:system-ui,sans-serif;min-width:220px;padding:4px 0;color:#111;">
-              <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${cell.name}</div>
-              ${cuerdaLabel ? `<div style="font-size:12px;color:#555;margin-bottom:2px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fillColor};margin-right:4px;vertical-align:middle;"></span>${cuerdaLabel}</div>` : ''}
-              <div style="font-size:12px;color:#555;margin-bottom:2px;">👤 Líder: ${leader}</div>
-              ${anfitrion ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🏠 Anfitrión: ${anfitrion}</div>` : ''}
-              <div style="font-size:12px;color:#555;margin-bottom:2px;">🕐 ${schedule}</div>
-              <div style="font-size:12px;color:#555;margin-bottom:2px;">👥 ${contactCount} persona${contactCount !== 1 ? 's' : ''}</div>
-              ${cell.address ? `<div style="font-size:11px;color:#777;margin-top:4px;">📍 ${cell.address}</div>` : ''}
-              <div style="margin-top:8px;"><button onclick="window.__openCellDetails('${cell.id}')" style="background:#FFC233;color:#000;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Ver detalles</button></div>
-            </div>
-          `);
-          infoWindow.open(map, marker);
+          const markerIcon = {
+            path: gmaps.SymbolPath.CIRCLE,
+            scale: cls === 'good' ? 5 : 6, // bad ones slightly bigger so they pop visually
+            fillColor,
+            fillOpacity: 0.85,
+            strokeColor,
+            strokeWeight: 1,
+          };
+
+          const marker = new gmaps.Marker({
+            position: pos,
+            map,
+            icon: markerIcon,
+            title: `${contact.first_name} ${contact.last_name || ''}`.trim(),
+          });
+
+          marker.addListener('click', () => {
+            const cuerdaLabel = contact.numero_cuerda ? `Cuerda ${contact.numero_cuerda}` : 'Sin cuerda';
+            const warning =
+              cls === 'caba' ? '<div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:600;">⚠ Posible mala geocodificación: cae en CABA pero la dirección no menciona Capital.</div>' :
+              cls === 'far'  ? '<div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:600;">⚠ Coordenadas fuera del Gran Buenos Aires.</div>' :
+              '';
+            infoWindow.setContent(`
+              <div style="font-family:system-ui,sans-serif;min-width:220px;padding:4px 0;color:#111;">
+                <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${contact.first_name} ${contact.last_name || ''}</div>
+                <div style="font-size:12px;color:#555;margin-bottom:2px;">${cuerdaLabel}</div>
+                ${contact.address ? `<div style="font-size:11px;color:#777;margin-top:4px;">📍 ${contact.address}</div>` : '<div style="font-size:11px;color:#999;margin-top:4px;">Sin dirección</div>'}
+                ${warning}
+                <div style="margin-top:8px;"><button onclick="window.__openContactDetails('${contact.id}')" style="background:#FFC233;color:#000;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Ver perfil</button></div>
+              </div>
+            `);
+            infoWindow.open(map, marker);
+          });
+
+          bounds.extend(pos);
         });
+      }
 
-        bounds.extend(pos);
-      });
-
-      if (mappableCells.length === 1) {
+      if (itemsForMap.length === 1) {
         map.setCenter(bounds.getCenter());
         map.setZoom(15);
       } else {
@@ -337,7 +544,41 @@ const MapaPage = () => {
     };
 
     initMap();
-  }, [mappableCellKey, isLoading, geocoding, cellContactCounts]);
+  }, [viewMode, mappableCellKey, mappableContactKey, isLoading, geocoding, contactsLoading, cellContactCounts]);
+
+  // Counts for the contacts mode breakdown — split good vs misaligned
+  // so the header can show e.g. '1135 contactos · 87 mal alineados'.
+  const contactCounts = useMemo(() => {
+    if (viewMode !== 'contacts') return null;
+    let good = 0, caba = 0, far = 0;
+    mappableContacts.forEach(c => {
+      const cls = classifyContactCoords(c);
+      if (cls === 'caba') caba++;
+      else if (cls === 'far') far++;
+      else good++;
+    });
+    return { good, caba, far, total: mappableContacts.length };
+  }, [viewMode, mappableContacts]);
+
+  // Reusable toggle component — segmented control with two pills.
+  const ViewModeToggle = () => (
+    <div className="inline-flex items-center bg-muted/60 rounded-md p-0.5 shrink-0">
+      <button
+        onClick={() => setViewMode('cells')}
+        className={`px-2.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5 ${viewMode === 'cells' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        title="Ver células"
+      >
+        <Building2 className="h-3 w-3" /> Células
+      </button>
+      <button
+        onClick={() => setViewMode('contacts')}
+        className={`px-2.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5 ${viewMode === 'contacts' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        title="Ver contactos"
+      >
+        <Users className="h-3 w-3" /> Contactos
+      </button>
+    </div>
+  );
 
   return (
     <div className="h-full flex flex-col gap-2">
@@ -349,9 +590,21 @@ const MapaPage = () => {
         return (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="text-lg sm:text-xl font-bold whitespace-nowrap">Mapa</h1>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {mappableCells.length}/{allMappable.length} células
-            </span>
+            <ViewModeToggle />
+            {viewMode === 'cells' ? (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {mappableCells.length}/{allMappable.length} células
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {contactCounts?.total ?? 0} contactos
+                {contactCounts && (contactCounts.caba + contactCounts.far) > 0 && (
+                  <span className="text-red-400 ml-1">
+                    · {contactCounts.caba + contactCounts.far} mal alineados
+                  </span>
+                )}
+              </span>
+            )}
             <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0">
               {availableCuerdas.map(num => {
                 const colors = cuerdaColorMap.get(num);
@@ -380,10 +633,15 @@ const MapaPage = () => {
         // Loading / geocoding state — just show the title row, no chips yet.
         <div className="flex items-center gap-3">
           <h1 className="text-lg sm:text-xl font-bold">Mapa</h1>
+          <ViewModeToggle />
           <span className="text-xs text-muted-foreground">
             {isLoading ? 'Cargando...' : geocoding
               ? `Geocodificando... ${geocodeProgress.done}/${geocodeProgress.total}`
-              : `${mappableCells.length} en el mapa`
+              : viewMode === 'cells'
+                ? `${mappableCells.length} en el mapa`
+                : contactsLoading
+                  ? 'Cargando contactos...'
+                  : `${mappableContacts.length} contactos`
             }
           </span>
         </div>
@@ -413,35 +671,70 @@ const MapaPage = () => {
             <p className="text-muted-foreground">{geocoding ? `Geocodificando ${geocodeProgress.done}/${geocodeProgress.total}...` : 'Cargando mapa...'}</p>
           </div>
         </div>
-      ) : (cells || []).length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">No hay células en esta iglesia.</div>
-      ) : mappableCells.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
-          <div>
-            <MapPin className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            {allMappable.length > 0 ? (
-              <>
-                <p className="text-lg font-medium mb-2">Sin células seleccionadas</p>
-                <p className="text-sm">Activá al menos una cuerda en el filtro de arriba para ver células en el mapa.</p>
-              </>
-            ) : (
-              <>
-                <p className="text-lg font-medium mb-2">Sin coordenadas registradas</p>
-                <p className="text-sm">Las células no tienen direcciones válidas para mostrar en el mapa.</p>
-              </>
-            )}
+      ) : viewMode === 'cells' ? (
+        // ─── CELLS MODE empty / map render ─────────────────────────────
+        (cells || []).length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">No hay células en esta iglesia.</div>
+        ) : mappableCells.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
+            <div>
+              <MapPin className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              {allMappable.length > 0 ? (
+                <>
+                  <p className="text-lg font-medium mb-2">Sin células seleccionadas</p>
+                  <p className="text-sm">Activá al menos una cuerda en el filtro de arriba para ver células en el mapa.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-medium mb-2">Sin coordenadas registradas</p>
+                  <p className="text-sm">Las células no tienen direcciones válidas para mostrar en el mapa.</p>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border" style={{ minHeight: '400px' }} />
+        )
       ) : (
-        <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border" style={{ minHeight: '400px' }} />
+        // ─── CONTACTS MODE ─────────────────────────────────────────────
+        contactsLoading ? (
+          <div className="flex-1 flex items-center justify-center" style={{ minHeight: 400 }}>
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-muted-foreground" />
+              <p className="text-muted-foreground">Cargando contactos...</p>
+            </div>
+          </div>
+        ) : (mapContacts || []).length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">No hay contactos con coordenadas para mostrar.</div>
+        ) : mappableContacts.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
+            <div>
+              <MapPin className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium mb-2">Sin contactos seleccionados</p>
+              <p className="text-sm">Activá al menos una cuerda en el filtro de arriba para ver contactos en el mapa.</p>
+            </div>
+          </div>
+        ) : (
+          <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border" style={{ minHeight: '400px' }} />
+        )
       )}
 
-      {/* Cell details dialog — opens when clicking "Ver detalles" in a marker popup */}
+      {/* Cell details dialog — opens when clicking "Ver detalles" in a cell marker popup */}
       <CellDetailsDialog
         open={!!selectedCellId}
         onOpenChange={(o) => { if (!o) setSelectedCellId(null); }}
         churchId={churchId!}
         cellId={selectedCellId}
+      />
+
+      {/* Contact profile dialog — opens when clicking "Ver perfil" in a
+          contact marker popup. Same dialog Semillero / Validator use, so
+          the user gets the full profile with edit / regeocode / etc. */}
+      <ContactProfileDialog
+        open={!!selectedContactId}
+        onOpenChange={(o) => { if (!o) setSelectedContactId(null); }}
+        contactId={selectedContactId}
+        churchId={churchId!}
       />
     </div>
   );
