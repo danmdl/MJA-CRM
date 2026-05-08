@@ -18,7 +18,13 @@
  * the first comma — for "Ricardo Balbin 1860, General San Martin", the
  * locality is "General San Martin") and use THAT as the suffix instead
  * of "Buenos Aires". Now "Mendoza 407" becomes "Mendoza 407, General
- * San Martin, Argentina" and resolves correctly.
+ * San Martin, Buenos Aires, Argentina" and resolves correctly.
+ *
+ * Two-province disambiguation: we always tail the result with
+ * ", Buenos Aires, Argentina" (the province + country). General San
+ * Martín exists in Mendoza and other provinces too, so the locality
+ * alone isn't enough — adding the province name makes the geocode
+ * unambiguous. The country tail keeps the Argentina region bias.
  *
  * Both functions are pure so they're easy to test and to use from any
  * component or page without dragging in React.
@@ -28,15 +34,24 @@
  * Pulls the locality portion out of a church's full address string.
  * The convention adopted by the team is "Calle Numero, Localidad" or
  * "Calle Numero, Localidad, Provincia", so anything after the first
- * comma is the locality plus optional extras. Returns null if the
- * address is empty or has no comma — caller decides the fallback.
+ * comma is the locality plus optional extras. If multiple commas exist
+ * we take only the segment before the second comma to avoid pulling
+ * the province (we add that ourselves below).
+ *
+ * Returns null if the address is empty or has no comma — caller
+ * decides the fallback.
  */
 export function parseChurchLocality(churchAddress: string | null | undefined): string | null {
   if (!churchAddress) return null;
   const idx = churchAddress.indexOf(',');
   if (idx === -1) return null;
   const tail = churchAddress.slice(idx + 1).trim();
-  return tail || null;
+  if (!tail) return null;
+  // If the tail itself has another comma (e.g. "General San Martin,
+  // Buenos Aires"), keep only the first segment — that's the locality.
+  // We append the province ourselves below regardless.
+  const secondComma = tail.indexOf(',');
+  return secondComma === -1 ? tail : tail.slice(0, secondComma).trim();
 }
 
 /**
@@ -45,12 +60,12 @@ export function parseChurchLocality(churchAddress: string | null | undefined): s
  *
  * Behaviour:
  *  - If the church has a parseable locality (e.g. "General San Martin"),
- *    we append that. Special case: if the contact's address ALREADY
- *    mentions the locality (case + accent insensitive token match),
- *    we don't duplicate it — we append ", Argentina" only, so a row
- *    like "Mendoza 407, San Martin" doesn't become "Mendoza 407, San
- *    Martin, General San Martin, Argentina" which confuses the
- *    geocoder more than it helps.
+ *    we append "<locality>, Buenos Aires, Argentina". Special case: if
+ *    the contact's address ALREADY mentions the locality (case + accent
+ *    insensitive token match), we don't duplicate it — we append just
+ *    ", Buenos Aires, Argentina" so a row like "Mendoza 407, San Martin"
+ *    doesn't become "Mendoza 407, San Martin, General San Martin, ..."
+ *    which confuses the geocoder more than it helps.
  *  - If the church has no parseable locality (legacy church row with
  *    no address yet), we fall back to "Buenos Aires, Argentina" — same
  *    behaviour as before this helper existed, so churches in CABA
@@ -78,10 +93,12 @@ export function buildGeocodeAddress(
     localityTokens.length > 0 &&
     localityTokens.every(w => addrTokens.has(w));
   if (alreadyMentioned) {
-    // The user already wrote the locality — don't repeat it, but make
-    // sure Argentina is on the end so the country-level bias still
-    // applies.
-    return `${trimmed}, Argentina`;
+    // The user already wrote the locality — don't repeat it, but tail
+    // with the province + country so the bias still applies. This
+    // disambiguates cases where the same locality name exists in
+    // another province (General San Martín exists in Mendoza, La
+    // Pampa, etc.).
+    return `${trimmed}, Buenos Aires, Argentina`;
   }
-  return `${trimmed}, ${locality}, Argentina`;
+  return `${trimmed}, ${locality}, Buenos Aires, Argentina`;
 }
