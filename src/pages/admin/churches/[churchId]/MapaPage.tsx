@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
-import { isWithinGBA } from '@/lib/geo-validation';
 import { useSession } from '@/hooks/use-session';
 
 interface Cell {
@@ -278,30 +277,6 @@ const MapaPage = () => {
     );
   }, [mapContacts, visibleCuerdas]);
 
-  // Classifies a contact's coordinates into one of three buckets so we
-  // can color-code markers in 'contacts' view. The user spotted that
-  // many contacts ended up geocoded into Capital Federal even though
-  // their addresses were clearly elsewhere — this turns that pattern
-  // into a visual signal.
-  //
-  //   'good'  → coords inside GBA, looks correct (yellow)
-  //   'caba'  → coords inside CABA's bounding box AND address text
-  //             doesn't mention CABA / Capital — a misalignment
-  //             suspect (red)
-  //   'far'   → coords outside GBA entirely — almost certainly wrong
-  //             (orange-red)
-  const classifyContactCoords = (c: ContactPin): 'good' | 'caba' | 'far' => {
-    if (!isWithinGBA(c.lat, c.lng)) return 'far';
-    // CABA bounding box (same one used in the bulk re-geocode tool)
-    const inCABA = c.lat >= -34.71 && c.lat <= -34.50 && c.lng >= -58.55 && c.lng <= -58.33;
-    if (inCABA) {
-      const norm = (c.address || '').toLowerCase();
-      const mentions = norm.includes('caba') || norm.includes('capital') || norm.includes('ciudad autonoma') || norm.includes('ciudad autónoma');
-      if (!mentions) return 'caba';
-    }
-    return 'good';
-  };
-
   const [geocodeFailed, setGeocodeFailed] = useState<string[]>([]);
 
   // Auto-geocode cells that have address but no coordinates
@@ -482,27 +457,21 @@ const MapaPage = () => {
       } else {
         // ─── CONTACTS MODE ─────────────────────────────────────────────
         // Smaller circle markers (vs cells' drop-pin) so a thousand pins
-        // don't overwhelm the map. Color by classification: yellow for
-        // good, red for misaligned-into-CABA, dark-orange for outside-
-        // GBA. The user uses this view specifically to spot reds.
+        // don't overwhelm the map. All the same color — earlier I tried
+        // to color-code 'misaligned' contacts using a CABA bounding box
+        // heuristic, but the box overlapped legitimate San Martín areas
+        // (the church itself fell inside it) and produced massive false
+        // positives. Removed. The user will spot misalignments by eye
+        // when they see a contact pin sitting on the wrong side of town
+        // relative to the cells they expect to be near.
         mappableContacts.forEach(contact => {
           const pos = { lat: contact.lat, lng: contact.lng };
-          const cls = classifyContactCoords(contact);
-          const fillColor =
-            cls === 'caba' ? '#ef4444' :
-            cls === 'far'  ? '#dc2626' :
-            '#FFC233';
-          const strokeColor =
-            cls === 'caba' ? '#7f1d1d' :
-            cls === 'far'  ? '#7f1d1d' :
-            '#B8720A';
-
           const markerIcon = {
             path: gmaps.SymbolPath.CIRCLE,
-            scale: cls === 'good' ? 5 : 6, // bad ones slightly bigger so they pop visually
-            fillColor,
+            scale: 5,
+            fillColor: '#FFC233',
             fillOpacity: 0.85,
-            strokeColor,
+            strokeColor: '#B8720A',
             strokeWeight: 1,
           };
 
@@ -515,16 +484,11 @@ const MapaPage = () => {
 
           marker.addListener('click', () => {
             const cuerdaLabel = contact.numero_cuerda ? `Cuerda ${contact.numero_cuerda}` : 'Sin cuerda';
-            const warning =
-              cls === 'caba' ? '<div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:600;">⚠ Posible mala geocodificación: cae en CABA pero la dirección no menciona Capital.</div>' :
-              cls === 'far'  ? '<div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:600;">⚠ Coordenadas fuera del Gran Buenos Aires.</div>' :
-              '';
             infoWindow.setContent(`
               <div style="font-family:system-ui,sans-serif;min-width:220px;padding:4px 0;color:#111;">
                 <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${contact.first_name} ${contact.last_name || ''}</div>
                 <div style="font-size:12px;color:#555;margin-bottom:2px;">${cuerdaLabel}</div>
                 ${contact.address ? `<div style="font-size:11px;color:#777;margin-top:4px;">📍 ${contact.address}</div>` : '<div style="font-size:11px;color:#999;margin-top:4px;">Sin dirección</div>'}
-                ${warning}
                 <div style="margin-top:8px;"><button onclick="window.__openContactDetails('${contact.id}')" style="background:#FFC233;color:#000;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Ver perfil</button></div>
               </div>
             `);
@@ -545,20 +509,6 @@ const MapaPage = () => {
 
     initMap();
   }, [viewMode, mappableCellKey, mappableContactKey, isLoading, geocoding, contactsLoading, cellContactCounts]);
-
-  // Counts for the contacts mode breakdown — split good vs misaligned
-  // so the header can show e.g. '1135 contactos · 87 mal alineados'.
-  const contactCounts = useMemo(() => {
-    if (viewMode !== 'contacts') return null;
-    let good = 0, caba = 0, far = 0;
-    mappableContacts.forEach(c => {
-      const cls = classifyContactCoords(c);
-      if (cls === 'caba') caba++;
-      else if (cls === 'far') far++;
-      else good++;
-    });
-    return { good, caba, far, total: mappableContacts.length };
-  }, [viewMode, mappableContacts]);
 
   // Reusable toggle component — segmented control with two pills.
   const ViewModeToggle = () => (
@@ -597,12 +547,7 @@ const MapaPage = () => {
               </span>
             ) : (
               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {contactCounts?.total ?? 0} contactos
-                {contactCounts && (contactCounts.caba + contactCounts.far) > 0 && (
-                  <span className="text-red-400 ml-1">
-                    · {contactCounts.caba + contactCounts.far} mal alineados
-                  </span>
-                )}
+                {mappableContacts.length} contactos
               </span>
             )}
             <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0">
