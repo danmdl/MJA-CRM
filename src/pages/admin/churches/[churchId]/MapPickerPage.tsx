@@ -554,12 +554,25 @@ const MapPickerPage = () => {
     }
     const geocoder = new (window as any).google.maps.Geocoder();
     const biased = buildGeocodeAddress(church.address, church.address);
-    geocoder.geocode({ address: biased, region: 'AR' }, (results: any[], status: string) => {
+    geocoder.geocode({ address: biased, region: 'AR' }, async (results: any[], status: string) => {
       if (status === 'OK' && results[0]) {
         const loc = results[0].geometry.location;
-        setStartLat(loc.lat());
-        setStartLng(loc.lng());
+        const lat = loc.lat();
+        const lng = loc.lng();
+        setStartLat(lat);
+        setStartLng(lng);
         setStartAddress(church.address!);
+        // Calibration: persist the geocoded result back to the church
+        // row so future clicks on 'Iglesia' (in any session, by any
+        // user) skip the geocoder and use the stored coords directly.
+        // First-click cost = 1 geocode call; every click after = 0.
+        // If the row already had coords this branch wouldn't have
+        // run — we got here because lat/lng was NULL, which is the
+        // signal that calibration is needed.
+        await supabase.from('churches').update({ lat, lng }).eq('id', church.id);
+        // Refresh the cached churchCoords so the rest of the app sees
+        // the new value without a manual reload.
+        queryClient.invalidateQueries({ queryKey: ['church-coords', churchId] });
       } else {
         showError(`No se pudo geolocalizar: ${church.address}`);
       }
