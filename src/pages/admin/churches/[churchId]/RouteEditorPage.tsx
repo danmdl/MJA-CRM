@@ -381,6 +381,31 @@ const RouteEditorPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeData, startLat, startLng]);
 
+  // Keep Google Maps in sync with the container's actual size. The map's
+  // internal dimensions are cached at init and aren't refreshed unless we
+  // explicitly fire a 'resize' event on the instance. When the user opens
+  // the "Editar contactos" dialog and then hits Recalcular, the body
+  // reflows (Radix Dialog locks scroll, swaps pointer-events, the
+  // backdrop transitions out), and the map div ends up the same SIZE
+  // but the tiles are drawn assuming the dimensions Google Maps cached
+  // earlier — which renders as a black canvas until the user resizes
+  // the window or refreshes. A ResizeObserver on the container catches
+  // any layout-driven size change (dialog open/close, sidebar toggle,
+  // window resize, container parent flex changes) and triggers the
+  // resize event so Maps redraws the tiles correctly.
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const el = mapRef.current;
+    const ro = new ResizeObserver(() => {
+      const google = (window as any).google;
+      if (google?.maps && mapInstance.current) {
+        google.maps.event.trigger(mapInstance.current, 'resize');
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // Re-color markers when visited changes
   useEffect(() => {
     refreshMarkers();
@@ -498,6 +523,24 @@ const RouteEditorPage = () => {
     setEditDialogOpen(false);
     // Force recalc — this picks up whatever's in selectedIds + start state now
     await calculateRoute();
+    // Belt-and-suspenders: even with the ResizeObserver above, the dialog
+    // closes via a CSS transition that doesn't always change the map div's
+    // measured size (the div was the same width/height the whole time;
+    // what changed is whether something was drawn over it). Some browsers
+    // skip the observer callback in that case. Fire the resize event
+    // ourselves on the next frame and re-fit the bounds so the tiles
+    // redraw and the route stays centered. This is the specific fix for
+    // the "map turns black after Recalcular ruta" Dan reported.
+    requestAnimationFrame(() => {
+      const google = (window as any).google;
+      if (!google?.maps || !mapInstance.current) return;
+      google.maps.event.trigger(mapInstance.current, 'resize');
+      // Re-fit to the directions bounds. setDirections already sets the
+      // viewport via DirectionsRenderer, but explicitly fitBounds picks
+      // up any new points the user just added/removed in the edit pass.
+      const bounds = directionsRenderer.current?.getDirections?.()?.routes?.[0]?.bounds;
+      if (bounds) mapInstance.current.fitBounds(bounds);
+    });
   };
 
   // ─── Render ───────────────────────────────────────────────────────────

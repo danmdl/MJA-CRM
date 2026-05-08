@@ -249,6 +249,27 @@ const MapPickerPage = () => {
     }
   }, []);
 
+  // Keep Google Maps in sync with the container's actual size. Same fix
+  // as RouteEditorPage: dialogs and layout changes around the map can
+  // leave Google's cached dimensions stale and the canvas paints black
+  // until something forces a resize. ResizeObserver catches every size
+  // change and fires the resize event so the tiles redraw correctly.
+  // Cheap defensive guard — even if no current flow triggers the bug
+  // here, anything that grows the toolbar or shows a dialog over the
+  // picker would, and this prevents it.
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const el = mapRef.current;
+    const ro = new ResizeObserver(() => {
+      const google = (window as any).google;
+      if (google?.maps && mapInstance.current) {
+        google.maps.event.trigger(mapInstance.current, 'resize');
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // Re-render markers whenever filtered list or selection changes.
   useEffect(() => {
     const google = (window as any).google;
