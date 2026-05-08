@@ -11,7 +11,7 @@ interface AdminRouteProps {
 
 const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
   const { session, loading: sessionLoading, profile } = useSession();
-  const { hasPermission, isLoading: permissionsLoading, canSeeAllChurches } = usePermissions();
+  const { hasPermission, permissionsReady, canSeeAllChurches } = usePermissions();
   const [loadingProfile, setLoadingProfile] = useState(true);
   const location = useLocation();
 
@@ -23,7 +23,15 @@ const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
     }
   }, [session, sessionLoading, profile]);
 
-  if (sessionLoading || loadingProfile || permissionsLoading) {
+  // permissionsReady is the SINGLE flag that says "profile + permissions
+  // are both available, so any decision based on hasPermission/canX is
+  // safe to make now". Earlier this guard checked permissionsLoading
+  // alone, which only covered half of the race — if the permissions
+  // query returned but the profile hadn't, hasPermission(...) would
+  // still answer false during the gap, and the guard could redirect
+  // to /login on a permission check that should have passed. Wait for
+  // the unified flag instead.
+  if (sessionLoading || loadingProfile || (session && !permissionsReady)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Verificando acceso...</div>

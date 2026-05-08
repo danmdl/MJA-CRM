@@ -31,8 +31,24 @@ import Profile from "./pages/Profile";
 // - Anyone else with a church_id → /admin/churches/<id>/overview (Resumen)
 // - Anyone else without a church_id (rare/misconfigured) → /admin/churches list
 const AdminRootRedirect = () => {
-  const { canSeeAllAnalytics } = usePermissions();
+  const { canSeeAllAnalytics, permissionsReady } = usePermissions();
   const { profile } = useSession();
+
+  // If we redirect before permissions have loaded, canSeeAllAnalytics()
+  // returns false during the loading window — which sends an admin
+  // freshly logged in to /churches/<id>/overview (the non-admin landing)
+  // instead of /dashboard. The user lands on the WRONG page and a
+  // refresh after permissions arrive finally takes them to the right
+  // one. That's what Dan reported as "no se carga todo a menos que
+  // refrescá ni bien me logueaba". Wait for the ready flag before
+  // deciding so the first navigation is the correct one.
+  if (!permissionsReady) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (canSeeAllAnalytics()) return <Navigate to="dashboard" replace />;
 
@@ -44,7 +60,17 @@ const AdminRootRedirect = () => {
 
 // Guards the dashboard route - only admins/generals can access.
 const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
-  const { canSeeAllAnalytics } = usePermissions();
+  const { canSeeAllAnalytics, permissionsReady } = usePermissions();
+  // Same race as AdminRootRedirect: don't bounce a freshly-logged-in
+  // admin away from the dashboard just because permissions haven't
+  // arrived yet. Wait, then check.
+  if (!permissionsReady) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
   if (!canSeeAllAnalytics()) return <Navigate to="/admin/churches" replace />;
   return <>{children}</>;
 };

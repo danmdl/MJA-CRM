@@ -4,6 +4,7 @@ import { Session } from '@supabase/supabase-js';
 import { SessionContext } from '@/hooks/use-session';
 import { RoleKey } from '@/lib/roles';
 import { normalize } from '@/lib/normalize';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Definir la interfaz para el perfil del usuario
 interface UserProfile {
@@ -26,6 +27,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const queryClient = useQueryClient();
 
   const clearPasswordSetup = () => {
     setNeedsPasswordSetup(false);
@@ -152,6 +154,18 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
         // first login of this session.
         if (_event === 'SIGNED_IN' && lastLoggedUserId !== session.user.id) {
           lastLoggedUserId = session.user.id;
+          // Invalidate every cached query so anything that ran with no
+          // session (or with a previous user's session) gets refetched
+          // with the new auth context. Without this, queries triggered
+          // during the brief window between mount and SIGNED_IN return
+          // empty/null and stay cached that way — which is exactly what
+          // Dan reported as "no se carga todo a menos que refresque ni
+          // bien me logueaba": refresh worked because the second mount
+          // already had the session in localStorage from the start.
+          // This is scoped to genuine logins (the lastLoggedUserId guard
+          // above), so hourly token refreshes don't trigger a full app
+          // refetch every time.
+          queryClient.invalidateQueries();
           supabase.from('activity_logs').insert({
             user_id: session.user.id,
             church_id: null,
@@ -167,6 +181,10 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
         // If user was signed out (session expired, manual logout, etc.)
         // redirect to login to prevent stale UI
         if (_event === 'SIGNED_OUT') {
+          // Clear any cached query data from the previous user before
+          // redirecting, so a different user logging in on the same tab
+          // doesn't briefly see the previous user's data flash on screen.
+          queryClient.clear();
           window.location.href = '/login';
         }
       }
