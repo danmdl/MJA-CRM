@@ -236,7 +236,12 @@ const MapaPage = () => {
     return Array.from(nums).sort((a, b) => Number(a) - Number(b));
   }, [cells, mapContacts, viewMode]);
 
-  // Which cuerdas are visible — starts with all selected
+  // Which cuerdas are visible — starts pre-filtered to the user's own
+  // cuerda when they have one (so the map opens focused on what's
+  // relevant to them, not an everything-everywhere view that's hard
+  // to read for somebody who only works in cuerda 204). Globals and
+  // users without a cuerda see all cuerdas selected by default —
+  // they're meant to look at the whole picture.
   const [visibleCuerdas, setVisibleCuerdas] = useState<Set<string> | null>(null);
   // Initialize once when cuerdas data loads. Also re-initialize when
   // switching modes so a brand-new cuerda set doesn't get filtered to
@@ -247,9 +252,21 @@ const MapaPage = () => {
     const modeChanged = lastModeRef.current !== viewMode;
     lastModeRef.current = viewMode;
     if (visibleCuerdas === null || modeChanged) {
-      setVisibleCuerdas(new Set(availableCuerdas));
+      const userCuerda = profile?.numero_cuerda;
+      const isGlobal = profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+      // Pre-narrow to the user's cuerda only when:
+      //   - they're not a global (globals expect to see everything)
+      //   - they actually have a cuerda assigned
+      //   - that cuerda exists in the current data set (otherwise the
+      //     'Ninguna' state would land empty and confuse the user)
+      // Otherwise: select all available cuerdas as before.
+      if (!isGlobal && userCuerda && availableCuerdas.includes(userCuerda)) {
+        setVisibleCuerdas(new Set([userCuerda]));
+      } else {
+        setVisibleCuerdas(new Set(availableCuerdas));
+      }
     }
-  }, [availableCuerdas, viewMode]);
+  }, [availableCuerdas, viewMode, profile?.numero_cuerda, profile?.role]);
 
   const toggleCuerda = (num: string) => {
     setVisibleCuerdas(prev => {

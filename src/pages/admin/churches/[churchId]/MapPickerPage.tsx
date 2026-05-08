@@ -225,6 +225,26 @@ const MapPickerPage = () => {
     });
   }, [contacts]);
 
+  // Pre-fill filterCuerda with the user's own cuerda the first time the
+  // contact data lands. Same UX pattern as MapaPage: a user who works
+  // in cuerda 204 doesn't want to scroll past 800 contacts from other
+  // cuerdas before finding the ones they actually plan visits for.
+  // Globals and users without a cuerda get no default — they're meant
+  // to scope manually. Runs once via the ref guard so the user can
+  // clear the filter if they actually want all cuerdas.
+  const cuerdaDefaultAppliedRef = useRef(false);
+  useEffect(() => {
+    if (cuerdaDefaultAppliedRef.current) return;
+    if (!profile) return;
+    if (availableCuerdas.length === 0) return;
+    cuerdaDefaultAppliedRef.current = true;
+    const isGlobal = profile.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+    const userCuerda = profile.numero_cuerda;
+    if (!isGlobal && userCuerda && availableCuerdas.includes(userCuerda)) {
+      setFilterCuerda(userCuerda);
+    }
+  }, [profile, availableCuerdas]);
+
   // Quick filter presets — set fecha_contacto >= N days ago
   const setLastNDays = (n: number) => {
     const d = new Date();

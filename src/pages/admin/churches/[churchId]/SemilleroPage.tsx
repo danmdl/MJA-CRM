@@ -666,8 +666,34 @@ const SemilleroPage = () => {
   }, [allContacts, zonas]);
 
   // ─── Pool counts ───────────────────────────────────────────────
-  // Semillero Externo: contacts flagged as external (nearest cell is in a different zona)
-  const externalContacts = useMemo(() => (allContacts || []).filter(c => (c as any).is_external === true && !c.cell_id), [allContacts]);
+  // Semillero Externo: contacts flagged as external (nearest cell is in
+  // a different zona). The chip count and the pool view must respect
+  // the same cuerda visibility rules as the rest of the page —
+  // otherwise a referente sees 'MJA 6' on their chip but those 6 are
+  // from other cuerdas and they can't actually act on them. The active
+  // filterCuerda also applies, so admins narrowing to a specific cuerda
+  // see only that cuerda's MJA-pool contacts.
+  const externalContacts = useMemo(() => {
+    const userId = session?.user?.id;
+    return (allContacts || []).filter(c => {
+      if (!(c as any).is_external) return false;
+      if (c.cell_id) return false;
+      // Cuerda-based visibility for non-globals (same rule used in
+      // filteredContacts further down).
+      if (!canSeeContactsFromAllCuerdas) {
+        if (userCuerdaNumero) {
+          if (c.numero_cuerda !== userCuerdaNumero) return false;
+        } else {
+          // No cuerda → only own creations / responsibilities visible.
+          if (c.created_by !== userId && c.responsable_id !== userId) return false;
+        }
+      }
+      // Active cuerda filter (everyone, including globals using the
+      // dropdown to drill in).
+      if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
+      return true;
+    });
+  }, [allContacts, canSeeContactsFromAllCuerdas, userCuerdaNumero, filterCuerda, session?.user?.id]);
 
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
 
@@ -1053,7 +1079,7 @@ const SemilleroPage = () => {
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
           title="Contactos enviados a MJA (church-cuerda) para que distribuya"
         >
-          <span className="text-[10px] uppercase tracking-wider text-orange-400">MJA</span>
+          <span className="text-[10px] uppercase tracking-wider text-orange-400">Enviar a MJA</span>
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
         {/* Duplicates toggle — narrows the table to rows whose normalized
@@ -1809,13 +1835,18 @@ const SemilleroPage = () => {
                               <div className="flex items-center gap-1">
                                 {/* Already in MJA pool. Globals can pull it back
                                     into a specific cell; non-globals can only
-                                    return it to "Sin asignar". */}
+                                    return it to "Sin asignar". The 'Confirmar
+                                    envío' wording (vs plain 'Asignar') is
+                                    deliberate here: the contact has already
+                                    been sent to MJA pool by a referente, and
+                                    this action confirms its final landing in
+                                    the suggested cell. */}
                                 {canSeeContactsFromAllCuerdas && sugCell && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
                                     type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
                                   })}>
-                                    <Zap className="h-3 w-3 mr-1" /> Asignar
+                                    <Zap className="h-3 w-3 mr-1" /> Confirmar envío
                                   </Button>
                                 )}
                                 <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
