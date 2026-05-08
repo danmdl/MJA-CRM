@@ -457,21 +457,21 @@ const MapaPage = () => {
       } else {
         // ─── CONTACTS MODE ─────────────────────────────────────────────
         // Smaller circle markers (vs cells' drop-pin) so a thousand pins
-        // don't overwhelm the map. All the same color — earlier I tried
-        // to color-code 'misaligned' contacts using a CABA bounding box
-        // heuristic, but the box overlapped legitimate San Martín areas
-        // (the church itself fell inside it) and produced massive false
-        // positives. Removed. The user will spot misalignments by eye
-        // when they see a contact pin sitting on the wrong side of town
-        // relative to the cells they expect to be near.
+        // don't overwhelm the map. Color by cuerda — same cuerdaColorMap
+        // the cell markers use, so a quick eye-scan groups people by
+        // who's responsible for them visually. Contacts without a cuerda
+        // assigned fall back to gold (the default cell fallback color).
         mappableContacts.forEach(contact => {
           const pos = { lat: contact.lat, lng: contact.lng };
+          const colors = contact.numero_cuerda ? cuerdaColorMap.get(contact.numero_cuerda) : null;
+          const fillColor = colors?.fill || '#FFC233';
+          const strokeColor = colors?.stroke || '#B8720A';
           const markerIcon = {
             path: gmaps.SymbolPath.CIRCLE,
             scale: 5,
-            fillColor: '#FFC233',
+            fillColor,
             fillOpacity: 0.85,
-            strokeColor: '#B8720A',
+            strokeColor,
             strokeWeight: 1,
           };
 
@@ -487,7 +487,7 @@ const MapaPage = () => {
             infoWindow.setContent(`
               <div style="font-family:system-ui,sans-serif;min-width:220px;padding:4px 0;color:#111;">
                 <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${contact.first_name} ${contact.last_name || ''}</div>
-                <div style="font-size:12px;color:#555;margin-bottom:2px;">${cuerdaLabel}</div>
+                <div style="font-size:12px;color:#555;margin-bottom:2px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fillColor};margin-right:4px;vertical-align:middle;"></span>${cuerdaLabel}</div>
                 ${contact.address ? `<div style="font-size:11px;color:#777;margin-top:4px;">📍 ${contact.address}</div>` : '<div style="font-size:11px;color:#999;margin-top:4px;">Sin dirección</div>'}
                 <div style="margin-top:8px;"><button onclick="window.__openContactDetails('${contact.id}')" style="background:#FFC233;color:#000;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Ver perfil</button></div>
               </div>
