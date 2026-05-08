@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
+import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { ChevronLeft, MapPin, Route as RouteIcon, Search, Filter, X, List, Map as MapIcon, Navigation } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
@@ -518,8 +519,33 @@ const MapPickerPage = () => {
   };
 
   const useChurchAddress = async () => {
-    if (!church?.address) {
-      showError(`${church?.name || 'La iglesia'} no tiene una dirección configurada.`);
+    if (!church) {
+      showError('Iglesia no encontrada.');
+      return;
+    }
+    // Prefer the lat/lng stored on the churches row. They were
+    // calibrated once and are authoritative — geocoding the address
+    // string fresh on every click is both unnecessary (we already
+    // know the answer) and unreliable (the historical bug Dan kept
+    // reporting was the result going to the wrong neighborhood
+    // because the query string was missing ', Buenos Aires,
+    // Argentina', so Google was matching against a different town
+    // with the same street name). Stored coords skip that whole
+    // class of failure.
+    if (churchCoords?.lat != null && churchCoords?.lng != null) {
+      setStartLat(churchCoords.lat);
+      setStartLng(churchCoords.lng);
+      setStartAddress(church.address || church.name);
+      return;
+    }
+
+    // Fallback for churches that don't have lat/lng stored yet
+    // (other churches in the org may not be calibrated). Use the
+    // locality-aware builder so the geocode at least gets the
+    // province + country tail and lands in the right city, then
+    // ask the user to verify since this path is less reliable.
+    if (!church.address) {
+      showError(`${church.name || 'La iglesia'} no tiene una dirección configurada.`);
       return;
     }
     if (!(window as any).google?.maps) {
@@ -527,7 +553,8 @@ const MapPickerPage = () => {
       return;
     }
     const geocoder = new (window as any).google.maps.Geocoder();
-    geocoder.geocode({ address: church.address, region: 'AR' }, (results: any[], status: string) => {
+    const biased = buildGeocodeAddress(church.address, church.address);
+    geocoder.geocode({ address: biased, region: 'AR' }, (results: any[], status: string) => {
       if (status === 'OK' && results[0]) {
         const loc = results[0].geometry.location;
         setStartLat(loc.lat());
