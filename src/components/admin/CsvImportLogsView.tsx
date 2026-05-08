@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronDown, ChevronRight, Upload, CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { ChevronDown, ChevronRight, Upload, CheckCircle2, AlertCircle, Download, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -21,9 +21,119 @@ interface ImportLog {
   user_name?: string;
 }
 
+interface ImportedContact {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  address: string | null;
+  numero_cuerda: string | null;
+  fecha_contacto: string | null;
+  created_at: string;
+}
+
 interface Props {
   churchId: string;
 }
+
+// Reconstructs the list of contacts that came in via a specific import log
+// row. The csv_import_logs entry is written AFTER the contacts loop
+// finishes, so the log's created_at is roughly right after the last insert.
+// We pull every contact created by the same user inside a window that ends
+// at the log timestamp + a small buffer, then take the most-recent
+// success_count of them.
+//
+// Why a window instead of an exact join: the import doesn't tag each
+// contact with the import_log_id (it predates the log table). We could
+// migrate the schema and backfill, but the time-window approach gives an
+// answer for every existing log row without a DB change. The window is
+// generous enough (10 min before + 30 sec after) to comfortably capture
+// even slow imports of thousands of rows.
+const ImportedContactsList = ({ log }: { log: ImportLog }) => {
+  const { data: contacts = [], isLoading } = useQuery<ImportedContact[]>({
+    queryKey: ['csv-import-contacts', log.id],
+    queryFn: async () => {
+      const logTime = new Date(log.created_at).getTime();
+      const windowStart = new Date(logTime - 10 * 60 * 1000).toISOString(); // -10 min
+      const windowEnd   = new Date(logTime + 30 * 1000).toISOString();       // +30 sec
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, phone, address, numero_cuerda, fecha_contacto, created_at')
+        .eq('created_by', log.user_id)
+        .gte('created_at', windowStart)
+        .lte('created_at', windowEnd)
+        .order('created_at', { ascending: false })
+        .limit(Math.max(log.success_count, 1));
+      // We asked for the most recent first so we pick up the import block;
+      // re-flip so the user sees them in the order they were inserted (the
+      // file's row order).
+      return (data || []).reverse() as ImportedContact[];
+    },
+    // Only run when this log row is expanded — keeps the page light when
+    // there are 50 imports listed and the user only opens one.
+    staleTime: 60_000,
+  });
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground py-4">Cargando contactos importados...</div>;
+  }
+
+  if (contacts.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground py-2">
+        No pudimos recuperar la lista de contactos para este import.
+      </div>
+    );
+  }
+
+  // Soft warning if the count we recovered doesn't match what the log
+  // claims succeeded. Could mean some contacts were soft-deleted later, or
+  // that the user did manual creates inside the same window. Either way
+  // we'd rather show what we found and label the discrepancy than hide it.
+  const mismatch = contacts.length !== log.success_count;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+          <Users className="h-3 w-3" />
+          {contacts.length} contacto{contacts.length === 1 ? '' : 's'} cargado{contacts.length === 1 ? '' : 's'}
+          {mismatch && (
+            <span className="text-amber-400 ml-1">
+              (el log indica {log.success_count}; algunos pueden haber sido eliminados después)
+            </span>
+          )}
+        </span>
+      </div>
+      <div className="rounded border border-border/50 bg-background/50 max-h-[400px] overflow-auto">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-background/95 backdrop-blur z-10">
+            <tr className="border-b border-border/50">
+              <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-10">#</th>
+              <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Nombre</th>
+              <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Teléfono</th>
+              <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Dirección</th>
+              <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-16">Cuerda</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contacts.map((c, i) => (
+              <tr key={c.id} className="border-b border-border/30 last:border-b-0 hover:bg-muted/20">
+                <td className="px-2 py-1.5 align-top text-muted-foreground tabular-nums">{i + 1}</td>
+                <td className="px-2 py-1.5 align-top">
+                  {[c.first_name, c.last_name].filter(Boolean).join(' ') || <span className="text-muted-foreground italic">sin nombre</span>}
+                </td>
+                <td className="px-2 py-1.5 align-top tabular-nums">{c.phone || <span className="text-muted-foreground">—</span>}</td>
+                <td className="px-2 py-1.5 align-top">{c.address || <span className="text-muted-foreground">—</span>}</td>
+                <td className="px-2 py-1.5 align-top tabular-nums">{c.numero_cuerda || <span className="text-muted-foreground">—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
 
 // One section per import session — RLS already filters the user's view to
 // either their own imports (if non-supervisor) or the whole church (if
@@ -97,7 +207,6 @@ const CsvImportLogsView = ({ churchId }: Props) => {
     <div className="space-y-2">
       {logs.map(log => {
         const isOpen = expandedId === log.id;
-        const allSuccess = log.failure_count === 0;
         return (
           <div key={log.id} className="rounded-lg border border-border bg-muted/10">
             <button
@@ -130,12 +239,14 @@ const CsvImportLogsView = ({ churchId }: Props) => {
             </button>
 
             {isOpen && (
-              <div className="px-4 pb-3 border-t border-border/50 pt-3 space-y-2">
-                {allSuccess ? (
-                  <div className="text-sm text-muted-foreground">
-                    Todas las filas importadas correctamente. ✅
-                  </div>
-                ) : (
+              <div className="px-4 pb-3 border-t border-border/50 pt-3 space-y-3">
+                {/* Successful contacts — always shown when there were any.
+                    Previously this branch only said "Todas importadas
+                    correctamente ✅" with no detail, which was useless if
+                    you actually wanted to know WHAT had been imported. */}
+                {log.success_count > 0 && <ImportedContactsList log={log} />}
+
+                {log.failure_count > 0 && (
                   <>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs text-muted-foreground">
@@ -177,6 +288,14 @@ const CsvImportLogsView = ({ churchId }: Props) => {
                       </table>
                     </div>
                   </>
+                )}
+
+                {/* Defensive: if a row somehow has zero successes AND zero
+                    failures, show something so the panel isn't empty. */}
+                {log.success_count === 0 && log.failure_count === 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    Sin filas registradas para este import.
+                  </div>
                 )}
               </div>
             )}
