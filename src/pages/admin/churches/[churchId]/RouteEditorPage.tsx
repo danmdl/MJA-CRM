@@ -173,6 +173,32 @@ const RouteEditorPage = () => {
     }
   }, [project]);
 
+  // Mark the route's notes as seen for the creator. Only fires once per
+  // mount when project loads, only updates if there's actually something
+  // newer than what we already saw — avoids noisy writes on every open.
+  // The Rutas grid card uses (notes_updated_at > notes_seen_at) to flag
+  // unseen updates with a red 'NUEVA NOTA' pill, so this write is what
+  // dismisses it.
+  const seenBumpedRef = useRef(false);
+  useEffect(() => {
+    if (!project || !profile?.id || seenBumpedRef.current) return;
+    if (project.created_by !== profile.id) return; // only the creator's view dismisses
+    if (!project.notes_updated_at) return;          // no notes ever — nothing to mark seen
+    const seenAt = project.notes_seen_at ? new Date(project.notes_seen_at).getTime() : 0;
+    const updatedAt = new Date(project.notes_updated_at).getTime();
+    if (seenAt >= updatedAt) return;                // already up to date
+    seenBumpedRef.current = true;
+    supabase.from('shared_routes')
+      .update({ notes_seen_at: new Date().toISOString() })
+      .eq('id', project.id)
+      .then(() => {
+        // Quietly invalidate the projects list so the badge disappears
+        // from the grid when the user goes back. No toast — this is
+        // background bookkeeping.
+        queryClient.invalidateQueries({ queryKey: ['route-projects'] });
+      });
+  }, [project, profile?.id, queryClient]);
+
   // Load Google Maps once
   useEffect(() => {
     if ((window as any).google?.maps) return;

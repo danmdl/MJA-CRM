@@ -7,7 +7,7 @@ import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Check } from 'lucide-react';
+import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Check, MessageSquare } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
 type CreateMode = 'map';
@@ -34,7 +34,7 @@ const RutasPage = () => {
       // back to "only my own routes" so they at least see their work.
       const isGlobal = profile.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
       let q = supabase.from('shared_routes')
-        .select('id, share_token, name, created_at, expires_at, ordered_contact_ids, total_meters, total_seconds, start_address, created_by, numero_cuerda, visited')
+        .select('id, share_token, name, created_at, expires_at, ordered_contact_ids, total_meters, total_seconds, start_address, created_by, numero_cuerda, visited, notes_updated_at, notes_seen_at')
         .eq('church_id', churchId!)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
@@ -49,6 +49,16 @@ const RutasPage = () => {
       return data || [];
     },
     enabled: !!profile?.id && !!churchId,
+    // Live-ish refresh so the 'NUEVA NOTA' pill appears without the
+    // creator having to reload the page. 20 seconds is a reasonable
+    // balance — fast enough to feel real-time when someone leaves a
+    // comment in the public viewer, slow enough to not hammer the DB
+    // for users who leave the Rutas tab open in a background pin.
+    // refetchOnWindowFocus also kicks in when the user comes back to
+    // the tab, which catches the case where they were away longer
+    // than the interval.
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
   });
 
   const openCreateDialog = () => {
@@ -158,21 +168,46 @@ const RutasPage = () => {
           const visitedMap: Record<string, boolean> = p.visited || {};
           const visitedCount = orderedIds.reduce((n, id) => n + (visitedMap[id] ? 1 : 0), 0);
           const isComplete = stops > 0 && visitedCount === stops;
+          // 'Nueva nota' indicator: only the route's creator sees it, and
+          // only when notes were updated more recently than the last time
+          // they viewed the route. The public viewer (the people walking
+          // the route) writes notes; the creator wants a heads-up that
+          // someone left a comment without having to open every card.
+          // notes_seen_at gets bumped to now() the moment the creator
+          // opens the route in RouteEditorPage, which dismisses this pill.
+          const isCreator = p.created_by === profile?.id;
+          const updatedAt = p.notes_updated_at ? new Date(p.notes_updated_at).getTime() : 0;
+          const seenAt = p.notes_seen_at ? new Date(p.notes_seen_at).getTime() : 0;
+          const hasUnseenNotes = isCreator && updatedAt > 0 && updatedAt > seenAt;
           return (
             <div
               key={p.id}
               onClick={() => navigate(`/admin/churches/${churchId}/rutas/${p.id}`)}
-              className={`border rounded-lg p-3 bg-card hover:bg-card/80 cursor-pointer transition-colors flex flex-col ${isComplete ? 'border-green-500/40' : ''}`}
+              className={`border rounded-lg p-3 bg-card hover:bg-card/80 cursor-pointer transition-colors flex flex-col ${
+                hasUnseenNotes
+                  ? 'border-red-500/60 ring-1 ring-red-500/30'
+                  : isComplete
+                    ? 'border-green-500/40'
+                    : ''
+              }`}
             >
               <div className="flex items-start justify-between gap-1.5 mb-1.5">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <div className="text-xs font-semibold truncate">{p.name || 'Sin nombre'}</div>
-                    {isComplete && (
-                      // Pill that appears as soon as every stop in the
-                      // route has been ticked off. Compact form (just a
-                      // check + 'OK') so it doesn't push the title off
-                      // the card on narrow widths.
+                    {hasUnseenNotes && (
+                      // Red pill that overrides the green 'OK' when both
+                      // conditions hit (a route can be both complete and
+                      // have a fresh comment). Red takes priority because
+                      // unseen feedback is more actionable than knowing
+                      // you finished. animate-pulse for the visibility
+                      // bump Dan asked for ('algo llamativo').
+                      <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium uppercase tracking-wider bg-red-500/15 text-red-400 border border-red-500/40 animate-pulse">
+                        <MessageSquare className="h-2 w-2" />
+                        Nueva nota
+                      </span>
+                    )}
+                    {isComplete && !hasUnseenNotes && (
                       <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium uppercase tracking-wider bg-green-500/15 text-green-400 border border-green-500/30">
                         <Check className="h-2 w-2" />
                         OK
