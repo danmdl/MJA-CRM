@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Upload, CheckCircle2 } from 'lucide-react';
+import { Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
@@ -16,6 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { logEvent } from '@/utils/clientLogger';
@@ -41,6 +44,27 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
   const [importSuccess, setImportSuccess] = useState(false);
   const [importErrors, setImportErrors] = useState<{row: number, field: string, value: string, message: string}[]>([]);
   const [failedContacts, setFailedContacts] = useState<{row: number, data: Record<string, string>}[]>([]);
+  // Cuerda mismatch confirmation: when a non-global user with a cuerda
+  // tries to import a CSV whose cuerda column has values that don't match
+  // their own, we pause before touching the DB and ask them to confirm.
+  // The trigger sync_contact_cuerda_with_responsable would force the
+  // alignment anyway, but doing it transparently behind the user's back
+  // is exactly what produced the orphan-contacts problem before — they
+  // need to see and consent to what's about to happen.
+  //
+  // Two-step state: cuerdaConfirm holds the diagnostic info (which other
+  // cuerdas appear in the file, and how many rows are affected) so the
+  // dialog can render specifics. cuerdaConfirmedAction is a sticky flag
+  // that survives across one round-trip — when the user clicks 'Importar
+  // a mi cuerda', we set it to 'rewrite' and re-fire handleImportData,
+  // which then skips the check and rewrites the CSV's cuerda column to
+  // the user's cuerda before building recordsToInsert.
+  const [cuerdaConfirm, setCuerdaConfirm] = useState<null | {
+    distinctMismatched: string[];
+    mismatchedRowCount: number;
+    userCuerda: string;
+  }>(null);
+  const [cuerdaConfirmedAction, setCuerdaConfirmedAction] = useState<null | 'rewrite'>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -226,10 +250,73 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       return;
     }
 
+    // Cuerda mismatch UX gate. Only applies when:
+    //   - the importer is a non-global role (referente, encargado, etc.)
+    //   - they have a cuerda assigned on their profile
+    //   - the CSV has a column mapped to numero_cuerda
+    //   - some rows in that column have values different from the user's
+    //     cuerda (and not blank)
+    // If we already asked and the user said "rewrite", skip — the rewrite
+    // will happen below before recordsToInsert is built.
+    const isGlobal = profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+    const userCuerda = profile?.numero_cuerda || '';
+    if (!cuerdaConfirmedAction && !isGlobal && userCuerda) {
+      const csvCuerdaCol = columnMapping['numero_cuerda'];
+      if (csvCuerdaCol) {
+        const mismatchedRows: string[] = [];
+        for (const row of dataToImport) {
+          const raw = (row[csvCuerdaCol] || '').trim();
+          if (!raw) continue; // blank cuerda: trigger / fallback fills it from creator, no UX warning needed
+          if (raw !== userCuerda) mismatchedRows.push(raw);
+        }
+        if (mismatchedRows.length > 0) {
+          const distinct = Array.from(new Set(mismatchedRows));
+          // Sort numeric cuerdas first ascending, then non-numeric, same
+          // ordering used in the column-header dropdown so it's familiar.
+          distinct.sort((a, b) => {
+            const an = Number(a), bn = Number(b);
+            const aIsNum = !Number.isNaN(an), bIsNum = !Number.isNaN(bn);
+            if (aIsNum && bIsNum) return an - bn;
+            if (aIsNum) return -1;
+            if (bIsNum) return 1;
+            return a.localeCompare(b);
+          });
+          setCuerdaConfirm({
+            distinctMismatched: distinct,
+            mismatchedRowCount: mismatchedRows.length,
+            userCuerda,
+          });
+          // Bail out of the import. The dialog now renders; if user
+          // confirms, it'll set cuerdaConfirmedAction='rewrite' and
+          // call handleImportData() again, which will pass this check.
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     const toastId = showLoading('Importando datos...');
 
     try {
+      // If the user confirmed "import to my cuerda", overwrite the cuerda
+      // column on every row of dataToImport so the records we're about to
+      // build use the user's cuerda regardless of what the CSV said. The
+      // sync_contact_cuerda_with_responsable trigger would do this anyway,
+      // but doing it explicitly here keeps the import log's
+      // `imported_rows` snapshot consistent with what actually got
+      // inserted (otherwise the snapshot would still show '104' even
+      // though every row landed in '204').
+      if (cuerdaConfirmedAction === 'rewrite') {
+        const csvCuerdaCol = columnMapping['numero_cuerda'];
+        if (csvCuerdaCol && userCuerda) {
+          for (const row of dataToImport) {
+            row[csvCuerdaCol] = userCuerda;
+          }
+        }
+        // One-shot: clear the flag so a subsequent import (different file,
+        // same dialog session) re-runs the check.
+        setCuerdaConfirmedAction(null);
+      }
       // Fields that should never be set from CSV (DB-managed)
       const BLOCKED_FIELDS = new Set(['created_at', 'id', 'church_id', 'created_by']);
       // Fields that are dates - empty/invalid values must be null
@@ -457,6 +544,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
   };
 
   return (
+    <>
     <Card className="w-full border-0 shadow-none">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -648,6 +736,65 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         </Button>
       </CardFooter>
     </Card>
+
+    {/* Cuerda mismatch confirmation. Shown only when the importer is a
+        non-global with a cuerda assigned, the CSV had cuerda values that
+        differ from theirs, and we haven't already gotten consent for
+        this run. The 'Importar a mi cuerda' button rewrites every cuerda
+        cell in dataToImport before the actual import runs, so the
+        snapshot we'll persist on the import log shows the user's cuerda
+        (matching what actually lands in the contacts table). */}
+    <Dialog open={!!cuerdaConfirm} onOpenChange={(o) => { if (!o) setCuerdaConfirm(null); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Cuerdas distintas a la tuya
+          </DialogTitle>
+          <DialogDescription className="text-left space-y-2 pt-2">
+            {cuerdaConfirm && (
+              <>
+                <span className="block">
+                  Estás por importar contactos cuya columna <strong>Cuerda</strong> tiene valores distintos al tuyo.
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Tu cuerda: <strong className="text-foreground tabular-nums">{cuerdaConfirm.userCuerda}</strong>
+                  {' · '}
+                  En el archivo aparece: <strong className="text-foreground tabular-nums">{cuerdaConfirm.distinctMismatched.join(', ')}</strong>
+                  {' · '}
+                  Filas afectadas: <strong className="text-foreground tabular-nums">{cuerdaConfirm.mismatchedRowCount}</strong>
+                </span>
+                <span className="block pt-1">
+                  Si los cargás tal cual el archivo, <strong>no vas a poder verlos en tu semillero</strong> porque tu sesión solo muestra contactos de tu cuerda.
+                </span>
+                <span className="block">
+                  ¿Querés que los importemos a tu cuerda <strong className="text-foreground">{cuerdaConfirm.userCuerda}</strong> para que aparezcan en tu semillero?
+                </span>
+              </>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" onClick={() => setCuerdaConfirm(null)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => {
+              // Confirm: set the sticky flag, close the dialog, and re-fire
+              // the import. The flag tells the next handleImportData call
+              // to skip the check and rewrite cuerda values to the user's.
+              setCuerdaConfirmedAction('rewrite');
+              setCuerdaConfirm(null);
+              // Defer one tick so the state update lands before we re-call.
+              setTimeout(() => handleImportData(), 0);
+            }}
+          >
+            Importar a mi cuerda{cuerdaConfirm ? ` ${cuerdaConfirm.userCuerda}` : ''}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
