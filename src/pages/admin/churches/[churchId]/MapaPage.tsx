@@ -8,6 +8,7 @@ import { MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
+import { buildGeocodeAddress } from '@/lib/geocode-address';
 
 interface Cell {
   id: string;
@@ -47,10 +48,17 @@ const loadGoogleMaps = (): Promise<any> => {
 // Gran Buenos Aires bounding box for validation
 const GBA_BOUNDS = { latMin: -34.85, latMax: -34.25, lngMin: -58.85, lngMax: -58.15 };
 
-const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+const geocodeAddress = async (
+  address: string,
+  churchAddress?: string | null,
+): Promise<{ lat: number; lng: number } | null> => {
   try {
-    // Add Buenos Aires bias to avoid geocoding "Tucumán 2590" to Tucumán province
-    const biasedAddress = address.includes('Buenos Aires') ? address : `${address}, Buenos Aires, Argentina`;
+    // Bias the geocode toward the church's locality (e.g. "General San
+    // Martin") instead of falling back to "Buenos Aires" — the latter
+    // gets read as CABA by Google and sends ambiguous street names to
+    // Capital. See src/lib/geocode-address.ts. The GBA bounds and
+    // region=ar params below stay as additional bias layers.
+    const biasedAddress = buildGeocodeAddress(address, churchAddress);
     const bounds = `${GBA_BOUNDS.latMin},${GBA_BOUNDS.lngMin}|${GBA_BOUNDS.latMax},${GBA_BOUNDS.lngMax}`;
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(biasedAddress)}&bounds=${bounds}&region=ar&key=${GOOGLE_KEY}`;
     const res = await fetch(url);
@@ -94,6 +102,20 @@ const MapaPage = () => {
       }));
     },
     enabled: !!churchId,
+  });
+
+  // Church address — used to bias every geocode call we make from this
+  // page toward the church's locality. Without this, "Mendoza 407"
+  // resolves to a Mendoza street in CABA instead of in San Martín
+  // where MJA Central actually is. Loaded once per session.
+  const { data: church } = useQuery<{ address: string | null } | null>({
+    queryKey: ['church-address', churchId],
+    queryFn: async () => {
+      const { data } = await supabase.from('churches').select('address').eq('id', churchId!).single();
+      return data as any;
+    },
+    enabled: !!churchId,
+    staleTime: 60 * 60_000,
   });
 
   // Count contacts assigned to each cell for the popup
@@ -157,7 +179,7 @@ const MapaPage = () => {
 
     for (let i = 0; i < needsGeocode.length; i++) {
       const cell = needsGeocode[i];
-      const coords = await geocodeAddress(cell.address!);
+      const coords = await geocodeAddress(cell.address!, church?.address);
       if (coords) {
         await supabase.from('cells').update({ lat: coords.lat, lng: coords.lng }).eq('id', cell.id);
       } else {

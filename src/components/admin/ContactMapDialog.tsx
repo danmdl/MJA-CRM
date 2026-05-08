@@ -1,12 +1,21 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { buildGeocodeAddress } from '@/lib/geocode-address';
 
 interface ContactMapDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contactName: string;
   contactAddress: string;
+  // Optional. When provided, the dialog uses the church's locality as
+  // the geocode bias instead of the historical "Buenos Aires" tail —
+  // which Google reads as CABA and lands ambiguous addresses in Capital
+  // instead of the correct suburb. Callers should pass church.address
+  // from the surrounding context (Semillero / Celulas pages have it
+  // already from their church query). Falls back to the old behavior
+  // when not provided.
+  churchAddress?: string | null;
   suggestedCell: {
     name: string;
     address: string | null;
@@ -51,7 +60,7 @@ const darkStyles = [
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ];
 
-const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, suggestedCell }: ContactMapDialogProps) => {
+const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, churchAddress, suggestedCell }: ContactMapDialogProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,7 +78,7 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
         const gmaps = await loadGoogleMaps();
         const geocoder = new gmaps.Geocoder();
 
-        const biasedAddress = contactAddress.includes('Buenos Aires') ? contactAddress : `${contactAddress}, Buenos Aires, Argentina`;
+        const biasedAddress = buildGeocodeAddress(contactAddress, churchAddress);
 
         geocoder.geocode({ address: biasedAddress, region: 'ar' }, (results: any, status: string) => {
           setLoading(false);
@@ -186,7 +195,7 @@ const ContactMapDialog = ({ open, onOpenChange, contactName, contactAddress, sug
     }, 500); // Wait 500ms for dialog animation to complete
 
     return () => clearTimeout(timer);
-  }, [open, contactAddress, suggestedCell, contactName]);
+  }, [open, contactAddress, suggestedCell, contactName, churchAddress]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

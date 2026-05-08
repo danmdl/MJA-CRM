@@ -26,6 +26,7 @@ import { usePermissions } from '@/lib/permissions';
 import { normalize } from '@/lib/normalize';
 import { isValidArgentinePhone } from '@/lib/phone-validation';
 import { isWithinGBA, getDistanceColor, getDistanceWarning, getDistanceBadgeClass } from '@/lib/geo-validation';
+import { buildGeocodeAddress } from '@/lib/geocode-address';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
@@ -524,10 +525,13 @@ const SemilleroPage = () => {
 
     toGeocode.forEach((contact, i) => {
       setTimeout(() => {
-        // Append country/region tail to improve accuracy. The bounds box
-        // above is what biases the result toward the church area; it's
-        // not a hard restriction, so addresses outside still resolve.
-        const searchAddr = `${contact.address}, Buenos Aires, Argentina`;
+        // Bias the geocode to the church's locality (e.g. "General San
+        // Martin") instead of the historical hardcoded "Buenos Aires"
+        // tail, which Google reads as CABA and sends every ambiguous
+        // street name to Capital. The bounds box below stays as a
+        // second layer of bias for cases where Google ignores the
+        // textual hint. See src/lib/geocode-address.ts for details.
+        const searchAddr = buildGeocodeAddress(contact.address || '', church?.address);
         const request: any = { address: searchAddr, region: 'AR' };
         if (churchBounds) request.bounds = churchBounds;
         geocoder.geocode(request, async (results: any[], status: string) => {
@@ -547,7 +551,7 @@ const SemilleroPage = () => {
         });
       }, i * 300);
     });
-  }, [allContacts, churchId, queryClient, church?.lat, church?.lng]);
+  }, [allContacts, churchId, queryClient, church?.lat, church?.lng, church?.address]);
 
   // ─── Cell suggestion by distance ───────────────────────────────
   // First detect zona from barrio/address text, then find cells in that zona sorted by distance
@@ -2132,6 +2136,7 @@ const SemilleroPage = () => {
         onOpenChange={(o) => { if (!o) setMapContact(null); }}
         contactName={mapContact?.name || ''}
         contactAddress={mapContact?.address || ''}
+        churchAddress={church?.address || null}
         suggestedCell={mapContact?.sugCell || null}
       />
       <WhatsAppComposeDialog

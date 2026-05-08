@@ -519,6 +519,7 @@ const CelulasPage = () => {
         onOpenChange={(o) => { if (!o) setMapCell(null); }}
         contactName={mapCell?.name || ''}
         contactAddress={mapCell?.address || ''}
+        churchAddress={churchCoords?.address || null}
         suggestedCell={null}
       />
 

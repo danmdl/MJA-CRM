@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Users, Crosshair, ChevronDown, ChevronRight } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { isWithinGBA } from '@/lib/geo-validation';
+import { buildGeocodeAddress } from '@/lib/geocode-address';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import { useSession } from '@/hooks/use-session';
 import { normalize } from '@/lib/normalize';
@@ -47,6 +48,17 @@ const ValidatorPage = () => {
   // and info collapse so the page doesn't dump 130 'sin dirección' rows on
   // first load. User can expand any group by clicking its header.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  // Church address — used to bias the re-geocode action toward the
+  // church's locality instead of falling back to "Buenos Aires" (which
+  // Google reads as CABA). Loaded on mount; null while loading.
+  const [churchAddress, setChurchAddress] = useState<string | null>(null);
+  useEffect(() => {
+    if (!churchId) return;
+    (async () => {
+      const { data } = await supabase.from('churches').select('address').eq('id', churchId).single();
+      if (data?.address) setChurchAddress(data.address);
+    })();
+  }, [churchId]);
 
   // Cuerda isolation: same rule we apply elsewhere. Below supervisor (referente,
   // encargado, consolidador, conector, anfitrion) only sees data tied to their
@@ -252,7 +264,7 @@ const ValidatorPage = () => {
     setGeocoding(contactId);
     setGeocodePreview(null);
     const geocoder = new (window as any).google.maps.Geocoder();
-    const searchAddr = `${address}, Buenos Aires, Argentina`;
+    const searchAddr = buildGeocodeAddress(address, churchAddress);
     geocoder.geocode({ address: searchAddr }, (results: any[], status: string) => {
       setGeocoding(null);
       if (status === 'OK' && results?.[0]?.geometry?.location) {
