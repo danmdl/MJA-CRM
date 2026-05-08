@@ -1223,7 +1223,88 @@ const SemilleroPage = () => {
                     </th>
                     {showCuerdaCol && (
                       <ResizableHeader width={colWidths.cuerda} onResize={resizeCol('cuerda')}>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Cuerda</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Cuerda</span>
+                              <Filter className={`h-3 w-3 ${filterCuerda ? 'text-primary fill-primary/30' : 'opacity-60'}`} />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" collisionPadding={16} className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto">
+                            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Filtrar por cuerda</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => setFilterCuerda('')} className={filterCuerda === '' ? 'bg-accent' : ''}>
+                              Todas
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {(() => {
+                              // Same dropdown-narrowing approach as the Responsable
+                              // column: build the visible set with all OTHER active
+                              // filters applied (cuerda excluded so the dropdown
+                              // doesn't collapse to just the selected one), then
+                              // collect distinct numero_cuerda values from there.
+                              // That way picking a Responsable first narrows what
+                              // cuerdas appear here to ones that actually have
+                              // contacts under the current criteria — admins
+                              // looking at "Responsable=Micaela" only see her
+                              // cuerdas, not every cuerda in the church.
+                              const userId = session?.user?.id;
+                              const visible = (allContacts || []).filter(c => {
+                                if (!canSeeContactsFromAllCuerdas) {
+                                  if (userCuerdaNumero) {
+                                    if (c.numero_cuerda !== userCuerdaNumero) return false;
+                                  } else if (c.responsable_id !== userId) {
+                                    return false;
+                                  }
+                                }
+                                if (filterResponsable === '__none__') {
+                                  if (c.responsable_id) return false;
+                                } else if (filterResponsable && c.responsable_id !== filterResponsable) {
+                                  return false;
+                                }
+                                if (filterConector === '__none__' && c.conector) return false;
+                                if (filterConector && filterConector !== '__none__') {
+                                  if (!c.conector || normalize(c.conector) !== normalize(filterConector)) return false;
+                                }
+                                if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
+                                if (searchTerm.trim()) {
+                                  const s = normalize(searchTerm);
+                                  const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
+                                  if (!hay.includes(s)) return false;
+                                }
+                                return true;
+                              });
+                              // Distinct cuerda values that actually appear in the
+                              // visible set, plus their counts so the user can see
+                              // at a glance how many contacts each cuerda holds
+                              // under the current view.
+                              const counts = new Map<string, number>();
+                              visible.forEach(c => {
+                                const k = c.numero_cuerda || '';
+                                if (!k) return;
+                                counts.set(k, (counts.get(k) || 0) + 1);
+                              });
+                              // Sort: numeric cuerdas ascending (101, 102, ..., 204),
+                              // then anything non-numeric (e.g. 'MJA Central') after.
+                              // Sorting purely lexically would put "104" between "1"
+                              // and "2", which is wrong for the church's numbering
+                              // convention (1xx masc, 2xx fem, 3xx etc).
+                              const cuerdas = Array.from(counts.keys()).sort((a, b) => {
+                                const an = Number(a), bn = Number(b);
+                                const aIsNum = !Number.isNaN(an), bIsNum = !Number.isNaN(bn);
+                                if (aIsNum && bIsNum) return an - bn;
+                                if (aIsNum) return -1;
+                                if (bIsNum) return 1;
+                                return a.localeCompare(b);
+                              });
+                              return cuerdas.map(k => (
+                                <DropdownMenuItem key={k} onClick={() => setFilterCuerda(k)} className={filterCuerda === k ? 'bg-accent' : ''}>
+                                  <span className="flex-1">{k}</span>
+                                  <span className="text-[10px] text-muted-foreground tabular-nums ml-2">{counts.get(k)}</span>
+                                </DropdownMenuItem>
+                              ));
+                            })()}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </ResizableHeader>
                     )}
                     <ResizableHeader width={colWidths.nombre} onResize={resizeCol('nombre')}>
