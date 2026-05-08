@@ -183,7 +183,31 @@ const MapPickerPage = () => {
   // filter EXCEPT onlySelected — picking 'Solo seleccionados' shouldn't
   // remove markers from the map, only condense the sidebar list), and
   // one for the SIDEBAR LIST (which additionally applies onlySelected).
+  // Whether this user is a 'global' (admin / general / pastor /
+  // supervisor) — globals can see every contact in the church, which
+  // for MJA Central means 1500+ pins. Painting all of them on initial
+  // load is slow, and the user almost always wants to focus on a
+  // specific cuerda anyway. So for globals we require an explicit
+  // narrowing filter (cuerda, responsable, search, date range, etc.)
+  // before populating the map. Non-globals are already cuerda-scoped
+  // by the backend query so this gate doesn't apply to them.
+  const isGlobalRole = !!profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+  const hasAnyNarrowingFilter = !!(
+    search.trim() ||
+    filterResponsableId ||
+    filterCuerda ||
+    filterDateFrom ||
+    filterDateTo ||
+    filterSexo
+  );
+  const requireFilterBeforePainting = isGlobalRole && !hasAnyNarrowingFilter;
+
   const filteredForMap = useMemo(() => {
+    // Empty result for globals who haven't picked a filter yet —
+    // surfaces the "Elegí una cuerda" empty state, keeps the map
+    // marker count at zero so Google Maps doesn't render thousands of
+    // pins on first load.
+    if (requireFilterBeforePainting) return [];
     const term = search.trim().toLowerCase();
     return (contacts || []).filter(c => {
       if (onlyWithNumber && !/\d/.test(c.address || '')) return false;
@@ -201,7 +225,7 @@ const MapPickerPage = () => {
       }
       return true;
     });
-  }, [contacts, search, onlyWithNumber, filterResponsableId, filterCuerda, filterDateFrom, filterDateTo, filterSexo]);
+  }, [contacts, search, onlyWithNumber, filterResponsableId, filterCuerda, filterDateFrom, filterDateTo, filterSexo, requireFilterBeforePainting]);
 
   // Sidebar list = map filtered set, optionally narrowed to selected.
   const filtered = useMemo(() => {
@@ -647,14 +671,30 @@ const MapPickerPage = () => {
             in the visible contact set. For a non-global referente whose
             list is already scoped to their own cuerda this would be a
             single-option dropdown, so we skip it. Same numeric-first
-            sort order as the Cuerda dropdown in Semillero. */}
+            sort order as the Cuerda dropdown in Semillero.
+            
+            Highlighted in gold when a global hasn't picked a filter yet
+            — in that case the page intentionally shows nothing on the
+            map until a cuerda is chosen, so we point to the dropdown
+            with an attention-grabbing border + ring + a small caption.
+            Once they pick anything, it goes back to a plain border. */}
         {availableCuerdas.length > 1 && (
-          <select value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background shrink-0" title="Filtrar por número de cuerda">
-            <option value="">Todas las cuerdas</option>
-            {availableCuerdas.map(num => (
-              <option key={num} value={num}>Cuerda {num}</option>
-            ))}
-          </select>
+          <div className="flex flex-col items-start shrink-0">
+            <select
+              value={filterCuerda}
+              onChange={e => setFilterCuerda(e.target.value)}
+              className={`h-8 text-xs rounded px-2 bg-background ${requireFilterBeforePainting ? 'border-2 border-primary ring-2 ring-primary/30 font-semibold text-primary' : 'border'}`}
+              title="Filtrar por número de cuerda"
+            >
+              <option value="">Todas las cuerdas</option>
+              {availableCuerdas.map(num => (
+                <option key={num} value={num}>Cuerda {num}</option>
+              ))}
+            </select>
+            {requireFilterBeforePainting && (
+              <span className="text-[10px] text-primary mt-0.5 font-medium">↑ Elegí una para empezar</span>
+            )}
+          </div>
         )}
         <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background shrink-0">
           <option value="">Sexo: todos</option>
@@ -800,8 +840,15 @@ const MapPickerPage = () => {
             {isLoading ? (
               <div className="p-4 text-center text-xs text-muted-foreground">Cargando contactos...</div>
             ) : filtered.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                {hasActiveFilters ? 'Ningún contacto matchea estos filtros.' : 'No hay contactos georreferenciados.'}
+              <div className="p-6 text-center">
+                {requireFilterBeforePainting ? (
+                  <>
+                    <p className="text-sm font-medium text-primary mb-1">Elegí una cuerda para empezar</p>
+                    <p className="text-xs text-muted-foreground">Hay muchos contactos en esta iglesia. Filtrá por cuerda (o por responsable, fecha, etc.) para que aparezcan en el mapa.</p>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{hasActiveFilters ? 'Ningún contacto matchea estos filtros.' : 'No hay contactos georreferenciados.'}</p>
+                )}
               </div>
             ) : (
               filtered.map(c => {
