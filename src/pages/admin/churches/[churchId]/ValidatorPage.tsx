@@ -52,11 +52,20 @@ const ValidatorPage = () => {
   // church's locality instead of falling back to "Buenos Aires" (which
   // Google reads as CABA). Loaded on mount; null while loading.
   const [churchAddress, setChurchAddress] = useState<string | null>(null);
+  // Church coords too — used as the centre of the bounds bias when
+  // re-geocoding contacts. Loaded alongside the address so we don't
+  // make a second roundtrip when the bulk action fires.
+  const [churchLat, setChurchLat] = useState<number | null>(null);
+  const [churchLng, setChurchLng] = useState<number | null>(null);
   useEffect(() => {
     if (!churchId) return;
     (async () => {
-      const { data } = await supabase.from('churches').select('address').eq('id', churchId).single();
+      const { data } = await supabase.from('churches').select('address, lat, lng').eq('id', churchId).single();
       if (data?.address) setChurchAddress(data.address);
+      if (data?.lat != null && data?.lng != null) {
+        setChurchLat(Number(data.lat));
+        setChurchLng(Number(data.lng));
+      }
     })();
   }, [churchId]);
 
@@ -329,7 +338,23 @@ const ValidatorPage = () => {
   //     them tells the user which contacts have addresses Google can't
   //     parse so they can fix them by hand.
   const [bulkRegeocoding, setBulkRegeocoding] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, fixed: 0, outOfZone: 0, failed: 0 });
+  // Five buckets now (was three) so the user understands what really
+  // changed:
+  //   fixed       — got a new coordinate that's plausibly correct
+  //                 (inside GBA, outside the CABA box, address doesn't
+  //                 say capital)
+  //   cleared     — address had no street number, geocoder will only
+  //                 ever return a centroid; we set lat/lng to NULL
+  //                 instead of keeping a misleading pin
+  //   stillInCaba — re-geocoded but result still landed in CABA box
+  //                 even after retrying with a province-biased tail.
+  //                 We keep the OLD coords (don't overwrite) so the
+  //                 user can spot them visually and manually edit.
+  //   outOfZone   — geocoded outside GBA entirely; address probably
+  //                 broken; old coords kept.
+  //   failed      — Google returned ZERO_RESULTS / OVER_QUERY_LIMIT /
+  //                 etc.; old coords kept.
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, fixed: 0, cleared: 0, stillInCaba: 0, outOfZone: 0, failed: 0 });
   const bulkAbortRef = React.useRef(false);
 
   const isInsideCABA = (lat: number, lng: number) =>
@@ -338,6 +363,19 @@ const ValidatorPage = () => {
   const addressMentionsCapital = (addr: string) => {
     const norm = addr.toLowerCase();
     return norm.includes('caba') || norm.includes('capital') || norm.includes('ciudad autonoma') || norm.includes('ciudad autónoma');
+  };
+
+  // Heuristic: an address "has a street number" if it contains at least
+  // one digit AND that digit isn't trivially short (we don't want '1' or
+  // '2' to count). Used to decide whether to even bother geocoding —
+  // street-less addresses ("Villa Lynch", "Villa Maipú, Gral. San
+  // Martín") will only ever resolve to a Google-picked centroid which is
+  // useless for routing, often just barely inside the CABA box even when
+  // the real neighbourhood isn't.
+  const addressHasStreetNumber = (addr: string) => {
+    const trimmed = (addr || '').trim();
+    if (trimmed.length < 6) return false;
+    return /\d{2,}/.test(trimmed);
   };
 
   const bulkRegeocodeCABA = async () => {
@@ -349,7 +387,7 @@ const ValidatorPage = () => {
 
     setBulkRegeocoding(true);
     bulkAbortRef.current = false;
-    setBulkProgress({ done: 0, total: 0, fixed: 0, outOfZone: 0, failed: 0 });
+    setBulkProgress({ done: 0, total: 0, fixed: 0, cleared: 0, stillInCaba: 0, outOfZone: 0, failed: 0 });
 
     // Pull candidates. Pagination not needed at 896 rows but we cap at
     // 2000 to be safe in case the criteria match more after future
@@ -388,44 +426,101 @@ const ValidatorPage = () => {
     }
 
     const geocoder = new (window as any).google.maps.Geocoder();
-    let fixed = 0, outOfZone = 0, failed = 0;
+    let fixed = 0, cleared = 0, stillInCaba = 0, outOfZone = 0, failed = 0;
 
-    for (let i = 0; i < eligible.length; i++) {
-      if (bulkAbortRef.current) break;
-      const c = eligible[i];
-      const searchAddr = buildGeocodeAddress(c.address || '', churchAddress);
+    // Bounds bias: when the church has a known location, we constrain
+    // the geocoder to a ~12km box around it. Soft hint, not strict —
+    // Google can return a result outside the box, but it'll prefer
+    // matches inside. Pulls "Israel 5013" toward the Israel street in
+    // Villa Lynch (San Martín) instead of the one in Devoto (CABA).
+    let churchBounds: any = null;
+    if (churchLat != null && churchLng != null) {
+      const gmaps = (window as any).google.maps;
+      // 0.11 degrees ≈ 12km in latitude, slightly more in longitude
+      // at this latitude. Generous on purpose so we don't filter out
+      // legitimate contacts living a town or two over from the church.
+      churchBounds = new gmaps.LatLngBounds(
+        new gmaps.LatLng(churchLat - 0.11, churchLng - 0.13),
+        new gmaps.LatLng(churchLat + 0.11, churchLng + 0.13),
+      );
+    }
 
-      // Wrap callback-style geocode in a promise so we can await + throttle.
-      const result = await new Promise<{ ok: boolean; lat?: number; lng?: number; formatted?: string }>((resolve) => {
-        geocoder.geocode({ address: searchAddr, region: 'AR' }, (results: any[], status: string) => {
+    // Helper: single geocode attempt. Returns ok+coords or ok:false.
+    const tryGeocode = async (addr: string, useBounds: boolean) => {
+      const req: any = { address: addr, region: 'AR' };
+      if (useBounds && churchBounds) req.bounds = churchBounds;
+      return new Promise<{ ok: boolean; lat?: number; lng?: number }>((resolve) => {
+        geocoder.geocode(req, (results: any[], status: string) => {
           if (status === 'OK' && results?.[0]?.geometry?.location) {
             resolve({
               ok: true,
               lat: results[0].geometry.location.lat(),
               lng: results[0].geometry.location.lng(),
-              formatted: results[0].formatted_address,
             });
           } else {
             resolve({ ok: false });
           }
         });
       });
+    };
+
+    for (let i = 0; i < eligible.length; i++) {
+      if (bulkAbortRef.current) break;
+      const c = eligible[i];
+      const rawAddr = c.address || '';
+
+      // Branch 1 — address has no street number. Geocoder will only
+      // ever return a Google-picked centroid (not a real building).
+      // Set lat/lng to NULL so the contact disappears from the map
+      // instead of pretending to be in Capital. Honest > misleading.
+      if (!addressHasStreetNumber(rawAddr)) {
+        await supabase.from('contacts')
+          .update({ lat: null, lng: null })
+          .eq('id', c.id);
+        cleared++;
+        setBulkProgress({ done: i + 1, total: eligible.length, fixed, cleared, stillInCaba, outOfZone, failed });
+        // No geocode happened, so no rate-limit pause needed — this
+        // path is just a DB write. Move on.
+        continue;
+      }
+
+      // Branch 2 — address has a street number. Two-attempt geocode
+      // with progressively stronger province hints, both bounds-biased.
+      const builtAddr = buildGeocodeAddress(rawAddr, churchAddress);
+      let result = await tryGeocode(builtAddr, true);
+
+      // If first attempt landed in CABA box (and address doesn't mention
+      // capital), retry with an explicit "provincia de Buenos Aires"
+      // suffix that disambiguates from Capital Federal harder than the
+      // bare "Buenos Aires" suffix does. Google reads "Buenos Aires"
+      // as CABA by default; "provincia de Buenos Aires" forces the
+      // province interpretation.
+      if (result.ok && isInsideCABA(result.lat!, result.lng!)) {
+        const altAddr = `${rawAddr.trim()}, provincia de Buenos Aires, Argentina`;
+        result = await tryGeocode(altAddr, true);
+        // Inter-call throttle for the retry too
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
 
       if (!result.ok) {
         failed++;
       } else if (!isWithinGBA(result.lat!, result.lng!)) {
-        // New coords also outside GBA — keep old ones, don't make
-        // things worse. Counts as 'outOfZone' so the user sees the
-        // address probably needs manual correction.
+        // Result outside GBA → address probably broken; keep old coords
         outOfZone++;
+      } else if (isInsideCABA(result.lat!, result.lng!)) {
+        // Even after retry we're still in CABA. Keep OLD coords (don't
+        // overwrite with another wrong value) and count separately so
+        // the user knows these need manual editing of the address.
+        stillInCaba++;
       } else {
+        // Plausibly correct: inside GBA, outside CABA box. Save it.
         await supabase.from('contacts')
           .update({ lat: result.lat, lng: result.lng })
           .eq('id', c.id);
         fixed++;
       }
 
-      setBulkProgress({ done: i + 1, total: eligible.length, fixed, outOfZone, failed });
+      setBulkProgress({ done: i + 1, total: eligible.length, fixed, cleared, stillInCaba, outOfZone, failed });
 
       // 200ms between calls — keeps us at 5/sec, under the 50/sec free
       // tier limit with plenty of margin if the user has other tabs
@@ -434,7 +529,14 @@ const ValidatorPage = () => {
     }
 
     setBulkRegeocoding(false);
-    showSuccess(`Listo. ${fixed} corregidos, ${outOfZone} fuera de zona (revisar dirección), ${failed} no encontrados.`);
+    const parts = [
+      `${fixed} corregidos`,
+      cleared > 0 ? `${cleared} sin calle (limpiados)` : null,
+      stillInCaba > 0 ? `${stillInCaba} siguen en CABA (revisar dirección)` : null,
+      outOfZone > 0 ? `${outOfZone} fuera de zona` : null,
+      failed > 0 ? `${failed} sin resultado` : null,
+    ].filter(Boolean).join(', ');
+    showSuccess(`Listo. ${parts}.`);
     runValidation();
   };
 
@@ -494,14 +596,38 @@ const ValidatorPage = () => {
                   style={{ width: bulkProgress.total > 0 ? `${(bulkProgress.done / bulkProgress.total) * 100}%` : '0%' }}
                 />
               </div>
-              <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
+              <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground tabular-nums">
                 <span>{bulkProgress.done} / {bulkProgress.total}</span>
-                <span>
+                <span className="flex flex-wrap gap-x-2 gap-y-0.5">
                   <span className="text-green-400">{bulkProgress.fixed} corregidos</span>
-                  {' · '}
-                  <span className="text-amber-400">{bulkProgress.outOfZone} fuera de zona</span>
-                  {' · '}
-                  <span className="text-red-400">{bulkProgress.failed} no encontrados</span>
+                  {bulkProgress.cleared > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-blue-400" title="Sin calle ni número en la dirección — se les borraron las coordenadas para que no aparezcan mal en el mapa.">
+                        {bulkProgress.cleared} sin calle
+                      </span>
+                    </>
+                  )}
+                  {bulkProgress.stillInCaba > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-orange-400" title="El geocoder los siguió ubicando en CABA aunque la dirección dice San Martín. Hay que editar la dirección manualmente.">
+                        {bulkProgress.stillInCaba} siguen en CABA
+                      </span>
+                    </>
+                  )}
+                  {bulkProgress.outOfZone > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-amber-400">{bulkProgress.outOfZone} fuera de zona</span>
+                    </>
+                  )}
+                  {bulkProgress.failed > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-red-400">{bulkProgress.failed} sin resultado</span>
+                    </>
+                  )}
                 </span>
               </div>
             </div>
