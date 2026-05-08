@@ -643,9 +643,14 @@ const RouteEditorPage = () => {
 
       {hasRoute ? (
         // ─── Calculated route view: 3 columns (matches public shared view) ───
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        // Grid balanced for the map to dominate. Side panels (paradas /
+        // notas) used to take 7 of 12 columns combined; now they take 6,
+        // and the map gets 6 (was 5). Gap bumped from 4 to 5 so the
+        // panels feel less glued to the map. On smaller screens
+        // everything still stacks single-column.
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Stops */}
-          <div className="lg:col-span-4 border rounded-lg p-4 bg-card flex flex-col">
+          <div className="lg:col-span-3 border rounded-lg p-4 bg-card flex flex-col">
             <h3 className="text-sm font-semibold mb-3">Paradas ({routeData.orderedContacts.length})</h3>
             <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
               <div className="flex items-center gap-2 text-xs">
@@ -684,7 +689,7 @@ const RouteEditorPage = () => {
           </div>
 
           {/* Map */}
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-6">
             <div ref={mapRef} className="w-full rounded-lg border" style={{ height: 'calc(100vh - 220px)', minHeight: 400 }} />
           </div>
 

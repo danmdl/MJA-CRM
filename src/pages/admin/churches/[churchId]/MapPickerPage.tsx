@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { ChevronLeft, MapPin, Route as RouteIcon, Search, Filter, X, List, Map as MapIcon, Navigation } from 'lucide-react';
-import { showError, showSuccess } from '@/utils/toast';
+import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
@@ -46,10 +46,18 @@ const MapPickerPage = () => {
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterResponsableId, setFilterResponsableId] = useState<string>('');
+  const [filterCuerda, setFilterCuerda] = useState<string>('');
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
   const [filterSexo, setFilterSexo] = useState<string>('');
   const [onlyWithNumber, setOnlyWithNumber] = useState(true);
+  // 'Solo seleccionados' toggle: when on, the sidebar list only shows
+  // contacts the user has already picked (via the map markers or the
+  // list checkboxes). Useful while building a route — instead of
+  // scrolling 1000+ contacts to verify what's in the route, you collapse
+  // the view to just the route members. Map markers are unaffected; this
+  // is purely a sidebar filter.
+  const [onlySelected, setOnlySelected] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'map'>('map');
   const [saving, setSaving] = useState(false);
   // Starting point — required before we can finalize the route
@@ -170,14 +178,18 @@ const MapPickerPage = () => {
     document.head.appendChild(script);
   }, []);
 
-  // Apply filters
-  const filtered = useMemo(() => {
+  // Apply filters. Two memos: one for the MAP (map markers respect every
+  // filter EXCEPT onlySelected — picking 'Solo seleccionados' shouldn't
+  // remove markers from the map, only condense the sidebar list), and
+  // one for the SIDEBAR LIST (which additionally applies onlySelected).
+  const filteredForMap = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (contacts || []).filter(c => {
       if (onlyWithNumber && !/\d/.test(c.address || '')) return false;
       if (filterResponsableId === '__none__') {
         if (c.responsable_id) return false;
       } else if (filterResponsableId && c.responsable_id !== filterResponsableId) return false;
+      if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
       if (filterDateFrom && (!c.fecha_contacto || c.fecha_contacto < filterDateFrom)) return false;
       if (filterDateTo && (!c.fecha_contacto || c.fecha_contacto > filterDateTo)) return false;
       if (filterSexo && c.sexo !== filterSexo) return false;
@@ -188,7 +200,29 @@ const MapPickerPage = () => {
       }
       return true;
     });
-  }, [contacts, search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, filterSexo]);
+  }, [contacts, search, onlyWithNumber, filterResponsableId, filterCuerda, filterDateFrom, filterDateTo, filterSexo]);
+
+  // Sidebar list = map filtered set, optionally narrowed to selected.
+  const filtered = useMemo(() => {
+    if (!onlySelected) return filteredForMap;
+    return filteredForMap.filter(c => selectedIds.has(c.id));
+  }, [filteredForMap, onlySelected, selectedIds]);
+
+  // Distinct cuerdas present in the church's data, for the cuerda
+  // filter dropdown. Sorted numerically when both values parse as
+  // numbers (101, 102, ..., 204) — same convention as everywhere else.
+  const availableCuerdas = useMemo(() => {
+    const set = new Set<string>();
+    (contacts || []).forEach(c => { if (c.numero_cuerda) set.add(c.numero_cuerda); });
+    return Array.from(set).sort((a, b) => {
+      const an = Number(a), bn = Number(b);
+      const aIsNum = !Number.isNaN(an), bIsNum = !Number.isNaN(bn);
+      if (aIsNum && bIsNum) return an - bn;
+      if (aIsNum) return -1;
+      if (bIsNum) return 1;
+      return a.localeCompare(b);
+    });
+  }, [contacts]);
 
   // Quick filter presets — set fecha_contacto >= N days ago
   const setLastNDays = (n: number) => {
@@ -201,12 +235,13 @@ const MapPickerPage = () => {
   const clearFilters = () => {
     setSearch('');
     setFilterResponsableId('');
+    setFilterCuerda('');
     setFilterDateFrom('');
     setFilterDateTo('');
     setFilterSexo('');
   };
 
-  const hasActiveFilters = !!(search || filterResponsableId || filterDateFrom || filterDateTo || filterSexo);
+  const hasActiveFilters = !!(search || filterResponsableId || filterCuerda || filterDateFrom || filterDateTo || filterSexo);
 
   const toggleContact = (id: string) => {
     setSelectedIds(prev => {
@@ -270,12 +305,15 @@ const MapPickerPage = () => {
     return () => ro.disconnect();
   }, []);
 
-  // Re-render markers whenever filtered list or selection changes.
+  // Re-render markers whenever the map-filtered list or selection
+  // changes. Uses filteredForMap (NOT the sidebar `filtered` list,
+  // which may be narrowed by 'Solo seleccionados') — turning that
+  // sidebar toggle on shouldn't make markers vanish from the map.
   useEffect(() => {
     const google = (window as any).google;
     if (!google?.maps || !mapInstance.current) return;
 
-    const visibleIds = new Set(filtered.map(c => c.id));
+    const visibleIds = new Set(filteredForMap.map(c => c.id));
 
     // Remove markers no longer visible
     markersById.current.forEach((m, id) => {
@@ -286,7 +324,7 @@ const MapPickerPage = () => {
     });
 
     // Add or update markers
-    filtered.forEach(c => {
+    filteredForMap.forEach(c => {
       if (c.lat == null || c.lng == null) return;
       const isSelected = selectedIds.has(c.id);
       const existing = markersById.current.get(c.id);
@@ -316,15 +354,15 @@ const MapPickerPage = () => {
     });
 
     // Fit bounds the first time we have markers
-    if (!fittedRef.current && filtered.length > 0) {
+    if (!fittedRef.current && filteredForMap.length > 0) {
       const bounds = new google.maps.LatLngBounds();
-      filtered.forEach(c => {
+      filteredForMap.forEach(c => {
         if (c.lat != null && c.lng != null) bounds.extend({ lat: c.lat, lng: c.lng });
       });
       mapInstance.current.fitBounds(bounds, 60);
       fittedRef.current = true;
     }
-  }, [filtered, selectedIds]);
+  }, [filteredForMap, selectedIds]);
 
   // Cleanup markers on unmount
   useEffect(() => {
@@ -439,13 +477,43 @@ const MapPickerPage = () => {
       showError('Tu navegador no soporta geolocalización.');
       return;
     }
+    // High accuracy is critical here — without it, the browser uses
+    // IP-based / WiFi-triangulation lookup which can be off by several
+    // kilometers (Dan reported the start point landing in completely
+    // wrong neighborhoods). enableHighAccuracy asks the OS to use GPS
+    // when possible; on a laptop without GPS it falls back to WiFi but
+    // with much better precision than the default "fast" mode.
+    // timeout caps how long we wait so the user isn't stuck on a
+    // browser that can't get a fix.
+    // maximumAge: 0 forces a fresh fix instead of accepting whatever
+    // cached position the browser has from a previous lookup.
+    const toastId = showLoading('Obteniendo tu ubicación...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        dismissToast(toastId);
+        // Reject coordinates with absurd accuracy (>10km) — that's
+        // almost always IP-geolocation falling back, and the user is
+        // better off picking a manual start than starting their route
+        // from a guess that's miles wrong.
+        if (pos.coords.accuracy && pos.coords.accuracy > 10000) {
+          showError(`Ubicación poco precisa (~${Math.round(pos.coords.accuracy / 1000)} km). Probá desde un dispositivo con GPS o usá "Iglesia".`);
+          return;
+        }
         setStartLat(pos.coords.latitude);
         setStartLng(pos.coords.longitude);
-        setStartAddress(`Mi ubicación (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
+        setStartAddress(`Mi ubicación (~${Math.round(pos.coords.accuracy)}m de precisión)`);
+        showSuccess('Ubicación capturada.');
       },
-      () => showError('No pudimos obtener tu ubicación.')
+      (err) => {
+        dismissToast(toastId);
+        const reason = err.code === 1 ? 'Permiso denegado' : err.code === 2 ? 'Ubicación no disponible' : 'Tiempo agotado';
+        showError(`No pudimos obtener tu ubicación: ${reason}.`);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15_000,
+        maximumAge: 0,
+      },
     );
   };
 
@@ -515,6 +583,19 @@ const MapPickerPage = () => {
               <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
             ))}
         </select>
+        {/* Cuerda filter — only shown when there's more than one cuerda
+            in the visible contact set. For a non-global referente whose
+            list is already scoped to their own cuerda this would be a
+            single-option dropdown, so we skip it. Same numeric-first
+            sort order as the Cuerda dropdown in Semillero. */}
+        {availableCuerdas.length > 1 && (
+          <select value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background shrink-0" title="Filtrar por número de cuerda">
+            <option value="">Todas las cuerdas</option>
+            {availableCuerdas.map(num => (
+              <option key={num} value={num}>Cuerda {num}</option>
+            ))}
+          </select>
+        )}
         <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background shrink-0">
           <option value="">Sexo: todos</option>
           <option value="masculino">Masculino</option>
@@ -629,11 +710,31 @@ const MapPickerPage = () => {
                 </>
               )}
             </div>
-            {selectedIds.size > 0 && (
-              <button onClick={clearSelection} className="text-[11px] text-muted-foreground hover:text-foreground">
-                Limpiar
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* 'Solo seleccionados' toggle — hidden when nothing is
+                  selected yet (would be a confusing button with no
+                  effect). Maps continue to show every visible marker
+                  even with this on; only the sidebar list narrows.
+                  Click again to go back to the full list. */}
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={() => setOnlySelected(v => !v)}
+                  className={`text-[11px] px-1.5 py-0.5 rounded border transition-colors ${
+                    onlySelected
+                      ? 'bg-primary/15 border-primary/40 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                  title="Mostrar solo los contactos elegidos en la lista"
+                >
+                  {onlySelected ? '✓ Solo elegidos' : 'Solo elegidos'}
+                </button>
+              )}
+              {selectedIds.size > 0 && (
+                <button onClick={clearSelection} className="text-[11px] text-muted-foreground hover:text-foreground">
+                  Limpiar
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             {isLoading ? (
