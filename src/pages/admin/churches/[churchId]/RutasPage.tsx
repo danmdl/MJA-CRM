@@ -7,7 +7,7 @@ import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Clock } from 'lucide-react';
+import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Clock, Check } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
 type CreateMode = 'map';
@@ -34,7 +34,7 @@ const RutasPage = () => {
       // back to "only my own routes" so they at least see their work.
       const isGlobal = profile.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
       let q = supabase.from('shared_routes')
-        .select('id, share_token, name, created_at, expires_at, ordered_contact_ids, total_meters, total_seconds, start_address, created_by, numero_cuerda')
+        .select('id, share_token, name, created_at, expires_at, ordered_contact_ids, total_meters, total_seconds, start_address, created_by, numero_cuerda, visited')
         .eq('church_id', churchId!)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
@@ -142,15 +142,39 @@ const RutasPage = () => {
           const expiresIn = Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
           const stops = (p.ordered_contact_ids || []).length;
           const url = `${window.location.origin}/r/${p.share_token}`;
+          // Count contacts marked as visited. visited is a JSONB shaped
+          // { [contactId]: true }, written from the editor and the public
+          // /r/ viewer. We only count IDs that are still in the route's
+          // ordered list — if someone removed a contact after marking it,
+          // the dangling visited entry shouldn't keep the route looking
+          // "complete" with fewer stops than visits.
+          const orderedIds: string[] = p.ordered_contact_ids || [];
+          const visitedMap: Record<string, boolean> = p.visited || {};
+          const visitedCount = orderedIds.reduce((n, id) => n + (visitedMap[id] ? 1 : 0), 0);
+          const isComplete = stops > 0 && visitedCount === stops;
           return (
             <div
               key={p.id}
               onClick={() => navigate(`/admin/churches/${churchId}/rutas/${p.id}`)}
-              className="border rounded-lg p-4 bg-card hover:bg-card/80 cursor-pointer transition-colors flex flex-col min-h-[200px]"
+              className={`border rounded-lg p-4 bg-card hover:bg-card/80 cursor-pointer transition-colors flex flex-col min-h-[200px] ${isComplete ? 'border-green-500/40' : ''}`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold truncate">{p.name || 'Sin nombre'}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-sm font-semibold truncate">{p.name || 'Sin nombre'}</div>
+                    {isComplete && (
+                      // Pill that appears as soon as every stop in the
+                      // route has been ticked off. Green-on-green to
+                      // visually echo the "Marcar" buttons inside the
+                      // editor — same color language for "done". Sits in
+                      // the title row so the user sees it scanning the
+                      // grid without expanding a card.
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-green-500/15 text-green-400 border border-green-500/30">
+                        <Check className="h-2.5 w-2.5" />
+                        Completada
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     Creado el {new Date(p.created_at).toLocaleDateString('es-AR')}
                   </div>
@@ -166,7 +190,16 @@ const RutasPage = () => {
               <div className="flex-1 space-y-1.5 text-xs">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-3 w-3" />
-                  <span>{stops} {stops === 1 ? 'parada' : 'paradas'}</span>
+                  <span>
+                    {stops} {stops === 1 ? 'parada' : 'paradas'}
+                    {/* Inline progress when there's at least one visit
+                        but it's not yet complete. Skipped at 0/N (no
+                        progress to talk about) and at N/N (the badge
+                        above already shouts 'Completada'). */}
+                    {stops > 0 && visitedCount > 0 && !isComplete && (
+                      <span className="text-green-400 ml-1">· {visitedCount}/{stops} visitadas</span>
+                    )}
+                  </span>
                   {p.total_meters && (
                     <>
                       <span>·</span>
