@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
-import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, MessageCircle, Plus, RefreshCw } from 'lucide-react';
+import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 
@@ -724,9 +724,21 @@ const RouteEditorPage = () => {
               : 'Agregá contactos a la ruta y un punto de partida para calcular el orden óptimo de visita.'}
           </p>
           {!calculating && (
-            <Button size="lg" onClick={openEditDialog} className="gap-2">
-              <Plus className="h-4 w-4" /> Agregar contactos
-            </Button>
+            // Two actions side-by-side. Primary (filled) is the map
+            // picker — that's the same flow the user took to create
+            // the project, so it's what they expect to see when they
+            // come back to a route they hadn't filled in yet. The
+            // dialog (outline) is the alternative for people who'd
+            // rather pick from a flat list. Putting both here means
+            // the user doesn't need to know there are two ways in.
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button size="lg" onClick={() => navigate(`/admin/churches/${churchId}/rutas/${projectId}/mapa`)} className="gap-2">
+                <MapIcon className="h-4 w-4" /> Elegir desde el mapa
+              </Button>
+              <Button size="lg" variant="outline" onClick={openEditDialog} className="gap-2">
+                <Plus className="h-4 w-4" /> Elegir desde lista
+              </Button>
+            </div>
           )}
         </div>
       )}
