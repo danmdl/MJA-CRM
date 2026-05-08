@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Users, Crosshair, ChevronDown, ChevronRight } from 'lucide-react';
-import { showSuccess } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 import { isWithinGBA } from '@/lib/geo-validation';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
@@ -297,6 +297,147 @@ const ValidatorPage = () => {
     runValidation();
   };
 
+  // ─── Bulk re-geocode of contacts whose coords landed in CABA when their ─────
+  // address never mentions Capital. Built specifically for the cleanup
+  // after the locality backfill — those contacts now have proper
+  // addresses ('Mendoza 407, General San Martín, Buenos Aires') so a
+  // fresh geocode from the address should land in the right town.
+  //
+  // Why client-side and not a server batch:
+  //   - The Google Geocoder via the Maps JS SDK is already loaded in the
+  //     browser (no extra script needed).
+  //   - Running from the browser means the user's session controls the
+  //     pace and can interrupt by closing the tab — no risk of an
+  //     edge function chewing through the API quota in the background.
+  //   - Each call gets its own RLS-checked supabase.from('contacts')
+  //     update, so we re-use the existing access policy.
+  //
+  // Throttled at one call every 200ms (5/sec) which keeps us comfortably
+  // under Google's free-tier rate limits (50 req/sec) and still finishes
+  // 896 contacts in roughly 3 minutes.
+  //
+  // Safety rails:
+  //   - Only contacts in the current church get touched.
+  //   - Only contacts whose lat/lng falls inside CABA's bounding box AND
+  //     whose address text doesn't mention Capital are eligible. The
+  //     ones that legitimately live in CABA (and do say so) are skipped.
+  //   - New coords are only saved if they pass isWithinGBA(). Outside
+  //     that box → leave the old coords alone (don't NULL them; the user
+  //     might want them as a hint until they edit the address).
+  //   - Failures (Google says ZERO_RESULTS, OVER_QUERY_LIMIT, etc.) are
+  //     logged in-page and skipped, not silently retried — surfacing
+  //     them tells the user which contacts have addresses Google can't
+  //     parse so they can fix them by hand.
+  const [bulkRegeocoding, setBulkRegeocoding] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, fixed: 0, outOfZone: 0, failed: 0 });
+  const bulkAbortRef = React.useRef(false);
+
+  const isInsideCABA = (lat: number, lng: number) =>
+    lat >= -34.71 && lat <= -34.50 && lng >= -58.55 && lng <= -58.33;
+
+  const addressMentionsCapital = (addr: string) => {
+    const norm = addr.toLowerCase();
+    return norm.includes('caba') || norm.includes('capital') || norm.includes('ciudad autonoma') || norm.includes('ciudad autónoma');
+  };
+
+  const bulkRegeocodeCABA = async () => {
+    if (!(window as any).google?.maps) {
+      showError('Google Maps no cargado. Recargá la página y volvé a intentar.');
+      return;
+    }
+    if (!churchId) return;
+
+    setBulkRegeocoding(true);
+    bulkAbortRef.current = false;
+    setBulkProgress({ done: 0, total: 0, fixed: 0, outOfZone: 0, failed: 0 });
+
+    // Pull candidates. Pagination not needed at 896 rows but we cap at
+    // 2000 to be safe in case the criteria match more after future
+    // imports.
+    const { data: candidates, error } = await supabase
+      .from('contacts')
+      .select('id, address, lat, lng')
+      .eq('church_id', churchId)
+      .is('deleted_at', null)
+      .not('address', 'is', null)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .limit(2000);
+
+    if (error || !candidates) {
+      setBulkRegeocoding(false);
+      showError('No se pudo cargar la lista de candidatos.');
+      return;
+    }
+
+    // Filter client-side — Postgres can't cheaply express the
+    // 'inside-CABA AND address-doesnt-mention-capital' combo without
+    // building a materialized view. With <4000 rows in flight a JS
+    // filter is fine.
+    const eligible = candidates.filter(c =>
+      isInsideCABA(Number(c.lat), Number(c.lng)) &&
+      !addressMentionsCapital(c.address || '')
+    );
+
+    setBulkProgress(p => ({ ...p, total: eligible.length }));
+
+    if (eligible.length === 0) {
+      setBulkRegeocoding(false);
+      showSuccess('No hay contactos para re-geocodificar.');
+      return;
+    }
+
+    const geocoder = new (window as any).google.maps.Geocoder();
+    let fixed = 0, outOfZone = 0, failed = 0;
+
+    for (let i = 0; i < eligible.length; i++) {
+      if (bulkAbortRef.current) break;
+      const c = eligible[i];
+      const searchAddr = buildGeocodeAddress(c.address || '', churchAddress);
+
+      // Wrap callback-style geocode in a promise so we can await + throttle.
+      const result = await new Promise<{ ok: boolean; lat?: number; lng?: number; formatted?: string }>((resolve) => {
+        geocoder.geocode({ address: searchAddr, region: 'AR' }, (results: any[], status: string) => {
+          if (status === 'OK' && results?.[0]?.geometry?.location) {
+            resolve({
+              ok: true,
+              lat: results[0].geometry.location.lat(),
+              lng: results[0].geometry.location.lng(),
+              formatted: results[0].formatted_address,
+            });
+          } else {
+            resolve({ ok: false });
+          }
+        });
+      });
+
+      if (!result.ok) {
+        failed++;
+      } else if (!isWithinGBA(result.lat!, result.lng!)) {
+        // New coords also outside GBA — keep old ones, don't make
+        // things worse. Counts as 'outOfZone' so the user sees the
+        // address probably needs manual correction.
+        outOfZone++;
+      } else {
+        await supabase.from('contacts')
+          .update({ lat: result.lat, lng: result.lng })
+          .eq('id', c.id);
+        fixed++;
+      }
+
+      setBulkProgress({ done: i + 1, total: eligible.length, fixed, outOfZone, failed });
+
+      // 200ms between calls — keeps us at 5/sec, under the 50/sec free
+      // tier limit with plenty of margin if the user has other tabs
+      // also using the API.
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    setBulkRegeocoding(false);
+    showSuccess(`Listo. ${fixed} corregidos, ${outOfZone} fuera de zona (revisar dirección), ${failed} no encontrados.`);
+    runValidation();
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
@@ -316,6 +457,57 @@ const ValidatorPage = () => {
           </Button>
         </div>
       </div>
+
+      {/* Bulk re-geocode panel — only meaningful for global roles
+          (admin/general/pastor/supervisor). Below supervisor each user
+          sees their own cuerda's issues only and a per-contact
+          re-geocode button is the right granularity for them. */}
+      {canSeeAllCuerdas && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex-1 min-w-[260px]">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-amber-500" />
+                Re-geocodificar contactos en CABA
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Vuelve a calcular las coordenadas de los contactos cuya posición cayó en Capital Federal pero la dirección no menciona Capital. Tarda ~3 minutos para 900 contactos. Se puede pausar cerrando la página.
+              </p>
+            </div>
+            {!bulkRegeocoding ? (
+              <Button size="sm" variant="outline" onClick={bulkRegeocodeCABA} className="gap-1.5 shrink-0">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Empezar
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => { bulkAbortRef.current = true; }} className="gap-1.5 shrink-0">
+                <XCircle className="h-3.5 w-3.5" />
+                Cancelar
+              </Button>
+            )}
+          </div>
+          {(bulkRegeocoding || bulkProgress.done > 0) && (
+            <div className="mt-3 space-y-2">
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-amber-500 transition-all"
+                  style={{ width: bulkProgress.total > 0 ? `${(bulkProgress.done / bulkProgress.total) * 100}%` : '0%' }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
+                <span>{bulkProgress.done} / {bulkProgress.total}</span>
+                <span>
+                  <span className="text-green-400">{bulkProgress.fixed} corregidos</span>
+                  {' · '}
+                  <span className="text-amber-400">{bulkProgress.outOfZone} fuera de zona</span>
+                  {' · '}
+                  <span className="text-red-400">{bulkProgress.failed} no encontrados</span>
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary cards */}
       {!loading && (
