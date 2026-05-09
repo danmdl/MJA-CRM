@@ -636,16 +636,9 @@ const TerritoriosPage: React.FC = () => {
     return { in: inn, out, noCoords, total: cuerdaCells.length };
   }, [selectedCuerda, cells, selectedCuerdaPaths, mapsLoaded]);
 
-  if (!cuerdasLoading && !editableCuerdas.length && (cuerdas || []).filter(c => !c.is_church_cuerda).length === 0) {
-    return (
-      <div className="p-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <AlertCircle className="h-4 w-4" />
-          No hay cuerdas configuradas en esta iglesia.
-        </div>
-      </div>
-    );
-  }
+  // Never early-return after this point — the map div must always stay in
+  // the DOM so mapRef.current is set before mapsLoaded fires.
+  const noCuerdas = !cuerdasLoading && !editableCuerdas.length && (cuerdas || []).filter(c => !c.is_church_cuerda).length === 0;
 
   const isSelectedEditable = selectedCuerda ? canEditCuerda(selectedCuerda) : false;
   const hasExistingTerritory = !!selectedCuerda?.territory_geojson;
@@ -800,13 +793,18 @@ const TerritoriosPage: React.FC = () => {
         </div>
       )}
 
-      {/* Map. Explicit min-height in viewport units instead of flex-1
-          so we don't depend on a height-bounded ancestor. The
-          surrounding <main> in ChurchDetailsLayout uses overflow-auto,
-          which means flex-1 inside resolves to 0 when the page hasn't
-          measured yet — Google Maps then renders into a 0-height
-          container and stays gray. The ResizeObserver above handles
-          the case where the container later grows. */}
+      {/* No-cuerdas message shown above the map (not as an early-return)
+          so the map div stays in the DOM and mapRef is always set. */}
+      {noCuerdas && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+          <AlertCircle className="h-4 w-4" />
+          No hay cuerdas configuradas en esta iglesia.
+        </div>
+      )}
+
+      {/* Map container always rendered — never behind a conditional.
+          mapRef.current must be set before the mapsLoaded effect fires
+          or the map init silently skips and the div stays blank forever. */}
       <div className="rounded-xl overflow-hidden border" style={{ height: 'min(70vh, 800px)' }}>
         <div ref={mapRef} className="w-full h-full" />
       </div>
