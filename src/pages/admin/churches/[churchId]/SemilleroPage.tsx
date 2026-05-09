@@ -705,17 +705,13 @@ const SemilleroPage = () => {
 
   const externalContacts = useMemo(() => {
     if (isMjaMember) {
-      // ── ASSIGNMENT POOL OUTBOX ──
-      // Contacts already dispatched into the MJA Central pool
-      // (is_external=true) waiting for someone on this side to assign
-      // them to a final célula. filterCuerda still applies so an admin
-      // can drill into a specific cuerda's pool subset.
-      return (allContacts || []).filter(c => {
-        if (!(c as any).is_external) return false;
-        if (c.cell_id) return false;
-        if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
-        return true;
-      });
+      // ── NO OUTBOX FOR MJA MEMBERS ──
+      // Per Dan: 'now the member of the church would see a new member
+      // [contact] added to their own semillero'. Dispatched contacts
+      // land in the MJA member's En Lista directly, not in a separate
+      // outbox tab. The 'Enviar a MJA' chip will read 0 for them, and
+      // is hidden in the toolbar render below to avoid confusion.
+      return [];
     }
     // ── REFERENTE DISPATCH OUTBOX ──
     // The user's own pending dispatches — contacts they clicked
@@ -732,7 +728,7 @@ const SemilleroPage = () => {
       }
       return true;
     });
-  }, [allContacts, isMjaMember, userCuerdaNumero, filterCuerda, session?.user?.id]);
+  }, [allContacts, isMjaMember, userCuerdaNumero, session?.user?.id]);
 
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
   // Every contact pending dispatch (any user, any cuerda). Used to
@@ -1122,17 +1118,23 @@ const SemilleroPage = () => {
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground">En lista</span>
           <span className={`text-sm font-bold tabular-nums ${filteredContacts.length > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : filteredContacts.length}</span>
         </button>
-        <button
-          type="button"
-          onClick={() => { setActivePool('external'); setSearchTerm(''); }}
-          className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
-          title={isMjaMember
-            ? 'Tu outbox: contactos despachados al pool de MJA Central. Asignales su célula final.'
-            : 'Tu outbox: contactos que enviaste a MJA pero todavía no confirmaste el despacho. Confirmá cuando estés seguro y recién ahí salen de tu cuerda.'}
-        >
-          <span className="text-[10px] uppercase tracking-wider text-orange-400">{isMjaMember ? 'Confirmar asignación' : 'Enviar a MJA'}</span>
-          <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
-        </button>
+        {/* Outbox chip — only for non-MJA users (referentes etc.). MJA
+            members don't have an outbox: contacts dispatched to MJA
+            Central land directly in their En Lista, where they get the
+            'Confirmar asignación' button to assign each one to a final
+            célula. Showing an empty outbox tab for MJA members would
+            be confusing, so it's gone for them. */}
+        {!isMjaMember && (
+          <button
+            type="button"
+            onClick={() => { setActivePool('external'); setSearchTerm(''); }}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
+            title='Tu outbox: contactos que enviaste a MJA pero todavía no confirmaste el despacho. Confirmá cuando estés seguro y recién ahí salen de tu cuerda.'
+          >
+            <span className="text-[10px] uppercase tracking-wider text-orange-400">Enviar a MJA</span>
+            <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
+          </button>
+        )}
         {/* Duplicates toggle — narrows the table to rows whose normalized
             full name appears more than once. The count reflects dups
             WITHIN the current filter context, not the church-wide total —
@@ -1775,6 +1777,19 @@ const SemilleroPage = () => {
                         {/* Responsable */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.responsable }}>
                           {(() => {
+                            // Church-cuerda exception: contacts dispatched to
+                            // MJA Central don't have a specific person as
+                            // responsable — the church handles them as a
+                            // whole. Per Dan: 'responsibles in church would
+                            // always be called by default. It cannot be
+                            // changed.' So we hardcode the label to the
+                            // church-cuerda's own numero (e.g. 'MJA Central')
+                            // regardless of what responsable_id holds. Only
+                            // affects this one cuerda — every other cuerda's
+                            // contacts still resolve via teamMembers.
+                            if (churchCuerda?.numero && c.numero_cuerda === churchCuerda.numero) {
+                              return <span className="text-[11px] text-foreground truncate block">{churchCuerda.numero}</span>;
+                            }
                             const resp = c.responsable_id ? profileById.get(c.responsable_id) : null;
                             if (!resp) return <span className="text-[11px] text-muted-foreground italic">—</span>;
                             return <span className="text-[11px] text-foreground truncate block">{resp.first_name} {resp.last_name}</span>;
@@ -1899,6 +1914,14 @@ const SemilleroPage = () => {
                                   const update: any = {
                                     pending_external_send: false,
                                     is_external: true,
+                                    // Auto-clear responsable_id on dispatch.
+                                    // Per Dan: 'responsibles in church would
+                                    // always be called by default. It cannot
+                                    // be changed. We don't have people
+                                    // responsible for contacts, we have just
+                                    // the church.' Setting to null + display
+                                    // logic shows 'MJA Central' for these.
+                                    responsable_id: null,
                                   };
                                   if (cc) update.numero_cuerda = cc.numero;
                                   await supabase.from('contacts').update(update).eq('id', c.id);
@@ -2367,6 +2390,9 @@ const SemilleroPage = () => {
                 const update: any = {
                   pending_external_send: false,
                   is_external: true,
+                  // Same church-handles-no-individual-responsable rule as
+                  // the per-row Confirmar despacho action.
+                  responsable_id: null,
                 };
                 if (cc) update.numero_cuerda = cc.numero;
                 await supabase.from('contacts').update(update).in('id', ids);
