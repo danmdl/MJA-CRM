@@ -818,6 +818,12 @@ const SemilleroPage = () => {
     }
     if (filterResponsable === '__none__') {
       filtered = filtered.filter(c => !c.responsable_id);
+    } else if (filterResponsable === '__church_cuerda__') {
+      // Virtual 'MJA Central' filter — match the contacts that landed
+      // on the church-cuerda after dispatch. The church-cuerda
+      // trigger forces responsable_id NULL on these, so the filter
+      // is the conjunction of cuerda + null responsable.
+      filtered = filtered.filter(c => !c.responsable_id && churchCuerda?.numero && c.numero_cuerda === churchCuerda.numero);
     } else if (filterResponsable) {
       filtered = filtered.filter(c => c.responsable_id === filterResponsable);
     }
@@ -1341,6 +1347,9 @@ const SemilleroPage = () => {
                                 }
                                 if (filterResponsable === '__none__') {
                                   if (c.responsable_id) return false;
+                                } else if (filterResponsable === '__church_cuerda__') {
+                                  if (c.responsable_id) return false;
+                                  if (!churchCuerda?.numero || c.numero_cuerda !== churchCuerda.numero) return false;
                                 } else if (filterResponsable && c.responsable_id !== filterResponsable) {
                                   return false;
                                 }
@@ -1437,6 +1446,23 @@ const SemilleroPage = () => {
                           <DropdownMenuItem onClick={() => setFilterResponsable('__none__')} className={filterResponsable === '__none__' ? 'bg-accent' : ''}>
                             Sin responsable
                           </DropdownMenuItem>
+                          {/* Virtual 'MJA Central' option — represents contacts
+                              dispatched to the church-cuerda (responsable_id
+                              is null on those rows, but conceptually the
+                              church itself is responsable). Only renders
+                              when there are actually church-cuerda contacts
+                              visible, so smaller iglesias without dispatches
+                              don't see a confusing dead option.
+                              Token '__church_cuerda__' is intercepted by the
+                              filter pipeline below. */}
+                          {churchCuerda?.numero && (allContacts || []).some(c => c.numero_cuerda === churchCuerda.numero) && (
+                            <DropdownMenuItem
+                              onClick={() => setFilterResponsable('__church_cuerda__')}
+                              className={filterResponsable === '__church_cuerda__' ? 'bg-accent' : ''}
+                            >
+                              🏛️ {churchCuerda.numero}
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           {(() => {
                             // Build the responsable filter list. Two layers of protection
@@ -1529,7 +1555,11 @@ const SemilleroPage = () => {
                                 if (!canSeeContactsFromAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return false;
                                 if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
                                 if (filterResponsable === '__none__' && c.responsable_id) return false;
-                                if (filterResponsable && filterResponsable !== '__none__' && c.responsable_id !== filterResponsable) return false;
+                                if (filterResponsable === '__church_cuerda__') {
+                                  if (c.responsable_id) return false;
+                                  if (!churchCuerda?.numero || c.numero_cuerda !== churchCuerda.numero) return false;
+                                }
+                                if (filterResponsable && filterResponsable !== '__none__' && filterResponsable !== '__church_cuerda__' && c.responsable_id !== filterResponsable) return false;
                                 if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
                                 if (searchTerm.trim()) {
                                   const s = normalize(searchTerm);
