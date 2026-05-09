@@ -795,17 +795,35 @@ const RouteEditorPage = () => {
                 <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background">
                   <option value="">Todos los responsables</option>
                   <option value="__none__">Sin responsable</option>
-                  {teamMembers
-                    .filter(m => {
-                      if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
-                        return m.numero_cuerda === profile.numero_cuerda;
-                      }
-                      return true;
-                    })
-                    .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
-                    .map(m => (
-                      <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                    ))}
+                  {(() => {
+                    // Visibility rule (mirrors the Semillero responsable
+                    // dropdown): privileged roles (admin/general/pastor/
+                    // supervisor) see EVERY teammate in the iglesia.
+                    // Everyone else sees only themselves — the contacts
+                    // they can act on belong to them, so listing other
+                    // people in their cuerda just adds noise (and
+                    // conectores aren't responsables at all).
+                    // Per Dan: 'logueado con un referente, igualmente
+                    // veo referentes de otras cuerdas. La idea sería
+                    // que solamente uno vea responsables que vayan de
+                    // acuerdo al número de cuerda al cual pertenezco.'
+                    const isPrivileged = profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+                    let list = teamMembers;
+                    if (!isPrivileged) {
+                      // Filter to JUST the current user. Same scope the
+                      // backend uses on the contacts query (line 99:
+                      // q = q.eq('responsable_id', profile.id)) — we'd
+                      // never see anyone else's contacts here anyway,
+                      // so picking another responsable always returns
+                      // empty. Limiting the dropdown matches reality.
+                      list = teamMembers.filter(m => m.id === profile?.id);
+                    }
+                    return list
+                      .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
+                      .map(m => (
+                        <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+                      ));
+                  })()}
                 </select>
                 <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
                 <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />

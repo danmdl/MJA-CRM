@@ -655,17 +655,23 @@ const MapPickerPage = () => {
         <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background min-w-[140px] shrink-0">
           <option value="">Todos los responsables</option>
           <option value="__none__">Sin responsable</option>
-          {teamMembers
-            .filter(m => {
-              if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
-                return m.numero_cuerda === profile.numero_cuerda;
-              }
-              return true;
-            })
-            .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
-            .map(m => (
-              <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-            ))}
+          {(() => {
+            // See RouteEditorPage for rationale: privileged roles see
+            // the whole iglesia team; everyone else sees only themselves
+            // (the contacts in their scope are already responsable_id =
+            // their own id, so listing other people in their cuerda just
+            // adds noise).
+            const isPrivileged = profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+            let list = teamMembers;
+            if (!isPrivileged) {
+              list = teamMembers.filter(m => m.id === profile?.id);
+            }
+            return list
+              .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
+              .map(m => (
+                <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+              ));
+          })()}
         </select>
         {/* Cuerda filter — only shown when there's more than one cuerda
             in the visible contact set. For a non-global referente whose
