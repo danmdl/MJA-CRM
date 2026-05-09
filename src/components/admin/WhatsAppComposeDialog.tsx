@@ -10,7 +10,7 @@ import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { normalizeArgentinePhoneForWhatsapp } from '@/lib/phone-validation';
 import { showSuccess, showError } from '@/utils/toast';
-import { Save, X, Star } from 'lucide-react';
+import { Save, X, Star, MessageSquare } from 'lucide-react';
 
 // Real green WhatsApp icon
 const WhatsAppIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
@@ -239,6 +239,25 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, con
     onOpenChange(false);
   };
 
+  // Open the WhatsApp chat to this contact with NO prefilled text and
+  // NO image, so the user can type their own message manually. Per Dan:
+  // 'add a secondary option for manually messaging the contact directly
+  // through WhatsApp.' Same number normalization as handleSend so AR
+  // mobiles are routed correctly. Doesn't fire onSent — there's no
+  // message to log; if the user does send something from inside
+  // WhatsApp, that's outside our visibility anyway. Closes the dialog
+  // immediately so it doesn't sit blocking the page.
+  const handleOpenChat = () => {
+    if (!contactPhone) return;
+    const waPhone = normalizeArgentinePhoneForWhatsapp(contactPhone);
+    if (!waPhone) {
+      showError('El número de teléfono del contacto es inválido o está incompleto.');
+      return;
+    }
+    window.open(`https://wa.me/${waPhone}`, '_blank');
+    onOpenChange(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[96vw] sm:max-w-[960px] max-h-[92vh] overflow-hidden p-0 flex flex-col">
@@ -371,25 +390,45 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, con
               </label>
             </div>
           ) : (
-            <div className="flex gap-2">
-              {canUseTemplates() && (
+            <div className="flex flex-col gap-2">
+              {/* Direct chat button — bypasses template/message entirely
+                  and just opens wa.me to the contact's number. Lives
+                  above the main row so it's discoverable but visually
+                  subordinate to the primary 'Enviar' action. Per Dan:
+                  'add a secondary option for manually messaging the
+                  contact directly through WhatsApp.' Disabled if there's
+                  no phone (the dialog itself shouldn't open in that case
+                  but covered defensively). */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs w-full"
+                onClick={handleOpenChat}
+                disabled={!contactPhone}
+                title="Abre el chat de WhatsApp con este contacto sin ningún mensaje precargado, para que escribas vos."
+              >
+                <MessageSquare className="h-3.5 w-3.5" /> Abrir chat directo (sin plantilla)
+              </Button>
+              <div className="flex gap-2">
+                {canUseTemplates() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() => setSaveMode(true)}
+                    disabled={!message.trim()}
+                  >
+                    <Save className="h-3.5 w-3.5" /> Guardar como plantilla
+                  </Button>
+                )}
                 <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs"
-                  onClick={() => setSaveMode(true)}
+                  className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={handleSend}
                   disabled={!message.trim()}
                 >
-                  <Save className="h-3.5 w-3.5" /> Guardar como plantilla
+                  <WhatsAppIcon className="h-4 w-4" /> Enviar
                 </Button>
-              )}
-              <Button
-                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
-                onClick={handleSend}
-                disabled={!message.trim()}
-              >
-                <WhatsAppIcon className="h-4 w-4" /> Enviar
-              </Button>
+              </div>
             </div>
           )}
         </div>
