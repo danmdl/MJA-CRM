@@ -1217,19 +1217,21 @@ const SemilleroPage = () => {
         {/* Asignar Contactos chip — MJA members only. The mirror of the
             referente's Enviar-a-MJA chip on the receiving side: contacts
             the MJA member pre-asigned (clicked Pre-Asignar on a sugerencia)
-            but hasn't confirmed yet. Same color cue (orange) for consistency
-            with the other staging tab. Hidden until there's at least one
-            pending row, so MJA members who haven't pre-assigned anything
-            don't see a clutter chip with 0. */}
-        {isMjaMember && pendingAssignmentContacts.length > 0 && (
+            but hasn't confirmed yet. Always visible for MJA members
+            regardless of count — Dan: 'el asignar contactos debería estar
+            siempre visible even when there are 0 contacts there.' This
+            way they always know where the staging tab lives even when
+            empty. The number greys out to muted-foreground at zero so
+            the chip doesn't visually clamor when there's nothing to do. */}
+        {isMjaMember && (
           <button
             type="button"
             onClick={() => { setActivePool('pending_assignment'); setSearchTerm(''); }}
-            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'pending_assignment' ? 'border-orange-500 bg-orange-500/10' : 'border-orange-500/30 hover:border-orange-500/60'}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'pending_assignment' ? 'border-orange-500 bg-orange-500/10' : pendingAssignmentContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
             title='Tu outbox de pre-asignaciones: contactos que pre-asignaste a una célula pero todavía no confirmaste. Confirmá cuando estés seguro y recién ahí entra a la célula final.'
           >
             <span className="text-[10px] uppercase tracking-wider text-orange-400">Asignar Contactos</span>
-            <span className="text-sm font-bold tabular-nums text-orange-400">{pendingAssignmentContacts.length}</span>
+            <span className={`text-sm font-bold tabular-nums ${pendingAssignmentContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : pendingAssignmentContacts.length}</span>
           </button>
         )}
         {/* Duplicates toggle — narrows the table to rows whose normalized
