@@ -244,6 +244,39 @@ const TerritoriosPage: React.FC = () => {
     });
   }, [mapsLoaded, church?.lat, church?.lng]);
 
+  // Trigger a Google Maps resize whenever the container changes size
+  // (e.g. mobile portrait → landscape, or initial render where the
+  // container starts at 0 height and grows on layout). Without this,
+  // the map renders in a 0×0 box and stays gray when the container
+  // later grows. ResizeObserver is supported on all modern mobile
+  // browsers — falls back gracefully if missing.
+  useEffect(() => {
+    if (!mapsLoaded || !mapRef.current) return;
+    const g = (window as any).google;
+    if (!g?.maps) return;
+    const el = mapRef.current;
+    let lastTrigger = 0;
+    const triggerResize = () => {
+      if (!mapInstanceRef.current) return;
+      const now = Date.now();
+      if (now - lastTrigger < 100) return; // throttle
+      lastTrigger = now;
+      const center = mapInstanceRef.current.getCenter();
+      g.maps.event.trigger(mapInstanceRef.current, 'resize');
+      if (center) mapInstanceRef.current.setCenter(center);
+    };
+    const ro = new ResizeObserver(() => {
+      // Only fire when we have non-zero size — avoids spamming during
+      // initial layout calculation.
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) triggerResize();
+    });
+    ro.observe(el);
+    // Initial nudge in case map was created in a 0-sized container.
+    setTimeout(triggerResize, 200);
+    return () => ro.disconnect();
+  }, [mapsLoaded]);
+
   // Attach mvc listeners that mark the polygon dirty whenever the
   // user drags a vertex or inserts/removes one. We have to listen
   // on every path's 'set_at', 'insert_at', 'remove_at' events.
@@ -533,8 +566,14 @@ const TerritoriosPage: React.FC = () => {
         </div>
       )}
 
-      {/* Map */}
-      <div className="flex-1 min-h-[60vh] rounded-xl overflow-hidden border">
+      {/* Map. Explicit min-height in viewport units instead of flex-1
+          so we don't depend on a height-bounded ancestor. The
+          surrounding <main> in ChurchDetailsLayout uses overflow-auto,
+          which means flex-1 inside resolves to 0 when the page hasn't
+          measured yet — Google Maps then renders into a 0-height
+          container and stays gray. The ResizeObserver above handles
+          the case where the container later grows. */}
+      <div className="rounded-xl overflow-hidden border" style={{ height: 'min(70vh, 800px)' }}>
         <div ref={mapRef} className="w-full h-full" />
       </div>
     </div>
