@@ -845,10 +845,21 @@ const SemilleroPage = () => {
   //
   // Visibility scope IS still applied — a referente in cuerda 204
   // shouldn't see the global count, just their own slice.
-  const inboxTotalCount = useMemo(() => {
-    if (!allContacts) return 0;
+  // Inbox counts. Returns total + breakdown by whether the contact
+  // has a usable address (mappable / sin dirección). The chip in the
+  // toolbar shows total; the help line below it adds the breakdown
+  // so the user knows how many of those they could actually plot on
+  // the map. Per Dan: 'sería bueno también en Semillero — ponés total
+  // tantos, X cantidad sin dirección.'
+  //
+  // Filters ad-hoc (search, cuerda, responsable, etc.) are NOT applied
+  // here. The chip is a stable signpost that shouldn't move when the
+  // user filters their view. Visibility scope IS applied (referente
+  // sees only their cuerda's count, not the global one).
+  const inboxCounts = useMemo(() => {
+    if (!allContacts) return { total: 0, withAddress: 0, withoutAddress: 0 };
     const userId = session?.user?.id;
-    let n = 0;
+    let total = 0, withAddress = 0;
     for (const c of allContacts) {
       // Already assigned to a cell → graduated out of the inbox.
       if (c.cell_id) continue;
@@ -865,10 +876,12 @@ const SemilleroPage = () => {
           continue;
         }
       }
-      n++;
+      total++;
+      if (c.address && c.address.trim()) withAddress++;
     }
-    return n;
+    return { total, withAddress, withoutAddress: total - withAddress };
   }, [allContacts, externalIds, pendingDispatchIds, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
+  const inboxTotalCount = inboxCounts.total;
 
   // How many contacts are autoassign-able for THIS user — visible to them
   // and currently without a cell_id. Used by the "Autoasignar todos (N)"
@@ -1282,6 +1295,18 @@ const SemilleroPage = () => {
         <div className="mr-1">
           <h1 className="text-xl font-bold flex items-center gap-2 leading-tight"><Users className="h-5 w-5" /> Semillero</h1>
           <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">Asignación de contactos a células por cercanía</p>
+          {/* Address breakdown. Per Dan: 'sería bueno también en
+              Semillero — ponés total tantos, X cantidad sin dirección.'
+              Same shape as the Rutas counter. Helps the user
+              understand why the inbox count shrinks when they go
+              filter by 'with address' or hop into Rutas (where only
+              the addressable subset shows up on the map). Hidden
+              when the inbox is empty — no useful breakdown then. */}
+          {!isLoading && inboxCounts.total > 0 && inboxCounts.withoutAddress > 0 && (
+            <p className="text-amber-400/80 text-[10px] leading-tight mt-0.5">
+              {inboxCounts.withAddress} con dirección · {inboxCounts.withoutAddress} sin dirección
+            </p>
+          )}
         </div>
 
         {/* Inbox chip — the main pool of contacts waiting in the user's
