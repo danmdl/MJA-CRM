@@ -939,13 +939,21 @@ const SemilleroPage = () => {
     // applied — so picking Responsable=Mauro and then Duplicados shows
     // only Mauro's duplicates, not all of them. The visibility gate above
     // still applies as the first cut for non-globals.
-    if (searchTerm) {
-      const s = normalize(searchTerm);
-      filtered = filtered.filter(c =>
-        normalize(c.first_name || '').includes(s) || normalize(c.last_name || '').includes(s) ||
-        normalize(c.address || '').includes(s) || normalize(c.barrio || '').includes(s) ||
-        normalize(c.phone || '').includes(s)
-      );
+    // Search now tokenizes by whitespace and requires every token to be
+    // found somewhere in the combined haystack (first_name + last_name +
+    // phone + address + barrio). Per Dan: typing 'camila b' in MJA Central
+    // returned 0 results because the old search compared the whole query
+    // 'camila b' against each field individually — it never spans the
+    // first_name/last_name boundary. With tokenization, both 'camila' AND
+    // 'b' independently must appear in the haystack: 'Camila Betancourt'
+    // matches because the haystack 'camila betancourt …' contains both.
+    // Order-insensitive too: 'b camila' or 'betancourt c' work the same.
+    if (searchTerm.trim()) {
+      const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
+      filtered = filtered.filter(c => {
+        const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''} ${c.address || ''} ${c.barrio || ''}`);
+        return tokens.every(t => hay.includes(t));
+      });
     }
     if (filterCuerda) {
       filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
@@ -1531,9 +1539,10 @@ const SemilleroPage = () => {
                                 }
                                 if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
                                 if (searchTerm.trim()) {
-                                  const s = normalize(searchTerm);
+                                  // Tokenized search — see main filter for the rationale.
+                                  const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
                                   const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
-                                  if (!hay.includes(s)) return false;
+                                  if (!tokens.every(t => hay.includes(t))) return false;
                                 }
                                 return true;
                               });
@@ -1665,9 +1674,10 @@ const SemilleroPage = () => {
                               }
                               if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
                               if (searchTerm.trim()) {
-                                const s = normalize(searchTerm);
+                                // Tokenized search — see main filter for the rationale.
+                                const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
                                 const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
-                                if (!hay.includes(s)) return false;
+                                if (!tokens.every(t => hay.includes(t))) return false;
                               }
                               return true;
                             });
@@ -1735,9 +1745,10 @@ const SemilleroPage = () => {
                                 if (filterResponsable && filterResponsable !== '__none__' && filterResponsable !== '__church_cuerda__' && c.responsable_id !== filterResponsable) return false;
                                 if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
                                 if (searchTerm.trim()) {
-                                  const s = normalize(searchTerm);
+                                  // Tokenized search — see main filter for the rationale.
+                                  const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
                                   const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
-                                  if (!hay.includes(s)) return false;
+                                  if (!tokens.every(t => hay.includes(t))) return false;
                                 }
                                 return true;
                               });
