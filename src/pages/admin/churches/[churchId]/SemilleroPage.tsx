@@ -60,6 +60,7 @@ interface Contact {
   estado_civil?: string | null;
   is_external?: boolean;
   pending_external_send?: boolean;
+  pending_assignment_cell_id?: string | null;
   responsable_id?: string | null;
   created_by?: string | null;
   created_at?: string | null;
@@ -142,7 +143,7 @@ const SemilleroPage = () => {
   const [mergeGroup, setMergeGroup] = useState<Contact[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
-    type: 'auto' | 'manual' | 'cuerda_only' | 'auto_selected';
+    type: 'auto' | 'manual' | 'cuerda_only' | 'auto_selected' | 'pre_assign';
     contactId?: string;
     cellId?: string;
     cellName?: string;
@@ -348,7 +349,7 @@ const SemilleroPage = () => {
       const all: Contact[] = [];
       for (let page = 0; ; page++) {
         let q = supabase.from('contacts')
-          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, pending_external_send, responsable_id, created_by, created_at')
+          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, pending_external_send, pending_assignment_cell_id, responsable_id, created_by, created_at')
           .eq('church_id', churchId!)
           .is('deleted_at', null)
           .order('fecha_contacto', { ascending: false })
@@ -772,6 +773,35 @@ const SemilleroPage = () => {
     return new Set((allContacts || []).filter(c => (c as any).pending_external_send).map(c => c.id));
   }, [allContacts]);
 
+  // ─── MJA pre-assignment outbox ('Asignar Contactos' tab) ──────
+  // For MJA members only. Symmetric to the referente Enviar-a-MJA flow:
+  // this is the staging area before the final cell assignment is
+  // committed. Workflow:
+  //   1. MJA member sees a contact in En Lista with sugCell.
+  //   2. Clicks 'Pre-Asignar' on that suggestion.
+  //   3. Server writes pending_assignment_cell_id = sugCell.id (no
+  //      change to cell_id yet — the contact is still un-celled).
+  //   4. Contact moves out of En Lista (excluded by pendingAssignmentIds
+  //      below) and into this 'Asignar Contactos' tab.
+  //   5. From the tab, member clicks 'Confirmar asignación' to commit
+  //      cell_id := pending_assignment_cell_id (and clear the staging
+  //      column + is_external).
+  //
+  // Non-MJA users never see this list.
+  const pendingAssignmentContacts = useMemo(() => {
+    if (!isMjaMember) return [];
+    return (allContacts || []).filter(c => {
+      if (!(c as any).pending_assignment_cell_id) return false;
+      if (c.cell_id) return false;
+      return true;
+    });
+  }, [allContacts, isMjaMember]);
+
+  const pendingAssignmentIds = useMemo(
+    () => new Set(pendingAssignmentContacts.map(c => c.id)),
+    [pendingAssignmentContacts],
+  );
+
   // How many contacts are autoassign-able for THIS user — visible to them
   // and currently without a cell_id. Used by the "Autoasignar todos (N)"
   // button label so the count matches what the action will actually do.
@@ -809,10 +839,20 @@ const SemilleroPage = () => {
       // Start with all non-external contacts AND skip ones currently
       // sitting in the referente's outbox waiting for dispatch
       // confirmation — those live in 'En MJA' until the referente
-      // confirms or cancels the dispatch.
-      filtered = allContacts.filter(c => !externalIds.has(c.id) && !pendingDispatchIds.has(c.id));
+      // confirms or cancels the dispatch. ALSO skip MJA pre-assignment
+      // outbox rows (pending_assignment_cell_id IS NOT NULL) — those
+      // live in 'Asignar Contactos' until the MJA member confirms.
+      filtered = allContacts.filter(c =>
+        !externalIds.has(c.id)
+        && !pendingDispatchIds.has(c.id)
+        && !pendingAssignmentIds.has(c.id)
+      );
     } else if (activePool === 'external') {
       filtered = externalContacts;
+    } else if (activePool === 'pending_assignment') {
+      // 'Asignar Contactos' tab — contacts MJA member pre-assigned,
+      // awaiting final confirmation.
+      filtered = pendingAssignmentContacts;
     } else {
       filtered = [];
     }
@@ -902,7 +942,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -1172,6 +1212,24 @@ const SemilleroPage = () => {
           >
             <span className="text-[10px] uppercase tracking-wider text-orange-400">Enviar a MJA</span>
             <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
+          </button>
+        )}
+        {/* Asignar Contactos chip — MJA members only. The mirror of the
+            referente's Enviar-a-MJA chip on the receiving side: contacts
+            the MJA member pre-asigned (clicked Pre-Asignar on a sugerencia)
+            but hasn't confirmed yet. Same color cue (orange) for consistency
+            with the other staging tab. Hidden until there's at least one
+            pending row, so MJA members who haven't pre-assigned anything
+            don't see a clutter chip with 0. */}
+        {isMjaMember && pendingAssignmentContacts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => { setActivePool('pending_assignment'); setSearchTerm(''); }}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'pending_assignment' ? 'border-orange-500 bg-orange-500/10' : 'border-orange-500/30 hover:border-orange-500/60'}`}
+            title='Tu outbox de pre-asignaciones: contactos que pre-asignaste a una célula pero todavía no confirmaste. Confirmá cuando estés seguro y recién ahí entra a la célula final.'
+          >
+            <span className="text-[10px] uppercase tracking-wider text-orange-400">Asignar Contactos</span>
+            <span className="text-sm font-bold tabular-nums text-orange-400">{pendingAssignmentContacts.length}</span>
           </button>
         )}
         {/* Duplicates toggle — narrows the table to rows whose normalized
@@ -2015,21 +2073,76 @@ const SemilleroPage = () => {
                                   <Undo2 className="h-3 w-3 mr-1" /> Cancelar
                                 </Button>
                               </div>
+                            ) : isMjaMember && (c as any).pending_assignment_cell_id && activePool === 'pending_assignment' ? (
+                              // ── MJA PRE-ASSIGNMENT OUTBOX ──
+                              // The contact has a tentative cell pre-selected
+                              // (pending_assignment_cell_id). MJA member needs
+                              // to either confirm (commit cell_id) or cancel
+                              // (clear the staging field, contact returns to
+                              // En Lista). The pre-selected cell is shown so
+                              // the member knows exactly what they pre-asigned
+                              // before confirming.
+                              (() => {
+                                const stagedCellId = (c as any).pending_assignment_cell_id as string;
+                                const stagedCell = cells?.find(cl => cl.id === stagedCellId);
+                                const stagedCuerda = stagedCell ? cuerdas?.find(cu => cu.id === stagedCell.cuerda_id) : null;
+                                const stagedZona = stagedCuerda ? zonas?.find(z => z.id === stagedCuerda.zona_id) : null;
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
+                                      // Commit: cell_id := pending_assignment_cell_id,
+                                      // clear the staging column and is_external,
+                                      // set zona/cuerda metadata to match the cell.
+                                      const update: any = {
+                                        cell_id: stagedCellId,
+                                        pending_assignment_cell_id: null,
+                                        is_external: false,
+                                      };
+                                      if (stagedCuerda) update.numero_cuerda = stagedCuerda.numero;
+                                      if (stagedZona) { update.zona_id = stagedZona.id; update.zona = stagedZona.nombre; }
+                                      const { error } = await supabase.from('contacts').update(update).eq('id', c.id);
+                                      if (error) { showError(error.message); return; }
+                                      // Activity log so this shows up in Historial
+                                      // the same way a normal assignment does.
+                                      await supabase.from('activity_logs').insert({
+                                        user_id: session?.user?.id, church_id: churchId, action: 'assign',
+                                        entity_type: 'contact', entity_id: c.id,
+                                        before_data: { numero_cuerda: c.numero_cuerda, cell_id: c.cell_id },
+                                        after_data: { numero_cuerda: stagedCuerda?.numero, cell_id: stagedCellId, cell_name: stagedCell?.name },
+                                      });
+                                      showSuccess(`Asignado a ${stagedCell?.name}.`);
+                                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                    }}>
+                                      <Zap className="h-3 w-3 mr-1" /> Confirmar asignación
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
+                                      // Cancel: clear staging, contact returns
+                                      // to En Lista. is_external untouched (if
+                                      // it was true before pre-assign, it stays
+                                      // true so the contact remains visibly part
+                                      // of the dispatched pool).
+                                      await supabase.from('contacts').update({ pending_assignment_cell_id: null }).eq('id', c.id);
+                                      showSuccess('Pre-asignación cancelada.');
+                                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                    }}>
+                                      <Undo2 className="h-3 w-3 mr-1" /> Cancelar
+                                    </Button>
+                                  </div>
+                                );
+                              })()
                             ) : isMjaMember && (c as any).is_external ? (
                               // ── MJA MEMBER ON A POOL CONTACT ──
                               // Contact lives in the MJA Central pool — already
                               // dispatched by some referente, waiting for the
-                              // MJA member to assign it to a final célula. Shown
-                              // wherever the contact appears (En Lista,
-                              // 'Confirmar asignación' tab, search), not gated
-                              // by activePool.
+                              // MJA member to pre-assign (stage 1) and then
+                              // confirm (stage 2) the final célula.
                               <div className="flex items-center gap-1">
                                 {sugCell && (
-                                  <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
-                                    type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
+                                  <Button variant="default" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50" onClick={() => setConfirmDialog({
+                                    type: 'pre_assign', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
                                   })}>
-                                    <Zap className="h-3 w-3 mr-1" /> Confirmar asignación
+                                    <Zap className="h-3 w-3 mr-1" /> Pre-Asignar
                                   </Button>
                                 )}
                                 <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
@@ -2063,10 +2176,10 @@ const SemilleroPage = () => {
                               <div className="flex items-center gap-1">
                                 {sugCell && !isExternal && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
-                                    type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
+                                    type: 'pre_assign', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
                                   })}>
-                                    <Zap className="h-3 w-3 mr-1" /> Asignar
+                                    <Zap className="h-3 w-3 mr-1" /> Pre-Asignar
                                   </Button>
                                 )}
                               </div>
@@ -2091,7 +2204,12 @@ const SemilleroPage = () => {
       <Dialog open={!!confirmDialog} onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{confirmDialog?.type === 'auto' ? 'Autoasignar contactos' : confirmDialog?.type === 'auto_selected' ? `Autoasignar ${visibleSelectedCount} seleccionados` : 'Confirmar asignación'}</DialogTitle>
+            <DialogTitle>{
+              confirmDialog?.type === 'auto' ? 'Autoasignar contactos'
+              : confirmDialog?.type === 'auto_selected' ? `Autoasignar ${visibleSelectedCount} seleccionados`
+              : confirmDialog?.type === 'pre_assign' ? 'Pre-asignar contacto'
+              : 'Confirmar asignación'
+            }</DialogTitle>
             <DialogDescription asChild>
               <div>
                 {confirmDialog?.type === 'auto' ? (
@@ -2111,6 +2229,17 @@ const SemilleroPage = () => {
                   </>
                 ) : confirmDialog?.type === 'auto_selected' ? (
                   <p>Se asignarán los <strong>{visibleSelectedCount}</strong> contactos seleccionados a la célula más cercana según su dirección. Solo se asignarán los que tengan dirección y no estén ya asignados a una célula.</p>
+                ) : confirmDialog?.type === 'pre_assign' ? (
+                  <>
+                    <p>
+                      ¿Pre-asignar a <strong>{confirmDialog?.cellName}</strong>
+                      {confirmDialog?.cuerdaNum && <> (Cuerda {confirmDialog.cuerdaNum})</>}
+                      {confirmDialog?.zonaName && <> — {confirmDialog.zonaName}</>}?
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Va a quedar pendiente en tu outbox <strong>"Asignar Contactos"</strong> hasta que confirmes la asignación final.
+                    </p>
+                  </>
                 ) : (
                   <p>
                     ¿Asignar a <strong>{confirmDialog?.cellName}</strong>
@@ -2192,11 +2321,28 @@ const SemilleroPage = () => {
                   }
                   setConfirmDialog(null);
                 }
+                else if (confirmDialog?.type === 'pre_assign' && confirmDialog?.contactId && confirmDialog?.cellId) {
+                  // Stage the assignment in pending_assignment_cell_id
+                  // without touching cell_id. Contact moves to the
+                  // 'Asignar Contactos' outbox tab. Member confirms or
+                  // cancels from there.
+                  const { error } = await supabase.from('contacts').update({
+                    pending_assignment_cell_id: confirmDialog.cellId,
+                  }).eq('id', confirmDialog.contactId);
+                  if (error) showError(error.message);
+                  else {
+                    showSuccess('Pre-asignado. Lo encontrás en "Asignar Contactos" para confirmar.');
+                    queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                  }
+                  setConfirmDialog(null);
+                }
                 else if (confirmDialog?.contactId && confirmDialog?.cellId) assignSingleMutation.mutate({ contactId: confirmDialog.contactId, cellId: confirmDialog.cellId });
               }}
               disabled={autoAssignMutation.isPending || assignSingleMutation.isPending}
             >
-              {(autoAssignMutation.isPending || assignSingleMutation.isPending) ? 'Asignando...' : 'Confirmar'}
+              {(autoAssignMutation.isPending || assignSingleMutation.isPending) ? 'Asignando...'
+                : confirmDialog?.type === 'pre_assign' ? 'Pre-asignar'
+                : 'Confirmar'}
             </Button>
           </DialogFooter>
         </DialogContent>
