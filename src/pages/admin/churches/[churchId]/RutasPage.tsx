@@ -109,7 +109,8 @@ const RutasPage = () => {
 
   const handleDelete = async (project: any) => {
     if (!confirm(`¿Eliminar el proyecto "${project.name}"?`)) return;
-    await supabase.from('shared_routes').delete().eq('id', project.id);
+    const { error } = await supabase.from('shared_routes').delete().eq('id', project.id);
+    if (error) { showError('No se pudo eliminar el proyecto.'); return; }
     queryClient.invalidateQueries({ queryKey: ['route-projects'] });
     showSuccess('Proyecto eliminado.');
   };
@@ -218,6 +219,7 @@ const RutasPage = () => {
                     {new Date(p.created_at).toLocaleDateString('es-AR')}
                   </div>
                 </div>
+                {isCreator && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(p); }}
                   className="text-muted-foreground hover:text-red-400 p-0.5 -mr-0.5 -mt-0.5 rounded"
@@ -225,6 +227,7 @@ const RutasPage = () => {
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
+                )}
               </div>
               {/* Single condensed info line — paradas, optional km, optional min,
                   expiration. Used to be two rows with icons; one row reads

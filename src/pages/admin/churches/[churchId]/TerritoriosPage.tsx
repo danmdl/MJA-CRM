@@ -636,11 +636,7 @@ const TerritoriosPage: React.FC = () => {
     return { in: inn, out, noCoords, total: cuerdaCells.length };
   }, [selectedCuerda, cells, selectedCuerdaPaths, mapsLoaded]);
 
-  if (cuerdasLoading) {
-    return <div className="p-4"><Skeleton className="h-96 w-full" /></div>;
-  }
-
-  if (!editableCuerdas.length && (cuerdas || []).filter(c => !c.is_church_cuerda).length === 0) {
+  if (!cuerdasLoading && !editableCuerdas.length && (cuerdas || []).filter(c => !c.is_church_cuerda).length === 0) {
     return (
       <div className="p-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -669,7 +665,13 @@ const TerritoriosPage: React.FC = () => {
       {/* Cuerda picker + actions */}
       <div className="flex flex-wrap items-center gap-2 p-3 rounded border bg-card">
         <label className="text-sm font-medium mr-1">Cuerda:</label>
+        {cuerdasLoading && (
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando cuerdas…
+          </span>
+        )}
         <select
+          disabled={cuerdasLoading}
           className="h-9 px-3 rounded border bg-background text-sm"
           value={selectedCuerdaNumero}
           onChange={(e) => {
