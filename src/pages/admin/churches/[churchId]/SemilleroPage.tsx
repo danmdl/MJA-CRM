@@ -667,73 +667,53 @@ const SemilleroPage = () => {
   }, [allContacts, zonas]);
 
   // ─── Pool counts ───────────────────────────────────────────────
-  // The "En MJA" chip shows DIFFERENT contacts depending on who's
-  // looking, because the outbox→pool flow has two distinct stages:
+  // The "En MJA" chip is the user's PERSONAL OUTBOX, always. For any
+  // role: contacts the current user clicked "Enviar a MJA" on, that
+  // are still pending dispatch confirmation. The contact is still
+  // theirs (numero_cuerda unchanged), they're staged for despatch.
   //
-  //   A. REFERENTE OUTBOX (non-globals).
-  //      A referente clicks "Enviar a MJA" on a contact in their
-  //      list → pending_external_send becomes true. The contact
-  //      stays on their cuerda (numero_cuerda unchanged). Now it
-  //      lives in their personal outbox. They click "Confirmar
-  //      despacho" to dispatch it; until then it's still theirs.
-  //      Their "En MJA" chip = these pending-dispatch contacts.
+  // Critical: this used to branch on role and show the MJA Central
+  // pool to admins, but that conflated two unrelated concepts under
+  // one chip. The pool of contacts already despatched to MJA Central
+  // (numero_cuerda='MJA Central', is_external=true) belongs to the
+  // admin's "En Lista" — they're regular contacts of the iglesia,
+  // identified by their cuerda, with a 'Confirmar envío' button to
+  // route them to a final célula. The outbox is something else
+  // entirely: it's the staging area BEFORE despatch, where the
+  // contact still belongs to the original cuerda.
   //
-  //   B. MJA CENTRAL POOL (globals).
-  //      After the referente confirms dispatch, numero_cuerda
-  //      changes to the church-cuerda (e.g. "MJA Central"),
-  //      is_external becomes true, and pending_external_send
-  //      becomes false. The contact disappears from the
-  //      referente's view and appears in the admin's. The
-  //      admin's "En MJA" chip = is_external=true contacts in
-  //      the church-cuerda waiting to be assigned to a final
-  //      destination cuerda.
-  //
-  // One chip, two semantics, gated on canSeeContactsFromAllCuerdas.
-  // Same chip click → same activePool ('external') → filteredContacts
-  // resolves the right list further down based on the same gate.
+  // For admins this list is normally empty — admins of MJA Central
+  // are the recipients of dispatches, not the senders. If they ever
+  // do send (edge case: an admin acting as a referente for an
+  // accidental load), it shows up here.
   const externalContacts = useMemo(() => {
     const userId = session?.user?.id;
-    if (!canSeeContactsFromAllCuerdas) {
-      // ── REFERENTE OUTBOX ──
-      // pending_external_send=true AND still on their own cuerda
-      // (or, fallback, where they're responsable). Don't include
-      // contacts that already moved to MJA Central — those left
-      // the outbox; they're the admin's problem now.
-      return (allContacts || []).filter(c => {
-        if (!(c as any).pending_external_send) return false;
-        if (c.cell_id) return false;
-        if (userCuerdaNumero) {
-          if (c.numero_cuerda !== userCuerdaNumero) return false;
-        } else {
-          if (c.created_by !== userId && c.responsable_id !== userId) return false;
-        }
-        return true;
-      });
-    }
-    // ── MJA CENTRAL POOL (admin view) ──
-    // is_external=true contacts not yet assigned to a final cell.
-    // Active filterCuerda (admin drilling in) still applies.
     return (allContacts || []).filter(c => {
-      if (!(c as any).is_external) return false;
+      if (!(c as any).pending_external_send) return false;
       if (c.cell_id) return false;
-      if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
+      // Visibility — only see MY pending, not other referentes' pending.
+      // For non-globals, scope is their cuerda (or own creations if no
+      // cuerda assigned). For globals, scope is contacts THEY personally
+      // created (admins shouldn't see other people's outboxes).
+      if (canSeeContactsFromAllCuerdas) {
+        if (c.created_by !== userId) return false;
+      } else if (userCuerdaNumero) {
+        if (c.numero_cuerda !== userCuerdaNumero) return false;
+      } else {
+        if (c.created_by !== userId && c.responsable_id !== userId) return false;
+      }
       return true;
     });
-  }, [allContacts, canSeeContactsFromAllCuerdas, userCuerdaNumero, filterCuerda, session?.user?.id]);
+  }, [allContacts, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
 
-  // The "En Lista" pool needs to EXCLUDE pending-dispatch contacts.
-  // Otherwise a referente's contact appears in both chips at once
-  // (still in their cuerda → in 'En Lista'; pending_external_send
-  // → in 'En MJA' outbox). Once they confirm dispatch the contact
-  // leaves the outbox and the cuerda both, no double-counting.
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
-  // Plus, for non-globals, every pending-dispatch contact (regardless
-  // of whether it ended up in externalContacts after the visibility
-  // filter) should also drop out of the unassigned pool.
+  // Every contact pending dispatch (any user, any cuerda). Used to
+  // remove them from the 'En Lista' pool view across the board — a
+  // pending-dispatch contact is private to its sender's outbox until
+  // dispatched.
   const pendingDispatchIds = useMemo(() => {
-    if (canSeeContactsFromAllCuerdas) return new Set<string>();
     return new Set((allContacts || []).filter(c => (c as any).pending_external_send).map(c => c.id));
-  }, [allContacts, canSeeContactsFromAllCuerdas]);
+  }, [allContacts]);
 
   // How many contacts are autoassign-able for THIS user — visible to them
   // and currently without a cell_id. Used by the "Autoasignar todos (N)"
@@ -1118,11 +1098,9 @@ const SemilleroPage = () => {
           type="button"
           onClick={() => { setActivePool('external'); setSearchTerm(''); }}
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
-          title={canSeeContactsFromAllCuerdas
-            ? 'Pool de MJA Central: contactos despachados por referentes esperando que les asignes una célula final.'
-            : 'Tu outbox: contactos que enviaste pero todavía no despachaste a MJA Central. Confirmá el despacho cuando estés seguro.'}
+          title='Tu outbox personal: contactos que enviaste a MJA pero todavía no confirmaste el despacho. Confirmá cuando estés seguro y recién ahí salen de tu cuerda.'
         >
-          <span className="text-[10px] uppercase tracking-wider text-orange-400">{canSeeContactsFromAllCuerdas ? 'En MJA' : 'Outbox'}</span>
+          <span className="text-[10px] uppercase tracking-wider text-orange-400">En MJA</span>
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
         {/* Duplicates toggle — narrows the table to rows whose normalized
@@ -1907,17 +1885,17 @@ const SemilleroPage = () => {
                                   <Undo2 className="h-3 w-3 mr-1" /> Cancelar
                                 </Button>
                               </div>
-                            ) : (c as any).is_external && activePool === 'external' ? (
+                            ) : canSeeContactsFromAllCuerdas && (c as any).is_external ? (
+                              // ── ADMIN ON A POOL CONTACT ──
+                              // Contact lives in the MJA Central pool — already
+                              // dispatched by some referente, waiting for the
+                              // admin to assign it to a final célula. Shown
+                              // wherever the contact appears (En Lista,
+                              // filtered views, search), not gated by
+                              // activePool — admins can see and act on these
+                              // anywhere they show up.
                               <div className="flex items-center gap-1">
-                                {/* Already in MJA pool. Globals can pull it back
-                                    into a specific cell; non-globals can only
-                                    return it to "Sin asignar". The 'Confirmar
-                                    envío' wording (vs plain 'Asignar') is
-                                    deliberate here: the contact has already
-                                    been sent to MJA pool by a referente, and
-                                    this action confirms its final landing in
-                                    the suggested cell. */}
-                                {canSeeContactsFromAllCuerdas && sugCell && (
+                                {sugCell && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
                                     type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
@@ -1950,14 +1928,6 @@ const SemilleroPage = () => {
                                 <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
                               </Button>
                             ) : !hasAddress ? (
-                              // Without address we can't compute a geo suggestion, but
-                              // 'Enviar a MJA' still works for non-globals (admin path
-                              // doesn't show this branch — globals can see all cuerdas
-                              // so the !canSeeContactsFromAllCuerdas branch above already
-                              // captured them). This branch only fires for globals
-                              // looking at someone else's contact without an address —
-                              // for them, no Enviar a MJA button (they can just assign
-                              // directly).
                               null
                             ) : (
                               <div className="flex items-center gap-1">
