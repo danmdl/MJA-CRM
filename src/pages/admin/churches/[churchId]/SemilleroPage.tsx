@@ -205,14 +205,42 @@ const SemilleroPage = () => {
   // For users without canFilterAllContacts permission, force filter to their
   // own contacts (security restriction). Admins/generals/etc with full filter
   // permission start unfiltered — they use the FilterTabs system to slice data.
+  // MJA members (admin/general OR cuerda matches church-cuerda) are also
+  // exempt — per Dan: 'en MJA Central siempre, por default, va a estar
+  // seteado a Todos'. They scope their work via the 'MJA Central' badge
+  // filter manually. We can't use isMjaMember here directly because it's
+  // computed later in the file (after cuerdas loads), so we shortcut:
+  // admin/general always exempt, AND we wait until cuerdas is loaded
+  // before applying the default for non-globals — that way a pastor of
+  // MJA Central whose isMjaMember will resolve to true once cuerdas
+  // arrives never gets the default applied.
   useEffect(() => {
     if (filterDefaultsAppliedRef.current) return;
     if (!profile || !session?.user?.id) return;
-    if (profile.role !== 'conector' && !canFilterAllContacts()) {
+    if (profile.role === 'admin' || profile.role === 'general') {
+      // Globals exempt — they start unfiltered.
+      filterDefaultsAppliedRef.current = true;
+      return;
+    }
+    if (profile.role === 'conector') {
+      // Conectors don't filter at all; mark applied so we don't
+      // re-run.
+      filterDefaultsAppliedRef.current = true;
+      return;
+    }
+    // Wait for cuerdas to load so we can detect MJA members. Without
+    // cuerdas we can't tell if profile.numero_cuerda matches the
+    // church-cuerda; defaulting too early would force-set them to
+    // their own ID and then we couldn't undo it (filterDefaultsAppliedRef
+    // is single-shot).
+    if (!cuerdas) return;
+    const churchCuerdaNumero = (cuerdas || []).find(cu => cu.is_church_cuerda)?.numero;
+    const userIsMja = !!(profile.numero_cuerda && churchCuerdaNumero && profile.numero_cuerda === churchCuerdaNumero);
+    if (!canFilterAllContacts() && !userIsMja) {
       setFilterResponsable(session.user.id);
     }
     filterDefaultsAppliedRef.current = true;
-  }, [profile, session?.user?.id, canFilterAllContacts]);
+  }, [profile, session?.user?.id, canFilterAllContacts, cuerdas]);
 
   // ─── Data Fetching ─────────────────────────────────────────────
   // Zonas, barrios, cuerdas, cells: these change very rarely. 5 min staleTime
@@ -1438,11 +1466,6 @@ const SemilleroPage = () => {
                           <DropdownMenuItem onClick={() => setFilterResponsable('')} className={filterResponsable === '' ? 'bg-accent' : ''}>
                             Todos
                           </DropdownMenuItem>
-                          {session?.user?.id && (
-                            <DropdownMenuItem onClick={() => setFilterResponsable(session.user.id)} className={filterResponsable === session.user.id ? 'bg-accent' : ''}>
-                              ⭐ Mis contactos
-                            </DropdownMenuItem>
-                          )}
                           <DropdownMenuItem onClick={() => setFilterResponsable('__none__')} className={filterResponsable === '__none__' ? 'bg-accent' : ''}>
                             Sin responsable
                           </DropdownMenuItem>
@@ -1509,14 +1532,21 @@ const SemilleroPage = () => {
                             const creators = Array.from(creatorIds)
                               .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
-                                if (!c.profile || c.id === userId) return false;
+                                // The current user IS now in the list (used to be
+                                // excluded because we had a 'Mis contactos' entry
+                                // at the top — Dan removed that, said: 'no debería
+                                // aparecer en esa primera lista, sino abajo con el
+                                // resto'). They appear with a ⭐ prefix so it's
+                                // still clear which entry is them.
+                                if (!c.profile) return false;
                                 if (canSeeContactsFromAllCuerdas) return true;
-                                if (!userCuerdaNumero) return false; // user has no cuerda — only Mis contactos applies
+                                if (!userCuerdaNumero) return false; // user has no cuerda
                                 return c.teamMember?.numero_cuerda === userCuerdaNumero;
                               })
                               .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
                             return creators.map(c => (
                               <DropdownMenuItem key={c.id} onClick={() => setFilterResponsable(c.id)} className={filterResponsable === c.id ? 'bg-accent' : ''}>
+                                {c.id === userId && <span className="mr-1">⭐</span>}
                                 {c.profile!.first_name} {c.profile!.last_name}
                               </DropdownMenuItem>
                             ));
