@@ -1273,6 +1273,19 @@ const SemilleroPage = () => {
               onActiveTabChange={(id, filters) => {
                 setActiveTabId(id);
                 setActiveTabFilters(filters);
+                // Reset all ad-hoc filters when the user switches tabs.
+                // Per Dan: 'si yo aplico un filtro estando en una solapa,
+                // cuando paso a otra solapa esos filtros no los debo
+                // arrastrar, sino que se resetearían.' Each tab is its
+                // own scope; carrying over a Cuerda or Responsable
+                // pick from the previous tab would surprise the user.
+                // The tab's own saved filters (passed in `filters` and
+                // stored in activeTabFilters) still apply.
+                setFilterResponsable('');
+                setFilterCuerda('');
+                setFilterConector('');
+                setFilterDuplicates(false);
+                setSearchTerm('');
               }}
               cuerdas={cuerdas || []}
               teamMembers={teamMembers || []}
@@ -1466,26 +1479,27 @@ const SemilleroPage = () => {
                           <DropdownMenuItem onClick={() => setFilterResponsable('')} className={filterResponsable === '' ? 'bg-accent' : ''}>
                             Todos
                           </DropdownMenuItem>
+                          {/* 'Mis contactos' for everyone:
+                              - Non-MJA: filterResponsable=userId (their own
+                                contacts where they're responsable).
+                              - MJA member: filterResponsable='__church_cuerda__'
+                                — for them 'mis' contactos ARE the contacts
+                                assigned to MJA Central. The church-cuerda
+                                badge IS them. Per Dan: 'no tiene sentido
+                                tener mis contactos y tener un MJA Central'.
+                                So we collapsed the two redundant entries
+                                into one. */}
+                          {session?.user?.id && (() => {
+                            const myToken = isMjaMember ? '__church_cuerda__' : session.user.id;
+                            return (
+                              <DropdownMenuItem onClick={() => setFilterResponsable(myToken)} className={filterResponsable === myToken ? 'bg-accent' : ''}>
+                                ⭐ Mis contactos
+                              </DropdownMenuItem>
+                            );
+                          })()}
                           <DropdownMenuItem onClick={() => setFilterResponsable('__none__')} className={filterResponsable === '__none__' ? 'bg-accent' : ''}>
                             Sin responsable
                           </DropdownMenuItem>
-                          {/* Virtual 'MJA Central' option — represents contacts
-                              dispatched to the church-cuerda (responsable_id
-                              is null on those rows, but conceptually the
-                              church itself is responsable). Only renders
-                              when there are actually church-cuerda contacts
-                              visible, so smaller iglesias without dispatches
-                              don't see a confusing dead option.
-                              Token '__church_cuerda__' is intercepted by the
-                              filter pipeline below. */}
-                          {churchCuerda?.numero && (allContacts || []).some(c => c.numero_cuerda === churchCuerda.numero) && (
-                            <DropdownMenuItem
-                              onClick={() => setFilterResponsable('__church_cuerda__')}
-                              className={filterResponsable === '__church_cuerda__' ? 'bg-accent' : ''}
-                            >
-                              🏛️ {churchCuerda.numero}
-                            </DropdownMenuItem>
-                          )}
                           <DropdownMenuSeparator />
                           {(() => {
                             // Build the responsable filter list. Two layers of protection
@@ -1532,21 +1546,19 @@ const SemilleroPage = () => {
                             const creators = Array.from(creatorIds)
                               .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
-                                // The current user IS now in the list (used to be
-                                // excluded because we had a 'Mis contactos' entry
-                                // at the top — Dan removed that, said: 'no debería
-                                // aparecer en esa primera lista, sino abajo con el
-                                // resto'). They appear with a ⭐ prefix so it's
-                                // still clear which entry is them.
-                                if (!c.profile) return false;
+                                // The current user is excluded from this list
+                                // because 'Mis contactos' at the top already
+                                // covers them (with the right semantics for
+                                // MJA members vs not). Including them here
+                                // would just duplicate the entry.
+                                if (!c.profile || c.id === userId) return false;
                                 if (canSeeContactsFromAllCuerdas) return true;
-                                if (!userCuerdaNumero) return false; // user has no cuerda
+                                if (!userCuerdaNumero) return false; // user has no cuerda — only Mis contactos applies
                                 return c.teamMember?.numero_cuerda === userCuerdaNumero;
                               })
                               .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
                             return creators.map(c => (
                               <DropdownMenuItem key={c.id} onClick={() => setFilterResponsable(c.id)} className={filterResponsable === c.id ? 'bg-accent' : ''}>
-                                {c.id === userId && <span className="mr-1">⭐</span>}
                                 {c.profile!.first_name} {c.profile!.last_name}
                               </DropdownMenuItem>
                             ));
