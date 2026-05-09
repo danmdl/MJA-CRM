@@ -155,6 +155,46 @@ const MapPickerPage = () => {
     staleTime: 60_000,
   });
 
+  // Lightweight count query: how many contacts exist in the user's
+  // scope total (with AND without coordinates), so we can render
+  // an honest counter like '623 con dirección · 557 sin dirección'.
+  // The main contacts query above filters to lat/lng IS NOT NULL —
+  // necessary because we paint pins on a map — but the user needs
+  // to know that the cuerda has more contacts that just aren't
+  // mappable yet. Per Dan: 'Micaela tiene muchos más que 691, tal
+  // vez no todos tienen dirección.'
+  //
+  // Two HEAD requests with .count('exact') so we don't pay for row
+  // payloads we won't use. Same scope rules as the main query.
+  const { data: scopeCounts } = useQuery<{ withCoords: number; withoutCoords: number }>({
+    queryKey: ['mappicker-counts', churchId, profile?.id, profile?.role, profile?.numero_cuerda],
+    queryFn: async () => {
+      const applyScope = (q: any) => {
+        if (profile?.role && !['admin', 'general', 'pastor', 'supervisor'].includes(profile.role)) {
+          if (profile.numero_cuerda) return q.eq('numero_cuerda', profile.numero_cuerda);
+          return q.eq('responsable_id', profile.id);
+        }
+        return q;
+      };
+      const baseFilter = (q: any) => q
+        .eq('church_id', churchId!)
+        .is('deleted_at', null);
+      const [withQ, withoutQ] = await Promise.all([
+        applyScope(baseFilter(supabase.from('contacts').select('id', { count: 'exact', head: true })))
+          .not('lat', 'is', null)
+          .not('lng', 'is', null),
+        applyScope(baseFilter(supabase.from('contacts').select('id', { count: 'exact', head: true })))
+          .or('lat.is.null,lng.is.null'),
+      ]);
+      return {
+        withCoords: withQ.count || 0,
+        withoutCoords: withoutQ.count || 0,
+      };
+    },
+    enabled: !!churchId && !!profile,
+    staleTime: 60_000,
+  });
+
   // Team members for Responsable filter — restricted to user's cuerda for non-globals.
   const { data: teamMembers = [] } = useQuery<{ id: string; first_name: string | null; last_name: string | null; numero_cuerda: string | null }[]>({
     queryKey: ['mappicker-team', churchId],
@@ -806,14 +846,36 @@ const MapPickerPage = () => {
           </div>
           <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30">
             <div className="text-xs">
-              <span className="font-semibold">{filtered.length}</span>
-              <span className="text-muted-foreground"> visibles</span>
-              {selectedIds.size > 0 && (
-                <>
-                  <span className="text-muted-foreground"> · </span>
-                  <span className="font-semibold text-primary">{selectedIds.size}</span>
-                  <span className="text-muted-foreground"> elegidos</span>
-                </>
+              {/* Multi-line counter so the user understands the
+                  relationship between filters / addressable / total.
+                  Per Dan: 'es mejor que pongas algo así como mostrando
+                  tantos contactos.' Without the breakdown it looks
+                  like the cuerda has fewer contacts than it really
+                  does — the 'sin dirección' bucket is invisible to
+                  the map by definition but accounts for hundreds of
+                  contacts in this iglesia. */}
+              <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0">
+                <span className="font-semibold">{filtered.length}</span>
+                <span className="text-muted-foreground">mostrados</span>
+                {scopeCounts && (
+                  <>
+                    <span className="text-muted-foreground">de</span>
+                    <span className="font-semibold">{scopeCounts.withCoords}</span>
+                    <span className="text-muted-foreground">con dirección</span>
+                  </>
+                )}
+                {selectedIds.size > 0 && (
+                  <>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="font-semibold text-primary">{selectedIds.size}</span>
+                    <span className="text-muted-foreground">elegidos</span>
+                  </>
+                )}
+              </div>
+              {scopeCounts && scopeCounts.withoutCoords > 0 && (
+                <div className="text-[10px] text-amber-400/80 mt-0.5">
+                  +{scopeCounts.withoutCoords} contacto{scopeCounts.withoutCoords === 1 ? '' : 's'} sin dirección (no se pueden mapear)
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2">
