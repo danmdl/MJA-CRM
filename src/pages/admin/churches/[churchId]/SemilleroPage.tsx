@@ -1079,7 +1079,7 @@ const SemilleroPage = () => {
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
           title="Contactos enviados a MJA (church-cuerda) para que distribuya"
         >
-          <span className="text-[10px] uppercase tracking-wider text-orange-400">Enviar a MJA</span>
+          <span className="text-[10px] uppercase tracking-wider text-orange-400">En MJA</span>
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
         {/* Duplicates toggle — narrows the table to rows whose normalized
