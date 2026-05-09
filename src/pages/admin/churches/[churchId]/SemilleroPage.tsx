@@ -203,44 +203,11 @@ const SemilleroPage = () => {
   const canSeeContactsFromAllCuerdas = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor' || profile?.role === 'supervisor';
 
   // For users without canFilterAllContacts permission, force filter to their
-  // own contacts (security restriction). Admins/generals/etc with full filter
-  // permission start unfiltered — they use the FilterTabs system to slice data.
-  // MJA members (admin/general OR cuerda matches church-cuerda) are also
-  // exempt — per Dan: 'en MJA Central siempre, por default, va a estar
-  // seteado a Todos'. They scope their work via the 'MJA Central' badge
-  // filter manually. We can't use isMjaMember here directly because it's
-  // computed later in the file (after cuerdas loads), so we shortcut:
-  // admin/general always exempt, AND we wait until cuerdas is loaded
-  // before applying the default for non-globals — that way a pastor of
-  // MJA Central whose isMjaMember will resolve to true once cuerdas
-  // arrives never gets the default applied.
-  useEffect(() => {
-    if (filterDefaultsAppliedRef.current) return;
-    if (!profile || !session?.user?.id) return;
-    if (profile.role === 'admin' || profile.role === 'general') {
-      // Globals exempt — they start unfiltered.
-      filterDefaultsAppliedRef.current = true;
-      return;
-    }
-    if (profile.role === 'conector') {
-      // Conectors don't filter at all; mark applied so we don't
-      // re-run.
-      filterDefaultsAppliedRef.current = true;
-      return;
-    }
-    // Wait for cuerdas to load so we can detect MJA members. Without
-    // cuerdas we can't tell if profile.numero_cuerda matches the
-    // church-cuerda; defaulting too early would force-set them to
-    // their own ID and then we couldn't undo it (filterDefaultsAppliedRef
-    // is single-shot).
-    if (!cuerdas) return;
-    const churchCuerdaNumero = (cuerdas || []).find(cu => cu.is_church_cuerda)?.numero;
-    const userIsMja = !!(profile.numero_cuerda && churchCuerdaNumero && profile.numero_cuerda === churchCuerdaNumero);
-    if (!canFilterAllContacts() && !userIsMja) {
-      setFilterResponsable(session.user.id);
-    }
-    filterDefaultsAppliedRef.current = true;
-  }, [profile, session?.user?.id, canFilterAllContacts, cuerdas]);
+  // own contacts (security restriction). The actual effect lives further
+  // down, AFTER the `cuerdas` query is declared — moving it past that
+  // declaration is what kept the TDZ ('Cannot access before initialization')
+  // error from biting. Don't move this hook back up here without also
+  // refactoring the cuerdas reference out of it.
 
   // ─── Data Fetching ─────────────────────────────────────────────
   // Zonas, barrios, cuerdas, cells: these change very rarely. 5 min staleTime
@@ -274,6 +241,44 @@ const SemilleroPage = () => {
     enabled: !!zonas?.length,
     staleTime: 5 * 60_000,
   });
+
+  // Default filterResponsable on first useful render. Admins/generals
+  // start unfiltered (they use FilterTabs to slice). MJA members
+  // (anyone whose numero_cuerda matches an is_church_cuerda) also
+  // start unfiltered — per Dan: 'en MJA Central siempre, por default,
+  // va a estar seteado a Todos'. Everyone else without
+  // canFilterAllContacts permission gets locked to their own
+  // contacts (security restriction).
+  //
+  // Why is this hook DOWN HERE instead of next to the other
+  // initialization hooks? Because we read `cuerdas` from the query
+  // above to detect church-cuerda membership, and a `const`
+  // declaration can't be referenced from code that runs above it
+  // without triggering a Temporal Dead Zone error in production
+  // (minified as 'Cannot access X before initialization'). Keep
+  // this effect's position below the cuerdas declaration.
+  useEffect(() => {
+    if (filterDefaultsAppliedRef.current) return;
+    if (!profile || !session?.user?.id) return;
+    if (profile.role === 'admin' || profile.role === 'general') {
+      filterDefaultsAppliedRef.current = true;
+      return;
+    }
+    if (profile.role === 'conector') {
+      filterDefaultsAppliedRef.current = true;
+      return;
+    }
+    // Wait for cuerdas data so we can detect MJA membership before
+    // committing a default that's hard to undo (filterDefaultsAppliedRef
+    // is single-shot).
+    if (!cuerdas) return;
+    const churchCuerdaNumero = (cuerdas || []).find(cu => cu.is_church_cuerda)?.numero;
+    const userIsMja = !!(profile.numero_cuerda && churchCuerdaNumero && profile.numero_cuerda === churchCuerdaNumero);
+    if (!canFilterAllContacts() && !userIsMja) {
+      setFilterResponsable(session.user.id);
+    }
+    filterDefaultsAppliedRef.current = true;
+  }, [profile, session?.user?.id, canFilterAllContacts, cuerdas]);
 
   // Team members for Responsable dropdown.
   // staleTime is 5 min because team membership changes very rarely.
