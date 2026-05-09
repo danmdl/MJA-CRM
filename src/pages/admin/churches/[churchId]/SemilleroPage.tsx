@@ -188,8 +188,18 @@ const SemilleroPage = () => {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem('semillero.showCuerdaCol') === '1';
   });
+  // Duplicates column off by default. The DUP badge is mostly useful
+  // when the user is actively de-duping; for day-to-day work it's
+  // visual noise (~2% of rows show it, but the column eats space on
+  // every row). User can toggle via the Columns3 menu and the choice
+  // persists.
+  const [showDupCol, setShowDupCol] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('semillero.showDupCol') === '1';
+  });
   useEffect(() => { try { window.localStorage.setItem('semillero.showConectorCol', showConectorCol ? '1' : '0'); } catch {} }, [showConectorCol]);
   useEffect(() => { try { window.localStorage.setItem('semillero.showCuerdaCol', showCuerdaCol ? '1' : '0'); } catch {} }, [showCuerdaCol]);
+  useEffect(() => { try { window.localStorage.setItem('semillero.showDupCol', showDupCol ? '1' : '0'); } catch {} }, [showDupCol]);
 
   // Assignment permission comes from canAssignContacts() via usePermissions
   const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
@@ -1378,6 +1388,10 @@ const SemilleroPage = () => {
               <span className="w-4 inline-flex justify-center">{showConectorCol ? '✓' : ''}</span>
               <span>Conector</span>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); setShowDupCol(v => !v); }} className="gap-2">
+              <span className="w-4 inline-flex justify-center">{showDupCol ? '✓' : ''}</span>
+              <span>Duplicados</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <Button size="sm" variant="ghost" disabled={refreshing} onClick={async () => {
@@ -1601,10 +1615,14 @@ const SemilleroPage = () => {
                         a centered cell so every duplicate flag lines up
                         vertically across rows regardless of name length.
                         Click on the pill opens the merge dialog (same
-                        action the dot used to do). */}
-                    <ResizableHeader width={colWidths.dup} onResize={resizeCol('dup')}>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Dup</span>
-                    </ResizableHeader>
+                        action the dot used to do). Toggleable via the
+                        Columns3 menu — off by default since most rows
+                        have nothing to flag. */}
+                    {showDupCol && (
+                      <ResizableHeader width={colWidths.dup} onResize={resizeCol('dup')}>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Dup</span>
+                      </ResizableHeader>
+                    )}
                     <ResizableHeader width={colWidths.telefono} onResize={resizeCol('telefono')}>Teléfono</ResizableHeader>
                     <ResizableHeader width={colWidths.responsable} onResize={resizeCol('responsable')}>
                       <DropdownMenu>
@@ -1907,32 +1925,36 @@ const SemilleroPage = () => {
                         {/* Dup column — fixed width so the pill renders in
                             the same horizontal position on every row. Empty
                             cell on contacts that aren't flagged. Click on
-                            the pill opens the merge dialog. */}
-                        <td className="px-2 py-1.5 text-center" style={{ width: colWidths.dup }}>
-                          {duplicateNameIds.has(c.id) && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center justify-center px-1.5 leading-none rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 hover:text-amber-200 cursor-pointer transition-colors"
-                                  style={{ height: 18 }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const groupIds = duplicateGroupByContactId.get(c.id) || [c.id];
-                                    const groupContacts = (allContacts || []).filter(x => groupIds.includes(x.id));
-                                    if (groupContacts.length >= 2) setMergeGroup(groupContacts);
-                                  }}
-                                  aria-label="Resolver duplicado"
-                                >
-                                  Dup
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="text-xs">Posible duplicado. Click para resolver (mergear o marcar como personas distintas).</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </td>
+                            the pill opens the merge dialog. Hidden when
+                            showDupCol is off — header and cell move
+                            together. */}
+                        {showDupCol && (
+                          <td className="px-2 py-1.5 text-center" style={{ width: colWidths.dup }}>
+                            {duplicateNameIds.has(c.id) && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center px-1.5 leading-none rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 hover:text-amber-200 cursor-pointer transition-colors"
+                                    style={{ height: 18 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const groupIds = duplicateGroupByContactId.get(c.id) || [c.id];
+                                      const groupContacts = (allContacts || []).filter(x => groupIds.includes(x.id));
+                                      if (groupContacts.length >= 2) setMergeGroup(groupContacts);
+                                    }}
+                                    aria-label="Resolver duplicado"
+                                  >
+                                    Dup
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">Posible duplicado. Click para resolver (mergear o marcar como personas distintas).</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </td>
+                        )}
 
                         {/* Teléfono + WhatsApp - on mobile we hide the number text and keep just the WhatsApp button to save horizontal space.
                             Invalid AR phones (truncated / missing digits) render in red on both the text and the WhatsApp icon.
