@@ -822,6 +822,8 @@ const SemilleroPage = () => {
     const userId = session?.user?.id;
     let n = 0;
     for (const c of allContacts) {
+      // Already assigned to a cell → graduated out of the inbox.
+      if (c.cell_id) continue;
       // In the inbox: not staged for dispatch, not pre-assigned, not
       // already in someone's outbox view.
       if (externalIds.has(c.id)) continue;
@@ -874,14 +876,23 @@ const SemilleroPage = () => {
     if (!allContacts) return [];
     let filtered: Contact[];
     if (activePool === 'unassigned') {
-      // Start with all non-external contacts AND skip ones currently
-      // sitting in the referente's outbox waiting for dispatch
-      // confirmation — those live in 'En MJA' until the referente
-      // confirms or cancels the dispatch. ALSO skip MJA pre-assignment
-      // outbox rows (pending_assignment_cell_id IS NOT NULL) — those
-      // live in 'Asignar Contactos' until the MJA member confirms.
+      // Inbox = the user's pending workload. Excludes:
+      // - Already-assigned contacts (cell_id IS NOT NULL). Per Dan:
+      //   'either they are part of the cuerda or they are not.' Once
+      //   a contact has a célula, it has graduated out of the inbox
+      //   and lives in that cell now. The DB trigger
+      //   sync_contact_cuerda_from_cell makes sure numero_cuerda
+      //   matches the cell's cuerda, so a referente of cuerda 201
+      //   won't see contacts that ended up in another cuerda after
+      //   assignment — they're filtered out here by the cell_id
+      //   exclusion AND by the visibility filter further down.
+      // - Contacts in the referente outbox (pending_external_send).
+      //   Live in 'Enviar a MJA' until the referente confirms.
+      // - Contacts pre-asigned by an MJA member but not yet confirmed
+      //   (pending_assignment_cell_id). Live in 'Asignar Contactos'.
       filtered = allContacts.filter(c =>
-        !externalIds.has(c.id)
+        !c.cell_id
+        && !externalIds.has(c.id)
         && !pendingDispatchIds.has(c.id)
         && !pendingAssignmentIds.has(c.id)
       );
