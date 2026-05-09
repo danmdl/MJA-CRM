@@ -872,6 +872,11 @@ const MapPickerPage = () => {
                   </>
                 )}
               </div>
+              {scopeCounts && scopeCounts.withCoords > filtered.length && (
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  {scopeCounts.withCoords - filtered.length} oculto{scopeCounts.withCoords - filtered.length === 1 ? '' : 's'} por los filtros activos
+                </div>
+              )}
               {scopeCounts && scopeCounts.withoutCoords > 0 && (
                 <div className="text-[10px] text-amber-400/80 mt-0.5">
                   +{scopeCounts.withoutCoords} contacto{scopeCounts.withoutCoords === 1 ? '' : 's'} sin dirección (no se pueden mapear)
