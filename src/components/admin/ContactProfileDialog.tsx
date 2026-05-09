@@ -435,7 +435,16 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         showError(msg || 'Error al actualizar el contacto.');
       } else {
         showSuccess('Contacto actualizado con éxito.');
+        // Two query keys to invalidate, not one. The shared 'contacts'
+        // key is what most lists outside of the Semillero page key
+        // off, but the Semillero (where the user spends most time
+        // editing) uses its own 'pool-all-contacts' key — without
+        // bumping that, the row keeps showing the pre-save data
+        // until a full refresh. Per Dan: 'cuando refresco sigue
+        // estando en la 206' on a contact whose cuerda he had just
+        // changed.
         queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+        queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
         // Mark current state as saved so hasUnsavedChanges becomes false
         // and safeClose doesn't open the unsaved-changes dialog
         if (contact) setOriginalContact(JSON.stringify(contact));
@@ -792,76 +801,98 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
 
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-muted-foreground">Nueva cuerda</label>
-                      {/* Referentes can only reassign to their own cuerda (return to origin) */}
-                      {profile?.role === 'referente' && profile?.numero_cuerda ? (
-                        <select
-                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                          value={pendingCuerdaChange === '__open__' ? '' : (pendingCuerdaChange || '')}
-                          onChange={(e) => setPendingCuerdaChange(e.target.value || '__open__')}
-                        >
-                          <option value="">Seleccionar cuerda...</option>
-                          <option value={profile.numero_cuerda}>{profile.numero_cuerda} (mi cuerda)</option>
-                        </select>
-                      ) : (
-                        <select
-                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                          value={pendingCuerdaChange === '__open__' ? '' : (pendingCuerdaChange || '')}
-                          onChange={(e) => setPendingCuerdaChange(e.target.value || '__open__')}
-                        >
-                          <option value="">Seleccionar cuerda...</option>
-                          <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
-                          <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
-                          <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
-                          <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
-                          <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
-                          <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
-                          <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
-                          <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
-                          <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
-                          <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
-                          <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
-                        </select>
-                      )}
+                      {/* Dropdown applies the change directly on selection.
+                          Used to require a separate 'Cambiar cuerda' button
+                          inside this sub-dialog to commit the choice — that
+                          was a UX trap: closing the sub-dialog by clicking
+                          outside (or pressing Esc) without clicking the
+                          button left the choice un-applied. The user would
+                          then click 'Guardar' on the main dialog with stale
+                          state and the change silently never reached the
+                          server. Activity log evidence: two no-op updates
+                          on the same contact in 30s. The applied change
+                          now happens the moment the dropdown changes; the
+                          user just closes the sub-dialog. */}
+                      {(() => {
+                        const onCuerdaPick = (newCuerda: string) => {
+                          if (!newCuerda) return;
+                          const zonaMap: Record<string, string> = {
+                            '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
+                            '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
+                            '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
+                            '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
+                            '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
+                            '301': 'Bonich', '302': 'Bonich',
+                          };
+                          const isPrivileged = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
+                          if (isPrivileged) {
+                            // Privileged: change cuerda. cell_id stays
+                            // touched here — the DB-level
+                            // clear_cell_on_cuerda_change trigger will
+                            // null it out at write time if the kept cell
+                            // points to a different cuerda. That keeps the
+                            // logic consistent for all paths (CSV import,
+                            // SQL, API) without us duplicating it here.
+                            setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null });
+                          } else {
+                            // Non-privileged: clear cell/zona explicitly,
+                            // returning the contact to Semillero. The
+                            // user-visible warning above the button told
+                            // them this would happen.
+                            setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null, cell_id: null } as any);
+                          }
+                        };
+                        if (profile?.role === 'referente' && profile?.numero_cuerda) {
+                          // Referentes can only reassign to their own cuerda.
+                          return (
+                            <select
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                              value={contact.numero_cuerda || ''}
+                              onChange={(e) => onCuerdaPick(e.target.value)}
+                            >
+                              <option value="">Seleccionar cuerda...</option>
+                              <option value={profile.numero_cuerda}>{profile.numero_cuerda} (mi cuerda)</option>
+                            </select>
+                          );
+                        }
+                        return (
+                          <select
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                            value={contact.numero_cuerda || ''}
+                            onChange={(e) => onCuerdaPick(e.target.value)}
+                          >
+                            <option value="">Seleccionar cuerda...</option>
+                            <optgroup label="San Martín"><option value="101">101</option><option value="201">201</option></optgroup>
+                            <optgroup label="Villa Lynch"><option value="102">102</option><option value="202">202</option></optgroup>
+                            <optgroup label="Ballester"><option value="103">103</option><option value="203">203</option></optgroup>
+                            <optgroup label="Gregoria Matorras"><option value="110">110</option><option value="210">210</option></optgroup>
+                            <optgroup label="Villa Maipú"><option value="104">104</option><option value="204">204</option></optgroup>
+                            <optgroup label="Loma Hermosa"><option value="105">105</option><option value="205">205</option></optgroup>
+                            <optgroup label="Jose L. Suarez"><option value="106">106</option><option value="206">206</option></optgroup>
+                            <optgroup label="Santos Lugares"><option value="107">107</option><option value="207">207</option></optgroup>
+                            <optgroup label="Billinghurst"><option value="108">108</option><option value="208">208</option></optgroup>
+                            <optgroup label="Caseros"><option value="109">109</option><option value="209">209</option></optgroup>
+                            <optgroup label="Bonich"><option value="301">301</option><option value="302">302</option></optgroup>
+                          </select>
+                        );
+                      })()}
                     </div>
 
                     {/* Warning: non-privileged roles return contact to Semillero */}
                     {!(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor') && (contact.cell_id || (contact as any).zona_id) && (
                       <div className="p-3 rounded border border-yellow-500/30 bg-yellow-500/5 text-sm">
-                        <p>Para editar el número de cuerda, este contacto se devolverá al <strong>Semillero Sin Asignar</strong> de la cuerda original ({contact.numero_cuerda}).</p>
+                        <p>Al cambiar la cuerda, este contacto se devolverá al <strong>Semillero Sin Asignar</strong> de la cuerda original ({contact.numero_cuerda}).</p>
                         <p className="text-xs text-muted-foreground mt-1">Desde ahí podrás asignarle una nueva cuerda o célula.</p>
                       </div>
                     )}
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setPendingCuerdaChange(null)}>Cancelar</Button>
-                    <Button
-                      size="sm"
-                      disabled={!pendingCuerdaChange || pendingCuerdaChange === '__open__'}
-                      onClick={() => {
-                        const newCuerda = pendingCuerdaChange!;
-                        const zonaMap: Record<string, string> = {
-                          '101': 'San Martín', '201': 'San Martín', '102': 'Villa Lynch', '202': 'Villa Lynch',
-                          '103': 'Ballester', '203': 'Ballester', '110': 'Gregoria Matorras', '210': 'Gregoria Matorras',
-                          '104': 'Villa Maipú', '204': 'Villa Maipú', '105': 'Loma Hermosa', '205': 'Loma Hermosa',
-                          '106': 'Jose L. Suarez', '206': 'Jose L. Suarez', '107': 'Santos Lugares', '207': 'Santos Lugares',
-                          '108': 'Billinghurst', '208': 'Billinghurst', '109': 'Caseros', '209': 'Caseros',
-                          '301': 'Bonich', '302': 'Bonich',
-                        };
-                        const isPrivileged = profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor';
-                        if (isPrivileged) {
-                          // Privileged: change cuerda directly without returning to Semillero
-                          setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null });
-                        } else {
-                          // Non-privileged: clear cell/zona, return to Semillero
-                          setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null, cell_id: null } as any);
-                        }
-                        setPendingCuerdaChange(null);
-                      }}
-                    >
-                      {(profile?.role === 'admin' || profile?.role === 'general' || profile?.role === 'pastor')
-                        ? 'Cambiar cuerda'
-                        : 'Devolver al Semillero y cambiar'}
-                    </Button>
+                  <div className="flex justify-end">
+                    {/* Just close — the change was applied on dropdown
+                        selection. A 'Cancelar' would need to revert the
+                        in-memory contact object, but since the user can
+                        also undo by reopening the sub-dialog and picking
+                        again, we keep it simple: one Cerrar button. */}
+                    <Button size="sm" onClick={() => setPendingCuerdaChange(null)}>Cerrar</Button>
                   </div>
                 </DialogContent>
               </Dialog>
