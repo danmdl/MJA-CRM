@@ -802,6 +802,44 @@ const SemilleroPage = () => {
     [pendingAssignmentContacts],
   );
 
+  // Count of contacts currently sitting in the Inbox (formerly 'En
+  // Lista') pool, with visibility scope applied but ad-hoc filters
+  // (search, cuerda, responsable, conector, duplicates, tab filters)
+  // ignored. This is the number the Inbox chip displays.
+  //
+  // Why ignore ad-hoc filters? The chip lives in the toolbar and is
+  // there to tell the user 'X contacts are waiting in your inbox'
+  // regardless of what slice they're currently filtering by. Otherwise
+  // when a user is on the outbox tab AND has a filter active, the
+  // chip's number would be filteredContacts.length on the outbox view
+  // (often 0), which Dan called out as misleading: 'no debería ver 0
+  // en EN LISTA, está mal llamado.'
+  //
+  // Visibility scope IS still applied — a referente in cuerda 204
+  // shouldn't see the global count, just their own slice.
+  const inboxTotalCount = useMemo(() => {
+    if (!allContacts) return 0;
+    const userId = session?.user?.id;
+    let n = 0;
+    for (const c of allContacts) {
+      // In the inbox: not staged for dispatch, not pre-assigned, not
+      // already in someone's outbox view.
+      if (externalIds.has(c.id)) continue;
+      if (pendingDispatchIds.has(c.id)) continue;
+      if (pendingAssignmentIds.has(c.id)) continue;
+      // Visibility — same rule as the main filter pipeline.
+      if (!canSeeContactsFromAllCuerdas) {
+        if (userCuerdaNumero) {
+          if (c.numero_cuerda !== userCuerdaNumero) continue;
+        } else if (c.responsable_id !== userId) {
+          continue;
+        }
+      }
+      n++;
+    }
+    return n;
+  }, [allContacts, externalIds, pendingDispatchIds, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
+
   // How many contacts are autoassign-able for THIS user — visible to them
   // and currently without a cell_id. Used by the "Autoasignar todos (N)"
   // button label so the count matches what the action will actually do.
@@ -1187,15 +1225,20 @@ const SemilleroPage = () => {
           <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">Asignación de contactos a células por cercanía</p>
         </div>
 
-        {/* Stats pills */}
+        {/* Inbox chip — the main pool of contacts waiting in the user's
+            scope. Always shows the total inbox count (visibility-scoped
+            for non-globals; ignores ad-hoc filters) so the number stays
+            meaningful regardless of which tab is active. Per Dan: 'cuando
+            estoy en el outbox, no debería ver 0 en EN LISTA, está mal
+            llamado. Cambia a Inbox y poné el número total.' */}
         <button
           type="button"
           onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'unassigned' ? 'border-primary bg-primary/10' : 'border-border hover:border-foreground/30'}`}
-          title="Total de contactos en la lista actual (después de aplicar todos los filtros activos)"
+          title="Total de contactos en tu inbox (sin contar los que están en outbox o pre-asignados)."
         >
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">En lista</span>
-          <span className={`text-sm font-bold tabular-nums ${filteredContacts.length > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : filteredContacts.length}</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Inbox</span>
+          <span className={`text-sm font-bold tabular-nums ${inboxTotalCount > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : inboxTotalCount}</span>
         </button>
         {/* Outbox chip — only for non-MJA users (referentes etc.). MJA
             members don't have an outbox: contacts dispatched to MJA
