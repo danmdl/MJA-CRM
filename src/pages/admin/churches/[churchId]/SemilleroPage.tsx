@@ -2186,29 +2186,6 @@ const SemilleroPage = () => {
                                   </div>
                                 );
                               })()
-                            ) : isMjaMember && (c as any).is_external ? (
-                              // ── MJA MEMBER ON A POOL CONTACT ──
-                              // Contact lives in the MJA Central pool — already
-                              // dispatched by some referente, waiting for the
-                              // MJA member to pre-assign (stage 1) and then
-                              // confirm (stage 2) the final célula.
-                              <div className="flex items-center gap-1">
-                                {sugCell && (
-                                  <Button variant="default" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50" onClick={() => setConfirmDialog({
-                                    type: 'pre_assign', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
-                                    cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
-                                  })}>
-                                    <Zap className="h-3 w-3 mr-1" /> Pre-Asignar
-                                  </Button>
-                                )}
-                                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
-                                  await supabase.from('contacts').update({ is_external: false }).eq('id', c.id);
-                                  showSuccess('Contacto devuelto al Semillero Sin Asignar.');
-                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                                }}>
-                                  <Undo2 className="h-3 w-3 mr-1" /> Devolver
-                                </Button>
-                              </div>
                             ) : !isMjaMember ? (
                               // Non-MJA users on a normal-list row: 'Enviar a MJA'
                               // is the OUTBOX action (stage 1). Only flips
@@ -2229,8 +2206,22 @@ const SemilleroPage = () => {
                             ) : !hasAddress ? (
                               null
                             ) : (
+                              // MJA member on a normal inbox row. Both
+                              // is_external (came from a referente dispatch)
+                              // and non-external rows show the same single
+                              // button: Pre-Asignar. There used to be a
+                              // separate 'Devolver' button on is_external
+                              // rows that cleared is_external=false, but Dan
+                              // pointed out it's confusing — once a contact
+                              // is in MJA Central's inbox, the MJA member's
+                              // job is to assign it. There's no meaningful
+                              // 'devolver' destination since MJA Central is
+                              // the receiving end of the flow. The Cancelar
+                              // action belongs in the 'Asignar Contactos'
+                              // outbox tab (where it undoes a pre-assignment
+                              // by clearing pending_assignment_cell_id).
                               <div className="flex items-center gap-1">
-                                {sugCell && !isExternal && (
+                                {sugCell && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
                                     type: 'pre_assign', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
