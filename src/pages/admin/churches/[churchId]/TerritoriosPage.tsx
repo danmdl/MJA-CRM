@@ -204,9 +204,13 @@ const TerritoriosPage: React.FC = () => {
   // ─── Map init ────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    loadGoogleMaps().then(() => {
+    console.log('[Territorios] component mounted, calling loadGoogleMaps');
+    loadGoogleMaps().then((maps) => {
       if (cancelled) return;
+      console.log('[Territorios] loadGoogleMaps resolved', { hasMaps: !!maps, hasGeometry: !!maps?.geometry });
       setMapsLoaded(true);
+    }).catch(err => {
+      console.error('[Territorios] loadGoogleMaps rejected', err);
     });
     return () => { cancelled = true; };
   }, []);
@@ -214,55 +218,70 @@ const TerritoriosPage: React.FC = () => {
   useEffect(() => {
     if (!mapsLoaded) return;
     if (mapInstanceRef.current) return;
-    if (!mapRef.current) return;
+    if (!mapRef.current) {
+      console.log('[Territorios] effect ran but mapRef.current is null');
+      return;
+    }
     const g = (window as any).google;
-    if (!g?.maps) return;
+    if (!g?.maps) {
+      console.log('[Territorios] google.maps not available even though mapsLoaded=true');
+      return;
+    }
 
-    // Don't init until the container has REAL size. If we instantiate
-    // google.maps.Map() into a 0×0 div, Google sometimes never paints
-    // tiles even after we trigger 'resize' later — the gray empty
-    // box Dan kept seeing. Retry every 100ms until size > 0 or we
-    // give up (20 tries / 2 seconds).
     let attempts = 0;
     let intervalId: number | undefined;
 
     const tryInit = (): boolean => {
       const el = mapRef.current;
-      if (!el) return false;
+      if (!el) {
+        console.log('[Territorios] tryInit: mapRef.current is null on attempt', attempts);
+        return false;
+      }
       const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return false;
+      if (rect.width === 0 || rect.height === 0) {
+        if (attempts === 0 || attempts % 5 === 0) {
+          console.log('[Territorios] tryInit: container 0-sized', { attempt: attempts, w: rect.width, h: rect.height });
+        }
+        return false;
+      }
+
+      console.log('[Territorios] tryInit: container has size, creating map', { w: rect.width, h: rect.height, churchLat: church?.lat, churchLng: church?.lng });
 
       const center = church?.lat && church?.lng
         ? { lat: church.lat, lng: church.lng }
         : { lat: -34.5824, lng: -58.5401 };
 
-      mapInstanceRef.current = new g.maps.Map(el, {
-        center,
-        zoom: 14,
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: true,
-        // See territorios drawing flow: we use our own tap-to-add
-        // implementation instead of DrawingManager. Disable native
-        // double-click zoom so accidental double-taps don't zoom in
-        // when the user is tapping rapidly to add vertices.
-        disableDoubleClickZoom: true,
-      });
+      try {
+        mapInstanceRef.current = new g.maps.Map(el, {
+          center,
+          zoom: 14,
+          mapTypeControl: true,
+          streetViewControl: false,
+          fullscreenControl: true,
+          disableDoubleClickZoom: true,
+        });
+        console.log('[Territorios] Map instance created successfully');
+      } catch (err) {
+        console.error('[Territorios] Map() constructor threw', err);
+        return false;
+      }
 
-      // Force tile paint sequence. Even after the Map is created with a
-      // properly-sized container, the first tile fetch sometimes lands
-      // before layout has stabilized (mobile browsers especially). A
-      // single 'resize' trigger right after init followed by a couple
-      // delayed ones reliably kicks the canvas into rendering.
       const recenter = () => {
         if (!mapInstanceRef.current) return;
         const c = mapInstanceRef.current.getCenter();
         g.maps.event.trigger(mapInstanceRef.current, 'resize');
         if (c) mapInstanceRef.current.setCenter(c);
+        console.log('[Territorios] resize triggered');
       };
       recenter();
       setTimeout(recenter, 200);
       setTimeout(recenter, 800);
+
+      // Listener: when the first tile loads, log it. Tells us tiles
+      // actually came back from Google's CDN.
+      g.maps.event.addListenerOnce(mapInstanceRef.current, 'tilesloaded', () => {
+        console.log('[Territorios] tilesloaded fired — map should be visible now');
+      });
 
       return true;
     };
@@ -272,6 +291,9 @@ const TerritoriosPage: React.FC = () => {
       attempts++;
       if (tryInit() || attempts >= 20) {
         if (intervalId !== undefined) clearInterval(intervalId);
+        if (attempts >= 20 && !mapInstanceRef.current) {
+          console.error('[Territorios] gave up after 20 attempts — container never got non-zero size');
+        }
       }
     }, 100);
 
