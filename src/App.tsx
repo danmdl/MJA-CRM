@@ -53,7 +53,12 @@ const AdminRootRedirect = () => {
   if (canSeeAllAnalytics()) return <Navigate to="dashboard" replace />;
 
   if (profile?.church_id) {
-    return <Navigate to={`churches/${profile.church_id}/overview`} replace />;
+    // Non-globals with a church land on Semillero (pool), not Resumen
+    // (overview). Per Dan: 'el botón de resumen no me sirve ahí arriba,
+    // debería defaultear siempre en semillero'. Resumen is still
+    // reachable via its tab on tablet/desktop, but the day-to-day
+    // landing is the Semillero where they actually do their work.
+    return <Navigate to={`churches/${profile.church_id}/pool`} replace />;
   }
   return <Navigate to="churches" replace />;
 };
@@ -336,7 +341,12 @@ const AppRoutes = () => {
           <Route path="rutas" element={<RutasPage />} />
           <Route path="rutas/:projectId" element={<RouteEditorPage />} />
           <Route path="rutas/:projectId/mapa" element={<MapPickerPage />} />
-          <Route index element={<Navigate to="overview" replace />} />
+          {/* Default landing inside a church is Semillero, not Resumen.
+              Both globals (entering MJA Central from the dashboard) and
+              non-globals (post-login redirect, see AdminRootRedirect)
+              hit this route when navigating to /churches/:id with no
+              tab segment. Resumen stays reachable via its tab. */}
+          <Route index element={<Navigate to="pool" replace />} />
         </Route>
       </Route>
 
