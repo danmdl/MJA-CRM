@@ -72,6 +72,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/celulas")) return "celulas";
     if (p.endsWith("/procesos")) return "procesos";
     if (p.endsWith("/mapa")) return "mapa";
+    if (p.endsWith("/territorios")) return "territorios";
     if (p.endsWith("/pool")) return "pool";
     if (p.endsWith("/historial")) return "historial";
     if (p.endsWith("/papelera")) return "papelera";
@@ -136,6 +137,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
                 {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
                 {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
                 {canSeeMapa() && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
+                {canSeeCuerdas() && <TabsTrigger value="territorios" className="text-xs sm:text-sm px-2 sm:px-3">🗾 Territorios</TabsTrigger>}
                 {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
                 {canSeeValidador() && <TabsTrigger value="validator" className="text-xs sm:text-sm px-2 sm:px-3">🛡️ Validador</TabsTrigger>}
                 {canSeePapelera() && <TabsTrigger value="papelera" className="text-xs sm:text-sm px-2 sm:px-3">🗑️ Papelera</TabsTrigger>}

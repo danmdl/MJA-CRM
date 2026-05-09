@@ -204,6 +204,7 @@ const ChurchesPage = lazyRetry(() => import("./pages/admin/ChurchesPage"));
 const ChurchOverviewPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/OverviewPage"));
 const CuerdasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CuerdasPage"));
 const MapaPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/MapaPage"));
+const TerritoriosPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/TerritoriosPage"));
 const ChurchTeamPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/TeamPage"));
 const SemilleroPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/SemilleroPage"));
 const CelulasPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/CelulasPage"));
@@ -329,6 +330,7 @@ const AppRoutes = () => {
           <Route path="team" element={<ChurchTeamPage />} />
           <Route path="cuerdas" element={<CuerdasPage />} />
           <Route path="mapa" element={<MapaPage />} />
+          <Route path="territorios" element={<TerritoriosPage />} />
           <Route path="pool" element={<SemilleroPage />} />
           <Route path="celulas" element={<CelulasPage />} />
           <Route path="procesos" element={<ProcesosPage />} />

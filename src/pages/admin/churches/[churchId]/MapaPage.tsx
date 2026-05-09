@@ -49,7 +49,11 @@ const loadGoogleMaps = (): Promise<any> => {
     }
     const script = document.createElement('script');
     script.id = 'google-maps-script';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places`;
+    // Include 'drawing' library so the new Territorios page can use
+    // google.maps.drawing.DrawingManager. Idempotent for other callers
+    // (Mapa, MapPicker, etc.) — they don't reference drawing, so the
+    // extra ~30kb load is the only cost. One Maps script per page.
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places,drawing,geometry`;
     script.async = true;
     script.onload = () => resolve((window as any).google.maps);
     document.head.appendChild(script);

@@ -26,6 +26,7 @@ import { usePermissions } from '@/lib/permissions';
 import { normalize } from '@/lib/normalize';
 import { isValidArgentinePhone } from '@/lib/phone-validation';
 import { isWithinGBA, getDistanceColor, getDistanceWarning, getDistanceBadgeClass } from '@/lib/geo-validation';
+import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
@@ -41,7 +42,7 @@ import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 // ─── Types ───────────────────────────────────────────────────────
 interface Zona { id: string; nombre: string; }
 interface Barrio { id: string; nombre: string; zona_id: string; }
-interface Cuerda { id: string; numero: string; zona_id: string; is_church_cuerda?: boolean; }
+interface Cuerda { id: string; numero: string; zona_id: string; is_church_cuerda?: boolean; territory_geojson?: string | null; }
 interface Cell {
   id: string; name: string; church_id: string; cuerda_id: string | null;
   address: string | null; lat: number | null; lng: number | null;
@@ -246,12 +247,29 @@ const SemilleroPage = () => {
     queryKey: ['cuerdas-pool', churchId],
     queryFn: async () => {
       if (!zonas?.length) return [];
-      const { data } = await supabase.from('cuerdas').select('id, numero, zona_id, is_church_cuerda').in('zona_id', zonas.map(z => z.id));
+      const { data } = await supabase
+        .from('cuerdas_with_geojson')
+        .select('id, numero, zona_id, is_church_cuerda, territory_geojson')
+        .in('zona_id', zonas.map(z => z.id));
       return data || [];
     },
     enabled: !!zonas?.length,
     staleTime: 5 * 60_000,
   });
+
+  // Pre-parse each cuerda's territory once. Used by the row renderer
+  // to classify the suggested cell as 'En zona' / 'Fuera' instead of
+  // a raw km distance, when the suggested cuerda has a defined
+  // territory. Cuerdas without a territory still render the km label
+  // (legacy behavior, important for MJA Central where there's no
+  // territory ever).
+  const cuerdaTerritoryMap = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof geoJsonToGooglePaths>>();
+    for (const cu of cuerdas || []) {
+      m.set(cu.id, geoJsonToGooglePaths(cu.territory_geojson || null));
+    }
+    return m;
+  }, [cuerdas]);
 
   // Default filterResponsable on first useful render. Admins/generals
   // start unfiltered (they use FilterTabs to slice). MJA members
@@ -2111,13 +2129,36 @@ const SemilleroPage = () => {
                             })() : sugCell ? (() => {
                               const hasDist = c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng) && sugCell.lat != null && sugCell.lng != null;
                               const dist = hasDist ? haversine(c.lat!, c.lng!, sugCell.lat!, sugCell.lng!) : null;
-                              const badgeClass = dist != null ? getDistanceBadgeClass(dist) : (isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15');
-                              const textColor = dist != null ? getDistanceColor(dist) : (isExternal ? 'text-orange-400' : 'text-green-500');
+                              // Territory-based classification beats km when
+                              // the suggested cuerda has a polygon defined.
+                              // Per Dan: 'el sistema mostraría En Zona / Fuera
+                              // de Zona, especialmente en el Semillero. La
+                              // distancia se queda solo para MJA Central.'
+                              // Implementation: church-cuerda has no territory
+                              // by trigger rule, so it naturally falls back to
+                              // the km label. Other cuerdas without a drawn
+                              // territory also fall back to km — no surprise.
+                              const territoryPaths = sugCuerda ? cuerdaTerritoryMap.get(sugCuerda.id) : null;
+                              const territoryClass = territoryPaths && c.lat != null && c.lng != null
+                                ? (isPointInTerritory(c.lat, c.lng, territoryPaths) ? 'in' : 'out')
+                                : null;
+                              const useTerritory = territoryClass !== null;
+                              const inZone = territoryClass === 'in';
+                              const badgeClass = useTerritory
+                                ? (inZone ? 'bg-green-500/15 text-green-400 hover:bg-green-500/15' : 'bg-red-500/15 text-red-400 hover:bg-red-500/15')
+                                : (dist != null ? getDistanceBadgeClass(dist) : (isExternal ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/15' : 'bg-green-500/15 text-green-500 hover:bg-green-500/15'));
+                              const textColor = useTerritory
+                                ? (inZone ? 'text-green-400' : 'text-red-400')
+                                : (dist != null ? getDistanceColor(dist) : (isExternal ? 'text-orange-400' : 'text-green-500'));
                               return (
                                 <div className="flex items-center gap-1 overflow-hidden">
                                   <Badge className={`text-[9px] shrink-0 ${badgeClass}`}>{sugCell.name}</Badge>
                                   {sugZona && <span className={`text-[9px] truncate ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>}
-                                  {dist != null && <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{dist.toFixed(1)}km</span>}
+                                  {useTerritory ? (
+                                    <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{inZone ? '✓ En zona' : '⚠ Fuera'}</span>
+                                  ) : (
+                                    dist != null && <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{dist.toFixed(1)}km</span>
+                                  )}
                                 </div>
                               );
                             })() : <span className="text-xs text-muted-foreground">—</span>}

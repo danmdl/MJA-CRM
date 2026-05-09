@@ -75,6 +75,7 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
         ...(canSeeAsistencia() ? [{ to: `/admin/churches/${currentChurchId}/asistencia`, emoji: '✅', label: 'Asistencia' }] : []),
         ...(canSeePool() ? [{ to: `/admin/churches/${currentChurchId}/pool`, emoji: '🌱', label: 'Semillero' }] : []),
         ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/mapa`, emoji: '🗺️', label: 'Mapa' }] : []),
+        ...(canSeeCuerdas() ? [{ to: `/admin/churches/${currentChurchId}/territorios`, emoji: '🗾', label: 'Territorios' }] : []),
         ...(canSeeRutas() ? [{ to: `/admin/churches/${currentChurchId}/rutas`, emoji: '🧭', label: 'Rutas' }] : []),
         ...(canSeeHistorial() ? [{ to: `/admin/churches/${currentChurchId}/historial`, emoji: '📋', label: 'Historial' }] : []),
         ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/papelera`, emoji: '🗑️', label: 'Papelera' }] : []),
