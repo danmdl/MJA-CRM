@@ -121,14 +121,14 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
               className="w-full"
             >
               <TabsList className="mb-0 w-max">
-                {/* Resumen hidden on mobile. Per Dan: 'no me sirve ahí
-                    arriba'. The Semillero is now the mobile-default
-                    landing (App.tsx redirect), and on a phone the
-                    cards-of-stats view of Resumen isn't what you
-                    open the app to consume. Stays visible from
-                    sm: (640px) up where the analytics cards
-                    actually fit. */}
-                {canSeeOverview && <TabsTrigger value="overview" className="hidden sm:inline-flex text-xs sm:text-sm px-2 sm:px-3">Resumen</TabsTrigger>}
+                {/* Resumen lives in the left sidebar now, not the tab
+                    strip. Per Dan: 'resumen debería solamente ser un
+                    botón del menú de la izquierda... siempre cuando me
+                    lo veo debería empezar en semillero'. The page
+                    itself (ChurchOverviewPage at /overview) still
+                    exists and the sidebar links to it; we just stop
+                    duplicating it here as a tab that competed with
+                    the actual workflow tabs. */}
                 {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🌱 Semillero</TabsTrigger>}
                 {canSeeProcesos() && <TabsTrigger value="procesos" className="text-xs sm:text-sm px-2 sm:px-3">⚡ Procesos</TabsTrigger>}
                 {canSeeCuerdas() && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
