@@ -2003,7 +2003,7 @@ const SemilleroPage = () => {
                                       });
                                     }}
                                   >
-                                    <span className="text-[10px] font-medium">Enviar</span>
+                                    <span className="hidden sm:inline text-[10px] font-medium">Enviar</span>
                                     <WhatsAppIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5 group-hover:scale-110 transition-transform" />
                                   </button>
                                 )}
@@ -2020,7 +2020,7 @@ const SemilleroPage = () => {
                                   className="flex items-center gap-0.5 shrink-0 text-red-500 cursor-not-allowed"
                                   title="Sin teléfono cargado"
                                 >
-                                  <span className="text-[10px] font-medium">Enviar</span>
+                                  <span className="hidden sm:inline text-[10px] font-medium">Enviar</span>
                                   <WhatsAppIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                                 </span>
                               )}
