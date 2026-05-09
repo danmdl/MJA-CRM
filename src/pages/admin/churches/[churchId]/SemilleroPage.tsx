@@ -2226,33 +2226,111 @@ const SemilleroPage = () => {
                               }}>
                                 <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
                               </Button>
-                            ) : !hasAddress ? (
-                              null
                             ) : (
                               // MJA member on a normal inbox row. Both
                               // is_external (came from a referente dispatch)
-                              // and non-external rows show the same single
-                              // button: Pre-Asignar. There used to be a
-                              // separate 'Devolver' button on is_external
-                              // rows that cleared is_external=false, but Dan
-                              // pointed out it's confusing — once a contact
-                              // is in MJA Central's inbox, the MJA member's
-                              // job is to assign it. There's no meaningful
-                              // 'devolver' destination since MJA Central is
-                              // the receiving end of the flow. The Cancelar
-                              // action belongs in the 'Asignar Contactos'
-                              // outbox tab (where it undoes a pre-assignment
-                              // by clearing pending_assignment_cell_id).
-                              <div className="flex items-center gap-1">
-                                {sugCell && (
-                                  <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
-                                    type: 'pre_assign', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
-                                    cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
-                                  })}>
-                                    <Zap className="h-3 w-3 mr-1" /> Pre-Asignar
-                                  </Button>
-                                )}
-                              </div>
+                              // and non-external rows show the same control:
+                              // a split button with 'Pre-Asignar' on the
+                              // main click (committing to sugCell) and a
+                              // caret dropdown for picking ANY cell in any
+                              // non-church cuerda. Per Dan: 'el botón de
+                              // pre-asignar no es solamente para pre-asignar
+                              // a la cuerda sugerida; tiene que tener una
+                              // flechita para asignarle cualquier cuerda.'
+                              //
+                              // The dropdown groups cells by cuerda so the
+                              // user navigates by cuerda first, cell second.
+                              // The suggested cell is highlighted with a
+                              // ★ marker so it's still discoverable from
+                              // inside the dropdown — useful when the user
+                              // opened the menu intending the suggestion
+                              // anyway.
+                              //
+                              // Renders even when sugCell is null (no
+                              // address / no geographic suggestion) — the
+                              // dropdown itself is the way to assign
+                              // those rows manually. In that case the main
+                              // half is disabled and only the caret works.
+                              (() => {
+                                // Build the cell list once per row. Skip cells
+                                // belonging to the church-cuerda — that's the
+                                // pool source, not a valid destination.
+                                const assignableCells = (cells || []).filter(cl => {
+                                  const cu = (cuerdas || []).find(x => x.id === cl.cuerda_id);
+                                  return cu && !cu.is_church_cuerda;
+                                });
+                                // Group by cuerda numero for menu sections.
+                                const cellsByCuerda = new Map<string, { cells: typeof assignableCells; cuerda: typeof cuerdas extends Array<infer T> ? T : never }>();
+                                for (const cell of assignableCells) {
+                                  const cu = (cuerdas || []).find(x => x.id === cell.cuerda_id);
+                                  if (!cu) continue;
+                                  const entry = cellsByCuerda.get(cu.numero) || { cells: [] as typeof assignableCells, cuerda: cu as any };
+                                  entry.cells.push(cell);
+                                  cellsByCuerda.set(cu.numero, entry);
+                                }
+                                const sortedCuerdaNumeros = Array.from(cellsByCuerda.keys()).sort();
+                                const onPickCell = (cell: { id: string; name: string; cuerda_id: string }) => {
+                                  const cu = (cuerdas || []).find(x => x.id === cell.cuerda_id);
+                                  const z = cu ? (zonas || []).find(zz => zz.id === cu.zona_id) : null;
+                                  setConfirmDialog({
+                                    type: 'pre_assign', contactId: c.id,
+                                    cellId: cell.id, cellName: cell.name,
+                                    cuerdaNum: cu?.numero, zonaName: z?.nombre,
+                                  });
+                                };
+                                return (
+                                  <div className="inline-flex items-center">
+                                    <Button
+                                      variant="default" size="sm"
+                                      className="h-7 text-[11px] pl-2 pr-1.5 rounded-r-none"
+                                      disabled={!sugCell}
+                                      onClick={() => sugCell && setConfirmDialog({
+                                        type: 'pre_assign', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
+                                        cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
+                                      })}
+                                    >
+                                      <Zap className="h-3 w-3 mr-1" /> Pre-Asignar
+                                    </Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="default" size="sm"
+                                          className="h-7 px-1 rounded-l-none border-l border-l-primary-foreground/30"
+                                          title="Pre-asignar a otra cuerda"
+                                        >
+                                          <ChevronDown className="h-3 w-3" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] overflow-auto" collisionPadding={16}>
+                                        {sortedCuerdaNumeros.length === 0 && (
+                                          <DropdownMenuItem disabled>Sin células disponibles</DropdownMenuItem>
+                                        )}
+                                        {sortedCuerdaNumeros.map((numero, idx) => {
+                                          const entry = cellsByCuerda.get(numero)!;
+                                          return (
+                                            <React.Fragment key={numero}>
+                                              {idx > 0 && <DropdownMenuSeparator />}
+                                              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                Cuerda {numero}
+                                              </DropdownMenuLabel>
+                                              {entry.cells.map(cell => (
+                                                <DropdownMenuItem
+                                                  key={cell.id}
+                                                  onClick={() => onPickCell(cell)}
+                                                  className="text-[11px]"
+                                                >
+                                                  {cell.id === sugCell?.id && <span className="mr-1.5">★</span>}
+                                                  <span>{cell.name}</span>
+                                                </DropdownMenuItem>
+                                              ))}
+                                            </React.Fragment>
+                                          );
+                                        })}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                );
+                              })()
                             )}
                           </td>
                         )}
