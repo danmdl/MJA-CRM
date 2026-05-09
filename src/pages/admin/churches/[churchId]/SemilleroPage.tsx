@@ -667,44 +667,72 @@ const SemilleroPage = () => {
   }, [allContacts, zonas]);
 
   // ─── Pool counts ───────────────────────────────────────────────
-  // The "En MJA" chip is the user's PERSONAL OUTBOX, always. For any
-  // role: contacts the current user clicked "Enviar a MJA" on, that
-  // are still pending dispatch confirmation. The contact is still
-  // theirs (numero_cuerda unchanged), they're staged for despatch.
+  // The "En MJA" chip is always the user's PERSONAL OUTBOX. What lives
+  // in that outbox depends on whether the user is a member of the
+  // church-cuerda (MJA Central) or not:
   //
-  // Critical: this used to branch on role and show the MJA Central
-  // pool to admins, but that conflated two unrelated concepts under
-  // one chip. The pool of contacts already despatched to MJA Central
-  // (numero_cuerda='MJA Central', is_external=true) belongs to the
-  // admin's "En Lista" — they're regular contacts of the iglesia,
-  // identified by their cuerda, with a 'Confirmar envío' button to
-  // route them to a final célula. The outbox is something else
-  // entirely: it's the staging area BEFORE despatch, where the
-  // contact still belongs to the original cuerda.
+  //   - NON-MJA member (referente de cuerda 204, encargado, conector,
+  //     anfitrion, etc): outbox = the contacts THEY are about to send
+  //     to MJA Central. Stage where pending_external_send=true and
+  //     numero_cuerda is still their own. Chip label "Enviar a MJA".
   //
-  // For admins this list is normally empty — admins of MJA Central
-  // are the recipients of dispatches, not the senders. If they ever
-  // do send (edge case: an admin acting as a referente for an
-  // accidental load), it shows up here.
+  //   - MJA member (admin/general OR anyone whose numero_cuerda is
+  //     the church-cuerda's numero, e.g. 'MJA Central'): outbox = the
+  //     contacts that LANDED in their pool from referentes' dispatches.
+  //     Stage where is_external=true and the cell is unassigned. Their
+  //     job is to assign each one to a final célula. Chip label
+  //     "Confirmar asignación".
+  //
+  // Same conceptual function (an outbox waiting on the user's action),
+  // different contents and label depending on who's looking. A
+  // supervisor of cuerda 204 is NOT an MJA member — they work in 204,
+  // they aren't on the receiving end of dispatches. They get the
+  // referente UX.
+  const churchCuerda = useMemo(
+    () => (cuerdas || []).find(cu => cu.is_church_cuerda),
+    [cuerdas],
+  );
+  const isMjaMember = useMemo(() => {
+    // Globals without an iglesia (admins like Dan) and generals are
+    // always MJA-side — they manage the assignment pool by definition.
+    if (profile?.role === 'admin' || profile?.role === 'general') return true;
+    // For everyone else, membership is determined by their cuerda
+    // matching the church-cuerda. Pastor of an iglesia who happens
+    // to be assigned to MJA Central qualifies; pastor of cuerda 204
+    // does not.
+    return !!(userCuerdaNumero && churchCuerda?.numero && userCuerdaNumero === churchCuerda.numero);
+  }, [profile?.role, userCuerdaNumero, churchCuerda?.numero]);
+
   const externalContacts = useMemo(() => {
+    if (isMjaMember) {
+      // ── ASSIGNMENT POOL OUTBOX ──
+      // Contacts already dispatched into the MJA Central pool
+      // (is_external=true) waiting for someone on this side to assign
+      // them to a final célula. filterCuerda still applies so an admin
+      // can drill into a specific cuerda's pool subset.
+      return (allContacts || []).filter(c => {
+        if (!(c as any).is_external) return false;
+        if (c.cell_id) return false;
+        if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
+        return true;
+      });
+    }
+    // ── REFERENTE DISPATCH OUTBOX ──
+    // The user's own pending dispatches — contacts they clicked
+    // 'Enviar a MJA' on but haven't confirmed yet. Cuerda still
+    // theirs.
     const userId = session?.user?.id;
     return (allContacts || []).filter(c => {
       if (!(c as any).pending_external_send) return false;
       if (c.cell_id) return false;
-      // Visibility — only see MY pending, not other referentes' pending.
-      // For non-globals, scope is their cuerda (or own creations if no
-      // cuerda assigned). For globals, scope is contacts THEY personally
-      // created (admins shouldn't see other people's outboxes).
-      if (canSeeContactsFromAllCuerdas) {
-        if (c.created_by !== userId) return false;
-      } else if (userCuerdaNumero) {
+      if (userCuerdaNumero) {
         if (c.numero_cuerda !== userCuerdaNumero) return false;
       } else {
         if (c.created_by !== userId && c.responsable_id !== userId) return false;
       }
       return true;
     });
-  }, [allContacts, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
+  }, [allContacts, isMjaMember, userCuerdaNumero, filterCuerda, session?.user?.id]);
 
   const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
   // Every contact pending dispatch (any user, any cuerda). Used to
@@ -1098,9 +1126,11 @@ const SemilleroPage = () => {
           type="button"
           onClick={() => { setActivePool('external'); setSearchTerm(''); }}
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
-          title='Tu outbox personal: contactos que enviaste a MJA pero todavía no confirmaste el despacho. Confirmá cuando estés seguro y recién ahí salen de tu cuerda.'
+          title={isMjaMember
+            ? 'Tu outbox: contactos despachados al pool de MJA Central. Asignales su célula final.'
+            : 'Tu outbox: contactos que enviaste a MJA pero todavía no confirmaste el despacho. Confirmá cuando estés seguro y recién ahí salen de tu cuerda.'}
         >
-          <span className="text-[10px] uppercase tracking-wider text-orange-400">En MJA</span>
+          <span className="text-[10px] uppercase tracking-wider text-orange-400">{isMjaMember ? 'Confirmar asignación' : 'Enviar a MJA'}</span>
           <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
         </button>
         {/* Duplicates toggle — narrows the table to rows whose normalized
@@ -1852,10 +1882,10 @@ const SemilleroPage = () => {
                           <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
                             {c.cell_id ? (
                               <span className="text-[10px] text-blue-400">✓ Asignado</span>
-                            ) : !canSeeContactsFromAllCuerdas && (c as any).pending_external_send && activePool === 'external' ? (
+                            ) : !isMjaMember && (c as any).pending_external_send && activePool === 'external' ? (
                               // ── REFERENTE OUTBOX ──
-                              // Contact is in their 'En MJA' outbox, waiting for
-                              // dispatch confirmation. Two actions:
+                              // Contact is in their 'Enviar a MJA' outbox, waiting
+                              // for dispatch confirmation. Two actions:
                               //   - Confirmar despacho: actually dispatch to
                               //     MJA Central. numero_cuerda flips to the
                               //     church-cuerda, is_external becomes true,
@@ -1865,12 +1895,12 @@ const SemilleroPage = () => {
                               //     normal list. Just clears pending_external_send.
                               <div className="flex items-center gap-1">
                                 <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
-                                  const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
+                                  const cc = (cuerdas || []).find(cu => cu.is_church_cuerda);
                                   const update: any = {
                                     pending_external_send: false,
                                     is_external: true,
                                   };
-                                  if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
+                                  if (cc) update.numero_cuerda = cc.numero;
                                   await supabase.from('contacts').update(update).eq('id', c.id);
                                   showSuccess('Despachado a MJA Central.');
                                   queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
@@ -1885,22 +1915,21 @@ const SemilleroPage = () => {
                                   <Undo2 className="h-3 w-3 mr-1" /> Cancelar
                                 </Button>
                               </div>
-                            ) : canSeeContactsFromAllCuerdas && (c as any).is_external ? (
-                              // ── ADMIN ON A POOL CONTACT ──
+                            ) : isMjaMember && (c as any).is_external ? (
+                              // ── MJA MEMBER ON A POOL CONTACT ──
                               // Contact lives in the MJA Central pool — already
                               // dispatched by some referente, waiting for the
-                              // admin to assign it to a final célula. Shown
+                              // MJA member to assign it to a final célula. Shown
                               // wherever the contact appears (En Lista,
-                              // filtered views, search), not gated by
-                              // activePool — admins can see and act on these
-                              // anywhere they show up.
+                              // 'Confirmar asignación' tab, search), not gated
+                              // by activePool.
                               <div className="flex items-center gap-1">
                                 {sugCell && (
                                   <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={() => setConfirmDialog({
                                     type: 'manual', contactId: c.id, cellId: sugCell.id, cellName: sugCell.name,
                                     cuerdaNum: sugCuerda?.numero, zonaName: sugZona?.nombre,
                                   })}>
-                                    <Zap className="h-3 w-3 mr-1" /> Confirmar envío
+                                    <Zap className="h-3 w-3 mr-1" /> Confirmar asignación
                                   </Button>
                                 )}
                                 <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
@@ -1911,18 +1940,19 @@ const SemilleroPage = () => {
                                   <Undo2 className="h-3 w-3 mr-1" /> Devolver
                                 </Button>
                               </div>
-                            ) : !canSeeContactsFromAllCuerdas ? (
-                              // Non-globals: 'Enviar a MJA' is the OUTBOX action
-                              // (stage 1). Only flips pending_external_send=true
-                              // and leaves numero_cuerda alone — the contact
-                              // stays on the referente's cuerda but moves into
-                              // their 'En MJA' outbox tab. The actual dispatch
+                            ) : !isMjaMember ? (
+                              // Non-MJA users on a normal-list row: 'Enviar a MJA'
+                              // is the OUTBOX action (stage 1). Only flips
+                              // pending_external_send=true and leaves
+                              // numero_cuerda alone — the contact stays on the
+                              // user's cuerda but moves into their 'Enviar a
+                              // MJA' outbox tab. The actual dispatch
                               // (numero_cuerda → 'MJA Central', is_external=true)
-                              // happens when the referente clicks 'Confirmar
-                              // despacho' inside the outbox.
+                              // happens when they click 'Confirmar despacho'
+                              // inside the outbox.
                               <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
                                 await supabase.from('contacts').update({ pending_external_send: true }).eq('id', c.id);
-                                showSuccess('Movido a tu outbox "En MJA". Confirmá el despacho cuando estés seguro.');
+                                showSuccess('Movido a tu outbox "Enviar a MJA". Confirmá el despacho cuando estés seguro.');
                                 queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
                               }}>
                                 <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
@@ -2292,7 +2322,7 @@ const SemilleroPage = () => {
           >
             Limpiar
           </button>
-          {canAssignContacts() && canSeeContactsFromAllCuerdas && (
+          {canAssignContacts() && isMjaMember && (
             <Button
               size="sm"
               onClick={() => setConfirmDialog({ type: 'auto_selected' })}
@@ -2301,7 +2331,7 @@ const SemilleroPage = () => {
               <Zap className="h-4 w-4" /> Autoasignar
             </Button>
           )}
-          {canAssignContacts() && !canSeeContactsFromAllCuerdas && activePool === 'unassigned' && (
+          {canAssignContacts() && !isMjaMember && activePool === 'unassigned' && (
             <Button
               size="sm"
               variant="outline"
@@ -2309,12 +2339,12 @@ const SemilleroPage = () => {
               onClick={async () => {
                 // Bulk OUTBOX action: same as the per-row button — flip
                 // pending_external_send=true on every selected contact.
-                // Numero_cuerda stays. They land in the user's 'En MJA'
-                // tab waiting for individual or bulk dispatch confirmation.
+                // Numero_cuerda stays. They land in the user's 'Enviar
+                // a MJA' tab waiting for dispatch confirmation.
                 const ids = Array.from(selectedIds).filter(id => filteredContacts.some(fc => fc.id === id));
                 if (ids.length === 0) return;
                 await supabase.from('contacts').update({ pending_external_send: true }).in('id', ids);
-                showSuccess(`${ids.length} movido${ids.length === 1 ? '' : 's'} al outbox "En MJA".`);
+                showSuccess(`${ids.length} movido${ids.length === 1 ? '' : 's'} al outbox "Enviar a MJA".`);
                 setSelectedIds(new Set());
                 queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
               }}
@@ -2322,8 +2352,8 @@ const SemilleroPage = () => {
               <ExternalLink className="h-4 w-4" /> Enviar a MJA
             </Button>
           )}
-          {canAssignContacts() && !canSeeContactsFromAllCuerdas && activePool === 'external' && (
-            // Inside the outbox, the bulk action is the second-stage
+          {canAssignContacts() && !isMjaMember && activePool === 'external' && (
+            // Inside the referente outbox, bulk = the second-stage
             // dispatch confirmation: actually push everything to MJA
             // Central. numero_cuerda flips, is_external becomes true,
             // pending_external_send goes back to false.
@@ -2331,14 +2361,14 @@ const SemilleroPage = () => {
               size="sm"
               className="gap-1.5"
               onClick={async () => {
-                const churchCuerda = (cuerdas || []).find(cu => cu.is_church_cuerda);
+                const cc = (cuerdas || []).find(cu => cu.is_church_cuerda);
                 const ids = Array.from(selectedIds).filter(id => filteredContacts.some(fc => fc.id === id));
                 if (ids.length === 0) return;
                 const update: any = {
                   pending_external_send: false,
                   is_external: true,
                 };
-                if (churchCuerda) update.numero_cuerda = churchCuerda.numero;
+                if (cc) update.numero_cuerda = cc.numero;
                 await supabase.from('contacts').update(update).in('id', ids);
                 showSuccess(`${ids.length} despachado${ids.length === 1 ? '' : 's'} a MJA Central.`);
                 setSelectedIds(new Set());
