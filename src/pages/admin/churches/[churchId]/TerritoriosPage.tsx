@@ -212,23 +212,70 @@ const TerritoriosPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!mapsLoaded || !mapRef.current) return;
+    if (!mapsLoaded) return;
     if (mapInstanceRef.current) return;
-    const center = church?.lat && church?.lng
-      ? { lat: church.lat, lng: church.lng }
-      : { lat: -34.5824, lng: -58.5401 }; // MJA Central fallback
+    if (!mapRef.current) return;
     const g = (window as any).google;
-    mapInstanceRef.current = new g.maps.Map(mapRef.current, {
-      center,
-      zoom: 14,
-      mapTypeControl: true,
-      streetViewControl: false,
-      fullscreenControl: true,
-      // Disable double-click zoom so the user can double-tap a vertex
-      // during drawing without the map zooming in unexpectedly. They
-      // can still pinch-zoom and use +/- controls.
-      disableDoubleClickZoom: true,
-    });
+    if (!g?.maps) return;
+
+    // Don't init until the container has REAL size. If we instantiate
+    // google.maps.Map() into a 0×0 div, Google sometimes never paints
+    // tiles even after we trigger 'resize' later — the gray empty
+    // box Dan kept seeing. Retry every 100ms until size > 0 or we
+    // give up (20 tries / 2 seconds).
+    let attempts = 0;
+    let intervalId: number | undefined;
+
+    const tryInit = (): boolean => {
+      const el = mapRef.current;
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+
+      const center = church?.lat && church?.lng
+        ? { lat: church.lat, lng: church.lng }
+        : { lat: -34.5824, lng: -58.5401 };
+
+      mapInstanceRef.current = new g.maps.Map(el, {
+        center,
+        zoom: 14,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        // See territorios drawing flow: we use our own tap-to-add
+        // implementation instead of DrawingManager. Disable native
+        // double-click zoom so accidental double-taps don't zoom in
+        // when the user is tapping rapidly to add vertices.
+        disableDoubleClickZoom: true,
+      });
+
+      // Force tile paint sequence. Even after the Map is created with a
+      // properly-sized container, the first tile fetch sometimes lands
+      // before layout has stabilized (mobile browsers especially). A
+      // single 'resize' trigger right after init followed by a couple
+      // delayed ones reliably kicks the canvas into rendering.
+      const recenter = () => {
+        if (!mapInstanceRef.current) return;
+        const c = mapInstanceRef.current.getCenter();
+        g.maps.event.trigger(mapInstanceRef.current, 'resize');
+        if (c) mapInstanceRef.current.setCenter(c);
+      };
+      recenter();
+      setTimeout(recenter, 200);
+      setTimeout(recenter, 800);
+
+      return true;
+    };
+
+    if (tryInit()) return;
+    intervalId = window.setInterval(() => {
+      attempts++;
+      if (tryInit() || attempts >= 20) {
+        if (intervalId !== undefined) clearInterval(intervalId);
+      }
+    }, 100);
+
+    return () => { if (intervalId !== undefined) clearInterval(intervalId); };
   }, [mapsLoaded, church?.lat, church?.lng]);
 
   // Trigger a Google Maps resize whenever the container changes size
