@@ -102,10 +102,18 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
       {/* Church header + tabs combined into a single compact row */}
       <div className="border-b bg-background">
         <div className="flex items-center gap-3 px-3 sm:px-4">
-          <h2 className="text-base sm:text-lg font-bold tracking-tight whitespace-nowrap py-2">
+          {/* Church name + divider hidden on mobile — on a 380px-wide
+              phone screen, "MJA Central" plus the separator was eating
+              ~40% of the width and pushing the tabs into a horizontal
+              scroller that hid the active tab on first paint. The
+              breadcrumb / title is already implied by the URL and the
+              page header below it, so dropping it on small screens
+              just gives the tab strip room to breathe. Reappears at
+              sm: (640px) and up. */}
+          <h2 className="hidden sm:block text-base sm:text-lg font-bold tracking-tight whitespace-nowrap py-2">
             {nameLoading ? <Skeleton className="h-5 w-32" /> : churchData?.name || "Iglesia"}
           </h2>
-          <div className="h-6 w-px bg-border shrink-0" />
+          <div className="hidden sm:block h-6 w-px bg-border shrink-0" />
           <div className="flex-1 overflow-x-auto">
             <Tabs
               value={activeTab}
