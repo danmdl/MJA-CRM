@@ -85,6 +85,26 @@ const TerritoriosPage: React.FC = () => {
   // Cell markers — small dots so the user knows where their cells
   // sit relative to the territory they're drawing.
   const cellMarkersRef = useRef<any[]>([]);
+  // ── Tap-to-draw mode ──
+  // Instead of Google's DrawingManager (which makes you tap the FIRST
+  // vertex again to close — borderline impossible on mobile), we
+  // implement our own simple flow: enter draw mode, tap to add
+  // vertices, click 'Cerrar polígono' to finalize. Dan's words:
+  // 'sería bueno que sea fácil cerrar el polígono.'
+  const [isDrawing, setIsDrawing] = useState(false);
+  // vertexCount mirrors drawingVerticesRef.current.length but as state
+  // so the help banner ('N puntos agregados') and the undo button's
+  // disabled state actually re-render on each tap. The ref is the
+  // source of truth for the data; this is purely UI sync.
+  const [vertexCount, setVertexCount] = useState(0);
+  const drawingVerticesRef = useRef<{ lat: number; lng: number }[]>([]);
+  // Visual aids during drawing:
+  //   - drawingMarkersRef holds the small numbered dots at each tap
+  //   - drawingPreviewLineRef is the open polyline connecting them so
+  //     the user sees what they're drawing as they go
+  const drawingMarkersRef = useRef<any[]>([]);
+  const drawingPreviewLineRef = useRef<any>(null);
+  const tapListenerRef = useRef<any>(null);
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [selectedCuerdaNumero, setSelectedCuerdaNumero] = useState<string>('');
@@ -204,43 +224,10 @@ const TerritoriosPage: React.FC = () => {
       mapTypeControl: true,
       streetViewControl: false,
       fullscreenControl: true,
-    });
-    // Drawing manager — used by the user to create a new polygon when
-    // the selected cuerda doesn't have one yet. Hidden by default;
-    // we toggle it on demand from the 'Dibujar territorio' button.
-    drawingManagerRef.current = new g.maps.drawing.DrawingManager({
-      drawingMode: null,
-      drawingControl: false, // we expose our own button
-      polygonOptions: {
-        editable: true,
-        draggable: false,
-        strokeColor: '#000',
-        strokeOpacity: 0.9,
-        strokeWeight: 2,
-        fillColor: '#000',
-        fillOpacity: 0.18,
-      },
-    });
-    drawingManagerRef.current.setMap(mapInstanceRef.current);
-
-    g.maps.event.addListener(drawingManagerRef.current, 'polygoncomplete', (polygon: any) => {
-      // User finished drawing a new polygon. Stop drawing mode, treat
-      // this as the new editing polygon, and mark unsaved.
-      drawingManagerRef.current.setDrawingMode(null);
-      // Wire up edit listeners so dragging vertices marks unsaved.
-      attachEditListeners(polygon);
-      // If there was an existing editing polygon (shouldn't happen but
-      // covered) drop it.
-      if (editingPolygonRef.current && editingPolygonRef.current !== polygon) {
-        editingPolygonRef.current.setMap(null);
-      }
-      editingPolygonRef.current = polygon;
-      // Recolor to the selected cuerda's hue
-      if (selectedCuerda) {
-        const c = colorForCuerda(selectedCuerda.numero);
-        polygon.setOptions({ strokeColor: c, fillColor: c });
-      }
-      setHasUnsavedChanges(true);
+      // Disable double-click zoom so the user can double-tap a vertex
+      // during drawing without the map zooming in unexpectedly. They
+      // can still pinch-zoom and use +/- controls.
+      disableDoubleClickZoom: true,
     });
   }, [mapsLoaded, church?.lat, church?.lng]);
 
@@ -368,18 +355,142 @@ const TerritoriosPage: React.FC = () => {
   }, [mapsLoaded, cells, cuerdas]);
 
   // ─── Drawing controls ────────────────────────────────────────────
-  const startDrawing = () => {
-    if (!drawingManagerRef.current) return;
+  // Tap-to-draw flow:
+  //   1. enterDrawMode(): attach a click listener to the map. Each
+  //      click adds a vertex (numbered marker), and the preview
+  //      polyline updates to connect all current vertices.
+  //   2. undoLastVertex(): pops the last vertex. No-op if empty.
+  //   3. closePolygon(): freezes the current vertex list as a real
+  //      editable Google Polygon, removes the preview markers + line,
+  //      exits draw mode. Requires at least 3 vertices.
+  //   4. cancelDrawing(): exits without committing anything.
+  //
+  // This avoids Google's DrawingManager which forces the user to tap
+  // the FIRST vertex AGAIN to close — practically impossible on a
+  // touch screen with shaky fingers.
+
+  const renderDrawingPreview = () => {
+    const g = (window as any).google;
+    if (!g?.maps || !mapInstanceRef.current) return;
+    const verts = drawingVerticesRef.current;
+    const color = selectedCuerda ? colorForCuerda(selectedCuerda.numero) : '#3b82f6';
+
+    // Refresh markers
+    drawingMarkersRef.current.forEach(m => m.setMap(null));
+    drawingMarkersRef.current = [];
+    verts.forEach((v, idx) => {
+      const marker = new g.maps.Marker({
+        position: v,
+        map: mapInstanceRef.current,
+        label: { text: String(idx + 1), color: '#fff', fontSize: '11px', fontWeight: 'bold' },
+        icon: {
+          path: g.maps.SymbolPath.CIRCLE,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+          scale: 9,
+        },
+        zIndex: 100,
+      });
+      drawingMarkersRef.current.push(marker);
+    });
+
+    // Refresh preview polyline (open — connects vertices in order)
+    if (drawingPreviewLineRef.current) {
+      drawingPreviewLineRef.current.setMap(null);
+      drawingPreviewLineRef.current = null;
+    }
+    if (verts.length >= 2) {
+      drawingPreviewLineRef.current = new g.maps.Polyline({
+        path: verts,
+        map: mapInstanceRef.current,
+        strokeColor: color,
+        strokeOpacity: 0.8,
+        strokeWeight: 2.5,
+        zIndex: 99,
+      });
+    }
+  };
+
+  const enterDrawMode = () => {
+    const g = (window as any).google;
+    if (!g?.maps || !mapInstanceRef.current) return;
     if (!selectedCuerda || !canEditCuerda(selectedCuerda)) return;
-    // If there's already an editing polygon, the user has to clear it
-    // first — drawing a second polygon would create ambiguity. We
-    // rely on the 'Borrar' button to reset state.
+    // If there's already an existing saved polygon, the user should
+    // clear it first or edit by dragging vertices. Don't stack two.
     if (editingPolygonRef.current) {
       showError('Ya hay un territorio dibujado. Borralo primero o editalo arrastrando los vértices.');
       return;
     }
+    drawingVerticesRef.current = [];
+    setIsDrawing(true);
+    // Wire up tap-to-add listener
+    if (tapListenerRef.current) g.maps.event.removeListener(tapListenerRef.current);
+    tapListenerRef.current = mapInstanceRef.current.addListener('click', (e: any) => {
+      if (!e.latLng) return;
+      drawingVerticesRef.current = [
+        ...drawingVerticesRef.current,
+        { lat: e.latLng.lat(), lng: e.latLng.lng() },
+      ];
+      setVertexCount(drawingVerticesRef.current.length);
+      renderDrawingPreview();
+    });
+  };
+
+  const undoLastVertex = () => {
+    if (drawingVerticesRef.current.length === 0) return;
+    drawingVerticesRef.current = drawingVerticesRef.current.slice(0, -1);
+    setVertexCount(drawingVerticesRef.current.length);
+    renderDrawingPreview();
+  };
+
+  const cancelDrawing = () => {
     const g = (window as any).google;
-    drawingManagerRef.current.setDrawingMode(g.maps.drawing.OverlayType.POLYGON);
+    if (tapListenerRef.current) {
+      g?.maps?.event?.removeListener(tapListenerRef.current);
+      tapListenerRef.current = null;
+    }
+    drawingVerticesRef.current = [];
+    setVertexCount(0);
+    drawingMarkersRef.current.forEach(m => m.setMap(null));
+    drawingMarkersRef.current = [];
+    if (drawingPreviewLineRef.current) {
+      drawingPreviewLineRef.current.setMap(null);
+      drawingPreviewLineRef.current = null;
+    }
+    setIsDrawing(false);
+  };
+
+  const closePolygon = () => {
+    const g = (window as any).google;
+    if (!g?.maps || !mapInstanceRef.current) return;
+    const verts = drawingVerticesRef.current;
+    if (verts.length < 3) {
+      showError('Necesitás al menos 3 puntos para cerrar el polígono.');
+      return;
+    }
+    if (!selectedCuerda) return;
+    const color = colorForCuerda(selectedCuerda.numero);
+    // Promote the vertex list to a real editable polygon
+    const polygon = new g.maps.Polygon({
+      paths: verts,
+      editable: true,
+      draggable: false,
+      strokeColor: color,
+      strokeOpacity: 0.9,
+      strokeWeight: 3,
+      fillColor: color,
+      fillOpacity: 0.18,
+      zIndex: 10,
+    });
+    polygon.setMap(mapInstanceRef.current);
+    attachEditListeners(polygon);
+    editingPolygonRef.current = polygon;
+    // Tear down the drawing aids
+    cancelDrawing();
+    setHasUnsavedChanges(true);
+    showSuccess('Polígono cerrado. Podés arrastrar los vértices para ajustar y después tocar Guardar.');
   };
 
   const clearDrawing = () => {
@@ -496,6 +607,7 @@ const TerritoriosPage: React.FC = () => {
             if (hasUnsavedChanges) {
               if (!confirm('Tenés cambios sin guardar. ¿Cambiar de cuerda y descartarlos?')) return;
             }
+            if (isDrawing) cancelDrawing();
             setSelectedCuerdaNumero(e.target.value);
           }}
         >
@@ -522,19 +634,53 @@ const TerritoriosPage: React.FC = () => {
               {hasExistingTerritory ? 'Con territorio' : 'Sin territorio'}
             </span>
 
-            {isSelectedEditable && !editingPolygonRef.current && (
-              <Button size="sm" onClick={startDrawing} className="gap-1.5">
+            {/* DRAW MODE CONTROLS (active only while drawing) */}
+            {isDrawing && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={undoLastVertex}
+                  disabled={vertexCount === 0}
+                  className="gap-1.5"
+                  title="Quitar el último punto"
+                >
+                  ↶ Deshacer punto
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={closePolygon}
+                  disabled={vertexCount < 3}
+                  className="gap-1.5 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                  title="Cerrar el polígono y pasar a modo edición"
+                >
+                  ✓ Cerrar polígono
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={cancelDrawing}
+                  className="gap-1.5"
+                >
+                  Cancelar
+                </Button>
+              </>
+            )}
+
+            {/* IDLE-STATE BUTTONS (only visible when not drawing) */}
+            {!isDrawing && isSelectedEditable && !editingPolygonRef.current && (
+              <Button size="sm" onClick={enterDrawMode} className="gap-1.5">
                 <Pencil className="h-3.5 w-3.5" /> Dibujar territorio
               </Button>
             )}
 
-            {isSelectedEditable && editingPolygonRef.current && (
+            {!isDrawing && isSelectedEditable && editingPolygonRef.current && (
               <Button size="sm" variant="outline" onClick={clearDrawing} className="gap-1.5">
                 <Trash2 className="h-3.5 w-3.5" /> Borrar
               </Button>
             )}
 
-            {isSelectedEditable && (
+            {!isDrawing && isSelectedEditable && (
               <Button
                 size="sm"
                 onClick={saveTerritory}
@@ -546,14 +692,31 @@ const TerritoriosPage: React.FC = () => {
               </Button>
             )}
 
-            {!isSelectedEditable && (
+            {!isDrawing && !isSelectedEditable && (
               <span className="text-xs text-muted-foreground italic">Solo podés ver esta cuerda. Para editarla, hablá con tu pastor o admin.</span>
             )}
           </>
         )}
 
-        {hasUnsavedChanges && <span className="text-xs text-amber-400 ml-auto">Cambios sin guardar</span>}
+        {hasUnsavedChanges && !isDrawing && <span className="text-xs text-amber-400 ml-auto">Cambios sin guardar</span>}
       </div>
+
+      {/* Drawing-mode help banner. Shown only while drawing so the
+          user has clear instructions and a count of points placed.
+          Above the map so it's visible without scrolling. */}
+      {isDrawing && (
+        <div className="px-3 py-2 rounded border border-amber-500/40 bg-amber-500/10 text-sm flex items-center gap-2">
+          <Pencil className="h-4 w-4 text-amber-400 shrink-0" />
+          <span className="text-amber-300">
+            Tocá el mapa para agregar puntos al borde de tu territorio.
+            {' '}
+            <strong>{vertexCount}</strong> punto{vertexCount === 1 ? '' : 's'} agregado{vertexCount === 1 ? '' : 's'}.
+            {vertexCount < 3
+              ? ' Necesitás 3 o más para poder cerrar.'
+              : ' Cuando termines, tocá "Cerrar polígono".'}
+          </span>
+        </div>
+      )}
 
       {/* Stats */}
       {stats && (
