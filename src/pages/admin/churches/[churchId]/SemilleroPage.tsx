@@ -875,7 +875,19 @@ const SemilleroPage = () => {
   const filteredContacts = useMemo(() => {
     if (!allContacts) return [];
     let filtered: Contact[];
-    if (activePool === 'unassigned') {
+    if (searchTerm.trim()) {
+      // Global search: when the user types in the search box, look
+      // across ALL contacts in their visibility scope — assigned,
+      // unassigned, in outbox, pre-asigned, anywhere. The user is
+      // looking for a specific person and shouldn't be blocked by
+      // pool boundaries. Per Dan: searching 'yesica Lopez' from
+      // MJA Central was returning 0 results because the inbox view
+      // had her excluded (she has a cell). Search now finds her
+      // regardless. Pool-state badges in the row (Asignado, etc.)
+      // tell the user where she actually is. Other filters (cuerda,
+      // responsable, conector, duplicates) still apply normally.
+      filtered = allContacts;
+    } else if (activePool === 'unassigned') {
       // Inbox = the user's pending workload. Excludes:
       // - Already-assigned contacts (cell_id IS NOT NULL). Per Dan:
       //   'either they are part of the cuerda or they are not.' Once
