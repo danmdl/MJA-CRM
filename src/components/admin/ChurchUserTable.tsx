@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff, UserPen } from 'lucide-react';
+import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff, UserPen, UserSearch } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { normalize as norm } from '@/lib/normalize';
@@ -202,6 +202,39 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
     onError: (err: any) => showError(err.message || 'Error al actualizar perfil.'),
   });
 
+  // Impersonation mutation. Calls admin-impersonate-v1 which generates
+  // a one-time magic link for the target user, returns it in
+  // { link, target_email, hint }, and writes an audit row in
+  // impersonation_logs. The link is copied to clipboard so the admin
+  // can paste it into an incognito window — that way their own admin
+  // session in the current window stays alive (different storage
+  // contexts in incognito vs regular).
+  const impersonateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-impersonate-v1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'No se pudo generar el link.');
+      }
+      return response.json() as Promise<{ link: string; target_email: string; hint: string }>;
+    },
+    onSuccess: async (data) => {
+      try {
+        await navigator.clipboard.writeText(data.link);
+        showSuccess(`Link copiado para ${data.target_email}. Pegalo en una ventana de incógnito (Ctrl+Shift+N) para no perder tu sesión.`);
+      } catch {
+        // Fallback if clipboard isn't writable (older browsers, insecure
+        // contexts). Show the link so the admin can copy by hand.
+        showError(`No pude copiar al clipboard. Link manual: ${data.link}`);
+      }
+    },
+    onError: (err: any) => showError(err.message || 'Error al generar el link de impersonación.'),
+  });
+
   const formatDate = (d: string | null) => {
     if (!d) return '-';
     try { return format(new Date(d), 'dd/MM/yyyy'); } catch { return d; }
@@ -325,6 +358,21 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
                         {canEditDeleteMembers() && user.status === 'confirmed' && (
                           <DropdownMenuItem onClick={() => { setResetDialogUser({ id: user.id, email: user.email }); setNewPassword(''); setShowPw(false); }}>
                             <KeyRound className="mr-2 h-4 w-4" /> Cambiar Contraseña
+                          </DropdownMenuItem>
+                        )}
+                        {/* Ver como — generates a magic-link login for the target
+                            user and copies it to clipboard. Only admins of the
+                            iglesia can use this, and only on non-admin confirmed
+                            users (the edge function rejects admin→admin to keep
+                            the audit clean and prevent privilege chains).
+                            Use case: see the app the way Ana sees it for
+                            troubleshooting, without asking Ana for her password. */}
+                        {profile?.role === 'admin' && user.status === 'confirmed' && user.role !== 'admin' && user.role !== 'general' && user.id !== profile?.id && (
+                          <DropdownMenuItem
+                            onClick={() => impersonateMutation.mutate(user.id)}
+                            disabled={impersonateMutation.isPending}
+                          >
+                            <UserSearch className="mr-2 h-4 w-4" /> Ver como este usuario
                           </DropdownMenuItem>
                         )}
                         {canEditDeleteMembers() && (
