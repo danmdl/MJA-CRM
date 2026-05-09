@@ -559,46 +559,64 @@ const MapaPage = () => {
           and the 'sin dirección' banner that used to live here are gone —
           they ate vertical space without adding much over the chips. */}
       {!isLoading && !geocoding && availableCuerdas.length > 1 ? (() => {
+        const allOn = visibleCuerdas?.size === availableCuerdas.length;
         return (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h1 className="text-lg sm:text-xl font-bold whitespace-nowrap">Mapa</h1>
-            <ViewModeToggle />
-            {viewMode === 'cells' ? (
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {mappableCells.length}/{allMappable.length} células
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {mappableContacts.length} contactos
-              </span>
-            )}
-            <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0">
-              {availableCuerdas.map(num => {
-                const colors = cuerdaColorMap.get(num);
-                const isActive = visibleCuerdas?.has(num) ?? true;
-                return (
-                  <button
-                    key={num}
-                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all ${isActive ? 'bg-muted/60 text-foreground' : 'opacity-30 text-muted-foreground'}`}
-                    onClick={() => toggleCuerda(num)}
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors?.fill || '#FFC233' }} />
-                    {num}
-                  </button>
-                );
-              })}
+          // Two explicit rows on mobile (and any narrow viewport):
+          //   row 1: title + view-mode toggle + count
+          //   row 2: cuerda chips (horizontally scrollable if too many) + Todas/Ninguna
+          // On desktop the rows still stack but each one has more
+          // breathing room. flex-wrap inside row 1 used to pack the chip
+          // strip onto the same line as the title, which then fought
+          // against the page tabs above it on narrow screens — making
+          // the whole header look squished. This split keeps every
+          // element in a predictable place.
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-xl font-bold whitespace-nowrap">Mapa</h1>
+              <ViewModeToggle />
+              {viewMode === 'cells' ? (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {mappableCells.length}/{allMappable.length} células
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {mappableContacts.length} contactos
+                </span>
+              )}
             </div>
-            <button
-              className="text-[10px] px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors text-muted-foreground whitespace-nowrap"
-              onClick={() => toggleAllCuerdas(visibleCuerdas?.size !== availableCuerdas.length)}
-            >
-              {visibleCuerdas?.size === availableCuerdas.length ? 'Ninguna' : 'Todas'}
-            </button>
+            <div className="flex items-center gap-1.5">
+              {/* Horizontal scroll inside this strip when there are many
+                  cuerdas — beats wrapping into multiple rows that eat
+                  vertical space. The shrink-0 on each chip keeps them
+                  from squashing. */}
+              <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 -mx-1 px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {availableCuerdas.map(num => {
+                  const colors = cuerdaColorMap.get(num);
+                  const isActive = visibleCuerdas?.has(num) ?? true;
+                  return (
+                    <button
+                      key={num}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all shrink-0 ${isActive ? 'bg-muted/60 text-foreground' : 'opacity-30 text-muted-foreground'}`}
+                      onClick={() => toggleCuerda(num)}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors?.fill || '#FFC233' }} />
+                      {num}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                className="text-[10px] px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors text-muted-foreground whitespace-nowrap shrink-0"
+                onClick={() => toggleAllCuerdas(!allOn)}
+              >
+                {allOn ? 'Ninguna' : 'Todas'}
+              </button>
+            </div>
           </div>
         );
       })() : (
         // Loading / geocoding state — just show the title row, no chips yet.
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-lg sm:text-xl font-bold">Mapa</h1>
           <ViewModeToggle />
           <span className="text-xs text-muted-foreground">
@@ -660,7 +678,7 @@ const MapaPage = () => {
             </div>
           </div>
         ) : (
-          <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border" style={{ minHeight: '400px' }} />
+          <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border min-h-[60vh]" />
         )
       ) : (
         // ─── CONTACTS MODE ─────────────────────────────────────────────
@@ -682,7 +700,7 @@ const MapaPage = () => {
             </div>
           </div>
         ) : (
-          <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border" style={{ minHeight: '400px' }} />
+          <div ref={mapRef} className="flex-1 rounded-xl overflow-hidden border min-h-[60vh]" />
         )
       )}
 
