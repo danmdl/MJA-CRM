@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mja-crm-v6';
+const CACHE_NAME = 'mja-crm-v7';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -14,6 +14,17 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Self-destruct route: unregister this SW and clear all caches
+  if (event.request.url.includes('/reset')) {
+    event.respondWith(
+      caches.keys()
+        .then(names => Promise.all(names.map(n => caches.delete(n))))
+        .then(() => self.registration.unregister())
+        .then(() => Response.redirect('/login', 302))
+    );
+    return;
+  }
+
   const { request } = event;
 
   if (request.method !== 'GET') return;
