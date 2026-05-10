@@ -15,7 +15,7 @@ interface NavItemConfig {
 const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpenSearch?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas, canSeeProcesos, canSeeValidador, permissionsReady } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas, canSeeProcesos, canSeeValidador, canSeeMapa, permissionsReady } = usePermissions();
 
   // Detect if we're inside a specific church
   const churchMatch = useMatch('/admin/churches/:churchId/*');
