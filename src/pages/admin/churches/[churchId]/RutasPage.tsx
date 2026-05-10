@@ -46,7 +46,18 @@ const RutasPage = () => {
         }
       }
       const { data } = await q;
-      return data || [];
+      const routes = data || [];
+      // Batch-resolve creator names for cards that belong to others
+      const creatorIds = [...new Set(routes.map((r: any) => r.created_by).filter(Boolean))];
+      const { data: creatorProfiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', creatorIds);
+      const nameMap = new Map((creatorProfiles || []).map((p: any) => [
+        p.id,
+        `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre',
+      ]));
+      return routes.map((r: any) => ({ ...r, creator_name: nameMap.get(r.created_by) || '' }));
     },
     enabled: !!profile?.id && !!churchId,
     // Live-ish refresh so the 'NUEVA NOTA' pill appears without the
@@ -217,6 +228,9 @@ const RutasPage = () => {
                   </div>
                   <div className="text-[10px] text-muted-foreground">
                     {new Date(p.created_at).toLocaleDateString('es-AR')}
+                    {!isCreator && p.creator_name && (
+                      <span className="ml-1 text-muted-foreground/70">· {p.creator_name}</span>
+                    )}
                   </div>
                 </div>
                 {isCreator && (
