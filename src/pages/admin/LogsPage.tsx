@@ -217,6 +217,28 @@ const LogsPage = () => {
     enabled: view === 'activity',
   });
 
+  // Failed login attempts logged from Login.tsx into client_logs
+  const { data: loginFailures } = useQuery<any[]>({
+    queryKey: ['login_failures'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('client_logs')
+        .select('id, created_at, user_email, error_message, error_code, context')
+        .eq('action', 'login_failed')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      return (data || []).map(f => ({
+        ...f,
+        user_id: null,
+        profiles: null,
+        action: 'login_failed',
+        entity_type: null,
+      }));
+    },
+    refetchInterval: 30_000,
+    enabled: view === 'activity',
+  });
+
   const filteredActivity = useMemo(() => {
     // Merge successes + failures, then apply action + user filters
     const failures = loginFailures || [];
@@ -265,28 +287,6 @@ const LogsPage = () => {
       return unique;
     },
     refetchInterval: 60_000,
-    enabled: view === 'activity',
-  });
-
-  // Failed login attempts logged from Login.tsx into client_logs
-  const { data: loginFailures } = useQuery<any[]>({
-    queryKey: ['login_failures'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('client_logs')
-        .select('id, created_at, user_email, error_message, error_code, context')
-        .eq('action', 'login_failed')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      return (data || []).map(f => ({
-        ...f,
-        user_id: null,
-        profiles: null,
-        action: 'login_failed',
-        entity_type: null,
-      }));
-    },
-    refetchInterval: 30_000,
     enabled: view === 'activity',
   });
 
