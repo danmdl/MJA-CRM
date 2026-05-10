@@ -33,14 +33,20 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
+      // If a stale service worker is installed, unregister it + clear caches + reload.
+      // sessionStorage flag ensures this only reloads ONCE — prevents infinite loops.
+      (function() {
+        if (!('serviceWorker' in navigator)) return;
+        if (sessionStorage.getItem('_sw_reset')) return;
         navigator.serviceWorker.getRegistrations().then(function(regs) {
-          regs.forEach(function(r) { r.unregister(); });
+          if (regs.length === 0) return;
+          sessionStorage.setItem('_sw_reset', '1');
+          return Promise.all(regs.map(function(r) { return r.unregister(); }))
+            .then(function() { return caches.keys(); })
+            .then(function(names) { return Promise.all(names.map(function(n) { return caches.delete(n); })); })
+            .then(function() { window.location.reload(); });
         });
-        caches.keys().then(function(names) {
-          names.forEach(function(n) { caches.delete(n); });
-        });
-      }
+      })();
     </script>
   </body>
 </html>
