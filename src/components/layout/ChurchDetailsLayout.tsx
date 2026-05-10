@@ -71,13 +71,13 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/cuerdas")) return "cuerdas";
     if (p.endsWith("/celulas")) return "celulas";
     if (p.endsWith("/procesos")) return "procesos";
-    if (p.endsWith("/mapa")) return "mapa";
-    if (p.endsWith("/territorios")) return "territorios";
+    if (p.endsWith("/territorio")) return "territorio";
     if (p.endsWith("/pool")) return "pool";
     if (p.endsWith("/historial")) return "historial";
     if (p.endsWith("/papelera")) return "papelera";
     if (p.endsWith("/validator")) return "validator";
     if (p.endsWith("/hogares")) return "hogares";
+    if (p.endsWith("/territorio")) return "territorio";
     if (p.includes("/rutas")) return "rutas";
     if (p.endsWith("/asistencia")) return "asistencia";
     if (p.endsWith("/eventos")) return "eventos";
@@ -139,8 +139,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
                 {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
                 {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
                 {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
-                {canSeeMapa() && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
-                {canSeeCuerdas() && <TabsTrigger value="territorios" className="text-xs sm:text-sm px-2 sm:px-3">🗾 Territorios</TabsTrigger>}
+                {(canSeeMapa() || canSeeCuerdas()) && <TabsTrigger value="territorio" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Territorio</TabsTrigger>}
                 {canSeeRutas() && <TabsTrigger value="rutas" className="text-xs sm:text-sm px-2 sm:px-3">🧭 Rutas</TabsTrigger>}
                 {canSeeAsistencia() && <TabsTrigger value="asistencia" className="text-xs sm:text-sm px-2 sm:px-3">✅ Asistencia</TabsTrigger>}
                 {canSeeEventos() && <TabsTrigger value="eventos" className="text-xs sm:text-sm px-2 sm:px-3">📅 Eventos</TabsTrigger>}

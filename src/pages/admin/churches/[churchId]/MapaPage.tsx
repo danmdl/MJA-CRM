@@ -94,7 +94,8 @@ const geocodeAddress = async (
   return null;
 };
 
-const MapaPage = () => {
+interface MapaPageProps { forcedViewMode?: 'cells' | 'contacts'; hideToggle?: boolean; }
+const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -123,9 +124,14 @@ const MapaPage = () => {
   //     Clicking opens the contact profile dialog.
   // Mode persists in URL hash so reloading keeps the state.
   const [viewMode, setViewMode] = useState<'cells' | 'contacts'>(() => {
+    if (forcedViewMode) return forcedViewMode;
     if (typeof window === 'undefined') return 'cells';
     return window.location.hash === '#contacts' ? 'contacts' : 'cells';
   });
+  // Sync with external control (TerritorioPage tabs)
+  React.useEffect(() => {
+    if (forcedViewMode) setViewMode(forcedViewMode);
+  }, [forcedViewMode]);
   useEffect(() => {
     if (viewMode === 'contacts') {
       window.location.hash = '#contacts';
@@ -537,7 +543,7 @@ const MapaPage = () => {
   }, [viewMode, mappableCellKey, mappableContactKey, isLoading, geocoding, contactsLoading, cellContactCounts]);
 
   // Reusable toggle component — segmented control with two pills.
-  const ViewModeToggle = () => (
+  const ViewModeToggle = () => hideToggle ? null : (
     <div className="inline-flex items-center bg-muted/60 rounded-md p-0.5 shrink-0">
       <button
         onClick={() => setViewMode('cells')}
