@@ -35,6 +35,8 @@ const AdminLayout = () => {
   // name + tabs in a compact row, so we hide the redundant top-bar title to
   // save vertical space.
   const isInsideChurch = /^\/admin\/churches\/[^/]+\//.test(pathname);
+  // Procesos is a kanban board that needs full width — auto-collapse sidebar
+  const isKanbanPage = pathname.endsWith('/procesos');
 
   // Global keyboard shortcut: Cmd+K (mac) / Ctrl+K (win/linux) opens the
   // contact search from anywhere in the admin area. preventDefault is
@@ -77,7 +79,7 @@ const AdminLayout = () => {
         transition: 'transform 0.25s ease',
         pointerEvents: sidebarOpen ? 'auto' : 'none',
         overflow: 'hidden',
-      }} className="lg:!relative lg:!transform-none lg:!translate-x-0 lg:!z-auto lg:!pointer-events-auto">
+      }} className={isKanbanPage ? '' : 'lg:!relative lg:!transform-none lg:!translate-x-0 lg:!z-auto lg:!pointer-events-auto'}>
         <Sidebar onNavigate={() => setSidebarOpen(false)} onOpenSearch={() => setSearchOpen(true)} />
       </div>
 
@@ -86,7 +88,7 @@ const AdminLayout = () => {
         {/* Topbar - hidden on desktop when inside a church (church layout has its own header).
             On mobile we keep a slim row just for the hamburger button + search. */}
         <div
-          className={isInsideChurch ? 'lg:hidden' : ''}
+          className={isInsideChurch && !isKanbanPage ? 'lg:hidden' : ''}
           style={{
             height: 52, flexShrink: 0,
             borderBottom: '1px solid rgba(255,255,255,0.07)',
@@ -98,7 +100,7 @@ const AdminLayout = () => {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setSidebarOpen(v => !v)}
-            className="lg:hidden"
+            className={isKanbanPage ? '' : 'lg:hidden'}
             style={{
               width: 36, height: 36, borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.1)',
