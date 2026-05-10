@@ -30,6 +30,7 @@ const PapeleraPage = () => {
   const queryClient = useQueryClient();
   const { canRestoreDeleted } = usePermissions();
   const [confirmAction, setConfirmAction] = useState<{ type: 'restore' | 'purge'; item: DeletedItem } | null>(null);
+  const [filterType, setFilterType] = useState<string>('all');
   const [filterCuerda, setFilterCuerda] = useState<string>('all');
   const [filterSexo, setFilterSexo] = useState<string>('all');
 
@@ -98,10 +99,11 @@ const PapeleraPage = () => {
 
   const filtered = useMemo(() => {
     let result = items || [];
+    if (filterType !== 'all') result = result.filter(i => i.type === filterType);
     if (filterCuerda !== 'all') result = result.filter(i => i.numero_cuerda != null && String(i.numero_cuerda) === filterCuerda);
     if (filterSexo !== 'all') result = result.filter(i => i.type === 'contact' && i.sexo === filterSexo);
     return result;
-  }, [items, filterCuerda, filterSexo]);
+  }, [items, filterType, filterCuerda, filterSexo]);
 
   const handleRestore = async (item: DeletedItem) => {
     const table = item.type === 'contact' ? 'contacts' : 'cells';
@@ -138,17 +140,22 @@ const PapeleraPage = () => {
       <p className="text-xs text-muted-foreground">Los elementos eliminados se pueden recuperar dentro de los {GRACE_DAYS} días. Después se eliminan permanentemente.</p>
 
       <div className="flex flex-wrap items-center gap-2">
+        <select value={filterType} onChange={e => { setFilterType(e.target.value); if (e.target.value === 'cell') setFilterSexo('all'); }} className="h-8 px-2 rounded border bg-background text-sm">
+          <option value="all">Contactos y Células</option>
+          <option value="contact">Solo Contactos</option>
+          <option value="cell">Solo Células</option>
+        </select>
         <select value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)} className="h-8 px-2 rounded border bg-background text-sm">
           <option value="all">Todas las cuerdas</option>
           {cuerdaOptions.map(c => <option key={c} value={c}>Cuerda {c}</option>)}
         </select>
-        <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 px-2 rounded border bg-background text-sm">
+        <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 px-2 rounded border bg-background text-sm" disabled={filterType === 'cell'}>
           <option value="all">Ambos sexos</option>
           <option value="M">Masculino</option>
           <option value="F">Femenino</option>
         </select>
-        {(filterCuerda !== 'all' || filterSexo !== 'all') && (
-          <button onClick={() => { setFilterCuerda('all'); setFilterSexo('all'); }} className="text-xs text-muted-foreground hover:text-foreground underline">
+        {(filterType !== 'all' || filterCuerda !== 'all' || filterSexo !== 'all') && (
+          <button onClick={() => { setFilterType('all'); setFilterCuerda('all'); setFilterSexo('all'); }} className="text-xs text-muted-foreground hover:text-foreground underline">
             Limpiar filtros
           </button>
         )}

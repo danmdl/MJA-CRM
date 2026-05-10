@@ -40,7 +40,7 @@ interface ProcessContact {
 
 const ProcesosPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
-  const { session } = useSession();
+  const { session, profile } = useSession();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [addDialogStage, setAddDialogStage] = useState<StageKey | null>(null);
@@ -48,6 +48,10 @@ const ProcesosPage = () => {
   const [dragItem, setDragItem] = useState<{ id: string; stage: StageKey } | null>(null);
   const [dragOverStage, setDragOverStage] = useState<StageKey | null>(null);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+
+  // Global roles see everyone; scoped roles only see their own cuerda
+  const isGlobal = profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
+  const userCuerda = profile?.numero_cuerda || null;
 
   // Fetch all process entries for this church, joined with contact data
   const { data: processContacts, isLoading } = useQuery<ProcessContact[]>({
@@ -100,11 +104,16 @@ const ProcesosPage = () => {
   const { data: availableContacts } = useQuery<{ id: string; first_name: string; last_name: string | null; phone: string | null }[]>({
     queryKey: ['process-available-contacts', churchId],
     queryFn: async () => {
-      const { data: allContacts } = await supabase
+      let contactsQuery = supabase
         .from('contacts')
-        .select('id, first_name, last_name, phone')
+        .select('id, first_name, last_name, phone, numero_cuerda')
         .eq('church_id', churchId!)
         .is('deleted_at', null);
+      // Non-global roles can only add contacts from their own cuerda
+      if (!isGlobal && userCuerda) {
+        contactsQuery = contactsQuery.eq('numero_cuerda', userCuerda);
+      }
+      const { data: allContacts } = await contactsQuery;
 
       const { data: inProcess } = await supabase
         .from('contact_processes')
@@ -168,6 +177,8 @@ const ProcesosPage = () => {
     const groups: Record<StageKey, ProcessContact[]> = {} as any;
     STAGES.forEach(s => { groups[s.key] = []; });
     (processContacts || []).forEach(pc => {
+      // Scoped roles: only see contacts from their own cuerda
+      if (!isGlobal && userCuerda && pc.numero_cuerda !== userCuerda) return;
       const q = normalize(search);
       if (q && !normalize(`${pc.first_name} ${pc.last_name || ''}`).includes(q) &&
           !normalize(pc.phone || '').includes(q) &&

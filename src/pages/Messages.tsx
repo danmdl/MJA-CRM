@@ -10,13 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { showSuccess, showError } from '@/utils/toast';
-import { Send, Mail, MailOpen, Search } from 'lucide-react';
+import { Send, Mail, MailOpen, Search, Archive, ArchiveRestore } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { usePermissions } from '@/lib/permissions';
 
 interface TeamUser { id: string; first_name: string | null; last_name: string | null; role: string | null; }
-interface Msg { id: string; body: string; created_at: string; sender_id: string; sender_name?: string; recipients?: string[]; recipient_names?: string[]; read_at?: string | null; }
+interface Msg { id: string; body: string; created_at: string; sender_id: string; sender_name?: string; recipients?: string[]; recipient_names?: string[]; read_at?: string | null; archived_at?: string | null; }
 
 const Messages = () => {
   const { session, profile } = useSession();
@@ -31,6 +31,7 @@ const Messages = () => {
   const [sending, setSending] = useState(false);
   const [selectedMsg, setSelectedMsg] = useState<Msg | null>(null);
   const [search, setSearch] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
 
   const userId = session?.user?.id;
   const { canSendMessages } = usePermissions();
@@ -63,7 +64,7 @@ const Messages = () => {
     if (!userId) return;
     const { data } = await supabase
       .from('message_recipients')
-      .select('message_id, read_at, messages:message_id(id, body, created_at, sender_id)')
+      .select('message_id, read_at, archived_at, messages:message_id(id, body, created_at, sender_id)')
       .eq('recipient_id', userId)
       .order('message_id', { ascending: false });
     const msgs: Msg[] = (data || []).map((r: any) => ({
@@ -72,6 +73,7 @@ const Messages = () => {
       created_at: r.messages.created_at,
       sender_id: r.messages.sender_id,
       read_at: r.read_at,
+      archived_at: r.archived_at,
     }));
     setInbox(msgs);
   };
@@ -111,6 +113,16 @@ const Messages = () => {
     loadInbox();
   };
 
+  const archiveMessage = async (msgId: string, archive: boolean) => {
+    await supabase
+      .from('message_recipients')
+      .update({ archived_at: archive ? new Date().toISOString() : null })
+      .eq('message_id', msgId)
+      .eq('recipient_id', userId!);
+    loadInbox();
+    setSelectedMsg(null);
+  };
+
   const sendMessage = async () => {
     if (selectedIds.size === 0 || !body.trim()) { showError('Seleccioná destinatarios y escribí un mensaje.'); return; }
     setSending(true);
@@ -130,13 +142,17 @@ const Messages = () => {
     return team.filter(u => normalize(`${u.first_name || ''} ${u.last_name || ''}`).includes(q));
   }, [team, recipientSearch]);
 
-  const unreadCount = inbox.filter(m => !m.read_at).length;
+  const unreadCount = activeInbox.filter(m => !m.read_at).length;
+
+  const activeInbox = useMemo(() => inbox.filter(m => !m.archived_at), [inbox]);
+  const archivedInbox = useMemo(() => inbox.filter(m => !!m.archived_at), [inbox]);
 
   const filteredInbox = useMemo(() => {
-    if (!search) return inbox;
+    const base = showArchived ? archivedInbox : activeInbox;
+    if (!search) return base;
     const q = normalize(search);
-    return inbox.filter(m => normalize(m.body).includes(q) || normalize(nameMap.get(m.sender_id) || '').includes(q));
-  }, [inbox, search, nameMap]);
+    return base.filter(m => normalize(m.body).includes(q) || normalize(nameMap.get(m.sender_id) || '').includes(q));
+  }, [inbox, activeInbox, archivedInbox, showArchived, search, nameMap]);
 
   const filteredOutbox = useMemo(() => {
     if (!search) return outbox;
@@ -172,24 +188,42 @@ const Messages = () => {
         </TabsList>
 
         <TabsContent value="inbox" className="space-y-1 mt-3">
-          {filteredInbox.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Sin mensajes.</p>}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-muted-foreground">{filteredInbox.length} mensaje{filteredInbox.length !== 1 ? 's' : ''}</span>
+            <button
+              onClick={() => setShowArchived(v => !v)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              {showArchived ? 'Ver activos' : `Archivados (${archivedInbox.length})`}
+            </button>
+          </div>
+          {filteredInbox.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">{showArchived ? 'No hay mensajes archivados.' : 'Sin mensajes.'}</p>}
           {filteredInbox.map(m => {
-            const isUnread = !m.read_at;
+            const isUnread = !m.read_at && !m.archived_at;
             return (
-              <button
-                key={m.id}
-                className={`w-full text-left p-3 rounded border hover:bg-muted/30 transition-colors ${isUnread ? 'bg-primary/5 border-primary/20' : ''}`}
-                onClick={() => { setSelectedMsg(m); if (isUnread) markAsRead(m.id); }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {isUnread ? <Mail className="h-4 w-4 text-primary shrink-0" /> : <MailOpen className="h-4 w-4 text-muted-foreground shrink-0" />}
-                    <span className={`text-sm truncate ${isUnread ? 'font-semibold' : ''}`}>{nameMap.get(m.sender_id) || 'Desconocido'}</span>
+              <div key={m.id} className={`group flex items-stretch rounded border hover:bg-muted/30 transition-colors ${isUnread ? 'bg-primary/5 border-primary/20' : ''}`}>
+                <button
+                  className="flex-1 text-left p-3 min-w-0"
+                  onClick={() => { setSelectedMsg(m); if (isUnread) markAsRead(m.id); }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isUnread ? <Mail className="h-4 w-4 text-primary shrink-0" /> : <MailOpen className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      <span className={`text-sm truncate ${isUnread ? 'font-semibold' : ''}`}>{nameMap.get(m.sender_id) || 'Desconocido'}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">{fmtDate(m.created_at)}</span>
                   </div>
-                  <span className="text-[10px] text-muted-foreground shrink-0">{fmtDate(m.created_at)}</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 truncate ml-6">{m.body}</p>
-              </button>
+                  <p className="text-xs text-muted-foreground mt-1 truncate ml-6">{m.body}</p>
+                </button>
+                <button
+                  className="px-2 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                  title={m.archived_at ? 'Desarchivar' : 'Archivar'}
+                  onClick={(e) => { e.stopPropagation(); archiveMessage(m.id, !m.archived_at); }}
+                >
+                  {m.archived_at ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                </button>
+              </div>
             );
           })}
         </TabsContent>
@@ -225,6 +259,13 @@ const Messages = () => {
                 <p className="text-xs text-muted-foreground">Para: {selectedMsg.recipients.map(id => nameMap.get(id) || 'Desconocido').join(', ')}</p>
               )}
               <div className="p-3 rounded border bg-muted/30 text-sm whitespace-pre-wrap">{selectedMsg.body}</div>
+              {selectedMsg.sender_id !== userId && (
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => archiveMessage(selectedMsg.id, !selectedMsg.archived_at)}>
+                    {selectedMsg.archived_at ? <><ArchiveRestore className="h-3.5 w-3.5" /> Desarchivar</> : <><Archive className="h-3.5 w-3.5" /> Archivar</>}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
