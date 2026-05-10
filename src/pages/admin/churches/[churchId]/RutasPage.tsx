@@ -6,8 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Check, MessageSquare } from 'lucide-react';
+import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Check, MessageSquare, ChevronDown } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
 type CreateMode = 'map';
@@ -19,6 +20,12 @@ const RutasPage = () => {
   const queryClient = useQueryClient();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [filterCuerdas, setFilterCuerdas] = useState<Set<string>>(new Set());
+
+  // Only supervisor and above can see the cuerda filter (they see
+  // routes across multiple cuerdas; lower roles only see their own).
+  const canFilterByCuerda = profile?.role &&
+    ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
   const [projectName, setProjectName] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -118,6 +125,17 @@ const RutasPage = () => {
     }
   };
 
+  const cuerdaOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    projects.forEach((p: any) => { if (p.numero_cuerda) set.add(String(p.numero_cuerda)); });
+    return Array.from(set).sort((a, b) => Number(a) - Number(b));
+  }, [projects]);
+
+  const visibleProjects = React.useMemo(() => {
+    if (!canFilterByCuerda || filterCuerdas.size === 0) return projects;
+    return projects.filter((p: any) => p.numero_cuerda && filterCuerdas.has(String(p.numero_cuerda)));
+  }, [projects, filterCuerdas, canFilterByCuerda]);
+
   const handleDelete = async (project: any) => {
     if (!confirm(`¿Eliminar el proyecto "${project.name}"?`)) return;
     const { error } = await supabase.from('shared_routes').delete().eq('id', project.id);
@@ -138,9 +156,57 @@ const RutasPage = () => {
         <RouteIcon className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-bold">Rutas</h1>
       </div>
-      <p className="text-muted-foreground text-sm mb-6">
+      <p className="text-muted-foreground text-sm mb-4">
         Cada proyecto de ruta es un mapa con contactos seleccionables, una ruta optimizada y un link compartible.
       </p>
+
+      {canFilterByCuerda && (
+        <div className="flex items-center gap-2 mb-5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-sm font-normal">
+                {filterCuerdas.size === 0
+                  ? 'Todas las cuerdas'
+                  : filterCuerdas.size === 1
+                    ? `Cuerda ${Array.from(filterCuerdas)[0]}`
+                    : `${filterCuerdas.size} cuerdas`}
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48 max-h-72 overflow-y-auto">
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Filtrar por cuerda</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={filterCuerdas.size === 0}
+                onCheckedChange={() => setFilterCuerdas(new Set())}
+              >
+                Todas las cuerdas
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              {cuerdaOptions.map(c => (
+                <DropdownMenuCheckboxItem
+                  key={c}
+                  checked={filterCuerdas.has(c)}
+                  onCheckedChange={(checked) => {
+                    setFilterCuerdas(prev => {
+                      const next = new Set(prev);
+                      if (checked) next.add(c); else next.delete(c);
+                      return next;
+                    });
+                  }}
+                >
+                  Cuerda {c}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {filterCuerdas.size > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {visibleProjects.length} proyecto{visibleProjects.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tighter grid + smaller cards. Each card used to be ~200px tall
           with 3 cols max — Dan asked to fit more on a page. Now: more
@@ -166,7 +232,7 @@ const RutasPage = () => {
         )}
 
         {/* Existing project cards */}
-        {projects.map((p: any) => {
+        {visibleProjects.map((p: any) => {
           const expiresIn = Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
           const stops = (p.ordered_contact_ids || []).length;
           const url = `${window.location.origin}/r/${p.share_token}`;
