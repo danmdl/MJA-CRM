@@ -26,6 +26,17 @@ export default defineConfig(() => ({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Keep phone-validation in the main bundle to prevent stale-hash 404s.
+        // Vite splits it into its own chunk when used by multiple lazy pages,
+        // but the hash changes every time the file is modified — users with
+        // an HTTP-cached index.html referencing the old hash get a 404 on load.
+        manualChunks: (id) => {
+          if (id.includes('phone-validation')) return undefined; // inline into importer
+        },
+      },
+    },
     // Disabled in production: with sourcemap: true Vite emits and PUBLISHES
     // a .map for every chunk. We had 52 maps totalling 6.8MB sitting in
     // dist/assets next to 1.9MB of actual JS — bots and devtools requests
