@@ -49,6 +49,8 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
   });
 
   const handleLogout = async () => {
+    // Flag manual logout so SessionProvider can distinguish it from session expiry
+    (window as any).__mjaCrmManualLogout = true;
     await supabase.auth.signOut();
     navigate('/login');
   };

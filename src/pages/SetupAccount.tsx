@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { logAuthEvent, categorizeAuthError } from '@/lib/auth-logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Eye, EyeOff } from 'lucide-react';
@@ -91,6 +92,16 @@ const SetupAccount = () => {
         });
         if (otpError) {
           setError('El link expiró o ya fue usado. Pedile a tu admin que te envíe una nueva invitación.');
+          logAuthEvent({
+            action: 'expired_link_used',
+            level: 'warning',
+            error_message: otpError.message,
+            error_code: categorizeAuthError(otpError.message),
+            context: {
+              token_type: tokenType,
+              note: 'OTP verification failed — token expired or already consumed',
+            },
+          });
           setSubmitting(false);
           return;
         }
@@ -98,7 +109,24 @@ const SetupAccount = () => {
 
       // STEP 2: Set the password
       const { error: pwError } = await supabase.auth.updateUser({ password });
-      if (pwError) { setError(pwError.message); setSubmitting(false); return; }
+      if (pwError) {
+        setError(pwError.message);
+        logAuthEvent({
+          action: 'reset_failed',
+          level: 'error',
+          error_message: pwError.message,
+          error_code: categorizeAuthError(pwError.message),
+          context: { flow: isRecovery ? 'password_reset' : 'first_time_setup' },
+        });
+        setSubmitting(false);
+        return;
+      }
+      // Password set successfully — USER_UPDATED event will also fire in SessionProvider
+      logAuthEvent({
+        action: isRecovery ? 'reset_completed' : 'account_setup_completed',
+        level: 'info',
+        context: { flow: isRecovery ? 'password_reset' : 'first_time_setup' },
+      });
 
       // STEP 3: Update profile only for first-time setup (invite flow), not recovery
       if (!isRecovery) {

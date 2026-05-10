@@ -98,7 +98,7 @@ const LogRow = ({ log, onResolve }: { log: LogEntry; onResolve: (id: string) => 
   );
 };
 
-const ActivityGroupRow = ({ group, name, email, actionColors }: { group: any[]; name: string; email: string; actionColors: Record<string, string>; }) => {
+const ActivityGroupRow = ({ group, name, email, actionColors, actionLabels = {} }: { group: any[]; name: string; email: string; actionColors: Record<string, string>; actionLabels?: Record<string, string>; }) => {
   const [expanded, setExpanded] = useState(false);
   const first = group[0]; // newest in the group (since data comes desc)
   const last = group[group.length - 1]; // oldest in the group
@@ -130,7 +130,7 @@ const ActivityGroupRow = ({ group, name, email, actionColors }: { group: any[]; 
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
-            <Badge className={`${actionColors[first.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{first.action}</Badge>
+            <Badge className={`${actionColors[first.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{actionLabels[first.action] || first.action}</Badge>
             {isGroup && <span className="text-xs text-muted-foreground">×{group.length}</span>}
           </div>
         </TableCell>
@@ -160,7 +160,7 @@ const LogsPage = () => {
   const [levelFilter, setLevelFilter] = useState('all');
   const [showResolved, setShowResolved] = useState(false);
   const [view, setView] = useState<'errors' | 'activity'>('activity');
-  const [activityFilter, setActivityFilter] = useState<'all' | 'login' | 'login_failed' | 'create' | 'update' | 'delete' | 'assign'>('all');
+  const [activityFilter, setActivityFilter] = useState<string>('all');
   const [activityUserSearch, setActivityUserSearch] = useState<string>('');
   const queryClient = useQueryClient();
 
@@ -223,15 +223,15 @@ const LogsPage = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from('client_logs')
-        .select('id, created_at, user_email, error_message, error_code, context')
-        .eq('action', 'login_failed')
+        .select('id, created_at, user_email, user_id, error_message, error_code, context, action')
+        .in('action', ['login_failed','login_success','reset_requested','reset_request_failed',
+                       'reset_link_clicked','reset_completed','reset_failed','expired_link_used',
+                       'logout_manual','session_expired','account_setup_completed'])
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200);
       return (data || []).map(f => ({
         ...f,
-        user_id: null,
         profiles: null,
-        action: 'login_failed',
         entity_type: null,
       }));
     },
@@ -243,7 +243,12 @@ const LogsPage = () => {
     // Merge successes + failures, then apply action + user filters
     const failures = loginFailures || [];
     let result: any[];
-    if (activityFilter === 'login_failed') {
+    const authClientActions = ['login_failed','login_success','reset_requested','reset_request_failed',
+      'reset_link_clicked','reset_completed','reset_failed','expired_link_used',
+      'logout_manual','session_expired','account_setup_completed'];
+    if (authClientActions.includes(activityFilter)) {
+      result = failures.filter((r: any) => r.action === activityFilter);
+    } else if (activityFilter === 'login_failed') {
       result = failures;
     } else if (activityFilter !== 'all') {
       result = (activity || []).filter((r: any) => r.action === activityFilter);
@@ -375,8 +380,11 @@ const LogsPage = () => {
           <div className="flex gap-2 mb-4 flex-wrap">
             {[
               { v: 'all', l: 'Todas' },
-              { v: 'login', l: 'Logins ✓' },
+              { v: 'login', l: 'Login ✓' },
               { v: 'login_failed', l: 'Login fallido' },
+              { v: 'reset_requested', l: 'Reset solicitado' },
+              { v: 'reset_completed', l: 'Reset completado' },
+              { v: 'expired_link_used', l: 'Link expirado' },
               { v: 'create', l: 'Creaciones' },
               { v: 'update', l: 'Ediciones' },
               { v: 'delete', l: 'Eliminaciones' },
@@ -421,13 +429,36 @@ const LogsPage = () => {
                 ) : (
                   (() => {
                     // Group consecutive rows by user_id + action + same hour bucket
+                    const ACTION_LABELS: Record<string, string> = {
+                      login_success:           'login ✓',
+                      login_failed:            'login ✗',
+                      reset_requested:         'reset solicitado',
+                      reset_request_failed:    'reset fallido',
+                      reset_link_clicked:      'reset link abierto',
+                      reset_completed:         'reset completado',
+                      reset_failed:            'reset error',
+                      expired_link_used:       'link expirado',
+                      logout_manual:           'logout',
+                      session_expired:         'sesión expirada',
+                      account_setup_completed: 'cuenta creada',
+                    };
                     const actionColors: Record<string, string> = {
-                      login: 'bg-blue-500/15 text-blue-400',
-                      login_failed: 'bg-red-500/20 text-red-400 border border-red-500/30',
-                      create: 'bg-green-500/15 text-green-400',
-                      update: 'bg-amber-500/15 text-amber-400',
-                      delete: 'bg-red-500/15 text-red-400',
-                      assign: 'bg-purple-500/15 text-purple-400',
+                      login:                   'bg-blue-500/15 text-blue-400',
+                      login_success:           'bg-blue-500/15 text-blue-400',
+                      login_failed:            'bg-red-500/20 text-red-400 border border-red-500/30',
+                      reset_requested:         'bg-amber-500/15 text-amber-400',
+                      reset_request_failed:    'bg-red-500/15 text-red-400',
+                      reset_link_clicked:      'bg-amber-500/15 text-amber-400',
+                      reset_completed:         'bg-green-500/15 text-green-400',
+                      reset_failed:            'bg-red-500/15 text-red-400',
+                      expired_link_used:       'bg-red-500/20 text-red-400 border border-red-500/30',
+                      logout_manual:           'bg-muted text-muted-foreground',
+                      session_expired:         'bg-orange-500/15 text-orange-400',
+                      account_setup_completed: 'bg-green-500/15 text-green-400',
+                      create:                  'bg-green-500/15 text-green-400',
+                      update:                  'bg-amber-500/15 text-amber-400',
+                      delete:                  'bg-red-500/15 text-red-400',
+                      assign:                  'bg-purple-500/15 text-purple-400',
                     };
                     const groups: any[][] = [];
                     filteredActivity.forEach((row: any) => {
@@ -449,6 +480,7 @@ const LogsPage = () => {
                       const first = group[0];
                       const name = first.profiles ? [first.profiles.first_name, first.profiles.last_name].filter(Boolean).join(' ') : '';
                       const email = first.profiles?.email || first.user_email || '';
+                      const actionLabel = ACTION_LABELS[first.action] || first.action;
                       return (
                         <ActivityGroupRow
                           key={`${first.id}-group`}
@@ -456,6 +488,7 @@ const LogsPage = () => {
                           name={name}
                           email={email}
                           actionColors={actionColors}
+                          actionLabels={ACTION_LABELS}
                         />
                       );
                     });

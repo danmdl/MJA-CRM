@@ -1,5 +1,6 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logAuthEvent, getDeviceInfo } from '@/lib/auth-logger';
 import { Session } from '@supabase/supabase-js';
 import { SessionContext } from '@/hooks/use-session';
 import { RoleKey } from '@/lib/roles';
@@ -166,6 +167,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
           // above), so hourly token refreshes don't trigger a full app
           // refetch every time.
           queryClient.invalidateQueries();
+          // Log login success to activity_logs (keeps the existing feed)
           supabase.from('activity_logs').insert({
             user_id: session.user.id,
             church_id: null,
@@ -173,17 +175,51 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
             entity_type: 'auth',
             entity_id: session.user.id,
           }).then(() => {});
+          // Also log to client_logs with device info for the auth dashboard
+          logAuthEvent({
+            action: 'login_success',
+            level: 'info',
+            user_email: session.user.email,
+            user_id: session.user.id,
+            context: {
+              provider: session.user.app_metadata?.provider ?? 'email',
+            },
+          });
         }
+      // User clicked a password-reset link — token is valid and exchanged for session
+      if (_event === 'PASSWORD_RECOVERY') {
+        logAuthEvent({
+          action: 'reset_link_clicked',
+          level: 'info',
+          user_email: session?.user?.email,
+          user_id: session?.user?.id,
+          context: { note: 'User opened reset link; session established for password update' },
+        });
+      }
+      // User successfully updated their password (or any profile field)
+      if (_event === 'USER_UPDATED' && session?.user) {
+        logAuthEvent({
+          action: 'reset_completed',
+          level: 'info',
+          user_email: session.user.email,
+          user_id: session.user.id,
+          context: { note: 'Password successfully changed via reset flow' },
+        });
+      }
       } else {
         setProfile(null);
         setLoading(false);
         lastLoggedUserId = null;
-        // If user was signed out (session expired, manual logout, etc.)
-        // redirect to login to prevent stale UI
+        // Log sign-out event so admins can see session endings
         if (_event === 'SIGNED_OUT') {
-          // Clear any cached query data from the previous user before
-          // redirecting, so a different user logging in on the same tab
-          // doesn't briefly see the previous user's data flash on screen.
+          // Distinguish manual logout (flag set in window) vs session expiry
+          const wasManual = (window as any).__mjaCrmManualLogout === true;
+          (window as any).__mjaCrmManualLogout = false;
+          logAuthEvent({
+            action: wasManual ? 'logout_manual' : 'session_expired',
+            level: 'info',
+            context: { source: wasManual ? 'user_action' : 'token_expiry_or_forced' },
+          });
           queryClient.clear();
           window.location.href = '/login';
         }

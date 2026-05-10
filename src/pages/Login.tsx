@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
+import { logAuthEvent, categorizeAuthError, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth-logger';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: '#18181b',
@@ -27,12 +28,17 @@ const Login = () => {
     const params = new URLSearchParams(search || hash.replace('#', '?'));
     const errorDesc = params.get('error_description') || params.get('error');
     if (errorDesc) {
-      if (errorDesc.includes('expired') || errorDesc.includes('invalid')) {
-        setError('El link de invitación expiró o es inválido. Pedile a tu admin que te envíe uno nuevo.');
-      } else {
-        setError(errorDesc);
-      }
-      // Clean URL
+      const isExpired = errorDesc.includes('expired') || errorDesc.includes('invalid');
+      setError(isExpired
+        ? 'El link de invitación expiró o es inválido. Pedile a tu admin que te envíe uno nuevo.'
+        : errorDesc);
+      logAuthEvent({
+        action: 'expired_link_used',
+        level: 'warning',
+        error_message: errorDesc,
+        error_code: isExpired ? 'expired_or_invalid_token' : 'link_error',
+        context: { raw_error: errorDesc },
+      });
       window.history.replaceState({}, '', '/login');
     }
   }, []);
@@ -59,19 +65,21 @@ const Login = () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError(translateError(error.message));
-      // Log the failed attempt so admins can see it in Logs → "Login fallido"
-      supabase.from('client_logs').insert({
-        user_email: email,
-        level: 'warning',
+      const attempts = recordFailedAttempt(email);
+      logAuthEvent({
         action: 'login_failed',
+        level: attempts >= 5 ? 'error' : 'warning',
+        user_email: email,
         error_message: error.message,
-        error_code: String((error as any).status || (error as any).code || ''),
+        error_code: categorizeAuthError(error.message),
         context: {
-          url: window.location.href,
-          userAgent: navigator.userAgent,
-          timestamp: new Date().toISOString(),
+          failed_attempts_last_10min: attempts,
+          brute_force_suspected: attempts >= 5,
+          http_status: (error as any).status,
         },
-      }).then(() => {});
+      });
+    } else {
+      clearFailedAttempts(email);
     }
     setLoading(false);
   };
@@ -84,8 +92,24 @@ const Login = () => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/setup-account`,
     });
-    if (error) setError(translateError(error.message));
-    else setResetSent(true);
+    if (error) {
+      setError(translateError(error.message));
+      logAuthEvent({
+        action: 'reset_request_failed',
+        level: 'warning',
+        user_email: email,
+        error_message: error.message,
+        error_code: categorizeAuthError(error.message),
+      });
+    } else {
+      setResetSent(true);
+      logAuthEvent({
+        action: 'reset_requested',
+        level: 'info',
+        user_email: email,
+        context: { note: 'Supabase invalidates previous reset token automatically on new request' },
+      });
+    }
     setLoading(false);
   };
 
