@@ -2006,7 +2006,7 @@ const SemilleroPage = () => {
                           {c.phone ? (() => {
                             const phoneOk = isValidArgentinePhone(c.phone);
                             return (
-                              <div className="flex items-center gap-1 justify-end">
+                              <div className="flex items-center gap-1 justify-center sm:justify-end">
                                 <span
                                   className={`hidden sm:inline text-[11px] tabular-nums font-medium truncate flex-1 ${phoneOk ? 'text-foreground' : 'text-red-500'}`}
                                   title={phoneOk ? undefined : 'Número incompleto o inválido'}
@@ -2039,7 +2039,7 @@ const SemilleroPage = () => {
                             // up vertically with the rows that DO have a phone. Without
                             // this, the button slides to the left of the cell because the
                             // phone-number span (which has flex-1) is missing.
-                            <div className="flex items-center gap-1 justify-end">
+                            <div className="flex items-center gap-1 justify-center sm:justify-end">
                               {canSendWhatsapp() && (
                                 <span
                                   className="flex items-center gap-0.5 shrink-0 text-red-500 cursor-not-allowed"
