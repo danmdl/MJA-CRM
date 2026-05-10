@@ -56,6 +56,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { canChangeUserRole, canEditDeleteMembers, canAddMembers } = usePermissions();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCuerda, setFilterCuerda] = useState<string>('all');
   const myLevel = getRoleLevel(profile?.role || '');
   const [resetDialogUser, setResetDialogUser] = useState<{ id: string; email: string } | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -132,12 +133,15 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         (myCuerda && u.numero_cuerda === myCuerda)
       );
     }
+    if (filterCuerda !== 'all') {
+      visible = visible.filter(u => u.numero_cuerda === filterCuerda);
+    }
     const term = norm(searchTerm);
     if (!term) return visible;
     return visible.filter(u =>
       norm([u.first_name, u.last_name, u.email, u.role, u.numero_cuerda].join(' ')).includes(term)
     );
-  }, [users, searchTerm, profile?.role, profile?.id, profile?.numero_cuerda]);
+  }, [users, searchTerm, filterCuerda, profile?.role, profile?.id, profile?.numero_cuerda]);
 
   const callEdge = async (body: object) => {
     const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3', {
@@ -262,14 +266,26 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   return (
     <>
     <div className="space-y-4">
-      <div className="relative w-[320px] max-w-full">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder="Buscar por nombre, correo o rol"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-[280px] max-w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Buscar por nombre, correo o rol"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <select
+          value={filterCuerda}
+          onChange={e => setFilterCuerda(e.target.value)}
+          className="h-10 px-2 rounded border bg-background text-sm"
+        >
+          <option value="all">Todas las cuerdas</option>
+          {cuerdas.filter(c => !c.is_church_cuerda).map(c => (
+            <option key={c.id} value={c.numero}>Cuerda {c.numero}</option>
+          ))}
+        </select>
       </div>
       <Table>
         <TableHeader>

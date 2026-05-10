@@ -15,7 +15,7 @@ interface NavItemConfig {
 const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpenSearch?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas, permissionsReady } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas, canSeeProcesos, canSeeValidador, permissionsReady } = usePermissions();
 
   // Detect if we're inside a specific church
   const churchMatch = useMatch('/admin/churches/:churchId/*');
@@ -78,6 +78,8 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
         ...(canSeeCuerdas() ? [{ to: `/admin/churches/${currentChurchId}/territorios`, emoji: '🗾', label: 'Territorios' }] : []),
         ...(canSeeRutas() ? [{ to: `/admin/churches/${currentChurchId}/rutas`, emoji: '🧭', label: 'Rutas' }] : []),
         ...(canSeeHistorial() ? [{ to: `/admin/churches/${currentChurchId}/historial`, emoji: '📋', label: 'Historial' }] : []),
+        ...(canSeeProcesos() ? [{ to: `/admin/churches/${currentChurchId}/procesos`, emoji: '⚡', label: 'Procesos' }] : []),
+        ...(canSeeValidador() ? [{ to: `/admin/churches/${currentChurchId}/validator`, emoji: '🛡️', label: 'Validador' }] : []),
         ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/papelera`, emoji: '🗑️', label: 'Papelera' }] : []),
       ],
     },

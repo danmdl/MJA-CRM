@@ -16,7 +16,7 @@ interface ChurchDetailsLayoutProps {
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile, loading: sessionLoading } = useSession();
-  const { canAccessAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canAddMembers, canSeeMapa, canSeeValidador, canSeePapelera, canSeeProcesos } = usePermissions();
+  const { canAccessAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canAddMembers, canSeeMapa, canSeeValidador, canSeePapelera, canSeeProcesos, canSeeRutas, canSeeEventos, canSeeAsistencia } = usePermissions();
   const canSeeOverview = canAccessAllChurches() || canSeeOwnChurchAnalytics();
   const navigate = useNavigate();
   const location = useLocation();
@@ -78,6 +78,9 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (p.endsWith("/papelera")) return "papelera";
     if (p.endsWith("/validator")) return "validator";
     if (p.endsWith("/hogares")) return "hogares";
+    if (p.includes("/rutas")) return "rutas";
+    if (p.endsWith("/asistencia")) return "asistencia";
+    if (p.endsWith("/eventos")) return "eventos";
     return "overview";
   })();
 
@@ -138,6 +141,9 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
                 {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
                 {canSeeMapa() && <TabsTrigger value="mapa" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Mapa</TabsTrigger>}
                 {canSeeCuerdas() && <TabsTrigger value="territorios" className="text-xs sm:text-sm px-2 sm:px-3">🗾 Territorios</TabsTrigger>}
+                {canSeeRutas() && <TabsTrigger value="rutas" className="text-xs sm:text-sm px-2 sm:px-3">🧭 Rutas</TabsTrigger>}
+                {canSeeAsistencia() && <TabsTrigger value="asistencia" className="text-xs sm:text-sm px-2 sm:px-3">✅ Asistencia</TabsTrigger>}
+                {canSeeEventos() && <TabsTrigger value="eventos" className="text-xs sm:text-sm px-2 sm:px-3">📅 Eventos</TabsTrigger>}
                 {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
                 {canSeeValidador() && <TabsTrigger value="validator" className="text-xs sm:text-sm px-2 sm:px-3">🛡️ Validador</TabsTrigger>}
                 {canSeePapelera() && <TabsTrigger value="papelera" className="text-xs sm:text-sm px-2 sm:px-3">🗑️ Papelera</TabsTrigger>}

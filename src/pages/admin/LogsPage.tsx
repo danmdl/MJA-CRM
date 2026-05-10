@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -154,6 +154,8 @@ const LogsPage = () => {
   const [showResolved, setShowResolved] = useState(false);
   const [view, setView] = useState<'errors' | 'activity'>('activity');
   const [activityFilter, setActivityFilter] = useState<'all' | 'login' | 'create' | 'update' | 'delete' | 'assign'>('all');
+  const [activityCuerdaFilter, setActivityCuerdaFilter] = useState<string>('all');
+  const [activitySexoFilter, setActivitySexoFilter] = useState<string>('all');
   const queryClient = useQueryClient();
 
   const { data: logs, isLoading, refetch } = useQuery<LogEntry[]>({
@@ -208,6 +210,32 @@ const LogsPage = () => {
     refetchInterval: 30_000,
     enabled: view === 'activity',
   });
+
+  const activityCuerdaOptions = useMemo(() => {
+    const set = new Set<string>();
+    (activity || []).forEach((l: any) => {
+      const c = l.after_data?.numero_cuerda || l.before_data?.numero_cuerda;
+      if (c) set.add(String(c));
+    });
+    return Array.from(set).sort((a, b) => Number(a) - Number(b));
+  }, [activity]);
+
+  const filteredActivity = useMemo(() => {
+    let result = activity || [];
+    if (activityCuerdaFilter !== 'all') {
+      result = result.filter((l: any) => {
+        const c = l.after_data?.numero_cuerda || l.before_data?.numero_cuerda;
+        return c != null && String(c) === activityCuerdaFilter;
+      });
+    }
+    if (activitySexoFilter !== 'all') {
+      result = result.filter((l: any) => {
+        const s = l.after_data?.sexo || l.before_data?.sexo;
+        return s === activitySexoFilter;
+      });
+    }
+    return result;
+  }, [activity, activityCuerdaFilter, activitySexoFilter]);
 
   // Currently online users — anyone who logged in within the last 30 minutes
   const { data: onlineUsers } = useQuery<any[]>({
@@ -306,6 +334,17 @@ const LogsPage = () => {
           </div>
 
           {/* Activity filter */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <select value={activityCuerdaFilter} onChange={e => setActivityCuerdaFilter(e.target.value)} className="h-8 px-2 rounded border bg-background text-xs">
+              <option value="all">Todas las cuerdas</option>
+              {activityCuerdaOptions.map((c: string) => <option key={c} value={c}>Cuerda {c}</option>)}
+            </select>
+            <select value={activitySexoFilter} onChange={e => setActivitySexoFilter(e.target.value)} className="h-8 px-2 rounded border bg-background text-xs">
+              <option value="all">Ambos sexos</option>
+              <option value="M">Masculino</option>
+              <option value="F">Femenino</option>
+            </select>
+          </div>
           <div className="flex gap-2 mb-4 flex-wrap">
             {[
               { v: 'all', l: 'Todas' },
@@ -327,7 +366,7 @@ const LogsPage = () => {
 
           {/* Activity table */}
           <div className="text-xs text-muted-foreground mb-2">
-            Mostrando {(activity || []).length} eventos · Hora en Argentina (ART UTC-3) · Se actualiza cada 30s
+            Mostrando {filteredActivity.length} de {(activity || []).length} eventos · Hora en Argentina (ART UTC-3) · Se actualiza cada 30s
           </div>
           <div className="border rounded-md overflow-x-auto">
             <Table>
@@ -341,7 +380,7 @@ const LogsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(activity || []).length === 0 ? (
+                {filteredActivity.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Sin actividad registrada.</TableCell></TableRow>
                 ) : (
                   (() => {
@@ -354,7 +393,7 @@ const LogsPage = () => {
                       assign: 'bg-purple-500/15 text-purple-400',
                     };
                     const groups: any[][] = [];
-                    (activity || []).forEach((row: any) => {
+                    filteredActivity.forEach((row: any) => {
                       const last = groups[groups.length - 1];
                       const rowKey = `${row.user_id}|${row.action}`;
                       if (last && last.length > 0) {

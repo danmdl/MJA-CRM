@@ -19,6 +19,8 @@ interface DeletedItem {
   deleted_at: string;
   deleted_by_name: string;
   days_left: number;
+  numero_cuerda?: string | null;
+  sexo?: string | null;
 }
 
 const GRACE_DAYS = 7;
@@ -28,25 +30,24 @@ const PapeleraPage = () => {
   const queryClient = useQueryClient();
   const { canRestoreDeleted } = usePermissions();
   const [confirmAction, setConfirmAction] = useState<{ type: 'restore' | 'purge'; item: DeletedItem } | null>(null);
+  const [filterCuerda, setFilterCuerda] = useState<string>('all');
+  const [filterSexo, setFilterSexo] = useState<string>('all');
 
   const { data: items, isLoading } = useQuery<DeletedItem[]>({
     queryKey: ['papelera', churchId],
     queryFn: async () => {
-      // Fetch deleted contacts
       const { data: contacts } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, numero_cuerda, deleted_at, deleted_by')
+        .select('id, first_name, last_name, numero_cuerda, sexo, deleted_at, deleted_by')
         .eq('church_id', churchId!)
         .not('deleted_at', 'is', null);
 
-      // Fetch deleted cells
       const { data: cells } = await supabase
         .from('cells')
         .select('id, name, address, deleted_at, deleted_by')
         .eq('church_id', churchId!)
         .not('deleted_at', 'is', null);
 
-      // Resolve names of who deleted
       const deleterIds = new Set<string>();
       (contacts || []).forEach(c => { if (c.deleted_by) deleterIds.add(c.deleted_by); });
       (cells || []).forEach(c => { if (c.deleted_by) deleterIds.add(c.deleted_by); });
@@ -57,8 +58,7 @@ const PapeleraPage = () => {
       const result: DeletedItem[] = [];
 
       (contacts || []).forEach(c => {
-        const deletedMs = new Date(c.deleted_at).getTime();
-        const daysElapsed = Math.floor((now - deletedMs) / (1000 * 60 * 60 * 24));
+        const daysElapsed = Math.floor((now - new Date(c.deleted_at).getTime()) / (1000 * 60 * 60 * 24));
         result.push({
           id: c.id,
           type: 'contact',
@@ -67,12 +67,13 @@ const PapeleraPage = () => {
           deleted_at: c.deleted_at,
           deleted_by_name: nameMap.get(c.deleted_by) || 'Sistema',
           days_left: Math.max(0, GRACE_DAYS - daysElapsed),
+          numero_cuerda: c.numero_cuerda,
+          sexo: c.sexo,
         });
       });
 
       (cells || []).forEach(c => {
-        const deletedMs = new Date(c.deleted_at).getTime();
-        const daysElapsed = Math.floor((now - deletedMs) / (1000 * 60 * 60 * 24));
+        const daysElapsed = Math.floor((now - new Date(c.deleted_at).getTime()) / (1000 * 60 * 60 * 24));
         result.push({
           id: c.id,
           type: 'cell',
@@ -88,6 +89,19 @@ const PapeleraPage = () => {
     },
     enabled: !!churchId,
   });
+
+  const cuerdaOptions = useMemo(() => {
+    const set = new Set<string>();
+    (items || []).forEach(i => { if (i.numero_cuerda) set.add(String(i.numero_cuerda)); });
+    return Array.from(set).sort((a, b) => Number(a) - Number(b));
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    let result = items || [];
+    if (filterCuerda !== 'all') result = result.filter(i => i.numero_cuerda != null && String(i.numero_cuerda) === filterCuerda);
+    if (filterSexo !== 'all') result = result.filter(i => i.type === 'contact' && i.sexo === filterSexo);
+    return result;
+  }, [items, filterCuerda, filterSexo]);
 
   const handleRestore = async (item: DeletedItem) => {
     const table = item.type === 'contact' ? 'contacts' : 'cells';
@@ -116,27 +130,45 @@ const PapeleraPage = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold">Papelera</h1>
-        <span className="text-sm text-muted-foreground">{(items || []).length} elemento(s)</span>
+        <span className="text-sm text-muted-foreground ml-auto">{filtered.length} / {(items || []).length} elemento(s)</span>
       </div>
 
       <p className="text-xs text-muted-foreground">Los elementos eliminados se pueden recuperar dentro de los {GRACE_DAYS} días. Después se eliminan permanentemente.</p>
 
-      {(items || []).length === 0 && (
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)} className="h-8 px-2 rounded border bg-background text-sm">
+          <option value="all">Todas las cuerdas</option>
+          {cuerdaOptions.map(c => <option key={c} value={c}>Cuerda {c}</option>)}
+        </select>
+        <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 px-2 rounded border bg-background text-sm">
+          <option value="all">Ambos sexos</option>
+          <option value="M">Masculino</option>
+          <option value="F">Femenino</option>
+        </select>
+        {(filterCuerda !== 'all' || filterSexo !== 'all') && (
+          <button onClick={() => { setFilterCuerda('all'); setFilterSexo('all'); }} className="text-xs text-muted-foreground hover:text-foreground underline">
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <Trash2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">La papelera está vacía.</p>
+          <p className="text-sm">{(items || []).length === 0 ? 'La papelera está vacía.' : 'Sin resultados para los filtros seleccionados.'}</p>
         </div>
       )}
 
       <div className="space-y-2">
-        {(items || []).map(item => (
+        {filtered.map(item => (
           <div key={`${item.type}-${item.id}`} className={`p-3 rounded border flex items-center justify-between gap-3 ${item.days_left === 0 ? 'border-red-500/30 bg-red-500/5' : ''}`}>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-[10px]">{item.type === 'contact' ? 'Contacto' : 'Célula'}</Badge>
                 <span className="text-sm font-medium truncate">{item.name}</span>
+                {item.sexo && <span className="text-[10px] text-muted-foreground">({item.sexo === 'M' ? 'M' : 'F'})</span>}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -163,7 +195,6 @@ const PapeleraPage = () => {
         ))}
       </div>
 
-      {/* Confirmation dialog */}
       <Dialog open={!!confirmAction} onOpenChange={(o) => { if (!o) setConfirmAction(null); }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
