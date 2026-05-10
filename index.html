@@ -33,46 +33,14 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Auto-recovery: if this app ever had a service worker installed (it
-      // shouldn't), unregister it and clear all caches immediately — before
-      // React even boots. Stale SWs intercept requests and serve old cached
-      // JS bundles or 403s, causing login failures that only work in incognito.
-      // This runs synchronously on every page load; if there are no SWs it's
-      // a no-op. Users never see anything — it just silently cleans up.
-      (function() {
-        if (!('serviceWorker' in navigator)) return;
-
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(regs) {
-          if (regs.length === 0) return; // nothing to do
-          // There's a SW installed — unregister all of them and clear caches,
-          // then force a hard reload so the page loads fresh without any SW.
-          return Promise.all(regs.map(function(r) { return r.unregister(); }))
-            .then(function() { return caches.keys(); })
-            .then(function(names) {
-              return Promise.all(names.map(function(n) { return caches.delete(n); }));
-            })
-            .then(function() {
-              // Hard reload — bypasses any in-memory cache
-              window.location.reload(true);
-            });
+          regs.forEach(function(r) { r.unregister(); });
         });
-
-        // Also catch any JS module load errors caused by stale SW serving
-        // wrong MIME types. If a script tag fails to load, force a clean reload.
-        window.addEventListener('error', function(e) {
-          if (e && e.message && e.message.includes('MIME')) {
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-              return Promise.all(regs.map(function(r) { return r.unregister(); }));
-            }).then(function() {
-              return caches.keys().then(function(names) {
-                return Promise.all(names.map(function(n) { return caches.delete(n); }));
-              });
-            }).then(function() {
-              window.location.reload(true);
-            });
-          }
-        }, true);
-      })();
+        caches.keys().then(function(names) {
+          names.forEach(function(n) { caches.delete(n); });
+        });
+      }
     </script>
   </body>
 </html>
