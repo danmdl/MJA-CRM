@@ -14,13 +14,15 @@ import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 
 // Pipeline stages in order
 const STAGES = [
-  { key: 'nuevas_personas', label: 'Nuevas Personas', color: '#3b82f6' },
-  { key: 'liberacion', label: 'Liberación', color: '#8b5cf6' },
-  { key: 'encuentro', label: 'Encuentro', color: '#f59e0b' },
-  { key: 'post_encuentro', label: 'Post Encuentro', color: '#f97316' },
-  { key: 'abc', label: 'ABC', color: '#10b981' },
-  { key: 'nivel_1', label: 'Nivel 1', color: '#06b6d4' },
-  { key: 'nivel_2', label: 'Nivel 2', color: '#ec4899' },
+  { key: 'nuevas_personas_domingos', label: 'Nuevas Personas Domingos', color: '#3b82f6' },
+  { key: 'nuevas_personas_celulas',  label: 'Nuevas Personas Células',  color: '#60a5fa' },
+  { key: 'liberacion',               label: 'Liberación',               color: '#8b5cf6' },
+  { key: 'pre_encuentro',            label: 'Pre-Encuentro',            color: '#f59e0b' },
+  { key: 'encuentro',                label: 'Encuentro',                color: '#f97316' },
+  { key: 'post_encuentro',           label: 'Post Encuentro',           color: '#ef4444' },
+  { key: 'abc',                      label: 'ABC',                      color: '#10b981' },
+  { key: 'nivel_1',                  label: 'Nivel 1',                  color: '#06b6d4' },
+  { key: 'nivel_2',                  label: 'Nivel 2',                  color: '#ec4899' },
 ] as const;
 
 type StageKey = typeof STAGES[number]['key'];
