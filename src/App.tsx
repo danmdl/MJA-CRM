@@ -114,10 +114,28 @@ class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, 
   constructor(props: any) { super(props); this.state = { hasError: false, isRetrying: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(error: any, errorInfo: any) {
-    // If it's a chunk load error, reload silently
-    if (error?.message?.includes('Loading chunk') || error?.message?.includes('Failed to fetch') || error?.name === 'ChunkLoadError') {
+    // If it's a chunk load error caused by stale SW (MIME type error) or actual
+    // chunk load failure — unregister any SW, clear caches, redirect to login.
+    // Do NOT reload() — that would loop if the SW keeps serving stale content.
+    const isMimeError = error?.message?.includes('MIME') || error?.message?.includes('text/html');
+    const isChunkError = error?.message?.includes('Loading chunk') || error?.message?.includes('Failed to fetch') || error?.name === 'ChunkLoadError';
+    if (isMimeError || isChunkError) {
       this.setState({ isRetrying: true });
-      window.location.reload();
+      // Clean up SW and caches, then go to login (hard navigate, not reload)
+      const cleanup = async () => {
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+          }
+          if ('caches' in window) {
+            const names = await caches.keys();
+            await Promise.all(names.map(n => caches.delete(n)));
+          }
+        } catch(e) { /* ignore */ }
+        window.location.href = '/login';
+      };
+      cleanup();
       return;
     }
     // removeChild crashes are almost always caused by browser auto-translate
@@ -177,8 +195,8 @@ class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, 
   }
   render() {
     if (this.state.hasError) {
-      // While retrying (chunk reload), show nothing — the page is about to reload
-      if (this.state.isRetrying) return null;
+      // While cleaning up SW and redirecting to login, show brief message
+      if (this.state.isRetrying) return <div style={{minHeight:'100vh',background:'#09090b',display:'flex',alignItems:'center',justifyContent:'center',color:'#a1a1aa',fontFamily:'system-ui'}}>Limpiando caché...</div>;
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center space-y-3">
