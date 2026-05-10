@@ -9,6 +9,35 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+
+const ResetPage = () => {
+  const [status, setStatus] = React.useState('Limpiando caché...');
+  React.useEffect(() => {
+    (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        if ('caches' in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map(n => caches.delete(n)));
+        }
+        try { localStorage.clear(); } catch(e) {}
+        setStatus('✓ Listo. Redirigiendo...');
+        setTimeout(() => { window.location.href = '/login'; }, 1500);
+      } catch(err: any) { setStatus('Error: ' + err.message); }
+    })();
+  }, []);
+  return (
+    <div style={{ background:'#09090b', color:'#fafafa', minHeight:'100vh', display:'flex',
+                  flexDirection:'column', alignItems:'center', justifyContent:'center',
+                  fontFamily:'system-ui,sans-serif', textAlign:'center', padding:'24px' }}>
+      <div style={{ fontSize:'1.5rem', fontWeight:700, marginBottom:'8px' }}>MJA CRM</div>
+      <div style={{ color:'#a1a1aa', fontSize:'0.9rem' }}>{status}</div>
+    </div>
+  );
+};
 import SetupAccount from "./pages/SetupAccount";
 import SharedRoutePage from "./pages/SharedRoutePage";
 import WelcomeMessageAlert from "./components/WelcomeMessageAlert";
@@ -272,6 +301,7 @@ const AppRoutes = () => {
     <ChunkErrorBoundary>
     <Suspense fallback={<PageLoader />}>
     <Routes>
+      <Route path="/reset" element={<ResetPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/setup-account" element={<SetupAccount />} />
       <Route path="/r/:token" element={<SharedRoutePage />} />
