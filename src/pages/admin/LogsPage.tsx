@@ -13,6 +13,40 @@ import { CheckCircle, RefreshCw, Search, ChevronDown, ChevronUp, UserSearch } fr
 import { normalize } from '@/lib/normalize';
 import { showSuccess } from '@/utils/toast';
 
+
+const ACTION_LABELS: Record<string, string> = {
+  login_success:           'login ✓',
+  login_failed:            'login ✗',
+  reset_requested:         'reset solicitado',
+  reset_request_failed:    'reset fallido',
+  reset_link_clicked:      'reset link abierto',
+  reset_completed:         'reset completado',
+  reset_failed:            'reset error',
+  expired_link_used:       'link expirado',
+  logout_manual:           'logout',
+  session_expired:         'sesión expirada',
+  account_setup_completed: 'cuenta creada',
+};
+
+const ACTION_COLORS: Record<string, string> = {
+  login:                   'bg-blue-500/15 text-blue-400',
+  login_success:           'bg-blue-500/15 text-blue-400',
+  login_failed:            'bg-red-500/20 text-red-400 border border-red-500/30',
+  reset_requested:         'bg-amber-500/15 text-amber-400',
+  reset_request_failed:    'bg-red-500/15 text-red-400',
+  reset_link_clicked:      'bg-amber-500/15 text-amber-400',
+  reset_completed:         'bg-green-500/15 text-green-400',
+  reset_failed:            'bg-red-500/15 text-red-400',
+  expired_link_used:       'bg-red-500/20 text-red-400 border border-red-500/30',
+  logout_manual:           'bg-muted text-muted-foreground',
+  session_expired:         'bg-orange-500/15 text-orange-400',
+  account_setup_completed: 'bg-green-500/15 text-green-400',
+  create:                  'bg-green-500/15 text-green-400',
+  update:                  'bg-amber-500/15 text-amber-400',
+  delete:                  'bg-red-500/15 text-red-400',
+  assign:                  'bg-purple-500/15 text-purple-400',
+};
+
 const ART_TZ = 'America/Argentina/Buenos_Aires';
 
 const formatART = (ts: string) => {
@@ -98,7 +132,7 @@ const LogRow = ({ log, onResolve }: { log: LogEntry; onResolve: (id: string) => 
   );
 };
 
-const ActivityGroupRow = ({ group, name, email, actionColors, actionLabels = {} }: { group: any[]; name: string; email: string; actionColors: Record<string, string>; actionLabels?: Record<string, string>; }) => {
+const ActivityGroupRow = ({ group, name, email }: { group: any[]; name: string; email: string; }) => {
   const [expanded, setExpanded] = useState(false);
   const first = group[0]; // newest in the group (since data comes desc)
   const last = group[group.length - 1]; // oldest in the group
@@ -130,7 +164,7 @@ const ActivityGroupRow = ({ group, name, email, actionColors, actionLabels = {} 
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
-            <Badge className={`${actionColors[first.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{actionLabels[first.action] || first.action}</Badge>
+            <Badge className={`${ACTION_COLORS[first.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{ACTION_LABELS[first.action] || first.action}</Badge>
             {isGroup && <span className="text-xs text-muted-foreground">×{group.length}</span>}
           </div>
         </TableCell>
@@ -429,37 +463,7 @@ const LogsPage = () => {
                 ) : (
                   (() => {
                     // Group consecutive rows by user_id + action + same hour bucket
-                    const ACTION_LABELS: Record<string, string> = {
-                      login_success:           'login ✓',
-                      login_failed:            'login ✗',
-                      reset_requested:         'reset solicitado',
-                      reset_request_failed:    'reset fallido',
-                      reset_link_clicked:      'reset link abierto',
-                      reset_completed:         'reset completado',
-                      reset_failed:            'reset error',
-                      expired_link_used:       'link expirado',
-                      logout_manual:           'logout',
-                      session_expired:         'sesión expirada',
-                      account_setup_completed: 'cuenta creada',
-                    };
-                    const actionColors: Record<string, string> = {
-                      login:                   'bg-blue-500/15 text-blue-400',
-                      login_success:           'bg-blue-500/15 text-blue-400',
-                      login_failed:            'bg-red-500/20 text-red-400 border border-red-500/30',
-                      reset_requested:         'bg-amber-500/15 text-amber-400',
-                      reset_request_failed:    'bg-red-500/15 text-red-400',
-                      reset_link_clicked:      'bg-amber-500/15 text-amber-400',
-                      reset_completed:         'bg-green-500/15 text-green-400',
-                      reset_failed:            'bg-red-500/15 text-red-400',
-                      expired_link_used:       'bg-red-500/20 text-red-400 border border-red-500/30',
-                      logout_manual:           'bg-muted text-muted-foreground',
-                      session_expired:         'bg-orange-500/15 text-orange-400',
-                      account_setup_completed: 'bg-green-500/15 text-green-400',
-                      create:                  'bg-green-500/15 text-green-400',
-                      update:                  'bg-amber-500/15 text-amber-400',
-                      delete:                  'bg-red-500/15 text-red-400',
-                      assign:                  'bg-purple-500/15 text-purple-400',
-                    };
+
                     const groups: any[][] = [];
                     filteredActivity.forEach((row: any) => {
                       const last = groups[groups.length - 1];
@@ -487,8 +491,6 @@ const LogsPage = () => {
                           group={group}
                           name={name}
                           email={email}
-                          actionColors={actionColors}
-                          actionLabels={ACTION_LABELS}
                         />
                       );
                     });

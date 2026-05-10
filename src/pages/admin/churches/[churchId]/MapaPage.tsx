@@ -531,10 +531,12 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
         });
       }
 
-      if (itemsForMap.length === 1) {
+      if (itemsForMap.length === 0) {
+        // Nothing to show — keep default center (GBA)
+      } else if (itemsForMap.length === 1) {
         map.setCenter(bounds.getCenter());
         map.setZoom(15);
-      } else {
+      } else if (!bounds.isEmpty()) {
         map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
       }
     };
