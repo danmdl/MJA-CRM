@@ -4,8 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff, UserPen, UserSearch } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff, UserPen, UserSearch, ChevronDown } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { normalize as norm } from '@/lib/normalize';
@@ -56,7 +56,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   const { canChangeUserRole, canEditDeleteMembers, canAddMembers } = usePermissions();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCuerda, setFilterCuerda] = useState<string>('all');
+  const [filterCuerdas, setFilterCuerdas] = useState<Set<string>>(new Set());
   const myLevel = getRoleLevel(profile?.role || '');
   const [resetDialogUser, setResetDialogUser] = useState<{ id: string; email: string } | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -133,15 +133,15 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
         (myCuerda && u.numero_cuerda === myCuerda)
       );
     }
-    if (filterCuerda !== 'all') {
-      visible = visible.filter(u => u.numero_cuerda === filterCuerda);
+    if (filterCuerdas.size > 0) {
+      visible = visible.filter(u => u.numero_cuerda != null && filterCuerdas.has(u.numero_cuerda));
     }
     const term = norm(searchTerm);
     if (!term) return visible;
     return visible.filter(u =>
       norm([u.first_name, u.last_name, u.email, u.role, u.numero_cuerda].join(' ')).includes(term)
     );
-  }, [users, searchTerm, filterCuerda, profile?.role, profile?.id, profile?.numero_cuerda]);
+  }, [users, searchTerm, filterCuerdas, profile?.role, profile?.id, profile?.numero_cuerda]);
 
   const callEdge = async (body: object) => {
     const response = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/admin-user-actions-v3', {
@@ -276,16 +276,45 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <select
-          value={filterCuerda}
-          onChange={e => setFilterCuerda(e.target.value)}
-          className="h-10 px-2 rounded border bg-background text-sm"
-        >
-          <option value="all">Todas las cuerdas</option>
-          {cuerdas.filter(c => !c.is_church_cuerda).map(c => (
-            <option key={c.id} value={c.numero}>Cuerda {c.numero}</option>
-          ))}
-        </select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-10 gap-1.5 text-sm font-normal">
+              {filterCuerdas.size === 0
+                ? 'Todas las cuerdas'
+                : filterCuerdas.size === 1
+                  ? `Cuerda ${Array.from(filterCuerdas)[0]}`
+                  : `${filterCuerdas.size} cuerdas`}
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48 max-h-72 overflow-y-auto">
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Filtrar por cuerda</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={filterCuerdas.size === 0}
+              onCheckedChange={() => setFilterCuerdas(new Set())}
+            >
+              Todas las cuerdas
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            {cuerdas.filter(c => !c.is_church_cuerda).map(c => (
+              <DropdownMenuCheckboxItem
+                key={c.id}
+                checked={filterCuerdas.has(c.numero)}
+                onCheckedChange={(checked) => {
+                  setFilterCuerdas(prev => {
+                    const next = new Set(prev);
+                    if (checked) next.add(c.numero);
+                    else next.delete(c.numero);
+                    return next;
+                  });
+                }}
+              >
+                Cuerda {c.numero}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <Table>
         <TableHeader>
