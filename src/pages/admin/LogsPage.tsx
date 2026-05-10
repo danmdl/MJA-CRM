@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, RefreshCw, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, RefreshCw, Search, ChevronDown, ChevronUp, UserSearch } from 'lucide-react';
+import { normalize } from '@/lib/normalize';
 import { showSuccess } from '@/utils/toast';
 
 const ART_TZ = 'America/Argentina/Buenos_Aires';
@@ -133,7 +134,11 @@ const ActivityGroupRow = ({ group, name, email, actionColors }: { group: any[]; 
             {isGroup && <span className="text-xs text-muted-foreground">×{group.length}</span>}
           </div>
         </TableCell>
-        <TableCell className="text-xs text-muted-foreground">{first.entity_type || '—'}</TableCell>
+        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+          {first.action === 'login_failed'
+            ? (first.error_message || 'Credenciales inválidas')
+            : (first.entity_type || '—')}
+        </TableCell>
       </TableRow>
       {isGroup && expanded && group.map((row: any) => (
         <TableRow key={row.id} className="bg-muted/10">
@@ -141,7 +146,9 @@ const ActivityGroupRow = ({ group, name, email, actionColors }: { group: any[]; 
           <TableCell className="font-mono text-xs pl-6 text-muted-foreground">↳ {formatART(row.created_at)}</TableCell>
           <TableCell className="text-xs text-muted-foreground">{name || email || 'Usuario'}</TableCell>
           <TableCell><Badge className={`${actionColors[row.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{row.action}</Badge></TableCell>
-          <TableCell className="text-xs text-muted-foreground">{row.entity_type || '—'}</TableCell>
+          <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+            {row.action === 'login_failed' ? (row.error_message || '—') : (row.entity_type || '—')}
+          </TableCell>
         </TableRow>
       ))}
     </>
@@ -153,9 +160,8 @@ const LogsPage = () => {
   const [levelFilter, setLevelFilter] = useState('all');
   const [showResolved, setShowResolved] = useState(false);
   const [view, setView] = useState<'errors' | 'activity'>('activity');
-  const [activityFilter, setActivityFilter] = useState<'all' | 'login' | 'create' | 'update' | 'delete' | 'assign'>('all');
-  const [activityCuerdaFilter, setActivityCuerdaFilter] = useState<string>('all');
-  const [activitySexoFilter, setActivitySexoFilter] = useState<string>('all');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'login' | 'login_failed' | 'create' | 'update' | 'delete' | 'assign'>('all');
+  const [activityUserSearch, setActivityUserSearch] = useState<string>('');
   const queryClient = useQueryClient();
 
   const { data: logs, isLoading, refetch } = useQuery<LogEntry[]>({
@@ -211,31 +217,30 @@ const LogsPage = () => {
     enabled: view === 'activity',
   });
 
-  const activityCuerdaOptions = useMemo(() => {
-    const set = new Set<string>();
-    (activity || []).forEach((l: any) => {
-      const c = l.after_data?.numero_cuerda || l.before_data?.numero_cuerda;
-      if (c) set.add(String(c));
-    });
-    return Array.from(set).sort((a, b) => Number(a) - Number(b));
-  }, [activity]);
-
   const filteredActivity = useMemo(() => {
-    let result = activity || [];
-    if (activityCuerdaFilter !== 'all') {
-      result = result.filter((l: any) => {
-        const c = l.after_data?.numero_cuerda || l.before_data?.numero_cuerda;
-        return c != null && String(c) === activityCuerdaFilter;
-      });
+    // Merge successes + failures, then apply action + user filters
+    const failures = loginFailures || [];
+    let result: any[];
+    if (activityFilter === 'login_failed') {
+      result = failures;
+    } else if (activityFilter !== 'all') {
+      result = (activity || []).filter((r: any) => r.action === activityFilter);
+    } else {
+      result = [...(activity || []), ...failures].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     }
-    if (activitySexoFilter !== 'all') {
-      result = result.filter((l: any) => {
-        const s = l.after_data?.sexo || l.before_data?.sexo;
-        return s === activitySexoFilter;
+    if (activityUserSearch.trim()) {
+      const q = normalize(activityUserSearch);
+      result = result.filter((r: any) => {
+        const name = r.profiles
+          ? [r.profiles.first_name, r.profiles.last_name].filter(Boolean).join(' ')
+          : '';
+        return normalize(name + ' ' + (r.profiles?.email || '') + ' ' + (r.user_email || '')).includes(q);
       });
     }
     return result;
-  }, [activity, activityCuerdaFilter, activitySexoFilter]);
+  }, [activity, loginFailures, activityFilter, activityUserSearch]);
 
   // Currently online users — anyone who logged in within the last 30 minutes
   const { data: onlineUsers } = useQuery<any[]>({
@@ -260,6 +265,28 @@ const LogsPage = () => {
       return unique;
     },
     refetchInterval: 60_000,
+    enabled: view === 'activity',
+  });
+
+  // Failed login attempts logged from Login.tsx into client_logs
+  const { data: loginFailures } = useQuery<any[]>({
+    queryKey: ['login_failures'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('client_logs')
+        .select('id, created_at, user_email, error_message, error_code, context')
+        .eq('action', 'login_failed')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      return (data || []).map(f => ({
+        ...f,
+        user_id: null,
+        profiles: null,
+        action: 'login_failed',
+        entity_type: null,
+      }));
+    },
+    refetchInterval: 30_000,
     enabled: view === 'activity',
   });
 
@@ -333,22 +360,23 @@ const LogsPage = () => {
             )}
           </div>
 
-          {/* Activity filter */}
+          {/* Person search + activity type filter */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <select value={activityCuerdaFilter} onChange={e => setActivityCuerdaFilter(e.target.value)} className="h-8 px-2 rounded border bg-background text-xs">
-              <option value="all">Todas las cuerdas</option>
-              {activityCuerdaOptions.map((c: string) => <option key={c} value={c}>Cuerda {c}</option>)}
-            </select>
-            <select value={activitySexoFilter} onChange={e => setActivitySexoFilter(e.target.value)} className="h-8 px-2 rounded border bg-background text-xs">
-              <option value="all">Ambos sexos</option>
-              <option value="M">Masculino</option>
-              <option value="F">Femenino</option>
-            </select>
+            <div className="relative">
+              <UserSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-8 h-8 w-52 text-xs"
+                placeholder="Buscar por persona..."
+                value={activityUserSearch}
+                onChange={e => setActivityUserSearch(e.target.value)}
+              />
+            </div>
           </div>
           <div className="flex gap-2 mb-4 flex-wrap">
             {[
               { v: 'all', l: 'Todas' },
-              { v: 'login', l: 'Logins' },
+              { v: 'login', l: 'Logins ✓' },
+              { v: 'login_failed', l: 'Login fallido' },
               { v: 'create', l: 'Creaciones' },
               { v: 'update', l: 'Ediciones' },
               { v: 'delete', l: 'Eliminaciones' },
@@ -357,7 +385,15 @@ const LogsPage = () => {
               <button
                 key={v}
                 onClick={() => setActivityFilter(v as any)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${activityFilter === v ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                  activityFilter === v
+                    ? v === 'login_failed'
+                      ? 'bg-red-500 text-white border-red-500'
+                      : 'bg-primary text-primary-foreground border-primary'
+                    : v === 'login_failed'
+                      ? 'border-red-500/40 text-red-400 hover:bg-red-500/10'
+                      : 'border-border hover:bg-muted'
+                }`}
               >
                 {l}
               </button>
@@ -366,7 +402,7 @@ const LogsPage = () => {
 
           {/* Activity table */}
           <div className="text-xs text-muted-foreground mb-2">
-            Mostrando {filteredActivity.length} de {(activity || []).length} eventos · Hora en Argentina (ART UTC-3) · Se actualiza cada 30s
+            Mostrando {filteredActivity.length} evento{filteredActivity.length !== 1 ? 's' : ''} · Hora en Argentina (ART UTC-3) · Se actualiza cada 30s
           </div>
           <div className="border rounded-md overflow-x-auto">
             <Table>
@@ -387,6 +423,7 @@ const LogsPage = () => {
                     // Group consecutive rows by user_id + action + same hour bucket
                     const actionColors: Record<string, string> = {
                       login: 'bg-blue-500/15 text-blue-400',
+                      login_failed: 'bg-red-500/20 text-red-400 border border-red-500/30',
                       create: 'bg-green-500/15 text-green-400',
                       update: 'bg-amber-500/15 text-amber-400',
                       delete: 'bg-red-500/15 text-red-400',
@@ -395,7 +432,10 @@ const LogsPage = () => {
                     const groups: any[][] = [];
                     filteredActivity.forEach((row: any) => {
                       const last = groups[groups.length - 1];
-                      const rowKey = `${row.user_id}|${row.action}`;
+                      // For login_failed, group by email since user_id is null
+                      const rowKey = row.action === 'login_failed'
+                        ? `__fail__|${row.user_email}|${row.action}`
+                        : `${row.user_id}|${row.action}`;
                       if (last && last.length > 0) {
                         const lastKey = `${last[0].user_id}|${last[0].action}`;
                         if (lastKey === rowKey) {
@@ -408,7 +448,7 @@ const LogsPage = () => {
                     return groups.map((group, gIdx) => {
                       const first = group[0];
                       const name = first.profiles ? [first.profiles.first_name, first.profiles.last_name].filter(Boolean).join(' ') : '';
-                      const email = first.profiles?.email || '';
+                      const email = first.profiles?.email || first.user_email || '';
                       return (
                         <ActivityGroupRow
                           key={`${first.id}-group`}

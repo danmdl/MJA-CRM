@@ -57,7 +57,22 @@ const Login = () => {
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(translateError(error.message));
+    if (error) {
+      setError(translateError(error.message));
+      // Log the failed attempt so admins can see it in Logs → "Login fallido"
+      supabase.from('client_logs').insert({
+        user_email: email,
+        level: 'warning',
+        action: 'login_failed',
+        error_message: error.message,
+        error_code: String((error as any).status || (error as any).code || ''),
+        context: {
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString(),
+        },
+      }).then(() => {});
+    }
     setLoading(false);
   };
 
