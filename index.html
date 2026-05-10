@@ -33,8 +33,14 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Unregister any previously installed service workers — the main CRM app
+      // does not use a SW. Stale SWs caused login failures (served cached 403s
+      // or old JS bundles with wrong MIME type after deploys).
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+        });
+        caches.keys().then(names => names.forEach(n => caches.delete(n)));
       }
     </script>
   </body>
