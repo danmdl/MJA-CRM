@@ -175,10 +175,25 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
 
   // Count contacts assigned to each cell for the popup
   const { data: cellContactCounts } = useQuery<Record<string, number>>({
+    queryKey: ['cell-contact-counts', churchId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('contacts')
+        .select('cell_id')
+        .eq('church_id', churchId!)
+        .is('deleted_at', null)
+        .not('cell_id', 'is', null);
+      const counts: Record<string, number> = {};
+      (data || []).forEach((c: any) => { if (c.cell_id) counts[c.cell_id] = (counts[c.cell_id] || 0) + 1; });
+      return counts;
+    },
+    enabled: !!churchId,
+    staleTime: 60_000,
+  });
 
   // Hogares de paz — shown as house icons on the cells map view.
-  // Loaded alongside cells so they appear together.
-  const { data: hogares } = useQuery<{ id: string; name: string | null; address: string | null; lat: number | null; lng: number | null; leader_name: string | null; anfitrion_name: string | null; meeting_day: string | null; meeting_time: string | null; cuerda_numero: string | null }[]>({
+  interface HogarPin { id: string; name: string | null; address: string | null; lat: number | null; lng: number | null; leader_name: string | null; anfitrion_name: string | null; meeting_day: string | null; meeting_time: string | null; cuerda_numero: string | null; }
+  const { data: hogares } = useQuery<HogarPin[]>({
     queryKey: ['hogares-map', churchId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -195,21 +210,6 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
     },
     enabled: !!churchId,
     staleTime: 5 * 60_000,
-  });
-    queryKey: ['cell-contact-counts', churchId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('contacts')
-        .select('cell_id')
-        .eq('church_id', churchId!)
-        .is('deleted_at', null)
-        .not('cell_id', 'is', null);
-      const counts: Record<string, number> = {};
-      (data || []).forEach((c: any) => { if (c.cell_id) counts[c.cell_id] = (counts[c.cell_id] || 0) + 1; });
-      return counts;
-    },
-    enabled: !!churchId,
-    staleTime: 60_000,
   });
 
   // Contacts-with-coords query — only fires when the user picks the
