@@ -4,4 +4,4 @@
 
 ## Overview
 
-This is a web application for managing church data, built with React, TypeScript, and Supabase.
+This is a web application for managing church data, built with React, TypeScript, and Supabase.// force redeploy 1778530654
