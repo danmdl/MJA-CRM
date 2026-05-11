@@ -160,16 +160,24 @@ const TerritoriosPage: React.FC = () => {
 
   // Contacts for the selected cuerda — only loaded when showContacts is on
   const { data: contacts } = useQuery<{ id: string; first_name: string; last_name: string | null; lat: number | null; lng: number | null; numero_cuerda: string | null }[]>({
-    queryKey: ['contacts-territorios', churchId, selectedCuerdaNumero],
+    queryKey: ['contacts-territorios', churchId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('contacts')
-        .select('id, first_name, last_name, lat, lng, numero_cuerda')
-        .eq('church_id', churchId!)
-        .is('deleted_at', null)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null);
-      return data || [];
+      const PAGE = 1000;
+      const all: any[] = [];
+      for (let p = 0; ; p++) {
+        const { data } = await supabase
+          .from('contacts')
+          .select('id, first_name, last_name, lat, lng, numero_cuerda')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .order('id')
+          .range(p * PAGE, (p + 1) * PAGE - 1);
+        all.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
+      return all;
     },
     enabled: !!churchId && showContacts,
     staleTime: 60_000,
@@ -622,13 +630,21 @@ const TerritoriosPage: React.FC = () => {
     queryKey: ['contacts-territory-stats', churchId, selectedCuerdaNumero],
     queryFn: async () => {
       if (!selectedCuerdaNumero) return [];
-      const { data } = await supabase
-        .from('contacts')
-        .select('lat, lng')
-        .eq('church_id', churchId!)
-        .eq('numero_cuerda', selectedCuerdaNumero)
-        .is('deleted_at', null);
-      return data || [];
+      const PAGE = 1000;
+      const all: any[] = [];
+      for (let p = 0; ; p++) {
+        const { data } = await supabase
+          .from('contacts')
+          .select('lat, lng')
+          .eq('church_id', churchId!)
+          .eq('numero_cuerda', selectedCuerdaNumero)
+          .is('deleted_at', null)
+          .order('id')
+          .range(p * PAGE, (p + 1) * PAGE - 1);
+        all.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
+      return all;
     },
     enabled: !!churchId && !!selectedCuerdaNumero,
     staleTime: 60_000,

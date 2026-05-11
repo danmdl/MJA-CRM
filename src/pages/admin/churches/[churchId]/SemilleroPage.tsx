@@ -770,11 +770,20 @@ const SemilleroPage = () => {
   // need it — they already see "✓ En zona" / "⚠ Fuera → Enviar a MJA"
   // inline. Non-MJA users WITHOUT a territory still see it as a fallback
   // (km-based suggestions).
-  // Sugerencia column is only for MJA Central members — they're the
-  // ones who assign contacts across cuerdas. Any other cuerda member
-  // (regardless of role) doesn't need it; they have their territory
-  // and see "En zona" / "Fuera → Enviar a MJA" inline.
-  const showSugerencia = isMjaMember;
+  // Sugerencia column is always visible. Content changes:
+  // - MJA Central members: cell/km suggestions (they assign to cuerdas)
+  // - Other cuerdas WITH territory: "✓ En zona" / "⚠ Fuera → Enviar a MJA"
+  // - Other cuerdas WITHOUT territory: cell/km suggestions (fallback)
+  const showSugerencia = true;
+
+  // Does the current user's cuerda have a territory drawn?
+  const userCuerdaHasTerritory = useMemo(() => {
+    if (isMjaMember) return false; // MJA members always see km suggestions
+    if (!userCuerdaNumero || !cuerdas) return false;
+    const uc = cuerdas.find(c => c.numero === userCuerdaNumero);
+    if (!uc) return false;
+    return !!cuerdaTerritoryMap.get(uc.id);
+  }, [isMjaMember, userCuerdaNumero, cuerdas, cuerdaTerritoryMap]);
 
   const externalContacts = useMemo(() => {
     if (isMjaMember) {
@@ -1885,7 +1894,7 @@ const SemilleroPage = () => {
                           : <ArrowUpDown className="h-3 w-3 opacity-40" />}
                       </button>
                     </ResizableHeader>
-                    {isUnassignedView && showSugerencia && <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>Sugerencia</ResizableHeader>}
+                    {isUnassignedView && showSugerencia && <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>{userCuerdaHasTerritory ? 'Zona' : 'Sugerencia'}</ResizableHeader>}
                     {isUnassignedView && canAssignContacts() && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                   </tr>
                 </thead>
@@ -2149,10 +2158,21 @@ const SemilleroPage = () => {
                           })() : '—'}
                         </td>
 
-                        {/* Sugerencia / Célula asignada */}
+                        {/* Sugerencia / Célula asignada / Zona classification */}
                         {isUnassignedView && showSugerencia && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.sugerencia }}>
-                            {c.cell_id ? (() => {
+                            {userCuerdaHasTerritory ? (() => {
+                              // Non-MJA user whose cuerda has territory: show zone classification only
+                              const uc = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
+                              const paths = uc ? cuerdaTerritoryMap.get(uc.id) : null;
+                              if (!paths || c.lat == null || c.lng == null) {
+                                return <span className="text-xs text-muted-foreground">Sin coordenadas</span>;
+                              }
+                              const inside = isPointInTerritory(c.lat, c.lng, paths);
+                              return inside
+                                ? <span className="text-[11px] font-medium text-green-400">✓ En zona</span>
+                                : <span className="text-[11px] font-medium text-red-400">⚠ Fuera de zona</span>;
+                            })() : c.cell_id ? (() => {
                               // Already assigned to a cell — show the assignment
                               const assignedCell = cells?.find(cl => cl.id === c.cell_id);
                               const assignedCuerda = assignedCell?.cuerda_id ? cuerdas?.find(cr => cr.id === assignedCell.cuerda_id) : null;
