@@ -202,136 +202,73 @@ const TerritoriosPage: React.FC = () => {
   );
 
   // ─── Map init ────────────────────────────────────────────────────
+  // This component is kept mounted even when its tab is inactive
+  // (display:none) so Google Maps state is preserved across tab
+  // switches. The problem: when mounted hidden, the container has
+  // 0×0 size and Google Maps can't initialize. Previous attempts
+  // polled 20 times over 2s and gave up — causing the black map.
+  //
+  // Fix: load the script eagerly, but defer map creation until a
+  // ResizeObserver detects the container has non-zero size (i.e.
+  // the user switched to the Delineación tab). The same observer
+  // also fires resize on the map when the container changes size
+  // after creation (orientation change, etc).
   useEffect(() => {
     let cancelled = false;
-    console.log('[Territorios] component mounted, calling loadGoogleMaps');
     loadGoogleMaps().then((maps) => {
       if (cancelled) return;
-      console.log('[Territorios] loadGoogleMaps resolved', { hasMaps: !!maps, hasGeometry: !!maps?.geometry });
       setMapsLoaded(true);
-    }).catch(err => {
-      console.error('[Territorios] loadGoogleMaps rejected', err);
-    });
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    if (!mapsLoaded) return;
-    if (mapInstanceRef.current) return;
-    if (!mapRef.current) {
-      console.log('[Territorios] effect ran but mapRef.current is null');
-      return;
-    }
-    const g = (window as any).google;
-    if (!g?.maps) {
-      console.log('[Territorios] google.maps not available even though mapsLoaded=true');
-      return;
-    }
-
-    let attempts = 0;
-    let intervalId: number | undefined;
-
-    const tryInit = (): boolean => {
-      const el = mapRef.current;
-      if (!el) {
-        console.log('[Territorios] tryInit: mapRef.current is null on attempt', attempts);
-        return false;
-      }
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) {
-        if (attempts === 0 || attempts % 5 === 0) {
-          console.log('[Territorios] tryInit: container 0-sized', { attempt: attempts, w: rect.width, h: rect.height });
-        }
-        return false;
-      }
-
-      console.log('[Territorios] tryInit: container has size, creating map', { w: rect.width, h: rect.height, churchLat: church?.lat, churchLng: church?.lng });
-
-      const center = church?.lat && church?.lng
-        ? { lat: church.lat, lng: church.lng }
-        : { lat: -34.5824, lng: -58.5401 };
-
-      try {
-        mapInstanceRef.current = new g.maps.Map(el, {
-          center,
-          zoom: 14,
-          mapTypeControl: true,
-          streetViewControl: false,
-          fullscreenControl: true,
-          disableDoubleClickZoom: true,
-        });
-        console.log('[Territorios] Map instance created successfully');
-      } catch (err) {
-        console.error('[Territorios] Map() constructor threw', err);
-        return false;
-      }
-
-      const recenter = () => {
-        if (!mapInstanceRef.current) return;
-        const c = mapInstanceRef.current.getCenter();
-        g.maps.event.trigger(mapInstanceRef.current, 'resize');
-        if (c) mapInstanceRef.current.setCenter(c);
-        console.log('[Territorios] resize triggered');
-      };
-      recenter();
-      setTimeout(recenter, 200);
-      setTimeout(recenter, 800);
-
-      // Listener: when the first tile loads, log it. Tells us tiles
-      // actually came back from Google's CDN.
-      g.maps.event.addListenerOnce(mapInstanceRef.current, 'tilesloaded', () => {
-        console.log('[Territorios] tilesloaded fired — map should be visible now');
-      });
-
-      return true;
-    };
-
-    if (tryInit()) return;
-    intervalId = window.setInterval(() => {
-      attempts++;
-      if (tryInit() || attempts >= 20) {
-        if (intervalId !== undefined) clearInterval(intervalId);
-        if (attempts >= 20 && !mapInstanceRef.current) {
-          console.error('[Territorios] gave up after 20 attempts — container never got non-zero size');
-        }
-      }
-    }, 100);
-
-    return () => { if (intervalId !== undefined) clearInterval(intervalId); };
-  }, [mapsLoaded, church?.lat, church?.lng]);
-
-  // Trigger a Google Maps resize whenever the container changes size
-  // (e.g. mobile portrait → landscape, or initial render where the
-  // container starts at 0 height and grows on layout). Without this,
-  // the map renders in a 0×0 box and stays gray when the container
-  // later grows. ResizeObserver is supported on all modern mobile
-  // browsers — falls back gracefully if missing.
   useEffect(() => {
     if (!mapsLoaded || !mapRef.current) return;
     const g = (window as any).google;
     if (!g?.maps) return;
     const el = mapRef.current;
-    let lastTrigger = 0;
-    const triggerResize = () => {
-      if (!mapInstanceRef.current) return;
-      const now = Date.now();
-      if (now - lastTrigger < 100) return; // throttle
-      lastTrigger = now;
-      const center = mapInstanceRef.current.getCenter();
-      g.maps.event.trigger(mapInstanceRef.current, 'resize');
-      if (center) mapInstanceRef.current.setCenter(center);
-    };
+
     const ro = new ResizeObserver(() => {
-      // Only fire when we have non-zero size — avoids spamming during
-      // initial layout calculation.
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) triggerResize();
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      if (!mapInstanceRef.current) {
+        // First time the container is visible — create the map.
+        const center = church?.lat && church?.lng
+          ? { lat: church.lat, lng: church.lng }
+          : { lat: -34.5824, lng: -58.5401 };
+        try {
+          mapInstanceRef.current = new g.maps.Map(el, {
+            center,
+            zoom: 14,
+            mapTypeControl: true,
+            streetViewControl: false,
+            fullscreenControl: true,
+            disableDoubleClickZoom: true,
+          });
+        } catch (err) {
+          console.error('[Territorios] Map() constructor threw', err);
+          return;
+        }
+        // Nudge resize after creation so tiles fill the container.
+        setTimeout(() => {
+          if (!mapInstanceRef.current) return;
+          const c = mapInstanceRef.current.getCenter();
+          g.maps.event.trigger(mapInstanceRef.current, 'resize');
+          if (c) mapInstanceRef.current.setCenter(c);
+        }, 100);
+      } else {
+        // Container resized after map already exists (e.g. tab
+        // re-shown, orientation change). Trigger resize so tiles
+        // fill the new dimensions.
+        const c = mapInstanceRef.current.getCenter();
+        g.maps.event.trigger(mapInstanceRef.current, 'resize');
+        if (c) mapInstanceRef.current.setCenter(c);
+      }
     });
     ro.observe(el);
-    // Initial nudge in case map was created in a 0-sized container.
-    setTimeout(triggerResize, 200);
     return () => ro.disconnect();
-  }, [mapsLoaded]);
+  }, [mapsLoaded, church?.lat, church?.lng]);
 
   // Attach mvc listeners that mark the polygon dirty whenever the
   // user drags a vertex or inserts/removes one. We have to listen
