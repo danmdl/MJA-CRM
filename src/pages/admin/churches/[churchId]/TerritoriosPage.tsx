@@ -537,6 +537,19 @@ const TerritoriosPage: React.FC = () => {
         setSaving(false);
         return;
       }
+      // Verify the territory was actually persisted — RPC can succeed
+      // but write 0 rows if RLS or trigger blocks silently.
+      const { data: verify } = await supabase
+        .from('cuerdas_with_geojson')
+        .select('territory_geojson')
+        .eq('id', selectedCuerda.id)
+        .single();
+      const saved = geojsonStr ? !!verify?.territory_geojson : !verify?.territory_geojson;
+      if (!saved) {
+        showError('No se pudo guardar el territorio. Verificá que tenés permisos para editar esta cuerda.');
+        setSaving(false);
+        return;
+      }
       showSuccess(geojsonStr ? 'Territorio guardado.' : 'Territorio borrado.');
       setHasUnsavedChanges(false);
       await queryClient.invalidateQueries({ queryKey: ['cuerdas-territorios', churchId] });
