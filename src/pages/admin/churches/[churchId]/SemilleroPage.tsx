@@ -114,6 +114,7 @@ const SemilleroPage = () => {
   // amber dot pill renders — when this is on, you only see the
   // contacts marked as possible duplicates.
   const [filterDuplicates, setFilterDuplicates] = useState<boolean>(false);
+  const [filterOnlyWithCoords, setFilterOnlyWithCoords] = useState<boolean>(false);
   // Pagination — pages of 200 contacts. The table is non-virtualized, so
   // dropping a thousand+ <tr>s into the DOM at once added noticeable click
   // and scroll lag. Pagination keeps the rendered set small while still
@@ -1039,6 +1040,9 @@ const SemilleroPage = () => {
     if (filterDuplicates) {
       filtered = filtered.filter(c => duplicateNameIds.has(c.id));
     }
+    if (filterOnlyWithCoords) {
+      filtered = filtered.filter(c => c.lat != null && c.lng != null);
+    }
     // Apply active tab filters (saved per-user filter combination)
     if (activeTabId && Object.keys(activeTabFilters).length > 0) {
       filtered = applyFilterTab(filtered, activeTabFilters);
@@ -1072,7 +1076,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -1090,7 +1094,7 @@ const SemilleroPage = () => {
   // page and force them to navigate back.
   useEffect(() => {
     setCurrentPage(0);
-  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, activePool, activeTabId]);
+  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, activePool, activeTabId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE));
   // Clamp the current page in case the data shrank below where we are
@@ -1399,6 +1403,16 @@ const SemilleroPage = () => {
             <span className="text-sm font-bold tabular-nums text-amber-400">{dupsInFilteredView}</span>
           </button>
         ) : null}
+        {/* Coords filter toggle */}
+        <button
+          type="button"
+          onClick={() => setFilterOnlyWithCoords(v => !v)}
+          className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${filterOnlyWithCoords ? 'border-cyan-500 bg-cyan-500/10' : 'border-border hover:border-cyan-500/40'}`}
+          title={filterOnlyWithCoords ? 'Mostrar todos los contactos' : 'Mostrar solo contactos con coordenadas (mapeables)'}
+        >
+          <MapPin className="h-3 w-3 text-cyan-400" />
+          <span className="text-[10px] uppercase tracking-wider text-cyan-400">{filterOnlyWithCoords ? 'Con coords' : 'Solo mapeables'}</span>
+        </button>
         {searchTerm && (
           <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-blue-500/30 bg-blue-500/5">
             <span className="text-[10px] uppercase tracking-wider text-blue-400">En filtro</span>

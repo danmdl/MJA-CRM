@@ -27,6 +27,7 @@ export interface FilterTabFilters {
   zonaId?: string;
   hasPhone?: 'yes' | 'no' | '';
   hasAddress?: 'yes' | 'no' | '';
+  hasCoords?: 'yes' | 'no' | '';
 }
 
 export interface FilterTab {
@@ -403,6 +404,14 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
                 <option value="no">Sin dirección</option>
               </select>
             </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Coordenadas</Label>
+              <select value={filters.hasCoords || ''} onChange={e => setF('hasCoords', e.target.value)} className={selectClass}>
+                <option value="">Cualquiera</option>
+                <option value="yes">Con coordenadas</option>
+                <option value="no">Sin coordenadas</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -451,6 +460,8 @@ export function applyFilterTab(contacts: any[], filters: FilterTabFilters): any[
     if (filters.hasPhone === 'no' && c.phone) return false;
     if (filters.hasAddress === 'yes' && !c.address) return false;
     if (filters.hasAddress === 'no' && c.address) return false;
+    if (filters.hasCoords === 'yes' && (c.lat == null || c.lng == null)) return false;
+    if (filters.hasCoords === 'no' && c.lat != null && c.lng != null) return false;
     return true;
   });
 }
