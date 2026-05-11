@@ -2178,11 +2178,15 @@ const SemilleroPage = () => {
                               return (
                                 <div className="flex items-center gap-1 overflow-hidden">
                                   <Badge className={`text-[9px] shrink-0 ${badgeClass}`}>{sugCell.name}</Badge>
-                                  {sugZona && <span className={`text-[9px] truncate ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>}
                                   {useTerritory ? (
-                                    <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{inZone ? '✓ En zona' : '⚠ Fuera'}</span>
+                                    inZone
+                                      ? <span className="text-[9px] font-medium shrink-0 text-green-400">✓ En zona</span>
+                                      : <span className="text-[9px] font-medium shrink-0 text-red-400">⚠ Fuera → Enviar a MJA</span>
                                   ) : (
-                                    dist != null && <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{dist.toFixed(1)}km</span>
+                                    <>
+                                      {sugZona && <span className={`text-[9px] truncate ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>}
+                                      {dist != null && <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{dist.toFixed(1)}km</span>}
+                                    </>
                                   )}
                                 </div>
                               );

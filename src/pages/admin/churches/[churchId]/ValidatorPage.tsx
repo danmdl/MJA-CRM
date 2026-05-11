@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw, MapPin, Phone, User, Users, Crosshair, ChevronDown, ChevronRight } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { isWithinGBA } from '@/lib/geo-validation';
+import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import { useSession } from '@/hooks/use-session';
@@ -34,6 +35,7 @@ const CHECKS = [
   { key: 'contacts_duplicate_name', label: 'Posibles duplicados (mismo nombre)', icon: Users, severity: 'warning' as const, entity: 'contact' as const },
   { key: 'cells_no_address', label: 'Células sin dirección', icon: MapPin, severity: 'error' as const, entity: 'cell' as const },
   { key: 'cells_no_coords', label: 'Células con dirección pero sin coordenadas', icon: Crosshair, severity: 'error' as const, entity: 'cell' as const },
+  { key: 'contacts_outside_territory', label: 'Contactos fuera del territorio de su cuerda', icon: MapPin, severity: 'warning' as const, entity: 'contact' as const },
 ];
 
 const ValidatorPage = () => {
@@ -231,6 +233,54 @@ const ValidatorPage = () => {
       found.push({ id: `cell-no-coords-${c.id}`, type: 'cells_no_coords', severity: 'error', entity: 'cell', entityId: c.id,
         name: c.name, detail: `Dirección: ${c.address} — sin geolocalización` });
     });
+
+    // 9. Contacts outside their cuerda's territory
+    // Only checks cuerdas that have a drawn territory polygon.
+    const { data: cuerdasWithTerritory } = await supabase
+      .from('cuerdas_with_geojson')
+      .select('id, numero, territory_geojson')
+      .not('territory_geojson', 'is', null);
+    if (cuerdasWithTerritory && cuerdasWithTerritory.length > 0) {
+      const territoryMap = new Map<string, { numero: string; paths: number[][][] }>();
+      for (const cu of cuerdasWithTerritory) {
+        const paths = geoJsonToGooglePaths(cu.territory_geojson);
+        if (paths) territoryMap.set(cu.id, { numero: cu.numero, paths });
+      }
+      if (territoryMap.size > 0) {
+        // Get all contacts with coords that belong to a cuerda with territory
+        const cuerdaIds = Array.from(territoryMap.keys());
+        const { data: cuerdaRows } = await supabase.from('cuerdas').select('id, numero').in('id', cuerdaIds);
+        const cuerdaNumeros = new Set((cuerdaRows || []).map(c => c.numero));
+        // Fetch contacts in those cuerdas
+        const { data: contactsInTerritoryCuerdas } = await supabase
+          .from('contacts')
+          .select('id, first_name, last_name, lat, lng, numero_cuerda')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .not('numero_cuerda', 'is', null);
+        for (const ct of (contactsInTerritoryCuerdas || [])) {
+          if (!ct.numero_cuerda || !cuerdaNumeros.has(ct.numero_cuerda)) continue;
+          // Find the cuerda entry
+          const cuerdaEntry = Array.from(territoryMap.entries()).find(([, v]) => v.numero === ct.numero_cuerda);
+          if (!cuerdaEntry) continue;
+          const [, { paths }] = cuerdaEntry;
+          if (!isPointInTerritory(ct.lat!, ct.lng!, paths)) {
+            const name = `${ct.first_name} ${ct.last_name || ''}`.trim();
+            found.push({
+              id: `contact-outside-${ct.id}`,
+              type: 'contacts_outside_territory',
+              severity: 'warning',
+              entity: 'contact',
+              entityId: ct.id,
+              name,
+              detail: `Cuerda ${ct.numero_cuerda} tiene territorio pero este contacto está fuera de zona`,
+            });
+          }
+        }
+      }
+    }
 
     setIssues(found);
     setLastRun(new Date());
