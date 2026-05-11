@@ -7,7 +7,9 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   referente: 'Referente',
   encargado_de_celula: 'Encargado de Célula',
   consolidador: 'Consolidador',
-  user: 'Usuario',
+  conector: 'Conector',
+  supervisor: 'Supervisor',
+  anfitrion: 'Anfitrión',
 };
 
 // Get the role label

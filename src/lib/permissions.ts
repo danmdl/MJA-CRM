@@ -40,9 +40,9 @@ export interface PermissionData {
   can_see_rutas: boolean;
 }
 
-// Role hierarchy: higher index = higher privilege
-// consolidador sits between conector and encargado_de_celula per user spec
-const ROLE_HIERARCHY: string[] = ['conector', 'consolidador', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
+// Role hierarchy: higher index = higher privilege.
+// anfitrion is the lowest tier (household/cell host).
+const ROLE_HIERARCHY: string[] = ['anfitrion', 'conector', 'consolidador', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
 
 export const getRoleLevel = (role: string): number => {
   const idx = ROLE_HIERARCHY.indexOf(role);
@@ -59,6 +59,7 @@ export const ROLE_LABELS: Record<string, string> = {
   consolidador: 'Consolidador',
   conector: 'Conector',
   supervisor: 'Supervisor',
+  anfitrion: 'Anfitrión',
 };
 
 export const usePermissions = () => {
@@ -78,8 +79,13 @@ export const usePermissions = () => {
       }
       return data || [];
     },
-    staleTime: 0,              // Always re-fetch permissions (no cache)
-    refetchInterval: 30_000,   // Poll every 30s to catch admin changes
+    // Permission changes are administrative and rare. Polling every 30s
+    // burned ~2 RPS per user — at 400 active users that's 800 RPS just for
+    // permissions metadata. Cache for 5 min instead; if an admin flips a
+    // permission and wants users to see it sooner, they can ask the user
+    // to refresh.
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
   });
 
   // True once we have BOTH the user's profile (so we know their role) and
