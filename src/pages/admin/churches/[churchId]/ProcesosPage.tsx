@@ -15,15 +15,15 @@ import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 // ─── Stage definitions ───────────────────────────────────────────────────────
 
 const STAGES = [
-  { key: 'nuevas_personas_domingos', label: 'Nuevas Personas Domingos', color: '#3b82f6' },
-  { key: 'nuevas_personas_celulas',  label: 'Nuevas Personas Células',  color: '#60a5fa' },
-  { key: 'liberacion',               label: 'Liberación',               color: '#8b5cf6' },
-  { key: 'pre_encuentro',            label: 'Pre-Encuentro',            color: '#f59e0b' },
-  { key: 'encuentro',                label: 'Encuentro',                color: '#f97316' },
-  { key: 'post_encuentro',           label: 'Post Encuentro',           color: '#ef4444' },
-  { key: 'abc',                      label: 'ABC',                      color: '#10b981' },
-  { key: 'nivel_1',                  label: 'Nivel 1',                  color: '#06b6d4' },
-  { key: 'nivel_2',                  label: 'Nivel 2',                  color: '#ec4899' },
+  { key: 'nuevas_personas_domingos', label: 'Nuevas Personas Domingos', short: 'NP Dom',  color: '#3b82f6' },
+  { key: 'nuevas_personas_celulas',  label: 'Nuevas Personas Células',  short: 'NP Cél',  color: '#60a5fa' },
+  { key: 'liberacion',               label: 'Liberación',               short: 'Lib',     color: '#8b5cf6' },
+  { key: 'pre_encuentro',            label: 'Pre-Encuentro',            short: 'Pre-E',   color: '#f59e0b' },
+  { key: 'encuentro',                label: 'Encuentro',                short: 'Enc',     color: '#f97316' },
+  { key: 'post_encuentro',           label: 'Post Encuentro',           short: 'PE',      color: '#ef4444' },
+  { key: 'abc',                      label: 'ABC',                      short: 'ABC',     color: '#10b981' },
+  { key: 'nivel_1',                  label: 'Nivel 1',                  short: 'N1',      color: '#06b6d4' },
+  { key: 'nivel_2',                  label: 'Nivel 2',                  short: 'N2',      color: '#ec4899' },
 ] as const;
 
 type StageKey = typeof STAGES[number]['key'];
@@ -263,14 +263,18 @@ const PersonDetailDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[540px] max-h-[85vh] overflow-hidden flex flex-col p-0">
         {/* Header */}
-        <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b shrink-0">
-          <div>
-            <h2 className="text-base font-semibold">{pc.first_name} {pc.last_name || ''}</h2>
-            {pc.numero_cuerda && <p className="text-xs text-muted-foreground">Cuerda {pc.numero_cuerda}</p>}
+        <div className="px-4 pt-4 pb-2 border-b shrink-0">
+          <div className="flex items-start justify-between gap-2 pr-6">
+            <div>
+              <h2 className="text-base font-semibold">{pc.first_name} {pc.last_name || ''}</h2>
+              <div className="flex items-center gap-2 mt-0.5">
+                {pc.numero_cuerda && <span className="text-xs text-muted-foreground">Cuerda {pc.numero_cuerda}</span>}
+                <Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-primary" onClick={() => { onOpenChange(false); onOpenProfile(pc.contact_id); }}>
+                  Ver perfil →
+                </Button>
+              </div>
+            </div>
           </div>
-          <Button variant="outline" size="sm" className="text-xs" onClick={() => { onOpenChange(false); onOpenProfile(pc.contact_id); }}>
-            Ver perfil
-          </Button>
         </div>
 
         {/* Stage tabs — scrollable horizontal strip */}
@@ -303,7 +307,7 @@ const PersonDetailDialog: React.FC<{
                 >
                   <span className="flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: isFuture && !hasData ? '#555' : s.color }} />
-                    {s.label.replace('Nuevas Personas ', 'NP ')}
+                    {s.short}
                   </span>
                 </button>
               );
