@@ -158,10 +158,11 @@ const TerritoriosPage: React.FC = () => {
     staleTime: 60_000,
   });
 
-  // Contacts for the selected cuerda — only loaded when showContacts is on
+  // Contacts for the SELECTED cuerda only — shown as pins on the map
   const { data: contacts } = useQuery<{ id: string; first_name: string; last_name: string | null; lat: number | null; lng: number | null; numero_cuerda: string | null }[]>({
-    queryKey: ['contacts-territorios', churchId],
+    queryKey: ['contacts-territorios', churchId, selectedCuerdaNumero],
     queryFn: async () => {
+      if (!selectedCuerdaNumero) return [];
       const PAGE = 1000;
       const all: any[] = [];
       for (let p = 0; ; p++) {
@@ -169,6 +170,7 @@ const TerritoriosPage: React.FC = () => {
           .from('contacts')
           .select('id, first_name, last_name, lat, lng, numero_cuerda')
           .eq('church_id', churchId!)
+          .eq('numero_cuerda', selectedCuerdaNumero)
           .is('deleted_at', null)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
@@ -179,7 +181,7 @@ const TerritoriosPage: React.FC = () => {
       }
       return all;
     },
-    enabled: !!churchId && showContacts,
+    enabled: !!churchId && !!selectedCuerdaNumero && showContacts,
     staleTime: 60_000,
   });
 
@@ -274,6 +276,14 @@ const TerritoriosPage: React.FC = () => {
             streetViewControl: false,
             fullscreenControl: true,
             disableDoubleClickZoom: true,
+            styles: [
+              { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+              { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+              { featureType: 'poi.park', stylers: [{ visibility: 'simplified' }] },
+              { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+              { featureType: 'landscape', stylers: [{ saturation: -30 }] },
+              { featureType: 'water', stylers: [{ saturation: -30 }] },
+            ],
           });
         } catch (err) {
           console.error('[Territorios] Map() constructor threw', err);
@@ -393,9 +403,17 @@ const TerritoriosPage: React.FC = () => {
     contactMarkersRef.current = [];
     if (!mapReady || !mapInstanceRef.current || !contacts || !showContacts) return;
     const g = (window as any).google;
+    // If the selected cuerda has territory, color pins green (in) or red (out)
+    const selCuerda = selectedCuerdaNumero && cuerdas ? cuerdas.find(c => c.numero === selectedCuerdaNumero) : null;
+    const selPaths = selCuerda ? cuerdaTerritoryMap.get(selCuerda.id) : null;
     for (const ct of contacts) {
       if (typeof ct.lat !== 'number' || typeof ct.lng !== 'number') continue;
-      const color = ct.numero_cuerda ? colorForCuerda(ct.numero_cuerda) : '#888';
+      let color: string;
+      if (selPaths) {
+        color = isPointInTerritory(ct.lat, ct.lng, selPaths) ? '#22c55e' : '#ef4444';
+      } else {
+        color = ct.numero_cuerda ? colorForCuerda(ct.numero_cuerda) : '#888';
+      }
       const marker = new g.maps.Marker({
         position: { lat: ct.lat, lng: ct.lng },
         map: mapInstanceRef.current,
@@ -412,7 +430,7 @@ const TerritoriosPage: React.FC = () => {
       });
       contactMarkersRef.current.push(marker);
     }
-  }, [mapReady, contacts, showContacts]);
+  }, [mapReady, contacts, showContacts, selectedCuerdaNumero, cuerdas, cuerdaTerritoryMap]);
 
   // ─── Drawing controls ────────────────────────────────────────────
   // Tap-to-draw flow:
