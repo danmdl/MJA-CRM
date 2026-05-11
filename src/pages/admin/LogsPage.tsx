@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, RefreshCw, Search, ChevronDown, ChevronUp, UserSearch } from 'lucide-react';
+import { CheckCircle, RefreshCw, Search, ChevronDown, ChevronUp, UserSearch, Users } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { showSuccess } from '@/utils/toast';
 
@@ -189,13 +189,139 @@ const ActivityGroupRow = ({ group, name, email }: { group: any[]; name: string; 
   );
 };
 
+const formatRelative = (ts: string | null) => {
+  if (!ts) return 'Nunca';
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff / 60_000);
+  if (m < 1) return 'hace segundos';
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `hace ${d} d`;
+  const mo = Math.floor(d / 30);
+  return `hace ${mo} mes${mo > 1 ? 'es' : ''}`;
+};
+
+const lastLoginStatus = (ts: string | null): 'green' | 'yellow' | 'red' => {
+  if (!ts) return 'red';
+  const diffH = (Date.now() - new Date(ts).getTime()) / 3_600_000;
+  if (diffH < 24) return 'green';
+  if (diffH < 72) return 'yellow';
+  return 'red';
+};
+
+const STATUS_DOT: Record<'green' | 'yellow' | 'red', string> = {
+  green: 'bg-green-500',
+  yellow: 'bg-yellow-500',
+  red: 'bg-red-500',
+};
+
+const PerPersonRow = ({ user }: { user: { id: string; name: string; email: string; lastLogin: string | null; status: 'green' | 'yellow' | 'red' } }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: events, isLoading } = useQuery<any[]>({
+    queryKey: ['per_person_events', user.id],
+    queryFn: async () => {
+      const [actRes, cliRes] = await Promise.all([
+        supabase
+          .from('activity_logs')
+          .select('id, action, entity_type, entity_id, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('client_logs')
+          .select('id, action, error_message, error_code, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+      ]);
+      const merged = [
+        ...(actRes.data || []).map((r: any) => ({ ...r, source: 'activity' })),
+        ...(cliRes.data || []).map((r: any) => ({ ...r, source: 'client' })),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 20);
+      return merged;
+    },
+    enabled: expanded,
+  });
+
+  return (
+    <>
+      <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => setExpanded(v => !v)}>
+        <TableCell className="w-8">
+          <button className="text-muted-foreground hover:text-foreground">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        </TableCell>
+        <TableCell className="w-8">
+          <div className={`w-2.5 h-2.5 rounded-full ${STATUS_DOT[user.status]}`} title={user.status === 'green' ? '<24h' : user.status === 'yellow' ? '24-72h' : '>72h o nunca'} />
+        </TableCell>
+        <TableCell>
+          <div className="text-sm font-medium">{user.name || user.email || 'Usuario'}</div>
+          {user.name && user.email && <div className="text-xs text-muted-foreground">{user.email}</div>}
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+          {user.lastLogin ? (
+            <>
+              <div>{formatART(user.lastLogin)}</div>
+              <div>{formatRelative(user.lastLogin)}</div>
+            </>
+          ) : (
+            <span className="italic">Nunca ingresó</span>
+          )}
+        </TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow className="bg-muted/10">
+          <TableCell colSpan={4} className="p-0">
+            <div className="p-3">
+              {isLoading ? (
+                <p className="text-xs text-muted-foreground py-2 px-2">Cargando eventos…</p>
+              ) : !events || events.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2 px-2">Sin eventos registrados.</p>
+              ) : (
+                <div className="border rounded">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="h-8 text-xs">Hora (ART)</TableHead>
+                        <TableHead className="h-8 text-xs">Acción</TableHead>
+                        <TableHead className="h-8 text-xs">Detalle</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {events.map((e: any) => (
+                        <TableRow key={`${e.source}-${e.id}`}>
+                          <TableCell className="font-mono text-xs whitespace-nowrap">{formatART(e.created_at)}</TableCell>
+                          <TableCell>
+                            <Badge className={`${ACTION_COLORS[e.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{ACTION_LABELS[e.action] || e.action || '—'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[260px] truncate">
+                            {e.source === 'client' ? (e.error_message || e.error_code || '—') : (e.entity_type || '—')}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+};
+
 const LogsPage = () => {
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [showResolved, setShowResolved] = useState(false);
-  const [view, setView] = useState<'errors' | 'activity'>('activity');
+  const [view, setView] = useState<'errors' | 'activity' | 'per_person'>('activity');
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [activityUserSearch, setActivityUserSearch] = useState<string>('');
+  const [perPersonSearch, setPerPersonSearch] = useState<string>('');
   const queryClient = useQueryClient();
 
   const { data: logs, isLoading, refetch } = useQuery<LogEntry[]>({
@@ -329,6 +455,73 @@ const LogsPage = () => {
     enabled: view === 'activity',
   });
 
+  // Per-person view: every user with their last login
+  const { data: perPersonUsers, isLoading: perPersonLoading } = useQuery<any[]>({
+    queryKey: ['per_person_users'],
+    queryFn: async () => {
+      const [profilesRes, actRes, cliRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .order('first_name', { ascending: true }),
+        supabase
+          .from('activity_logs')
+          .select('user_id, created_at')
+          .eq('action', 'login')
+          .order('created_at', { ascending: false })
+          .limit(2000),
+        supabase
+          .from('client_logs')
+          .select('user_id, created_at')
+          .eq('action', 'login_success')
+          .order('created_at', { ascending: false })
+          .limit(2000),
+      ]);
+      const lastByUser: Record<string, string> = {};
+      (actRes.data || []).forEach((r: any) => {
+        if (r.user_id && !lastByUser[r.user_id]) lastByUser[r.user_id] = r.created_at;
+      });
+      (cliRes.data || []).forEach((r: any) => {
+        if (r.user_id) {
+          const prev = lastByUser[r.user_id];
+          if (!prev || new Date(r.created_at).getTime() > new Date(prev).getTime()) {
+            lastByUser[r.user_id] = r.created_at;
+          }
+        }
+      });
+      return (profilesRes.data || []).map((p: any) => {
+        const lastLogin = lastByUser[p.id] || null;
+        const name = [p.first_name, p.last_name].filter(Boolean).join(' ');
+        return {
+          id: p.id,
+          name,
+          email: p.email || '',
+          lastLogin,
+          status: lastLoginStatus(lastLogin),
+        };
+      });
+    },
+    refetchInterval: 60_000,
+    enabled: view === 'per_person',
+  });
+
+  const filteredPerPerson = useMemo(() => {
+    const list = perPersonUsers || [];
+    const order = { red: 0, yellow: 1, green: 2 } as const;
+    const sorted = [...list].sort((a, b) => {
+      const o = order[a.status as keyof typeof order] - order[b.status as keyof typeof order];
+      if (o !== 0) return o;
+      // Within same bucket: most recent first for green/yellow, then alphabetical for red without login
+      if (a.lastLogin && b.lastLogin) return new Date(b.lastLogin).getTime() - new Date(a.lastLogin).getTime();
+      if (a.lastLogin) return -1;
+      if (b.lastLogin) return 1;
+      return (a.name || a.email).localeCompare(b.name || b.email);
+    });
+    if (!perPersonSearch.trim()) return sorted;
+    const q = normalize(perPersonSearch);
+    return sorted.filter(u => normalize(`${u.name} ${u.email}`).includes(q));
+  }, [perPersonUsers, perPersonSearch]);
+
   const filtered = (logs || []).filter(log => {
     if (levelFilter !== 'all' && log.level !== levelFilter) return false;
     if (search) {
@@ -369,7 +562,61 @@ const LogsPage = () => {
         >
           Actividad de usuarios
         </button>
+        <button
+          onClick={() => setView('per_person')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${view === 'per_person' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          <Users className="h-4 w-4" />
+          Por persona
+        </button>
       </div>
+
+      {view === 'per_person' && (
+        <>
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="relative">
+              <UserSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-8 h-8 w-52 text-xs"
+                placeholder="Buscar por persona..."
+                value={perPersonSearch}
+                onChange={e => setPerPersonSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500" /> &lt;24h</span>
+              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-500" /> 24–72h</span>
+              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500" /> &gt;72h o nunca</span>
+            </div>
+          </div>
+
+          <div className="text-xs text-muted-foreground mb-2">
+            Mostrando {filteredPerPerson.length} usuario{filteredPerPerson.length !== 1 ? 's' : ''} · Hora en Argentina (ART UTC-3) · Click en un usuario para ver sus últimos 20 eventos
+          </div>
+
+          <div className="border rounded-md overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="w-8"></TableHead>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Último ingreso</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {perPersonLoading ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Cargando…</TableCell></TableRow>
+                ) : filteredPerPerson.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Sin usuarios.</TableCell></TableRow>
+                ) : (
+                  filteredPerPerson.map(u => <PerPersonRow key={u.id} user={u} />)
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
 
       {view === 'activity' && (
         <>
