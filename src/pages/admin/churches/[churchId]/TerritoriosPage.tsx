@@ -110,7 +110,7 @@ const TerritoriosPage: React.FC = () => {
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [showCells, setShowCells] = useState(false);
-  const [showContacts, setShowContacts] = useState(false);
+  const [showContacts, setShowContacts] = useState(true);
   const [selectedCuerdaNumero, setSelectedCuerdaNumero] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -393,12 +393,13 @@ const TerritoriosPage: React.FC = () => {
         map: mapInstanceRef.current,
         title: `${ct.first_name} ${ct.last_name || ''}`.trim() + (ct.numero_cuerda ? ` · C${ct.numero_cuerda}` : ''),
         icon: {
-          path: g.maps.SymbolPath.CIRCLE,
+          path: 'M12 0C7.6 0 4 3.6 4 8c0 5.4 7.1 13.2 7.4 13.6.3.3.9.3 1.2 0C13 21.2 20 13.4 20 8c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z',
           fillColor: color,
-          fillOpacity: 0.7,
-          strokeColor: color,
-          strokeWeight: 0.5,
-          scale: 4,
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 1,
+          scale: 1.2,
+          anchor: new g.maps.Point(12, 24),
         },
       });
       contactMarkersRef.current.push(marker);

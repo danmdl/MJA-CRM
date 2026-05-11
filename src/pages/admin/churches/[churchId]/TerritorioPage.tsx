@@ -14,7 +14,7 @@ const TABS: { key: SubTab; label: string; Icon: React.ElementType }[] = [
 ];
 
 const TerritorioPage: React.FC = () => {
-  const [subTab, setSubTab] = useState<SubTab>('celulas');
+  const [subTab, setSubTab] = useState<SubTab>('delineacion');
   const { canSeeMapa, canSeeCuerdas } = usePermissions();
 
   const visibleTabs = TABS.filter(t => {

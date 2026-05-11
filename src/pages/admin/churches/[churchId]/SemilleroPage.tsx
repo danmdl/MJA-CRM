@@ -770,14 +770,11 @@ const SemilleroPage = () => {
   // need it — they already see "✓ En zona" / "⚠ Fuera → Enviar a MJA"
   // inline. Non-MJA users WITHOUT a territory still see it as a fallback
   // (km-based suggestions).
-  const showSugerencia = useMemo(() => {
-    if (isMjaMember) return true;
-    // Check if the user's own cuerda has a territory drawn
-    if (!userCuerdaNumero || !cuerdas) return true; // fallback: show it
-    const userCuerda = cuerdas.find(c => c.numero === userCuerdaNumero);
-    if (!userCuerda) return true;
-    return !cuerdaTerritoryMap.get(userCuerda.id); // hide if territory exists
-  }, [isMjaMember, userCuerdaNumero, cuerdas, cuerdaTerritoryMap]);
+  // Sugerencia column is only for MJA Central members — they're the
+  // ones who assign contacts across cuerdas. Any other cuerda member
+  // (regardless of role) doesn't need it; they have their territory
+  // and see "En zona" / "Fuera → Enviar a MJA" inline.
+  const showSugerencia = isMjaMember;
 
   const externalContacts = useMemo(() => {
     if (isMjaMember) {
