@@ -278,7 +278,47 @@ const Messages = () => {
           <div className="space-y-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground">Destinatarios</label>
-              <Input placeholder="Buscar..." value={recipientSearch} onChange={e => setRecipientSearch(e.target.value)} className="mt-1 h-8 text-sm" />
+              {/* Role quick-select buttons */}
+              <div className="flex flex-wrap gap-1.5 mt-1.5 mb-2">
+                {(() => {
+                  const roles = [...new Set(team.map(u => u.role).filter(Boolean))] as string[];
+                  const roleLabels: Record<string, string> = {
+                    admin: 'Admins', general: 'Generales', pastor: 'Pastores',
+                    supervisor: 'Supervisores', referente: 'Referentes',
+                    encargado_de_celula: 'Enc. Célula', consolidador: 'Consolidadores',
+                    conector: 'Conectores', anfitrion: 'Anfitriones',
+                  };
+                  return roles.sort().map(role => {
+                    const roleMembers = team.filter(u => u.role === role);
+                    const allSelected = roleMembers.every(u => selectedIds.has(u.id));
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (allSelected) {
+                              roleMembers.forEach(u => next.delete(u.id));
+                            } else {
+                              roleMembers.forEach(u => next.add(u.id));
+                            }
+                            return next;
+                          });
+                        }}
+                        className={`px-2 py-1 rounded text-[11px] border transition-colors ${
+                          allSelected
+                            ? 'bg-primary/20 border-primary text-primary font-medium'
+                            : 'border-border text-muted-foreground hover:border-primary/40'
+                        }`}
+                      >
+                        {roleLabels[role] || role} ({roleMembers.length})
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+              <Input placeholder="Buscar..." value={recipientSearch} onChange={e => setRecipientSearch(e.target.value)} className="h-8 text-sm" />
               <div className="max-h-36 overflow-auto border rounded mt-1.5">
                 {filteredTeam.map(u => (
                   <label key={u.id} className="flex items-center gap-2 px-2.5 py-1.5 border-b last:border-b-0 hover:bg-muted/30 cursor-pointer text-sm">
