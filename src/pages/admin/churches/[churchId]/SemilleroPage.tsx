@@ -1047,6 +1047,21 @@ const SemilleroPage = () => {
     if (activeTabId && Object.keys(activeTabFilters).length > 0) {
       filtered = applyFilterTab(filtered, activeTabFilters);
     }
+    // Zona status filter — requires territory data from cuerdaTerritoryMap.
+    // Applied after tab filters so it works both as a tab preset and ad-hoc.
+    const zonaFilter = activeTabFilters?.zonaStatus;
+    if (zonaFilter === 'in' || zonaFilter === 'out') {
+      filtered = filtered.filter(c => {
+        if (c.lat == null || c.lng == null) return false;
+        // Find the cuerda this contact belongs to
+        const contactCuerda = (cuerdas || []).find(cu => cu.numero === c.numero_cuerda);
+        if (!contactCuerda) return false;
+        const paths = cuerdaTerritoryMap.get(contactCuerda.id);
+        if (!paths) return false; // no territory drawn, can't classify
+        const inside = isPointInTerritory(c.lat, c.lng, paths);
+        return zonaFilter === 'in' ? inside : !inside;
+      });
+    }
     // Sorting. When Duplicados toggle is on, we force-sort by normalized
     // name regardless of what the user's sort header was set to — there's
     // no point seeing duplicate pairs scattered down the table when the
@@ -1076,7 +1091,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id, cuerdaTerritoryMap, cuerdas]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -1411,7 +1426,7 @@ const SemilleroPage = () => {
           title={filterOnlyWithCoords ? 'Mostrar todos los contactos' : 'Mostrar solo contactos con coordenadas (mapeables)'}
         >
           <MapPin className="h-3 w-3 text-cyan-400" />
-          <span className="text-[10px] uppercase tracking-wider text-cyan-400">{filterOnlyWithCoords ? 'Con coords' : 'Solo mapeables'}</span>
+          <span className="text-[10px] uppercase tracking-wider text-cyan-400">{filterOnlyWithCoords ? 'Ver todos' : 'Solo mapeables'}</span>
         </button>
         {searchTerm && (
           <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-blue-500/30 bg-blue-500/5">

@@ -28,6 +28,7 @@ export interface FilterTabFilters {
   hasPhone?: 'yes' | 'no' | '';
   hasAddress?: 'yes' | 'no' | '';
   hasCoords?: 'yes' | 'no' | '';
+  zonaStatus?: 'in' | 'out' | '';
 }
 
 export interface FilterTab {
@@ -410,6 +411,14 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
                 <option value="">Cualquiera</option>
                 <option value="yes">Con coordenadas</option>
                 <option value="no">Sin coordenadas</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zona</Label>
+              <select value={filters.zonaStatus || ''} onChange={e => setF('zonaStatus', e.target.value)} className={selectClass}>
+                <option value="">Cualquiera</option>
+                <option value="in">En zona</option>
+                <option value="out">Fuera de zona</option>
               </select>
             </div>
           </div>
