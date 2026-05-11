@@ -179,6 +179,7 @@ const RutasPage = () => {
               <DropdownMenuCheckboxItem
                 checked={filterCuerdas.size === 0}
                 onCheckedChange={() => setFilterCuerdas(new Set())}
+                onSelect={(e) => e.preventDefault()}
               >
                 Todas las cuerdas
               </DropdownMenuCheckboxItem>
@@ -187,6 +188,7 @@ const RutasPage = () => {
                 <DropdownMenuCheckboxItem
                   key={c}
                   checked={filterCuerdas.has(c)}
+                  onSelect={(e) => e.preventDefault()}
                   onCheckedChange={(checked) => {
                     setFilterCuerdas(prev => {
                       const next = new Set(prev);

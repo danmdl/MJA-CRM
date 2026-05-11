@@ -293,6 +293,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
             <DropdownMenuCheckboxItem
               checked={filterCuerdas.size === 0}
               onCheckedChange={() => setFilterCuerdas(new Set())}
+              onSelect={(e) => e.preventDefault()}
             >
               Todas las cuerdas
             </DropdownMenuCheckboxItem>
@@ -301,6 +302,7 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
               <DropdownMenuCheckboxItem
                 key={c.id}
                 checked={filterCuerdas.has(c.numero)}
+                onSelect={(e) => e.preventDefault()}
                 onCheckedChange={(checked) => {
                   setFilterCuerdas(prev => {
                     const next = new Set(prev);
