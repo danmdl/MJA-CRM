@@ -85,6 +85,7 @@ const TerritoriosPage: React.FC = () => {
   // Cell markers — small dots so the user knows where their cells
   // sit relative to the territory they're drawing.
   const cellMarkersRef = useRef<any[]>([]);
+  const contactMarkersRef = useRef<any[]>([]);
   // ── Tap-to-draw mode ──
   // Instead of Google's DrawingManager (which makes you tap the FIRST
   // vertex again to close — borderline impossible on mobile), we
@@ -107,6 +108,9 @@ const TerritoriosPage: React.FC = () => {
   const tapListenerRef = useRef<any>(null);
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [showCells, setShowCells] = useState(false);
+  const [showContacts, setShowContacts] = useState(false);
   const [selectedCuerdaNumero, setSelectedCuerdaNumero] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -151,6 +155,23 @@ const TerritoriosPage: React.FC = () => {
       return data || [];
     },
     enabled: !!churchId,
+    staleTime: 60_000,
+  });
+
+  // Contacts for the selected cuerda — only loaded when showContacts is on
+  const { data: contacts } = useQuery<{ id: string; first_name: string; last_name: string | null; lat: number | null; lng: number | null; numero_cuerda: string | null }[]>({
+    queryKey: ['contacts-territorios', churchId, selectedCuerdaNumero],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, lat, lng, numero_cuerda')
+        .eq('church_id', churchId!)
+        .is('deleted_at', null)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null);
+      return data || [];
+    },
+    enabled: !!churchId && showContacts,
     staleTime: 60_000,
   });
 
@@ -257,6 +278,7 @@ const TerritoriosPage: React.FC = () => {
           g.maps.event.trigger(mapInstanceRef.current, 'resize');
           if (c) mapInstanceRef.current.setCenter(c);
         }, 100);
+        setMapReady(true);
       } else {
         // Container resized after map already exists (e.g. tab
         // re-shown, orientation change). Trigger resize so tiles
@@ -285,7 +307,7 @@ const TerritoriosPage: React.FC = () => {
 
   // ─── Render polygons whenever data or selection changes ──────────
   useEffect(() => {
-    if (!mapsLoaded || !mapInstanceRef.current || !cuerdas) return;
+    if (!mapReady || !mapInstanceRef.current || !cuerdas) return;
     const g = (window as any).google;
 
     // Tear down everything and rebuild. Cheaper than diffing for the
@@ -327,17 +349,14 @@ const TerritoriosPage: React.FC = () => {
     }
 
     setHasUnsavedChanges(false);
-  }, [mapsLoaded, cuerdas, selectedCuerdaNumero, profile?.role, profile?.numero_cuerda]);
+  }, [mapReady, cuerdas, selectedCuerdaNumero, profile?.role, profile?.numero_cuerda]);
 
-  // ─── Render cell markers ─────────────────────────────────────────
-  // Show all cells in the iglesia as small dots, colored by their
-  // cuerda. Helps the user verify their drawing covers the right
-  // cells.
+  // ─── Render cell markers (toggled via showCells checkbox) ────────
   useEffect(() => {
-    if (!mapsLoaded || !mapInstanceRef.current || !cells || !cuerdas) return;
-    const g = (window as any).google;
     cellMarkersRef.current.forEach(m => m.setMap(null));
     cellMarkersRef.current = [];
+    if (!mapReady || !mapInstanceRef.current || !cells || !cuerdas || !showCells) return;
+    const g = (window as any).google;
     const cuerdaById = new Map((cuerdas || []).map(c => [c.id, c]));
     for (const cell of cells) {
       if (typeof cell.lat !== 'number' || typeof cell.lng !== 'number') continue;
@@ -358,7 +377,33 @@ const TerritoriosPage: React.FC = () => {
       });
       cellMarkersRef.current.push(marker);
     }
-  }, [mapsLoaded, cells, cuerdas]);
+  }, [mapReady, cells, cuerdas, showCells]);
+
+  // ─── Render contact markers (toggled via showContacts checkbox) ──
+  useEffect(() => {
+    contactMarkersRef.current.forEach(m => m.setMap(null));
+    contactMarkersRef.current = [];
+    if (!mapReady || !mapInstanceRef.current || !contacts || !showContacts) return;
+    const g = (window as any).google;
+    for (const ct of contacts) {
+      if (typeof ct.lat !== 'number' || typeof ct.lng !== 'number') continue;
+      const color = ct.numero_cuerda ? colorForCuerda(ct.numero_cuerda) : '#888';
+      const marker = new g.maps.Marker({
+        position: { lat: ct.lat, lng: ct.lng },
+        map: mapInstanceRef.current,
+        title: `${ct.first_name} ${ct.last_name || ''}`.trim() + (ct.numero_cuerda ? ` · C${ct.numero_cuerda}` : ''),
+        icon: {
+          path: g.maps.SymbolPath.CIRCLE,
+          fillColor: color,
+          fillOpacity: 0.7,
+          strokeColor: color,
+          strokeWeight: 0.5,
+          scale: 4,
+        },
+      });
+      contactMarkersRef.current.push(marker);
+    }
+  }, [mapReady, contacts, showContacts]);
 
   // ─── Drawing controls ────────────────────────────────────────────
   // Tap-to-draw flow:
@@ -737,6 +782,18 @@ const TerritoriosPage: React.FC = () => {
           No hay cuerdas configuradas en esta iglesia.
         </div>
       )}
+
+      {/* Overlay toggles */}
+      <div className="flex items-center gap-4 px-1">
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+          <input type="checkbox" checked={showCells} onChange={e => setShowCells(e.target.checked)} className="rounded" />
+          Mostrar células
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+          <input type="checkbox" checked={showContacts} onChange={e => setShowContacts(e.target.checked)} className="rounded" />
+          Mostrar contactos
+        </label>
+      </div>
 
       {/* Map container — flex-1 fills all remaining vertical space */}
       <div className="flex-1 min-h-[300px] rounded-xl overflow-hidden border">
