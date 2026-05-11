@@ -32,8 +32,17 @@ export default defineConfig(() => ({
         // Vite splits it into its own chunk when used by multiple lazy pages,
         // but the hash changes every time the file is modified — users with
         // an HTTP-cached index.html referencing the old hash get a 404 on load.
+        // Split only HEAVY LEAF deps that don't import React at module-load
+        // time. The previous attempt also chunked radix/lucide/tanstack and
+        // crashed prod with "createContext undefined" because a radix chunk
+        // loaded before React. These libs stay in the main bundle.
         manualChunks: (id) => {
-          if (id.includes('phone-validation')) return undefined; // inline into importer
+          if (id.includes('phone-validation')) return undefined;
+          if (id.includes('node_modules/xlsx')) return 'vendor-xlsx';
+          if (id.includes('node_modules/papaparse')) return 'vendor-papaparse';
+          if (id.includes('node_modules/recharts')) return 'vendor-charts';
+          if (id.includes('node_modules/date-fns')) return 'vendor-date';
+          return undefined;
         },
       },
     },
