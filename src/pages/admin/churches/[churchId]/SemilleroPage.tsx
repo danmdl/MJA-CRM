@@ -115,6 +115,7 @@ const SemilleroPage = () => {
   // contacts marked as possible duplicates.
   const [filterDuplicates, setFilterDuplicates] = useState<boolean>(false);
   const [filterOnlyWithCoords, setFilterOnlyWithCoords] = useState<boolean>(false);
+  const [filterZonaStatus, setFilterZonaStatus] = useState<'' | 'in' | 'out'>('');
   // Pagination — pages of 200 contacts. The table is non-virtualized, so
   // dropping a thousand+ <tr>s into the DOM at once added noticeable click
   // and scroll lag. Pagination keeps the rendered set small while still
@@ -1049,7 +1050,7 @@ const SemilleroPage = () => {
     }
     // Zona status filter — requires territory data from cuerdaTerritoryMap.
     // Applied after tab filters so it works both as a tab preset and ad-hoc.
-    const zonaFilter = activeTabFilters?.zonaStatus;
+    const zonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
     if (zonaFilter === 'in' || zonaFilter === 'out') {
       filtered = filtered.filter(c => {
         if (c.lat == null || c.lng == null) return false;
@@ -1091,7 +1092,7 @@ const SemilleroPage = () => {
       });
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id, cuerdaTerritoryMap, cuerdas]);
+  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id, cuerdaTerritoryMap, cuerdas]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -1109,7 +1110,7 @@ const SemilleroPage = () => {
   // page and force them to navigate back.
   useEffect(() => {
     setCurrentPage(0);
-  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, activePool, activeTabId]);
+  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, activePool, activeTabId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE));
   // Clamp the current page in case the data shrank below where we are
@@ -1530,6 +1531,8 @@ const SemilleroPage = () => {
                 setFilterCuerda('');
                 setFilterConector('');
                 setFilterDuplicates(false);
+                setFilterOnlyWithCoords(false);
+                setFilterZonaStatus('');
                 setSearchTerm('');
               }}
               cuerdas={cuerdas || []}
@@ -1923,7 +1926,25 @@ const SemilleroPage = () => {
                           : <ArrowUpDown className="h-3 w-3 opacity-40" />}
                       </button>
                     </ResizableHeader>
-                    {isUnassignedView && showSugerencia && <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>{userCuerdaHasTerritory ? 'Zona' : 'Sugerencia'}</ResizableHeader>}
+                    {isUnassignedView && showSugerencia && (
+                      <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>
+                        {userCuerdaHasTerritory ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button type="button" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                                Zona
+                                <Filter className={`h-3 w-3 ${filterZonaStatus ? 'text-primary fill-primary/30' : 'opacity-60'}`} />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuItem onClick={() => setFilterZonaStatus('')} className={filterZonaStatus === '' ? 'bg-accent' : ''}>Todos</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setFilterZonaStatus('in')} className={filterZonaStatus === 'in' ? 'bg-accent' : ''}>✓ En zona</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setFilterZonaStatus('out')} className={filterZonaStatus === 'out' ? 'bg-accent' : ''}>⚠ Fuera de zona</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : 'Sugerencia'}
+                      </ResizableHeader>
+                    )}
                     {isUnassignedView && canAssignContacts() && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                   </tr>
                 </thead>
