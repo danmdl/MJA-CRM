@@ -405,7 +405,7 @@ const TerritoriosPage: React.FC = () => {
     const g = (window as any).google;
     // If the selected cuerda has territory, color pins green (in) or red (out)
     const selCuerda = selectedCuerdaNumero && cuerdas ? cuerdas.find(c => c.numero === selectedCuerdaNumero) : null;
-    const selPaths = selCuerda ? cuerdaTerritoryMap.get(selCuerda.id) : null;
+    const selPaths = selCuerda ? geoJsonToGooglePaths(selCuerda.territory_geojson as any) : null;
     for (const ct of contacts) {
       if (typeof ct.lat !== 'number' || typeof ct.lng !== 'number') continue;
       let color: string;
@@ -430,7 +430,7 @@ const TerritoriosPage: React.FC = () => {
       });
       contactMarkersRef.current.push(marker);
     }
-  }, [mapReady, contacts, showContacts, selectedCuerdaNumero, cuerdas, cuerdaTerritoryMap]);
+  }, [mapReady, contacts, showContacts, selectedCuerdaNumero, cuerdas]);
 
   // ─── Drawing controls ────────────────────────────────────────────
   // Tap-to-draw flow:
