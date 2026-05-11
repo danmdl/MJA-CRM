@@ -175,6 +175,27 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
 
   // Count contacts assigned to each cell for the popup
   const { data: cellContactCounts } = useQuery<Record<string, number>>({
+
+  // Hogares de paz — shown as house icons on the cells map view.
+  // Loaded alongside cells so they appear together.
+  const { data: hogares } = useQuery<{ id: string; name: string | null; address: string | null; lat: number | null; lng: number | null; leader_name: string | null; anfitrion_name: string | null; meeting_day: string | null; meeting_time: string | null; cuerda_numero: string | null }[]>({
+    queryKey: ['hogares-map', churchId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('hogares_de_paz')
+        .select('id, name, address, lat, lng, leader_name, anfitrion_name, meeting_day, meeting_time, cuerda_id, cuerdas(numero)')
+        .eq('church_id', churchId!)
+        .is('deleted_at', null)
+        .is('closed_at', null);
+      if (error) throw error;
+      return (data || []).map((h: any) => ({
+        ...h,
+        cuerda_numero: h.cuerdas?.numero ?? null,
+      }));
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
     queryKey: ['cell-contact-counts', churchId],
     queryFn: async () => {
       const { data } = await supabase
@@ -486,6 +507,52 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
 
           bounds.extend(pos);
         });
+
+        // ─── HOGARES DE PAZ (house icons, cells mode only) ─────────────
+        const mappableHogares = (hogares || []).filter(h => h.lat && h.lng);
+        mappableHogares.forEach(hogar => {
+          const pos = { lat: hogar.lat!, lng: hogar.lng! };
+          const colors = hogar.cuerda_numero ? cuerdaColorMap.get(hogar.cuerda_numero) : null;
+          const fillColor = colors?.fill || '#FFC233';
+          const strokeColor = colors?.stroke || '#B8720A';
+
+          // House SVG path — distinguishes hogares from cell pin markers
+          const houseIcon = {
+            path: 'M12 3L2 12h3v8h5v-6h4v6h5v-8h3L12 3z',
+            fillColor,
+            fillOpacity: 1,
+            strokeColor,
+            strokeWeight: 1.5,
+            scale: 1.4,
+            anchor: new gmaps.Point(12, 22),
+          };
+
+          const marker = new gmaps.Marker({
+            position: pos,
+            map,
+            icon: houseIcon,
+            title: hogar.name || 'Hogar de Paz',
+          });
+
+          const cuerdaLabel = hogar.cuerda_numero ? `Cuerda ${hogar.cuerda_numero}` : '';
+          const schedule = [hogar.meeting_day, hogar.meeting_time].filter(Boolean).join(' · ') || 'Sin horario';
+
+          marker.addListener('click', () => {
+            infoWindow.setContent(`
+              <div style="font-family:system-ui,sans-serif;min-width:220px;padding:4px 0;color:#111;">
+                <div style="font-size:15px;font-weight:700;margin-bottom:5px;">🏠 ${hogar.name || 'Hogar de Paz'}</div>
+                ${cuerdaLabel ? `<div style="font-size:12px;color:#555;margin-bottom:2px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fillColor};margin-right:4px;vertical-align:middle;"></span>${cuerdaLabel}</div>` : ''}
+                ${hogar.leader_name ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">👤 Líder: ${hogar.leader_name}</div>` : ''}
+                ${hogar.anfitrion_name ? `<div style="font-size:12px;color:#555;margin-bottom:2px;">🏠 Anfitrión: ${hogar.anfitrion_name}</div>` : ''}
+                <div style="font-size:12px;color:#555;margin-bottom:2px;">🕐 ${schedule}</div>
+                ${hogar.address ? `<div style="font-size:11px;color:#777;margin-top:4px;">📍 ${hogar.address}</div>` : ''}
+              </div>
+            `);
+            infoWindow.open(map, marker);
+          });
+
+          bounds.extend(pos);
+        });
       } else {
         // ─── CONTACTS MODE ─────────────────────────────────────────────
         // Smaller circle markers (vs cells' drop-pin) so a thousand pins
@@ -542,7 +609,7 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
     };
 
     initMap();
-  }, [viewMode, mappableCellKey, mappableContactKey, isLoading, geocoding, contactsLoading, cellContactCounts]);
+  }, [viewMode, mappableCellKey, mappableContactKey, isLoading, geocoding, contactsLoading, cellContactCounts, hogares]);
 
   // Reusable toggle component — segmented control with two pills.
   const ViewModeToggle = () => hideToggle ? null : (
