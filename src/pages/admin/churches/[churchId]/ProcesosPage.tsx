@@ -5,7 +5,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { showSuccess, showError } from '@/utils/toast';
-import { Search, Plus, X, GripVertical, Pencil } from 'lucide-react';
+import { Search, Plus, X, GripVertical } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -151,26 +151,29 @@ const CardMeta: React.FC<{ stage: StageKey; meta: Record<string, any> }> = ({ st
   );
 };
 
-// ─── Edit metadata dialog ─────────────────────────────────────────────────────
+// ─── Person detail dialog with stage tabs ─────────────────────────────────────
 
-const EditMetaDialog: React.FC<{
+const PersonDetailDialog: React.FC<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   pc: ProcessContact | null;
   onSave: (processId: string, meta: Record<string, any>) => void;
   saving: boolean;
-}> = ({ open, onOpenChange, pc, onSave, saving }) => {
+  onOpenProfile: (contactId: string) => void;
+}> = ({ open, onOpenChange, pc, onSave, saving, onOpenProfile }) => {
   const [local, setLocal] = useState<Record<string, any>>({});
+  const [activeTab, setActiveTab] = useState<StageKey | null>(null);
 
   React.useEffect(() => {
-    if (pc) setLocal({ ...(pc.metadata || {}) });
+    if (pc) {
+      setLocal({ ...(pc.metadata || {}) });
+      setActiveTab(pc.stage);
+    }
   }, [pc]);
 
   if (!pc) return null;
-  const stage = pc.stage;
-  const fields = STAGE_FIELDS[stage];
-  const stageLabel = STAGES.find(s => s.key === stage)?.label || stage;
 
+  const currentStageIdx = STAGES.findIndex(s => s.key === pc.stage);
   const set = (key: string, val: any) => setLocal(prev => ({ ...prev, [key]: val }));
 
   const renderField = (f: StageField) => {
@@ -238,7 +241,6 @@ const EditMetaDialog: React.FC<{
         </div>
       );
     }
-    // text or date
     return (
       <div key={f.key} className="flex items-center justify-between gap-3 py-1.5 border-b border-border/30">
         <label className="text-sm text-muted-foreground shrink-0">{f.label}</label>
@@ -252,17 +254,78 @@ const EditMetaDialog: React.FC<{
     );
   };
 
+  const tabStage = activeTab || pc.stage;
+  const tabFields = STAGE_FIELDS[tabStage] || [];
+  const tabIdx = STAGES.findIndex(s => s.key === tabStage);
+  const isFutureStage = tabIdx > currentStageIdx;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{pc.first_name} {pc.last_name || ''} — {stageLabel}</DialogTitle>
-          <DialogDescription>Completá los datos de esta etapa.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-0">
-          {fields.map(renderField)}
+      <DialogContent className="sm:max-w-[540px] max-h-[85vh] overflow-hidden flex flex-col p-0">
+        {/* Header */}
+        <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b shrink-0">
+          <div>
+            <h2 className="text-base font-semibold">{pc.first_name} {pc.last_name || ''}</h2>
+            {pc.numero_cuerda && <p className="text-xs text-muted-foreground">Cuerda {pc.numero_cuerda}</p>}
+          </div>
+          <Button variant="outline" size="sm" className="text-xs" onClick={() => { onOpenChange(false); onOpenProfile(pc.contact_id); }}>
+            Ver perfil
+          </Button>
         </div>
-        <div className="flex justify-end gap-2 pt-2">
+
+        {/* Stage tabs — scrollable horizontal strip */}
+        <div className="border-b shrink-0 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-0">
+            {STAGES.map((s, idx) => {
+              const isActive = s.key === tabStage;
+              const isCurrent = s.key === pc.stage;
+              const isPast = idx < currentStageIdx;
+              const isFuture = idx > currentStageIdx;
+              // Check if any data exists for this stage
+              const stageFields = STAGE_FIELDS[s.key];
+              const hasData = stageFields.some(f => {
+                const v = local[f.key];
+                return v != null && v !== '' && v !== false;
+              });
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => setActiveTab(s.key)}
+                  className={`shrink-0 px-2.5 py-2 text-[11px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    isActive
+                      ? 'border-primary text-foreground'
+                      : isCurrent
+                        ? 'border-transparent text-foreground/80 hover:text-foreground'
+                        : isPast && hasData
+                          ? 'border-transparent text-muted-foreground hover:text-foreground'
+                          : 'border-transparent text-muted-foreground/40 hover:text-muted-foreground'
+                  }`}
+                >
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: isFuture && !hasData ? '#555' : s.color }} />
+                    {s.label.replace('Nuevas Personas ', 'NP ')}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          {isFutureStage && !STAGE_FIELDS[tabStage].some(f => { const v = local[f.key]; return v != null && v !== '' && v !== false; }) ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              Esta persona aún no llegó a esta etapa.
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {tabFields.map(renderField)}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-4 py-3 border-t shrink-0">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button size="sm" onClick={() => onSave(pc.id, local)} disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar'}
@@ -531,23 +594,15 @@ const ProcesosPage = () => {
                       <div className="flex items-start justify-between gap-1">
                         <div className="flex items-center gap-1 min-w-0 flex-1">
                           <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          {/* Name → profile dialog */}
+                          {/* Name → stage data dialog with tabs */}
                           <button
                             className="text-xs font-medium truncate text-left hover:text-primary hover:underline transition-colors"
-                            onClick={e => { e.stopPropagation(); setSelectedContactId(pc.contact_id); }}
+                            onClick={e => { e.stopPropagation(); setEditingPc(pc); }}
                           >
                             {pc.first_name} {pc.last_name || ''}
                           </button>
                         </div>
                         <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* Edit stage data */}
-                          <button
-                            className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                            title="Editar datos de etapa"
-                            onClick={e => { e.stopPropagation(); setEditingPc(pc); }}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </button>
                           {/* Remove */}
                           <button
                             className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
@@ -614,13 +669,14 @@ const ProcesosPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit stage metadata dialog */}
-      <EditMetaDialog
+      {/* Person detail dialog (stage data with tabs) */}
+      <PersonDetailDialog
         open={!!editingPc}
         onOpenChange={o => { if (!o) setEditingPc(null); }}
         pc={editingPc}
         onSave={saveMetadata}
         saving={savingMeta}
+        onOpenProfile={(contactId) => setSelectedContactId(contactId)}
       />
 
       {/* Contact profile */}
