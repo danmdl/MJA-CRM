@@ -615,21 +615,38 @@ const TerritoriosPage: React.FC = () => {
     [selectedCuerda?.territory_geojson],
   );
 
+  // Contacts in the selected cuerda — for territory in/out stats.
+  // Lightweight query that only fetches coords + cuerda, always enabled.
+  const { data: cuerdaContacts } = useQuery<{ lat: number | null; lng: number | null }[]>({
+    queryKey: ['contacts-territory-stats', churchId, selectedCuerdaNumero],
+    queryFn: async () => {
+      if (!selectedCuerdaNumero) return [];
+      const { data } = await supabase
+        .from('contacts')
+        .select('lat, lng')
+        .eq('church_id', churchId!)
+        .eq('numero_cuerda', selectedCuerdaNumero)
+        .is('deleted_at', null);
+      return data || [];
+    },
+    enabled: !!churchId && !!selectedCuerdaNumero,
+    staleTime: 60_000,
+  });
+
   const stats = useMemo(() => {
-    if (!selectedCuerda || !cells || !mapsLoaded) return null;
+    if (!selectedCuerda || !cuerdaContacts) return null;
     if (!selectedCuerdaPaths) return null;
-    const cuerdaCells = cells.filter(c => c.cuerda_id === selectedCuerda.id);
     let inn = 0, out = 0, noCoords = 0;
-    for (const cell of cuerdaCells) {
-      if (typeof cell.lat !== 'number' || typeof cell.lng !== 'number') {
+    for (const ct of cuerdaContacts) {
+      if (typeof ct.lat !== 'number' || typeof ct.lng !== 'number') {
         noCoords++;
         continue;
       }
-      if (isPointInTerritory(cell.lat, cell.lng, selectedCuerdaPaths)) inn++;
+      if (isPointInTerritory(ct.lat, ct.lng, selectedCuerdaPaths)) inn++;
       else out++;
     }
-    return { in: inn, out, noCoords, total: cuerdaCells.length };
-  }, [selectedCuerda, cells, selectedCuerdaPaths, mapsLoaded]);
+    return { in: inn, out, noCoords, total: cuerdaContacts.length };
+  }, [selectedCuerda, cuerdaContacts, selectedCuerdaPaths]);
 
   // Never early-return after this point — the map div must always stay in
   // the DOM so mapRef.current is set before mapsLoaded fires.
@@ -768,7 +785,7 @@ const TerritoriosPage: React.FC = () => {
       {/* Stats */}
       {stats && (
         <div className="flex flex-wrap items-center gap-3 px-2 text-sm">
-          <span className="text-muted-foreground">Células en cuerda {selectedCuerda?.numero}:</span>
+          <span className="text-muted-foreground">Contactos en cuerda {selectedCuerda?.numero}:</span>
           <span className="text-green-400">✓ {stats.in} en zona</span>
           <span className="text-red-400">⚠ {stats.out} fuera de zona</span>
           {stats.noCoords > 0 && <span className="text-muted-foreground">{stats.noCoords} sin coordenadas</span>}
