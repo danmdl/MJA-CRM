@@ -9,27 +9,7 @@ import { Loader2, Save, Trash2, Pencil, Eye, AlertCircle } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { geoJsonToGooglePaths, googlePathsToGeoJson, isPointInTerritory } from '@/lib/territory-utils';
-
-const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
-
-const loadGoogleMaps = (): Promise<any> => {
-  return new Promise((resolve) => {
-    if ((window as any).google?.maps) { resolve((window as any).google.maps); return; }
-    const existing = document.getElementById('google-maps-script');
-    if (existing) {
-      const interval = setInterval(() => {
-        if ((window as any).google?.maps) { clearInterval(interval); resolve((window as any).google.maps); }
-      }, 100);
-      return;
-    }
-    const script = document.createElement('script');
-    script.id = 'google-maps-script';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places,drawing,geometry`;
-    script.async = true;
-    script.onload = () => resolve((window as any).google.maps);
-    document.head.appendChild(script);
-  });
-};
+import { loadGoogleMaps } from '@/lib/google-maps';
 
 interface CuerdaWithTerritory {
   id: string;

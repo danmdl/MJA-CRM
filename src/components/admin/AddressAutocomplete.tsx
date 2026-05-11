@@ -25,26 +25,7 @@ interface AddressAutocompleteProps {
   biasRadius?: number;
 }
 
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
-
-let googleScriptLoaded = false;
-const loadGoogleMaps = (): Promise<void> => {
-  return new Promise((resolve) => {
-    if ((window as any).google?.maps?.places) { resolve(); return; }
-    if (googleScriptLoaded) {
-      const interval = setInterval(() => {
-        if ((window as any).google?.maps?.places) { clearInterval(interval); resolve(); }
-      }, 100);
-      return;
-    }
-    googleScriptLoaded = true;
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=places`;
-    script.async = true;
-    script.onload = () => resolve();
-    document.head.appendChild(script);
-  });
-};
+import { loadGoogleMaps } from '@/lib/google-maps';
 
 const AddressAutocomplete = ({
   value,

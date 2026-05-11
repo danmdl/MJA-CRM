@@ -1,0 +1,42 @@
+name: CI
+
+# Runs on every push to main AND on every pull request.
+# Acts as a gatekeeper: if the build fails, the deploy doesn't happen
+# (you'll see a red ❌ in GitHub and know something is broken before
+# users notice).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (Vite + TypeScript)
+        run: pnpm run build
+        env:
+          # Build doesn't actually need the Google Maps key — Vite reads it
+          # at runtime from import.meta.env. We pass a placeholder so the
+          # build doesn't warn about an undefined variable.
+          VITE_GOOGLE_MAPS_KEY: ci-placeholder

@@ -96,6 +96,7 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
+        { to: '/admin/ayuda', emoji: '❓', label: 'Ayuda' },
         ...(profile?.role !== 'conector' ? [{ to: '/admin/info', emoji: 'ℹ️', label: 'Información' }] : []),
       ],
     },
@@ -118,6 +119,7 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
         ...(canAccessPermissions() ? [{ to: '/admin/permissions', emoji: '🛡️', label: 'Permisos' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/logs', emoji: '🔍', label: 'Logs' }] : []),
         { to: '/admin/profile', emoji: '👤', label: 'Perfil' },
+        { to: '/admin/ayuda', emoji: '❓', label: 'Ayuda' },
       ],
     },
   ];

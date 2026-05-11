@@ -5,6 +5,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Menu, X, Search } from 'lucide-react';
 import UpdateBanner from '@/components/UpdateBanner';
 import GlobalContactSearch from '@/components/admin/GlobalContactSearch';
+import { useOutboxReminder } from '@/hooks/use-outbox-reminder';
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/admin/dashboard') return 'Dashboard';
@@ -31,6 +32,9 @@ const AdminLayout = () => {
   const title = getPageTitle(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Daily nudge for users with contacts pending in their MJA outbox.
+  // Internally throttled to once per user per day.
+  useOutboxReminder();
   // Inside a specific church the ChurchDetailsLayout already shows the church
   // name + tabs in a compact row, so we hide the redundant top-bar title to
   // save vertical space.

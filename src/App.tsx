@@ -268,6 +268,7 @@ const LoginManagementPage = lazyRetry(() => import("./pages/admin/LoginManagemen
 const LogsPage = lazyRetry(() => import("./pages/admin/LogsPage"));
 const ZonasPage = lazyRetry(() => import("./pages/admin/ZonasPage"));
 const Messages = lazyRetry(() => import("./pages/Messages"));
+const AyudaPage = lazyRetry(() => import("./pages/admin/AyudaPage"));
 const PermissionsDashboard = lazyRetry(() => import("./pages/admin/PermissionsDashboard"));
 const InfoPage = lazyRetry(() => import("./pages/admin/InfoPage"));
 const NotificationsPage = lazyRetry(() => import("./pages/admin/NotificationsPage"));
@@ -338,6 +339,7 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="/admin" replace />} />
         <Route path="profile" element={<Profile />} />
         <Route path="messages" element={<Messages />} />
+        <Route path="ayuda" element={<AyudaPage />} />
       </Route>
 
       {/* Admin Routes */}
@@ -354,6 +356,7 @@ const AppRoutes = () => {
           <Route path="zonas" element={<ZonasPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<Messages />} />
+        <Route path="ayuda" element={<AyudaPage />} />
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="csv-merger" element={<CsvColumnMergerPage />} />
         <Route path="csv-sandbox" element={
