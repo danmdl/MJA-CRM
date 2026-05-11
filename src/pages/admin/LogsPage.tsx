@@ -179,7 +179,7 @@ const ActivityGroupRow = ({ group, name, email }: { group: any[]; name: string; 
           <TableCell></TableCell>
           <TableCell className="font-mono text-xs pl-6 text-muted-foreground">↳ {formatART(row.created_at)}</TableCell>
           <TableCell className="text-xs text-muted-foreground">{name || email || 'Usuario'}</TableCell>
-          <TableCell><Badge className={`${actionColors[row.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{row.action}</Badge></TableCell>
+          <TableCell><Badge className={`${ACTION_COLORS[row.action] || 'bg-muted'} hover:bg-opacity-100 text-xs`}>{ACTION_LABELS[row.action] || row.action}</Badge></TableCell>
           <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
             {row.action === 'login_failed' ? (row.error_message || '—') : (row.entity_type || '—')}
           </TableCell>

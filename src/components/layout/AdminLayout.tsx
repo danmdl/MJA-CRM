@@ -86,14 +86,14 @@ const AdminLayout = () => {
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         {/* Topbar - hidden on desktop when inside a church (church layout has its own header).
-            On mobile we keep a slim row just for the hamburger button + search. */}
+            On mobile we keep a slim row just for the hamburger button. */}
         <div
           className={isInsideChurch && !isKanbanPage ? 'lg:hidden' : ''}
           style={{
-            height: 52, flexShrink: 0,
+            height: 44, flexShrink: 0,
             borderBottom: '1px solid rgba(255,255,255,0.07)',
             display: 'flex', alignItems: 'center',
-            padding: '0 16px', gap: 12,
+            padding: '0 12px', gap: 8,
             background: '#09090b',
           }}
         >
@@ -111,28 +111,32 @@ const AdminLayout = () => {
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
 
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa', flexShrink: 0 }}>
-            {title}
-          </span>
+          {/* Title — only shown outside church context */}
+          {!isInsideChurch && (
+            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa', flexShrink: 0 }}>
+              {title}
+            </span>
+          )}
 
-          {/* Search trigger — pushes to the right edge of the topbar. On
-              desktop the sidebar has its own button; this one is mainly
-              for mobile where the sidebar is a drawer. */}
-          <button
-            onClick={() => setSearchOpen(true)}
-            title="Buscar contactos (Ctrl/Cmd + K)"
-            style={{
-              marginLeft: 'auto',
-              height: 32, padding: '0 10px', borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: '#111113', display: 'flex', alignItems: 'center',
-              gap: 6, cursor: 'pointer', color: '#a1a1aa', flexShrink: 0,
-            }}
-          >
-            <Search size={14} />
-            <span style={{ fontSize: 12 }} className="hidden sm:inline">Buscar</span>
-            <span style={{ fontSize: 10, color: '#71717a' }} className="hidden sm:inline">⌘K</span>
-          </button>
+          {/* Search trigger — only outside church context. Inside a church
+              the sidebar and Cmd+K shortcut are sufficient. */}
+          {!isInsideChurch && (
+            <button
+              onClick={() => setSearchOpen(true)}
+              title="Buscar contactos (Ctrl/Cmd + K)"
+              style={{
+                marginLeft: 'auto',
+                height: 32, padding: '0 10px', borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.1)',
+                background: '#111113', display: 'flex', alignItems: 'center',
+                gap: 6, cursor: 'pointer', color: '#a1a1aa', flexShrink: 0,
+              }}
+            >
+              <Search size={14} />
+              <span style={{ fontSize: 12 }} className="hidden sm:inline">Buscar</span>
+              <span style={{ fontSize: 10, color: '#71717a' }} className="hidden sm:inline">⌘K</span>
+            </button>
+          )}
         </div>
 
         {/* Page content */}

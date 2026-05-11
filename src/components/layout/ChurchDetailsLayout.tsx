@@ -5,9 +5,6 @@ import { useSession } from "@/hooks/use-session";
 import { usePermissions } from "@/lib/permissions";
 import { showError } from "@/utils/toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -45,24 +42,6 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
       setAccessChecked(true);
     }
   }, [churchId, profile, sessionLoading, navigate, location.pathname]);
-
-  const { data: churchData, isLoading: nameLoading } = useQuery({
-    queryKey: ["churchName", churchId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("churches")
-        .select("name")
-        .eq("id", churchId)
-        .single();
-      
-      if (error) {
-        return { name: "" };
-      }
-      
-      return data as { name: string };
-    },
-    enabled: !!churchId,
-  });
 
   const activeTab = (() => {
     const p = location.pathname;
@@ -103,57 +82,35 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Church header + tabs combined into a single compact row */}
+      {/* Tabs — compact single row, no church name (already visible in sidebar/URL) */}
       <div className="border-b bg-background">
-        <div className="flex items-center gap-3 px-3 sm:px-4">
-          {/* Church name + divider hidden on mobile — on a 380px-wide
-              phone screen, "MJA Central" plus the separator was eating
-              ~40% of the width and pushing the tabs into a horizontal
-              scroller that hid the active tab on first paint. The
-              breadcrumb / title is already implied by the URL and the
-              page header below it, so dropping it on small screens
-              just gives the tab strip room to breathe. Reappears at
-              sm: (640px) and up. */}
-          <h2 className="hidden sm:block text-base sm:text-lg font-bold tracking-tight whitespace-nowrap py-2">
-            {nameLoading ? <Skeleton className="h-5 w-32" /> : churchData?.name || "Iglesia"}
-          </h2>
-          <div className="hidden sm:block h-6 w-px bg-border shrink-0" />
-          <div className="flex-1 overflow-x-auto">
-            <Tabs
-              value={activeTab}
-              onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchId}/${val}`))}
-              className="w-full"
-            >
-              <TabsList className="mb-0 w-max">
-                {/* Resumen lives in the left sidebar now, not the tab
-                    strip. Per Dan: 'resumen debería solamente ser un
-                    botón del menú de la izquierda... siempre cuando me
-                    lo veo debería empezar en semillero'. The page
-                    itself (ChurchOverviewPage at /overview) still
-                    exists and the sidebar links to it; we just stop
-                    duplicating it here as a tab that competed with
-                    the actual workflow tabs. */}
-                {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🌱 Semillero</TabsTrigger>}
-                {canSeeProcesos() && <TabsTrigger value="procesos" className="text-xs sm:text-sm px-2 sm:px-3">⚡ Procesos</TabsTrigger>}
-                {canSeeCuerdas() && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
-                {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
-                {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
-                {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
-                {(canSeeMapa() || canSeeCuerdas()) && <TabsTrigger value="territorio" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Territorio</TabsTrigger>}
-                {canSeeRutas() && <TabsTrigger value="rutas" className="text-xs sm:text-sm px-2 sm:px-3">🧭 Rutas</TabsTrigger>}
-                {canSeeAsistencia() && <TabsTrigger value="asistencia" className="text-xs sm:text-sm px-2 sm:px-3">✅ Asistencia</TabsTrigger>}
-                {canSeeEventos() && <TabsTrigger value="eventos" className="text-xs sm:text-sm px-2 sm:px-3">📅 Eventos</TabsTrigger>}
-                {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
-                {canSeeValidador() && <TabsTrigger value="validator" className="text-xs sm:text-sm px-2 sm:px-3">🛡️ Validador</TabsTrigger>}
-                {canSeePapelera() && <TabsTrigger value="papelera" className="text-xs sm:text-sm px-2 sm:px-3">🗑️ Papelera</TabsTrigger>}
-              </TabsList>
-            </Tabs>
-          </div>
+        <div className="overflow-x-auto px-1">
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchId}/${val}`))}
+            className="w-full"
+          >
+            <TabsList className="mb-0 w-max">
+              {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🌱 Semillero</TabsTrigger>}
+              {canSeeProcesos() && <TabsTrigger value="procesos" className="text-xs sm:text-sm px-2 sm:px-3">⚡ Procesos</TabsTrigger>}
+              {canSeeCuerdas() && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
+              {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
+              {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
+              {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
+              {(canSeeMapa() || canSeeCuerdas()) && <TabsTrigger value="territorio" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Territorio</TabsTrigger>}
+              {canSeeRutas() && <TabsTrigger value="rutas" className="text-xs sm:text-sm px-2 sm:px-3">🧭 Rutas</TabsTrigger>}
+              {canSeeAsistencia() && <TabsTrigger value="asistencia" className="text-xs sm:text-sm px-2 sm:px-3">✅ Asistencia</TabsTrigger>}
+              {canSeeEventos() && <TabsTrigger value="eventos" className="text-xs sm:text-sm px-2 sm:px-3">📅 Eventos</TabsTrigger>}
+              {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
+              {canSeeValidador() && <TabsTrigger value="validator" className="text-xs sm:text-sm px-2 sm:px-3">🛡️ Validador</TabsTrigger>}
+              {canSeePapelera() && <TabsTrigger value="papelera" className="text-xs sm:text-sm px-2 sm:px-3">🗑️ Papelera</TabsTrigger>}
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
       {/* Main content area */}
-      <main className={`flex-1 p-3 sm:p-6 overflow-auto transition-opacity duration-150 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
+      <main className={`flex-1 p-2 sm:p-3 overflow-auto transition-opacity duration-150 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
         {children || <Outlet />}
       </main>
     </div>

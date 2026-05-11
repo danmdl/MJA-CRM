@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Loader2, Save, Trash2, Pencil, Eye, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Trash2, Pencil, Eye, AlertCircle } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { geoJsonToGooglePaths, googlePathsToGeoJson, isPointInTerritory } from '@/lib/territory-utils';
@@ -581,28 +581,18 @@ const TerritoriosPage: React.FC = () => {
   const hasExistingTerritory = !!selectedCuerda?.territory_geojson;
 
   return (
-    <div className="flex flex-col h-full p-3 gap-3">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-semibold">Territorios</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Definí el área geográfica de cada cuerda dibujándola sobre el mapa. Las células dentro del territorio aparecerán como "En zona" en el Semillero; las de afuera, "Fuera de zona".
-        </p>
-      </div>
-
-      {/* Cuerda picker + actions */}
-      <div className="flex flex-wrap items-center gap-2 p-3 rounded border bg-card">
+    <div className="flex flex-col h-full p-2 gap-2">
+      {/* Cuerda picker + actions — single compact row */}
+      <div className="flex flex-wrap items-center gap-2 p-2 rounded border bg-card">
         <label className="text-sm font-medium mr-1">Cuerda:</label>
         {cuerdasLoading && (
           <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando cuerdas…
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
           </span>
         )}
         <select
           disabled={cuerdasLoading}
-          className="h-9 px-3 rounded border bg-background text-sm"
+          className="h-8 px-2 rounded border bg-background text-sm"
           value={selectedCuerdaNumero}
           onChange={(e) => {
             if (hasUnsavedChanges) {
@@ -615,14 +605,11 @@ const TerritoriosPage: React.FC = () => {
           {(cuerdas || [])
             .filter(c => !c.is_church_cuerda)
             .sort((a, b) => a.numero.localeCompare(b.numero))
-            .map(c => {
-              const editable = canEditCuerda(c);
-              return (
-                <option key={c.id} value={c.numero}>
-                  Cuerda {c.numero} {editable ? '(editable)' : '(solo lectura)'}
-                </option>
-              );
-            })}
+            .map(c => (
+              <option key={c.id} value={c.numero}>
+                Cuerda {c.numero}
+              </option>
+            ))}
         </select>
 
         {selectedCuerda && (
@@ -700,13 +687,14 @@ const TerritoriosPage: React.FC = () => {
         )}
 
         {hasUnsavedChanges && !isDrawing && <span className="text-xs text-amber-400 ml-auto">Cambios sin guardar</span>}
+
+        {/* Compact description hint — only when idle */}
+        {!isDrawing && <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">Dibujá el área de cada cuerda · "En zona" / "Fuera de zona" en Semillero</span>}
       </div>
 
-      {/* Drawing-mode help banner. Shown only while drawing so the
-          user has clear instructions and a count of points placed.
-          Above the map so it's visible without scrolling. */}
+      {/* Drawing-mode help banner */}
       {isDrawing && (
-        <div className="px-3 py-2 rounded border border-amber-500/40 bg-amber-500/10 text-sm flex items-center gap-2">
+        <div className="px-2 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-sm flex items-center gap-2">
           <Pencil className="h-4 w-4 text-amber-400 shrink-0" />
           <span className="text-amber-300">
             Tocá el mapa para agregar puntos al borde de tu territorio.
@@ -721,7 +709,7 @@ const TerritoriosPage: React.FC = () => {
 
       {/* Stats */}
       {stats && (
-        <div className="flex flex-wrap items-center gap-3 px-3 text-sm">
+        <div className="flex flex-wrap items-center gap-3 px-2 text-sm">
           <span className="text-muted-foreground">Células en cuerda {selectedCuerda?.numero}:</span>
           <span className="text-green-400">✓ {stats.in} en zona</span>
           <span className="text-red-400">⚠ {stats.out} fuera de zona</span>
@@ -730,8 +718,6 @@ const TerritoriosPage: React.FC = () => {
         </div>
       )}
 
-      {/* No-cuerdas message shown above the map (not as an early-return)
-          so the map div stays in the DOM and mapRef is always set. */}
       {noCuerdas && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
           <AlertCircle className="h-4 w-4" />
@@ -739,10 +725,8 @@ const TerritoriosPage: React.FC = () => {
         </div>
       )}
 
-      {/* Map container always rendered — never behind a conditional.
-          mapRef.current must be set before the mapsLoaded effect fires
-          or the map init silently skips and the div stays blank forever. */}
-      <div className="rounded-xl overflow-hidden border" style={{ height: 'min(70vh, 800px)' }}>
+      {/* Map container — flex-1 fills all remaining vertical space */}
+      <div className="flex-1 min-h-[300px] rounded-xl overflow-hidden border">
         <div ref={mapRef} className="w-full h-full" />
       </div>
     </div>
