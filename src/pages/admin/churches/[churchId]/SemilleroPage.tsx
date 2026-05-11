@@ -38,62 +38,11 @@ import BulkWhatsAppDialog from '@/components/admin/BulkWhatsAppDialog';
 import AddContactDialog from '@/components/admin/AddContactDialog';
 import DuplicateMergeDialog from '@/components/admin/DuplicateMergeDialog';
 import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
-
-// ─── Types ───────────────────────────────────────────────────────
-interface Zona { id: string; nombre: string; }
-interface Barrio { id: string; nombre: string; zona_id: string; }
-interface Cuerda { id: string; numero: string; zona_id: string; is_church_cuerda?: boolean; territory_geojson?: string | null; }
-interface Cell {
-  id: string; name: string; church_id: string; cuerda_id: string | null;
-  address: string | null; lat: number | null; lng: number | null;
-  meeting_day: string | null; meeting_time: string | null;
-}
-
-interface Contact {
-  id: string; first_name: string; last_name: string | null;
-  phone: string | null; address: string | null; barrio: string | null;
-  zona_id: string | null; zona?: string | null;
-  conector: string | null; fecha_contacto: string | null;
-  numero_cuerda: string | null; edad: string | null;
-  cell_id: string | null; estado_seguimiento?: string | null;
-  lat?: number | null; lng?: number | null;
-  sexo?: string | null;
-  estado_civil?: string | null;
-  is_external?: boolean;
-  pending_external_send?: boolean;
-  pending_assignment_cell_id?: string | null;
-  responsable_id?: string | null;
-  created_by?: string | null;
-  created_at?: string | null;
-}
-
-// Haversine distance in km
-const haversine = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
-
-// ─── Resizable Header ────────────────────────────────────────────
-const ResizableHeader = ({ children, width, onResize, className = '' }: {
-  children: React.ReactNode; width: number; onResize: (delta: number) => void; className?: string;
-}) => {
-  const startX = useRef(0);
-  const onMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault(); startX.current = e.clientX;
-    const onMove = (ev: MouseEvent) => { onResize(ev.clientX - startX.current); startX.current = ev.clientX; };
-    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
-  };
-  return (
-    <th className={`relative text-left text-xs font-medium text-muted-foreground px-3 py-2 select-none ${className}`} style={{ width, minWidth: 60 }}>
-      {children}
-      <div onMouseDown={onMouseDown} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors" />
-    </th>
-  );
-};
+import type { Zona, Barrio, Cuerda, Cell, Contact } from './semillero/types';
+import { haversine } from './semillero/helpers';
+import { ResizableHeader } from './semillero/ResizableHeader';
+import { BulkDeleteDialog } from './semillero/BulkDeleteDialog';
+import { BulkAssignDialog } from './semillero/BulkAssignDialog';
 
 // ─── Main Component ──────────────────────────────────────────────
 const SemilleroPage = () => {
@@ -2704,62 +2653,45 @@ const SemilleroPage = () => {
         churchId={churchId!}
       />
 
-      {/* Bulk Delete Confirmation Dialog */}
-      <Dialog open={bulkDeleteOpen} onOpenChange={(o) => { if (!o && !deleting) setBulkDeleteOpen(false); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar contactos</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de eliminar <strong>{selectedIds.size}</strong> contacto{selectedIds.size === 1 ? '' : 's'}? Los vas a poder restaurar desde la Papelera.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setBulkDeleteOpen(false)} disabled={deleting}>Cancelar</Button>
-            <Button
-              variant="destructive"
-              disabled={deleting}
-              onClick={async () => {
-                setDeleting(true);
-                const ids = Array.from(selectedIds);
-                const nowIso = new Date().toISOString();
-                const userId = session?.user?.id || null;
-                // Bulk-delete in chunks. Sending 1138 ids as a single
-                // PostgREST .in() call builds a query string of ~42KB
-                // (each UUID is 36 chars), and the server rejects it
-                // with a 400 Bad Request. Chunk size 200 keeps each URL
-                // around 7-8KB, which is well inside any sane limit.
-                const CHUNK = 200;
-                let failed = 0;
-                let firstError: string | null = null;
-                for (let i = 0; i < ids.length; i += CHUNK) {
-                  const slice = ids.slice(i, i + CHUNK);
-                  const { error } = await supabase
-                    .from('contacts')
-                    .update({ deleted_at: nowIso, deleted_by: userId })
-                    .in('id', slice);
-                  if (error) {
-                    failed += slice.length;
-                    if (!firstError) firstError = error.message;
-                  }
-                }
-                setDeleting(false);
-                if (failed > 0) {
-                  showError(`No se pudieron eliminar ${failed} contacto(s). ${firstError || ''}`);
-                  // Still refetch — partial deletes did succeed.
-                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                  return;
-                }
-                showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}.`);
-                setSelectedIds(new Set());
-                setBulkDeleteOpen(false);
-                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-              }}
-            >
-              <Trash2 className="h-4 w-4 mr-1.5" /> Eliminar {selectedIds.size}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BulkDeleteDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        selectedCount={selectedIds.size}
+        deleting={deleting}
+        onConfirm={async () => {
+          setDeleting(true);
+          const ids = Array.from(selectedIds);
+          const nowIso = new Date().toISOString();
+          const userId = session?.user?.id || null;
+          // Bulk-delete in chunks. Sending 1138 ids as a single PostgREST .in()
+          // call builds a query string of ~42KB and the server rejects it with
+          // 400. Chunk size 200 keeps each URL around 7-8KB.
+          const CHUNK = 200;
+          let failed = 0;
+          let firstError: string | null = null;
+          for (let i = 0; i < ids.length; i += CHUNK) {
+            const slice = ids.slice(i, i + CHUNK);
+            const { error } = await supabase
+              .from('contacts')
+              .update({ deleted_at: nowIso, deleted_by: userId })
+              .in('id', slice);
+            if (error) {
+              failed += slice.length;
+              if (!firstError) firstError = error.message;
+            }
+          }
+          setDeleting(false);
+          if (failed > 0) {
+            showError(`No se pudieron eliminar ${failed} contacto(s). ${firstError || ''}`);
+            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            return;
+          }
+          showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}.`);
+          setSelectedIds(new Set());
+          setBulkDeleteOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+        }}
+      />
 
       {/* Add Contact Dialog */}
       <AddContactDialog
@@ -2985,74 +2917,37 @@ const SemilleroPage = () => {
         </div>
       )}
 
-      {/* Bulk-assign Responsable dialog */}
-      <Dialog open={bulkAssignOpen} onOpenChange={(o) => { if (!o && !bulkAssigning) setBulkAssignOpen(false); }}>
-        <DialogContent className="sm:max-w-[460px]">
-          <DialogHeader>
-            <DialogTitle>Asignar Responsable</DialogTitle>
-            <DialogDescription>
-              Vas a asignar un responsable a <strong>{visibleSelectedCount}</strong> contacto{visibleSelectedCount === 1 ? '' : 's'}.
-              Esto va a sobreescribir el responsable actual.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nuevo responsable</label>
-            <select
-              className="w-full h-9 text-sm border rounded px-2 bg-background"
-              value={bulkAssignTargetId}
-              onChange={(e) => setBulkAssignTargetId(e.target.value)}
-              disabled={bulkAssigning}
-            >
-              <option value="">Seleccionar responsable...</option>
-              <option value="__none__">— Sin responsable (limpiar)</option>
-              {(teamMembers || [])
-                .filter(m => {
-                  if (!m.id) return false;
-                  // Non-global users can only assign to people in their own cuerda.
-                  // This prevents a referente of cuerda 202 from assigning a contact
-                  // to a referente of cuerda 101.
-                  if (!canSeeContactsFromAllCuerdas) {
-                    if (!userCuerdaNumero) return false;
-                    return m.numero_cuerda === userCuerdaNumero;
-                  }
-                  return true;
-                })
-                .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
-                .map(m => (
-                  <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                ))}
-            </select>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setBulkAssignOpen(false)} disabled={bulkAssigning}>Cancelar</Button>
-            <Button
-              disabled={bulkAssigning || !bulkAssignTargetId}
-              onClick={async () => {
-                if (!bulkAssignTargetId) return;
-                setBulkAssigning(true);
-                // Only act on the contacts that are actually visible in the
-                // current filtered view, matching the visibleSelectedCount UI.
-                const visibleIds = new Set(filteredContacts.map(c => c.id));
-                const ids = Array.from(selectedIds).filter(id => visibleIds.has(id));
-                const newResponsableId = bulkAssignTargetId === '__none__' ? null : bulkAssignTargetId;
-                const { error } = await supabase
-                  .from('contacts')
-                  .update({ responsable_id: newResponsableId })
-                  .in('id', ids);
-                setBulkAssigning(false);
-                if (error) { showError(error.message); return; }
-                showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} actualizado${ids.length === 1 ? '' : 's'}.`);
-                setSelectedIds(new Set());
-                setBulkAssignOpen(false);
-                setBulkAssignTargetId('');
-                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-              }}
-            >
-              {bulkAssigning ? 'Asignando...' : 'Confirmar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BulkAssignDialog
+        open={bulkAssignOpen}
+        onOpenChange={setBulkAssignOpen}
+        selectedCount={visibleSelectedCount}
+        assigning={bulkAssigning}
+        targetId={bulkAssignTargetId}
+        onTargetChange={setBulkAssignTargetId}
+        teamMembers={teamMembers}
+        canSeeAllCuerdas={canSeeContactsFromAllCuerdas}
+        userCuerdaNumero={userCuerdaNumero}
+        onConfirm={async () => {
+          if (!bulkAssignTargetId) return;
+          setBulkAssigning(true);
+          // Only act on the contacts that are actually visible in the current
+          // filtered view, matching the visibleSelectedCount UI.
+          const visibleIds = new Set(filteredContacts.map(c => c.id));
+          const ids = Array.from(selectedIds).filter(id => visibleIds.has(id));
+          const newResponsableId = bulkAssignTargetId === '__none__' ? null : bulkAssignTargetId;
+          const { error } = await supabase
+            .from('contacts')
+            .update({ responsable_id: newResponsableId })
+            .in('id', ids);
+          setBulkAssigning(false);
+          if (error) { showError(error.message); return; }
+          showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} actualizado${ids.length === 1 ? '' : 's'}.`);
+          setSelectedIds(new Set());
+          setBulkAssignOpen(false);
+          setBulkAssignTargetId('');
+          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+        }}
+      />
     </div>
   );
 };
