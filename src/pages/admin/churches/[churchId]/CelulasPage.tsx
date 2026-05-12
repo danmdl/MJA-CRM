@@ -59,15 +59,21 @@ const CelulasPage = () => {
   const { data: cells, isLoading } = useQuery<CellRow[]>({
     queryKey: ['celulas-page', churchId, userCuerda, canSeeAll],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('cells')
-        .select('id, name, address, lat, lng, meeting_day, meeting_time, leader_name, anfitrion_name, cuerda_id, closed_at, closed_reason')
-        .eq('church_id', churchId!)
-        .is('deleted_at', null);
-      if (error) throw error;
-
-      const { data: cuerdas } = await supabase.from('cuerdas').select('id, numero, zona_id, referente_name, supervisor_name');
-      const { data: zonas } = await supabase.from('zonas').select('id, nombre').eq('church_id', churchId!);
+      // Fire cells/cuerdas/zonas in parallel — they're independent, so waiting
+      // serially is just network-stall time we don't need.
+      const [cellsRes, cuerdasRes, zonasRes] = await Promise.all([
+        supabase
+          .from('cells')
+          .select('id, name, address, lat, lng, meeting_day, meeting_time, leader_name, anfitrion_name, cuerda_id, closed_at, closed_reason')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null),
+        supabase.from('cuerdas').select('id, numero, zona_id, referente_name, supervisor_name'),
+        supabase.from('zonas').select('id, nombre').eq('church_id', churchId!),
+      ]);
+      if (cellsRes.error) throw cellsRes.error;
+      const data = cellsRes.data;
+      const cuerdas = cuerdasRes.data;
+      const zonas = zonasRes.data;
 
       const cuerdaMap = new Map((cuerdas || []).map(c => [c.id, c]));
       const zonaMap = new Map((zonas || []).map(z => [z.id, z]));

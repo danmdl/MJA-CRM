@@ -161,12 +161,11 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
           // during the brief window between mount and SIGNED_IN return
           // empty/null and stay cached that way — which is exactly what
           // Dan reported as "no se carga todo a menos que refresque ni
-          // bien me logueaba": refresh worked because the second mount
-          // already had the session in localStorage from the start.
-          // This is scoped to genuine logins (the lastLoggedUserId guard
-          // above), so hourly token refreshes don't trigger a full app
-          // refetch every time.
-          queryClient.invalidateQueries();
+          // bien me logueaba". refetchType:'active' refetches only what's
+          // currently rendered; everything else is just marked stale and
+          // refetched lazily on next mount, saving a network burst on a
+          // login that lands on a page whose data was already correct.
+          queryClient.invalidateQueries({ refetchType: 'active' });
           // Log login success to activity_logs (keeps the existing feed)
           supabase.from('activity_logs').insert({
             user_id: session.user.id,
