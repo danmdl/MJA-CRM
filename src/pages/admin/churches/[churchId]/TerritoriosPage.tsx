@@ -331,10 +331,10 @@ const TerritoriosPage: React.FC = () => {
         editable: isEditable,
         draggable: false,
         strokeColor: color,
-        strokeOpacity: isSelected ? 0.9 : 0.5,
-        strokeWeight: isSelected ? 3 : 1.5,
+        strokeOpacity: isSelected ? 1.0 : 0.85,
+        strokeWeight: isSelected ? 3 : 2,
         fillColor: color,
-        fillOpacity: isSelected ? 0.18 : 0.05,
+        fillOpacity: isSelected ? 0.30 : 0.18,
         zIndex: isSelected ? 10 : 1,
       });
       polygon.setMap(mapInstanceRef.current);
