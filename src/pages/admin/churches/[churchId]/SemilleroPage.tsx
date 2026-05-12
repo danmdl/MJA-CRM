@@ -1944,14 +1944,12 @@ const SemilleroPage = () => {
                     const sugCell = sug?.cell;
                     const sugCuerda = sug?.cuerda;
                     const sugZona = sug?.zona;
-                    const hasAddress = !!(c.address || c.barrio);
                     // A contact is "external" when the nearest suggested cell belongs to a
                     // different cuerda than the contact's own cuerda. If the contact has no
                     // cuerda assigned, fall back to comparing zonas.
                     const isExternal = sugCuerda
                       ? (c.numero_cuerda ? sugCuerda.numero !== c.numero_cuerda : (sugZona && homeZonaId ? sugZona.id !== homeZonaId : false))
                       : false;
-                    const responsable = c.responsable_id ? teamMemberById.get(c.responsable_id) : undefined;
 
                     return (
                       <tr key={c.id} className={`border-b h-[37px] transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>
@@ -2783,7 +2781,7 @@ const SemilleroPage = () => {
         contactLastName={whatsappCompose?.lastName || ''}
         contactPhone={whatsappCompose?.phone || ''}
         churchId={churchId}
-        onSent={async (message, templateName) => {
+        onSent={async (_message, templateName) => {
           // Log WhatsApp send to contact history
           if (!whatsappCompose) return;
           const contactId = whatsappCompose.contactId;
@@ -2833,7 +2831,7 @@ const SemilleroPage = () => {
               phone: c.phone,
             }))}
             churchId={churchId}
-            onSent={async (sentContactIds, message, templateName) => {
+            onSent={async (sentContactIds, _message, templateName) => {
           // Log each WhatsApp send to contact history
           try {
             const session = (await supabase.auth.getSession()).data.session;

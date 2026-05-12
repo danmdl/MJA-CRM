@@ -4,7 +4,6 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Save, Trash2, Pencil, Eye, AlertCircle } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
@@ -54,7 +53,6 @@ const TerritoriosPage: React.FC = () => {
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
-  const drawingManagerRef = useRef<any>(null);
   // Active polygon currently being edited. There can only be ONE at
   // a time — the polygon for the cuerda the user picked.
   const editingPolygonRef = useRef<any>(null);
@@ -229,7 +227,7 @@ const TerritoriosPage: React.FC = () => {
   // after creation (orientation change, etc).
   useEffect(() => {
     let cancelled = false;
-    loadGoogleMaps().then((maps) => {
+    loadGoogleMaps().then(() => {
       if (cancelled) return;
       setMapsLoaded(true);
     }).catch(() => {});

@@ -183,7 +183,7 @@ const ValidatorPage = () => {
       entry.contacts!.push(c);
       phoneCounts.set(key, entry);
     });
-    phoneCounts.forEach((v, phone) => {
+    phoneCounts.forEach((v) => {
       if (v.count > 1) {
         v.contacts!.forEach(c => {
           found.push({ id: `dup-phone-${c!.id}`, type: 'contacts_duplicate_phone', severity: 'info', entity: 'contact', entityId: c!.id,
@@ -206,7 +206,7 @@ const ValidatorPage = () => {
       entry.contacts!.push(c);
       nameGroups.set(full, entry);
     });
-    nameGroups.forEach((v, fullNameKey) => {
+    nameGroups.forEach((v) => {
       if (v.contacts!.length > 1) {
         v.contacts!.forEach(c => {
           const others = v.contacts!.filter(x => x.id !== c.id).length;
