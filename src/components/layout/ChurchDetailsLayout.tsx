@@ -93,7 +93,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('mja-toggle-sidebar'))}
-          className="lg:hidden flex items-center justify-center w-10 shrink-0 border-r text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          className="md:hidden flex items-center justify-center w-10 shrink-0 border-r text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
           aria-label="Abrir menú"
         >
           <Menu className="h-4 w-4" />
