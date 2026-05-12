@@ -517,6 +517,16 @@ const SemilleroPage = () => {
     return m;
   }, [profileById, extraResponsableProfiles]);
 
+  // O(1) lookup of full team-member records by id. Previously the row
+  // render did `teamMembers?.find(...)` for every row on every re-render —
+  // O(rows × team). At 200 rows × 24 members that's 4800 comparisons per
+  // render; multiplied by every keystroke in a filter input it adds up
+  // fast. Hoisting to a memo makes per-row access O(1).
+  const teamMemberById = useMemo(
+    () => new Map((teamMembers || []).map(m => [m.id, m])),
+    [teamMembers],
+  );
+
   // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────
   const geocodedRef = useRef(false);
   useEffect(() => {
@@ -1748,7 +1758,6 @@ const SemilleroPage = () => {
                             });
                             const creatorIds = new Set<string>();
                             visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
-                            const teamMemberById = new Map((teamMembers || []).map(m => [m.id, m]));
                             const creators = Array.from(creatorIds)
                               .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
@@ -1926,7 +1935,7 @@ const SemilleroPage = () => {
                     const isExternal = sugCuerda
                       ? (c.numero_cuerda ? sugCuerda.numero !== c.numero_cuerda : (sugZona && homeZonaId ? sugZona.id !== homeZonaId : false))
                       : false;
-                    const responsable = teamMembers?.find(m => m.id === c.responsable_id);
+                    const responsable = c.responsable_id ? teamMemberById.get(c.responsable_id) : undefined;
 
                     return (
                       <tr key={c.id} className={`border-b h-[37px] transition-colors ${recentImportIds.has(c.id) ? 'bg-amber-500/15 hover:bg-amber-500/25' : 'hover:bg-muted/50'}`}>

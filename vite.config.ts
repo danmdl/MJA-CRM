@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import dyadComponentTagger from "@dyad-sh/react-vite-component-tagger";
 import react from "@vitejs/plugin-react-swc";
+import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 
 export default defineConfig(() => ({
@@ -8,7 +9,23 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
-  plugins: [dyadComponentTagger(), react()],
+  plugins: [
+    dyadComponentTagger(),
+    react(),
+    // Bundle analyzer — opt-in via ANALYZE=1 so it doesn't add weight to
+    // every normal build. Run `ANALYZE=1 pnpm run build` to regenerate
+    // dist/bundle-stats.html, then open it in a browser to spot which
+    // dependencies are hogging the main bundle. Gzip + brotli sizes
+    // included so you can judge real-network cost, not raw bytes.
+    process.env.ANALYZE === "1"
+      ? visualizer({
+          filename: "dist/bundle-stats.html",
+          gzipSize: true,
+          brotliSize: true,
+          template: "treemap",
+        })
+      : null,
+  ].filter(Boolean) as any,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
