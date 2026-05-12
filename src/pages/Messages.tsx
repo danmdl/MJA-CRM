@@ -142,10 +142,10 @@ const Messages = () => {
     return team.filter(u => normalize(`${u.first_name || ''} ${u.last_name || ''}`).includes(q));
   }, [team, recipientSearch]);
 
-  const unreadCount = activeInbox.filter(m => !m.read_at).length;
-
   const activeInbox = useMemo(() => inbox.filter(m => !m.archived_at), [inbox]);
   const archivedInbox = useMemo(() => inbox.filter(m => !!m.archived_at), [inbox]);
+
+  const unreadCount = activeInbox.filter(m => !m.read_at).length;
 
   const filteredInbox = useMemo(() => {
     const base = showArchived ? archivedInbox : activeInbox;

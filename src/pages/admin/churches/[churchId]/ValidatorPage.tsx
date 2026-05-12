@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -8,9 +8,11 @@ import { showSuccess, showError } from '@/utils/toast';
 import { isWithinGBA } from '@/lib/geo-validation';
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
-import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import { useSession } from '@/hooks/use-session';
 import { normalize } from '@/lib/normalize';
+
+// Lazy: only fetch the ~1k LOC profile dialog when the user opens it.
+const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
 
 interface Issue {
   id: string;
@@ -241,7 +243,9 @@ const ValidatorPage = () => {
       .select('id, numero, territory_geojson')
       .not('territory_geojson', 'is', null);
     if (cuerdasWithTerritory && cuerdasWithTerritory.length > 0) {
-      const territoryMap = new Map<string, { numero: string; paths: number[][][] }>();
+      // paths is google.maps-style { lat, lng }[][] (the shape returned
+      // by geoJsonToGooglePaths), not raw number[][][] coordinates.
+      const territoryMap = new Map<string, { numero: string; paths: { lat: number; lng: number }[][] }>();
       for (const cu of cuerdasWithTerritory) {
         const paths = geoJsonToGooglePaths(cu.territory_geojson);
         if (paths) territoryMap.set(cu.id, { numero: cu.numero, paths });
@@ -838,12 +842,16 @@ const ValidatorPage = () => {
       )}
 
       {/* Contact profile dialog - opens when clicking a contact name in a validation row */}
-      <ContactProfileDialog
-        open={!!profileContactId}
-        onOpenChange={(o) => { if (!o) { setProfileContactId(null); runValidation(); } }}
-        contactId={profileContactId || ''}
-        churchId={churchId!}
-      />
+      {profileContactId && (
+        <Suspense fallback={null}>
+          <ContactProfileDialog
+            open
+            onOpenChange={(o) => { if (!o) { setProfileContactId(null); runValidation(); } }}
+            contactId={profileContactId}
+            churchId={churchId!}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

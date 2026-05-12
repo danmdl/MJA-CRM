@@ -16,6 +16,9 @@ export const showLoading = (message: string) => {
   return toast.loading(message);
 };
 
-export const dismissToast = (toastId: string) => {
+// Sonner's toast.loading() returns string | number depending on internal
+// id generation, so dismissToast must accept either. The narrower string
+// signature triggered TS2345 in pages that store the loading toast id.
+export const dismissToast = (toastId: string | number) => {
   toast.dismiss(toastId);
 };

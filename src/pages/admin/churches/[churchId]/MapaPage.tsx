@@ -1,13 +1,20 @@
 "use client";
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MapPin, Loader2, Users, Building2 } from 'lucide-react';
-import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
-import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
+// Heavy dialogs are lazy: they only render when the user clicks a marker.
+// Pulls ContactProfileDialog (~1k LOC) out of the MapaPage chunk.
+const CellDetailsDialog = lazy(() => import('@/components/admin/CellDetailsDialog'));
+const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { useSession } from '@/hooks/use-session';
+
+// Geocoder API key, same env var used by lib/google-maps.ts. Falling back
+// to '' means the geocode request will fail with a clearer 400 from Google
+// rather than crashing with ReferenceError when the var isn't configured.
+const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? '';
 
 interface Cell {
   id: string;
@@ -758,22 +765,30 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
       )}
 
       {/* Cell details dialog — opens when clicking "Ver detalles" in a cell marker popup */}
-      <CellDetailsDialog
-        open={!!selectedCellId}
-        onOpenChange={(o) => { if (!o) setSelectedCellId(null); }}
-        churchId={churchId!}
-        cellId={selectedCellId}
-      />
+      {selectedCellId && (
+        <Suspense fallback={null}>
+          <CellDetailsDialog
+            open
+            onOpenChange={(o) => { if (!o) setSelectedCellId(null); }}
+            churchId={churchId!}
+            cellId={selectedCellId}
+          />
+        </Suspense>
+      )}
 
       {/* Contact profile dialog — opens when clicking "Ver perfil" in a
           contact marker popup. Same dialog Semillero / Validator use, so
           the user gets the full profile with edit / regeocode / etc. */}
-      <ContactProfileDialog
-        open={!!selectedContactId}
-        onOpenChange={(o) => { if (!o) setSelectedContactId(null); }}
-        contactId={selectedContactId}
-        churchId={churchId!}
-      />
+      {selectedContactId && (
+        <Suspense fallback={null}>
+          <ContactProfileDialog
+            open
+            onOpenChange={(o) => { if (!o) setSelectedContactId(null); }}
+            contactId={selectedContactId}
+            churchId={churchId!}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

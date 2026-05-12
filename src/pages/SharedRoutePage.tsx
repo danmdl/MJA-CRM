@@ -49,7 +49,9 @@ const SharedRoutePage = () => {
       const { data: cs } = await supabase.from('contacts')
         .select('id, first_name, last_name, address, lat, lng')
         .in('id', data.ordered_contact_ids);
-      const orderMap = new Map(data.ordered_contact_ids.map((id: string, i: number) => [id, i]));
+      const orderMap = new Map<string, number>(
+        (data.ordered_contact_ids as string[]).map((id, i) => [id, i] as [string, number])
+      );
       const sorted = (cs || []).sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
       setContacts(sorted as Contact[]);
       setLoading(false);

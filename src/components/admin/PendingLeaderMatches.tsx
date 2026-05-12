@@ -28,7 +28,11 @@ const PendingLeaderMatches = () => {
         .select('id, cell_id, matched_name, status, cell:cells(name, address, meeting_day, meeting_time)')
         .eq('profile_id', session.user.id)
         .eq('status', 'pending');
-      return (data || []) as PendingMatch[];
+      // Supabase types `cell:cells(...)` as an array because the join is
+      // technically many-to-many at the schema level, but in this query
+      // pending_leader_matches.cell_id is a single FK so we get exactly
+      // one cell back. Cast through unknown to silence the variance check.
+      return (data || []) as unknown as PendingMatch[];
     },
     enabled: !!session?.user?.id,
   });
