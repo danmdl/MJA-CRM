@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { logAdminAction } from '@/lib/audit-log';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -2721,6 +2722,17 @@ const SemilleroPage = () => {
             queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
             return;
           }
+          // Audit row for the bulk delete. We log a single row covering
+          // the whole batch — the affected ids are in after_data so we
+          // can reconstruct exactly which contacts were soft-deleted if
+          // an incident calls for it.
+          logAdminAction({
+            action: 'bulk_delete_contacts',
+            entityType: 'contacts',
+            entityId: ids[0],
+            churchId,
+            afterData: { count: ids.length, contact_ids: ids, deleted_at: nowIso },
+          });
           showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}.`);
           setSelectedIds(new Set());
           setBulkDeleteOpen(false);

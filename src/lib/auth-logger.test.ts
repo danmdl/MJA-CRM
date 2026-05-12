@@ -5,6 +5,8 @@ import {
   getFailedAttempts,
   clearFailedAttempts,
   getDeviceInfo,
+  getLoginBlockSecondsLeft,
+  MAX_LOGIN_ATTEMPTS,
 } from './auth-logger';
 
 describe('categorizeAuthError', () => {
@@ -88,6 +90,52 @@ describe('failed-attempts tracker', () => {
     expect(getFailedAttempts('a@x.com')).toBe(0);
     // Recording a new attempt should also drop the stale one.
     expect(recordFailedAttempt('a@x.com')).toBe(1);
+  });
+
+  describe('getLoginBlockSecondsLeft', () => {
+    it('returns 0 when below threshold', () => {
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS - 1; i++) {
+        recordFailedAttempt('a@x.com');
+      }
+      expect(getLoginBlockSecondsLeft('a@x.com')).toBe(0);
+    });
+
+    it('returns >0 once the threshold is hit', () => {
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS; i++) {
+        recordFailedAttempt('a@x.com');
+      }
+      const s = getLoginBlockSecondsLeft('a@x.com');
+      expect(s).toBeGreaterThan(0);
+      expect(s).toBeLessThanOrEqual(10 * 60); // within the 10-min window
+    });
+
+    it('block expires once the oldest attempt ages out', () => {
+      // Stamp MAX attempts all at exactly 10 min ago — they're outside
+      // the window so they should not count, and the block should clear.
+      const tenMinAgo = Date.now() - 10 * 60 * 1000 - 1;
+      const stamps = Array.from({ length: MAX_LOGIN_ATTEMPTS }, () => tenMinAgo);
+      memoryStore.set('_login_fails_a@x.com', JSON.stringify(stamps));
+      expect(getLoginBlockSecondsLeft('a@x.com')).toBe(0);
+    });
+
+    it('counts the time until the oldest attempt expires, not the newest', () => {
+      // Oldest attempt was 9 min ago, so user gets ~1 minute of block.
+      const now = Date.now();
+      const stamps: number[] = [];
+      stamps.push(now - 9 * 60 * 1000); // oldest
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS - 1; i++) stamps.push(now);
+      memoryStore.set('_login_fails_a@x.com', JSON.stringify(stamps));
+      const s = getLoginBlockSecondsLeft('a@x.com');
+      expect(s).toBeGreaterThan(0);
+      expect(s).toBeLessThanOrEqual(60 + 5); // ~60s ± a few
+    });
+
+    it('normalises email casing so DAN@X.com and dan@x.com share the lock', () => {
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS; i++) {
+        recordFailedAttempt('DAN@X.com');
+      }
+      expect(getLoginBlockSecondsLeft('dan@x.COM')).toBeGreaterThan(0);
+    });
   });
 });
 

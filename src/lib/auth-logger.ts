@@ -47,6 +47,8 @@ export const categorizeAuthError = (msg: string): string => {
 // ─── Failed-attempts tracker (localStorage, per email, 10-min window) ─────────
 
 const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+/** Threshold above which we soft-block further login attempts client-side. */
+export const MAX_LOGIN_ATTEMPTS = 8;
 
 export const recordFailedAttempt = (email: string): number => {
   const key = `_login_fails_${email.toLowerCase()}`;
@@ -67,6 +69,30 @@ export const getFailedAttempts = (email: string): number => {
   const now  = Date.now();
   const prev = JSON.parse(localStorage.getItem(key) || '[]') as number[];
   return prev.filter(t => now - t < WINDOW_MS).length;
+};
+
+/**
+ * If the email has reached MAX_LOGIN_ATTEMPTS in the 10-minute window,
+ * returns the number of seconds until the OLDEST attempt in the window
+ * expires (i.e. when the user can try again). Returns 0 if not blocked.
+ *
+ * Note: this is a client-side soft block. It protects legitimate users
+ * from accidentally getting locked out by Supabase's harder server-side
+ * rate limit, AND it shuts down trivial brute-force scripts running in
+ * the same browser session. A real attacker can clear localStorage and
+ * keep trying — but they'll hit Supabase's own auth rate limit before
+ * doing real damage.
+ */
+export const getLoginBlockSecondsLeft = (email: string): number => {
+  const key = `_login_fails_${email.toLowerCase()}`;
+  const now  = Date.now();
+  const prev = JSON.parse(localStorage.getItem(key) || '[]') as number[];
+  const recent = prev.filter(t => now - t < WINDOW_MS);
+  if (recent.length < MAX_LOGIN_ATTEMPTS) return 0;
+  const oldest = Math.min(...recent);
+  const expiresAt = oldest + WINDOW_MS;
+  const seconds = Math.ceil((expiresAt - now) / 1000);
+  return seconds > 0 ? seconds : 0;
 };
 
 // ─── Core log inserter ────────────────────────────────────────────────────────

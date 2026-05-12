@@ -11,11 +11,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { validatePasswordFull } from '@/lib/password-strength';
 
 const onboardingSchema = z.object({
   firstName: z.string().trim().min(1, { message: 'El nombre es obligatorio.' }),
   lastName: z.string().trim().min(1, { message: 'El apellido es obligatorio.' }),
-  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
+  password: z.string().min(8, { message: 'La contraseña debe tener al menos 8 caracteres.' }),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden.',
@@ -51,6 +52,13 @@ const OnboardingForm = ({ onSuccess }: Props) => {
   const onSubmit = async (values: z.infer<typeof onboardingSchema>) => {
     if (!session?.user?.id) return;
     setLoading(true);
+    // Strength + leaked-password check before hitting Supabase.
+    const pwCheck = await validatePasswordFull(values.password);
+    if (!pwCheck.ok) {
+      showError(pwCheck.reason || 'Contraseña inválida.');
+      setLoading(false);
+      return;
+    }
     try {
       // 1. Set the password
       const { error: pwErr } = await supabase.auth.updateUser({

@@ -9,9 +9,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
+import { validatePasswordFull } from '@/lib/password-strength';
 
 const passwordSchema = z.object({
-  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
+  password: z.string().min(8, { message: 'La contraseña debe tener al menos 8 caracteres.' }),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden.',
@@ -38,6 +39,13 @@ const PasswordChangeForm = ({ isFirstSetup = false, onSuccess }: PasswordChangeF
 
   const onSubmit = async (values: z.infer<typeof passwordSchema>) => {
     setLoading(true);
+    // Strength + leaked-password check before hitting Supabase.
+    const pwCheck = await validatePasswordFull(values.password);
+    if (!pwCheck.ok) {
+      showError(pwCheck.reason || 'Contraseña inválida.');
+      setLoading(false);
+      return;
+    }
     const { error } = await supabase.auth.updateUser({
       password: values.password,
     });

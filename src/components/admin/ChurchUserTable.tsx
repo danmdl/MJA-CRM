@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Copy, Send, Trash2, KeyRound, Eye, EyeOff, UserPen, UserSearch, ChevronDown } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
+import { logAdminAction } from '@/lib/audit-log';
 import { normalize as norm } from '@/lib/normalize';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
@@ -181,8 +182,27 @@ const ChurchUserTable = ({ churchId }: { churchId: string }) => {
   });
 
   const updateUserRoleMutation = useMutation({
-    mutationFn: ({ userId, newRole }: { userId: string; newRole: UserRole }) =>
-      callEdge({ action: 'updateUserRole', userId, newRole }),
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: UserRole }) => {
+      // Capture the previous role for the audit row. Best-effort: if the
+      // read fails we still go through with the role change.
+      let previousRole: string | null = null;
+      try {
+        const { data } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle();
+        previousRole = (data as any)?.role ?? null;
+      } catch { /* swallow */ }
+      const result = await callEdge({ action: 'updateUserRole', userId, newRole });
+      // Audit AFTER the edge call succeeds so we don't log a change
+      // that didn't actually happen.
+      logAdminAction({
+        action: 'role_change',
+        entityType: 'profile',
+        entityId: userId,
+        churchId,
+        beforeData: { role: previousRole },
+        afterData: { role: newRole },
+      });
+      return result;
+    },
     onSuccess: () => { showSuccess('Rol actualizado.'); queryClient.invalidateQueries({ queryKey: ['churchUsers', churchId] }); },
     onError: (err: any) => showError(err.message || 'Error al actualizar rol.'),
   });

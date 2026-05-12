@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import { logAuthEvent, categorizeAuthError, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth-logger';
+import { logAuthEvent, categorizeAuthError, recordFailedAttempt, clearFailedAttempts, getLoginBlockSecondsLeft, MAX_LOGIN_ATTEMPTS } from '@/lib/auth-logger';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: '#18181b',
@@ -62,6 +62,29 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    // Soft block: too many failed attempts in the last 10 min for this email.
+    // Tell the user how long until they can try again rather than just
+    // returning a generic "wrong password" which would encourage them to
+    // keep guessing. Also logs once so we can see brute-force attempts
+    // in the auth dashboard even if Supabase's server-side rate limit
+    // hasn't kicked in yet.
+    const blockSeconds = getLoginBlockSecondsLeft(email);
+    if (blockSeconds > 0) {
+      const mins = Math.ceil(blockSeconds / 60);
+      setError(`Demasiados intentos fallidos para esta cuenta. Esperá ${mins} ${mins === 1 ? 'minuto' : 'minutos'} antes de volver a intentar.`);
+      logAuthEvent({
+        action: 'login_blocked_client',
+        level: 'warning',
+        user_email: email,
+        context: {
+          block_seconds_left: blockSeconds,
+          max_attempts: MAX_LOGIN_ATTEMPTS,
+          note: 'Client-side soft block: max attempts hit within 10-min window',
+        },
+      });
+      setLoading(false);
+      return;
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError(translateError(error.message));
