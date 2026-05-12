@@ -27,6 +27,12 @@ interface AddressAutocompleteProps {
 
 import { loadGoogleMaps } from '@/lib/google-maps';
 
+// Lifted out alongside the loadGoogleMaps refactor — used below to short-circuit
+// the autocomplete effect and render a plain input fallback when the key isn't
+// configured. Foundation pass removed this declaration but kept the references,
+// which made the component throw ReferenceError on mount.
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+
 const AddressAutocomplete = ({
   value,
   onChange,
