@@ -407,59 +407,89 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         validationErrors.filter(v => v.field === 'Sexo').map(v => v.row - 1)
       );
 
-      // Insert records individually to track exactly which ones fail
+      // Insert in batches. Single-row inserts in a tight await loop were
+      // the bottleneck: every row was 3 round-trips (insert + select +
+      // activity_logs), which at ~40ms RTT meant a 3k CSV took 2+ min.
+      // Batching to 100 rows per insert call collapses that to ~30
+      // round-trips total. If a batch fails wholesale (one bad row
+      // rejected by Postgres takes the whole batch with it) we fall
+      // back to per-row inserts inside that batch so we still pinpoint
+      // the offender for the failure log.
       const failed: {row: number, data: Record<string, string>}[] = [];
       const importedIds: string[] = [];
-      // Snapshot of the original CSV row data for every successful insert,
-      // so we can persist it on the import log for later forensic viewing.
-      // Without this, when a trigger or migration later changes the
-      // contact's columns (e.g. the cuerda alignment migration moved
-      // Micaela's contacts from 104 → 204), Historial only sees the
-      // current value and the user can't tell what the file actually
-      // said. The snapshot answers "what came in" independently.
       const importedRows: Array<{ row: number; data: Record<string, any> }> = [];
       let successCount = 0;
-      
-      for (let i = 0; i < recordsToInsert.length; i++) {
-        if (fatalRowIdxs.has(i)) {
-          failed.push({ row: i + 1, data: dataToImport[i] as Record<string, string> });
-          continue;
-        }
-        const { data: inserted, error } = await supabase.from(tableName).insert(recordsToInsert[i]).select().single();
+      const BATCH_SIZE = 100;
+
+      // Per-row fallback used when a whole batch errors — keeps the
+      // exact same per-row error-handling semantics the old code had.
+      const insertOneRow = async (rowIdx: number) => {
+        const { data: inserted, error } = await supabase
+          .from(tableName)
+          .insert(recordsToInsert[rowIdx])
+          .select()
+          .single();
         if (error) {
-          // Generic insert error path. The duplicate_phone trigger that
-          // used to reject same-phone rows was dropped — duplicates are
-          // surfaced as a non-blocking flag in the Semillero now, not as
-          // a rejection at insert time.
           const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);
           setImportErrors(prev => [...prev, {
-            row: i + 1,
+            row: rowIdx + 1,
             field: 'Error de inserción',
             value: colMatch ? colMatch[1] : '',
             message: error.message,
           }]);
-          failed.push({ row: i + 1, data: dataToImport[i] as Record<string, string> });
-          await logEvent({ action: 'csv_import', error, payload: { row: i + 1, church_id: churchId }, context: { church_id: churchId } });
-        } else {
+          failed.push({ row: rowIdx + 1, data: dataToImport[rowIdx] as Record<string, string> });
+          await logEvent({ action: 'csv_import', error, payload: { row: rowIdx + 1, church_id: churchId }, context: { church_id: churchId } });
+          return null;
+        }
+        if (inserted) {
           successCount++;
-          if (inserted) {
-            importedIds.push(inserted.id);
-            // Capture both the original CSV row (dataToImport[i]) and the
-            // contact's id so the Historial view can hard-link rather
-            // than reconstruct via time-window heuristics. Storing the
-            // full row keeps "what the file said" pinned permanently —
-            // even if every column on the contact gets edited later, the
-            // import log still shows the original.
-            importedRows.push({
-              row: i + 1,
-              data: { id: inserted.id, ...dataToImport[i] },
-            });
+          importedIds.push(inserted.id);
+          importedRows.push({ row: rowIdx + 1, data: { id: inserted.id, ...dataToImport[rowIdx] } });
+        }
+        return inserted;
+      };
+
+      for (let batchStart = 0; batchStart < recordsToInsert.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, recordsToInsert.length);
+        // Collect the indexes in this batch that aren't pre-flagged as fatal.
+        const includedIdxs: number[] = [];
+        for (let i = batchStart; i < batchEnd; i++) {
+          if (fatalRowIdxs.has(i)) {
+            failed.push({ row: i + 1, data: dataToImport[i] as Record<string, string> });
+          } else {
+            includedIdxs.push(i);
           }
-          // Log every successful import to activity_logs so it appears in Historial.
-          // Without this, bulk-imported contacts were invisible in the historial view
-          // even though they existed in the contacts table.
-          if (inserted && tableName === 'contacts' && churchId) {
-            await supabase.from('activity_logs').insert({
+        }
+        if (includedIdxs.length === 0) continue;
+
+        const batchRows = includedIdxs.map(idx => recordsToInsert[idx]);
+        const { data: insertedBatch, error: batchErr } = await supabase
+          .from(tableName)
+          .insert(batchRows)
+          .select();
+
+        if (batchErr || !insertedBatch) {
+          // Fallback: insert this batch row-by-row so a single bad row
+          // doesn't poison the surrounding 99 valid ones.
+          for (const idx of includedIdxs) {
+            await insertOneRow(idx);
+          }
+          continue;
+        }
+
+        // Postgres preserves insert order with bulk insert, so the i-th
+        // returned row corresponds to the i-th input row.
+        const auditEntries: Array<Record<string, unknown>> = [];
+        insertedBatch.forEach((inserted: any, j: number) => {
+          const rowIdx = includedIdxs[j];
+          successCount++;
+          importedIds.push(inserted.id);
+          importedRows.push({
+            row: rowIdx + 1,
+            data: { id: inserted.id, ...dataToImport[rowIdx] },
+          });
+          if (tableName === 'contacts' && churchId) {
+            auditEntries.push({
               user_id: session?.user?.id,
               church_id: churchId,
               action: 'create',
@@ -469,6 +499,12 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
               after_data: { ...inserted, _source: 'csv_import' },
             });
           }
+        });
+        // One activity_logs insert per batch instead of per-row keeps
+        // Historial coverage intact (every contact gets a row) but
+        // collapses 100 round-trips into 1.
+        if (auditEntries.length > 0) {
+          await supabase.from('activity_logs').insert(auditEntries);
         }
       }
       
