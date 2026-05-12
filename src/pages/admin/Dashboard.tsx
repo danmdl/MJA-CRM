@@ -61,9 +61,13 @@ const Dashboard = () => {
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
       const [contacts, cells, churches] = await Promise.all([
-        supabase.from('contacts').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-        supabase.from('cells').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-        supabase.from('churches').select('id', { count: 'exact', head: true }),
+        // 'planned' returns the Postgres planner estimate (reltuples) which
+        // is orders of magnitude faster than count(*) once a table grows.
+        // The dashboard tile only needs an order-of-magnitude figure, not
+        // a precise number, so the trade-off is fine.
+        supabase.from('contacts').select('id', { count: 'planned', head: true }).is('deleted_at', null),
+        supabase.from('cells').select('id', { count: 'planned', head: true }).is('deleted_at', null),
+        supabase.from('churches').select('id', { count: 'planned', head: true }),
       ]);
       return {
         contacts: contacts.count ?? 0,

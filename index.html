@@ -28,6 +28,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MJA CRM" />
+    <!-- Open early TCP+TLS connections to the third parties the app hits
+         on essentially every page load. Saves ~200-400ms on first request
+         to each on cold connections (mobile / coffee-shop wifi). The
+         Supabase host is the project's REST + Storage endpoint; the maps
+         host serves Google Maps JS + tiles. -->
+    <link rel="preconnect" href="https://jczsgvaednptnypxhcje.supabase.co" crossorigin />
+    <link rel="preconnect" href="https://maps.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://maps.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://api.mapbox.com" />
   </head>
   <body class="notranslate">
     <div id="root"></div>

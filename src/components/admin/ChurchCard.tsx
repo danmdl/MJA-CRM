@@ -37,7 +37,7 @@ const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId
     queryFn: async () => {
       const { count } = await supabase
         .from('cells')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true })
         .eq('church_id', church.id)
         .is('deleted_at', null);
       return count || 0;
@@ -51,7 +51,7 @@ const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId
     queryFn: async () => {
       const { count } = await supabase
         .from('contacts')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true })
         .eq('church_id', church.id)
         .is('deleted_at', null);
       return count || 0;
@@ -68,7 +68,7 @@ const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId
     queryFn: async () => {
       const { count } = await supabase
         .from('profiles')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true })
         .eq('church_id', church.id);
       return count || 0;
     }

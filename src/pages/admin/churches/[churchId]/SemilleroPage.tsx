@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,15 +28,18 @@ import { isValidArgentinePhone } from '@/lib/phone-validation';
 import { isWithinGBA, getDistanceColor, getDistanceWarning, getDistanceBadgeClass } from '@/lib/geo-validation';
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
-import CsvImporter from '@/components/admin/CsvImporter';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
-import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsAppComposeDialog';
 import FilterTabsBar, { applyFilterTab, FilterTabFilters } from '@/components/admin/FilterTabsBar';
-import BulkWhatsAppDialog from '@/components/admin/BulkWhatsAppDialog';
-import AddContactDialog from '@/components/admin/AddContactDialog';
-import DuplicateMergeDialog from '@/components/admin/DuplicateMergeDialog';
+// Heavy dialogs are lazy: they're conditionally rendered (open && <Dialog>),
+// so the chunk only downloads when the user actually opens one. Pulled out
+// roughly 70KB of JS from the SemilleroPage initial load.
+const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
+const CsvImporter = lazy(() => import('@/components/admin/CsvImporter'));
+const BulkWhatsAppDialog = lazy(() => import('@/components/admin/BulkWhatsAppDialog'));
+const AddContactDialog = lazy(() => import('@/components/admin/AddContactDialog'));
+const DuplicateMergeDialog = lazy(() => import('@/components/admin/DuplicateMergeDialog'));
 import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 import type { Zona, Barrio, Cuerda, Cell, Contact } from './semillero/types';
 import { haversine } from './semillero/helpers';
@@ -2618,40 +2621,49 @@ const SemilleroPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* CSV Import Dialog */}
-      <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
-        <DialogContent className="sm:max-w-[1200px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Importar Contactos desde CSV o Excel</DialogTitle>
-            <DialogDescription>
-              Los contactos importados aparecerán en el pool "Sin asignar" para que puedas verificar sus direcciones y asignarles una célula.
-            </DialogDescription>
-          </DialogHeader>
-          <CsvImporter
-            tableName="contacts"
-            requiredFields={CONTACT_FIELDS.filter(f => f.key === 'first_name' || f.key === 'sexo')}
-            optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name' && f.key !== 'sexo' && f.key !== 'barrio' && f.key !== 'leader_assigned')}
-            churchId={churchId}
-            onImportComplete={(ids) => {
-              setRecentImportIds(new Set(ids));
-              setCsvDialogOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* CSV Import Dialog — render the wrapper only when open so the lazy
+          CsvImporter chunk only fetches on first open, not page mount. */}
+      {csvDialogOpen && (
+        <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
+          <DialogContent className="sm:max-w-[1200px] max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Importar Contactos desde CSV o Excel</DialogTitle>
+              <DialogDescription>
+                Los contactos importados aparecerán en el pool "Sin asignar" para que puedas verificar sus direcciones y asignarles una célula.
+              </DialogDescription>
+            </DialogHeader>
+            <Suspense fallback={<div className="py-6 text-center text-sm text-muted-foreground">Cargando importador…</div>}>
+              <CsvImporter
+                tableName="contacts"
+                requiredFields={CONTACT_FIELDS.filter(f => f.key === 'first_name' || f.key === 'sexo')}
+                optionalFields={CONTACT_FIELDS.filter(f => f.key !== 'first_name' && f.key !== 'sexo' && f.key !== 'barrio' && f.key !== 'leader_assigned')}
+                churchId={churchId}
+                onImportComplete={(ids) => {
+                  setRecentImportIds(new Set(ids));
+                  setCsvDialogOpen(false);
+                }}
+              />
+            </Suspense>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* Contact Profile Dialog */}
-      <ContactProfileDialog
-        open={!!selectedContactId}
-        onOpenChange={(o) => {
-          if (!o) {
-            setSelectedContactId(null);
-            queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
-          }
-        }}
-        contactId={selectedContactId || ''}
-        churchId={churchId!}
-      />
+      {/* Contact Profile Dialog — only mount once a row has been clicked. */}
+      {selectedContactId && (
+        <Suspense fallback={null}>
+          <ContactProfileDialog
+            open
+            onOpenChange={(o) => {
+              if (!o) {
+                setSelectedContactId(null);
+                queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
+              }
+            }}
+            contactId={selectedContactId}
+            churchId={churchId!}
+          />
+        </Suspense>
+      )}
 
       <BulkDeleteDialog
         open={bulkDeleteOpen}
@@ -2693,31 +2705,40 @@ const SemilleroPage = () => {
         }}
       />
 
-      {/* Add Contact Dialog */}
-      <AddContactDialog
-        open={addContactOpen}
-        onOpenChange={(o) => {
-          setAddContactOpen(o);
-          if (!o) queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
-        }}
-        churchId={churchId!}
-      />
+      {/* Add Contact Dialog — lazy: only rendered after the user clicks "Add". */}
+      {addContactOpen && (
+        <Suspense fallback={null}>
+          <AddContactDialog
+            open
+            onOpenChange={(o) => {
+              setAddContactOpen(o);
+              if (!o) queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
+            }}
+            churchId={churchId!}
+          />
+        </Suspense>
+      )}
 
       {/* Duplicate merge dialog — opened by clicking the amber dot on a row.
           On resolve (merge or dismiss) we invalidate both the contacts pool
           and the dismissals query so the table updates and the dot recomputes
-          correctly without a manual refresh. */}
-      <DuplicateMergeDialog
-        open={!!mergeGroup}
-        onOpenChange={(o) => { if (!o) setMergeGroup(null); }}
-        group={(mergeGroup || []) as any}
-        userId={session?.user?.id || null}
-        onResolved={() => {
-          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-          queryClient.invalidateQueries({ queryKey: ['dedupe-dismissals', churchId] });
-          setSelectedIds(new Set()); // mergees might be in selection — drop ghosts
-        }}
-      />
+          correctly without a manual refresh. Lazy because most users never
+          open it. */}
+      {mergeGroup && (
+        <Suspense fallback={null}>
+          <DuplicateMergeDialog
+            open
+            onOpenChange={(o) => { if (!o) setMergeGroup(null); }}
+            group={mergeGroup as any}
+            userId={session?.user?.id || null}
+            onResolved={() => {
+              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+              queryClient.invalidateQueries({ queryKey: ['dedupe-dismissals', churchId] });
+              setSelectedIds(new Set());
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Contact Map Dialog */}
       <ContactMapDialog
@@ -2773,18 +2794,21 @@ const SemilleroPage = () => {
         }}
       />
 
-      {/* Bulk WhatsApp dialog - up to 5 contacts at once */}
-      <BulkWhatsAppDialog
-        open={bulkWhatsAppOpen}
-        onOpenChange={setBulkWhatsAppOpen}
-        contacts={(allContacts || []).filter(c => selectedIds.has(c.id)).map(c => ({
-          id: c.id,
-          first_name: c.first_name,
-          last_name: c.last_name,
-          phone: c.phone,
-        }))}
-        churchId={churchId}
-        onSent={async (sentContactIds, message, templateName) => {
+      {/* Bulk WhatsApp dialog - up to 5 contacts at once. Lazy: most uses
+          of Semillero never trigger a bulk send. */}
+      {bulkWhatsAppOpen && (
+        <Suspense fallback={null}>
+          <BulkWhatsAppDialog
+            open
+            onOpenChange={setBulkWhatsAppOpen}
+            contacts={(allContacts || []).filter(c => selectedIds.has(c.id)).map(c => ({
+              id: c.id,
+              first_name: c.first_name,
+              last_name: c.last_name,
+              phone: c.phone,
+            }))}
+            churchId={churchId}
+            onSent={async (sentContactIds, message, templateName) => {
           // Log each WhatsApp send to contact history
           try {
             const session = (await supabase.auth.getSession()).data.session;
@@ -2805,7 +2829,9 @@ const SemilleroPage = () => {
             ));
           } catch (e) { console.error('Failed to log bulk WhatsApp:', e); }
         }}
-      />
+          />
+        </Suspense>
+      )}
 
       {/* Floating action bar - appears at bottom of viewport when contacts are selected.
           Solves the problem of having to scroll back to the top to find the delete
