@@ -132,34 +132,36 @@ const PapeleraPage = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">Papelera</h1>
-        <span className="text-sm text-muted-foreground ml-auto">{filtered.length} / {(items || []).length} elemento(s)</span>
+      {/* Single header row: title + count + all filters */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">Papelera</h1>
+          <span className="text-sm text-muted-foreground">{filtered.length} / {(items || []).length} elemento(s)</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={filterType} onChange={e => { setFilterType(e.target.value); if (e.target.value === 'cell') setFilterSexo('all'); }} className="h-9 px-2 rounded border bg-background text-sm">
+            <option value="all">Contactos y Células</option>
+            <option value="contact">Solo Contactos</option>
+            <option value="cell">Solo Células</option>
+          </select>
+          <select value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)} className="h-9 px-2 rounded border bg-background text-sm">
+            <option value="all">Todas las cuerdas</option>
+            {cuerdaOptions.map(c => <option key={c} value={c}>Cuerda {c}</option>)}
+          </select>
+          <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-9 px-2 rounded border bg-background text-sm" disabled={filterType === 'cell'}>
+            <option value="all">Ambos sexos</option>
+            <option value="M">Masculino</option>
+            <option value="F">Femenino</option>
+          </select>
+          {(filterType !== 'all' || filterCuerda !== 'all' || filterSexo !== 'all') && (
+            <button onClick={() => { setFilterType('all'); setFilterCuerda('all'); setFilterSexo('all'); }} className="text-xs text-muted-foreground hover:text-foreground underline">
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground">Los elementos eliminados se pueden recuperar dentro de los {GRACE_DAYS} días. Después se eliminan permanentemente.</p>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <select value={filterType} onChange={e => { setFilterType(e.target.value); if (e.target.value === 'cell') setFilterSexo('all'); }} className="h-8 px-2 rounded border bg-background text-sm">
-          <option value="all">Contactos y Células</option>
-          <option value="contact">Solo Contactos</option>
-          <option value="cell">Solo Células</option>
-        </select>
-        <select value={filterCuerda} onChange={e => setFilterCuerda(e.target.value)} className="h-8 px-2 rounded border bg-background text-sm">
-          <option value="all">Todas las cuerdas</option>
-          {cuerdaOptions.map(c => <option key={c} value={c}>Cuerda {c}</option>)}
-        </select>
-        <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 px-2 rounded border bg-background text-sm" disabled={filterType === 'cell'}>
-          <option value="all">Ambos sexos</option>
-          <option value="M">Masculino</option>
-          <option value="F">Femenino</option>
-        </select>
-        {(filterType !== 'all' || filterCuerda !== 'all' || filterSexo !== 'all') && (
-          <button onClick={() => { setFilterType('all'); setFilterCuerda('all'); setFilterSexo('all'); }} className="text-xs text-muted-foreground hover:text-foreground underline">
-            Limpiar filtros
-          </button>
-        )}
-      </div>
 
       {filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">

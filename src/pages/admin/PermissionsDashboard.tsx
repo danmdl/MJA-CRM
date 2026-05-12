@@ -313,25 +313,6 @@ const PermissionsDashboard = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Shield className="h-8 w-8" />
-            Panel de Permisos
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Configura los permisos de acceso para cada rol en el sistema
-          </p>
-        </div>
-        <div />
-      </div>
-
-      <div className="flex items-center gap-3 mb-4">
-        <Button onClick={savePermissions} disabled={isSaving} size="lg">
-          {isSaving ? 'Guardando...' : 'Guardar Permisos'}
-        </Button>
-      </div>
-
       {/* Info banner: business rule about automatic responsable assignment.
           Placed prominently so admins remember why some roles auto-assign and
           others don't. This is NOT a permission to toggle - it's hardcoded in
@@ -354,17 +335,29 @@ const PermissionsDashboard = () => {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Configuración de Permisos por Rol</CardTitle>
-          <CardDescription>
-            Marca las casillas para permitir que cada rol realice acciones específicas
-          </CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <Shield className="h-7 w-7 mt-0.5 shrink-0" />
+            <div>
+              <CardTitle className="text-2xl">Panel de Permisos</CardTitle>
+              <CardDescription>
+                Configura los permisos de acceso para cada rol en el sistema.
+                Marca las casillas para permitir que cada rol realice acciones
+                específicas.
+              </CardDescription>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative w-48 sm:w-60">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-8 h-9 text-sm" placeholder="Buscar permisos..." value={permSearch} onChange={e => setPermSearch(e.target.value)} />
+            </div>
+            <Button onClick={savePermissions} disabled={isSaving}>
+              {isSaving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 relative max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-8 h-9 text-sm" placeholder="Buscar permisos..." value={permSearch} onChange={e => setPermSearch(e.target.value)} />
-          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
