@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { normalize } from '@/lib/normalize';
-import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
+// Lazy: only fetch the profile dialog chunk when the user clicks a card.
+const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
 
 // ─── Stage definitions ───────────────────────────────────────────────────────
 
@@ -684,12 +685,16 @@ const ProcesosPage = () => {
       />
 
       {/* Contact profile */}
-      <ContactProfileDialog
-        open={!!selectedContactId}
-        onOpenChange={o => { if (!o) { setSelectedContactId(null); queryClient.invalidateQueries({ queryKey: ['processes', churchId] }); } }}
-        contactId={selectedContactId || ''}
-        churchId={churchId!}
-      />
+      {selectedContactId && (
+        <Suspense fallback={null}>
+          <ContactProfileDialog
+            open
+            onOpenChange={o => { if (!o) { setSelectedContactId(null); queryClient.invalidateQueries({ queryKey: ['processes', churchId] }); } }}
+            contactId={selectedContactId}
+            churchId={churchId!}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

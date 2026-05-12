@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,7 +12,8 @@ import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
-import ContactProfileDialog from '@/components/admin/ContactProfileDialog';
+// Lazy: profile dialog chunk only loads when a contact card is clicked.
+const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
@@ -909,20 +910,22 @@ const RouteEditorPage = () => {
 
       {/* Edit contact dialog */}
       {editingContactId && churchId && (
-        <ContactProfileDialog
-          open={!!editingContactId}
-          onOpenChange={(o) => {
-            if (!o) {
-              setEditingContactId(null);
-              queryClient.invalidateQueries({ queryKey: ['rutas-contacts', churchId] });
-              // Force a recalc so updated coordinates flow into the map
-              setRouteData(null);
-              autoCalcedRef.current = false;
-            }
-          }}
-          contactId={editingContactId}
-          churchId={churchId}
-        />
+        <Suspense fallback={null}>
+          <ContactProfileDialog
+            open
+            onOpenChange={(o) => {
+              if (!o) {
+                setEditingContactId(null);
+                queryClient.invalidateQueries({ queryKey: ['rutas-contacts', churchId] });
+                // Force a recalc so updated coordinates flow into the map
+                setRouteData(null);
+                autoCalcedRef.current = false;
+              }
+            }}
+            contactId={editingContactId}
+            churchId={churchId}
+          />
+        </Suspense>
       )}
     </div>
   );
