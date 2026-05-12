@@ -269,6 +269,7 @@ const ZonasPage = lazyRetry(() => import("./pages/admin/ZonasPage"));
 const Messages = lazyRetry(() => import("./pages/Messages"));
 const AyudaPage = lazyRetry(() => import("./pages/admin/AyudaPage"));
 const PermissionsDashboard = lazyRetry(() => import("./pages/admin/PermissionsDashboard"));
+const MantenimientoPage = lazyRetry(() => import("./pages/admin/MantenimientoPage"));
 const InfoPage = lazyRetry(() => import("./pages/admin/InfoPage"));
 const NotificationsPage = lazyRetry(() => import("./pages/admin/NotificationsPage"));
 const TemplatesPage = lazyRetry(() => import("./pages/admin/TemplatesPage"));
@@ -370,6 +371,11 @@ const AppRoutes = () => {
         <Route path="permissions" element={
           <AdminOnlyRoute>
             <PermissionsDashboard />
+          </AdminOnlyRoute>
+        } />
+        <Route path="mantenimiento" element={
+          <AdminOnlyRoute>
+            <MantenimientoPage />
           </AdminOnlyRoute>
         } />
 

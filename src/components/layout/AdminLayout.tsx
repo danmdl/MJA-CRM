@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu, X, Search } from 'lucide-react';
 import UpdateBanner from '@/components/UpdateBanner';
+import { AppBanner } from '@/components/AppBanner';
 import GlobalContactSearch from '@/components/admin/GlobalContactSearch';
 import { useOutboxReminder } from '@/hooks/use-outbox-reminder';
 
@@ -58,7 +59,12 @@ const AdminLayout = () => {
   }, []);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#09090b' }}>
+    // Outer column so the global app banner sits ABOVE the
+    // sidebar+main row. The banner takes its natural height and the
+    // sidebar/main flex row below it gets whatever's left.
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#09090b' }}>
+      <AppBanner />
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
       <UpdateBanner />
 
       {/* Mobile overlay */}
@@ -152,6 +158,7 @@ const AdminLayout = () => {
       {/* Global contact search — accessible via Cmd/Ctrl+K from anywhere in
           the admin area, the topbar Buscar button, or the Sidebar entry. */}
       <GlobalContactSearch open={searchOpen} onOpenChange={setSearchOpen} />
+    </div>
     </div>
   );
 };
