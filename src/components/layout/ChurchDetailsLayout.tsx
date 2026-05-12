@@ -5,6 +5,7 @@ import { useSession } from "@/hooks/use-session";
 import { usePermissions } from "@/lib/permissions";
 import { showError } from "@/utils/toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Menu } from "lucide-react";
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
@@ -82,9 +83,22 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Tabs — compact single row, no church name (already visible in sidebar/URL) */}
-      <div className="border-b bg-background">
-        <div className="overflow-x-auto px-1">
+      {/* Compact single row: mobile hamburger (< lg only) + horizontally
+          scrollable tab bar. On desktop the sidebar is always visible so
+          the hamburger is hidden and the tab strip uses the full width. */}
+      <div className="border-b bg-background flex items-stretch">
+        {/* Mobile hamburger — emits a window event that AdminLayout
+            listens to. Keeps this layout decoupled from AdminLayout's
+            sidebar state without dragging a shared store in. */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('mja-toggle-sidebar'))}
+          className="lg:hidden flex items-center justify-center w-10 shrink-0 border-r text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          aria-label="Abrir menú"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+        <div className="flex-1 overflow-x-auto px-1 min-w-0">
           <Tabs
             value={activeTab}
             onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchId}/${val}`))}
