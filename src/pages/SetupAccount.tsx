@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { logAuthEvent, categorizeAuthError } from '@/lib/auth-logger';
+import { validatePasswordFull } from '@/lib/password-strength';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Eye, EyeOff } from 'lucide-react';
@@ -79,10 +80,17 @@ const SetupAccount = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return; }
     if (password !== confirmPassword) { setError('Las contraseñas no coinciden.'); return; }
     if (!isRecovery && !firstName.trim()) { setError('Ingresá tu nombre.'); return; }
     setSubmitting(true);
+    // Strength + HaveIBeenPwned check. Runs after local match check so the
+    // "passwords don't match" message takes priority for a clearer error.
+    const pwCheck = await validatePasswordFull(password);
+    if (!pwCheck.ok) {
+      setError(pwCheck.reason || 'Contraseña inválida.');
+      setSubmitting(false);
+      return;
+    }
     try {
       // STEP 1: If we have a token from URL, verify it now (this consumes it)
       if (tokenHash && tokenType && !hasExistingSession) {

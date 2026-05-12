@@ -7,6 +7,7 @@ import { Check, X, Shield, Building, BarChart, UserPlus, Edit, Eye, UserCog, Sea
 import { Input } from '@/components/ui/input';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
+import { logAdminAction } from '@/lib/audit-log';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -180,6 +181,14 @@ const PermissionsDashboard = () => {
 
   const savePermissions = async () => {
     setIsSaving(true);
+    // Snapshot the live permissions table BEFORE we overwrite it, so the
+    // audit row has the previous state. If the read fails for whatever
+    // reason we still proceed with the save — audit is best-effort.
+    let beforeSnapshot: unknown[] | null = null;
+    try {
+      const { data } = await supabase.from('permissions').select('*');
+      beforeSnapshot = data ?? null;
+    } catch { /* swallow */ }
     try {
       const { error } = await supabase
         .from('permissions')
@@ -227,6 +236,17 @@ const PermissionsDashboard = () => {
       if (error) {
         throw error;
       }
+
+      // Audit: record the permissions table mutation with before/after
+      // JSON snapshots. entity_id is a fixed sentinel UUID so all
+      // permissions-table changes group under one entity in the log.
+      logAdminAction({
+        action: 'permissions_change',
+        entityType: 'permissions_table',
+        entityId: '00000000-0000-0000-0000-000000000001',
+        beforeData: beforeSnapshot ? { rows: beforeSnapshot } : null,
+        afterData: { rows: permissions },
+      });
 
       showSuccess('Permisos guardados exitosamente');
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
