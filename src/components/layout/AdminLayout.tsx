@@ -58,6 +58,16 @@ const AdminLayout = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // Inside a church, ChurchDetailsLayout renders its own hamburger
+  // inline with the tab bar. It signals us via this custom event since
+  // the sidebar's open/closed state lives in this component and not in
+  // a shared store.
+  useEffect(() => {
+    const onToggle = () => setSidebarOpen(v => !v);
+    window.addEventListener('mja-toggle-sidebar', onToggle);
+    return () => window.removeEventListener('mja-toggle-sidebar', onToggle);
+  }, []);
+
   return (
     // Outer column so the global app banner sits ABOVE the
     // sidebar+main row. The banner takes its natural height and the
@@ -95,10 +105,13 @@ const AdminLayout = () => {
 
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        {/* Topbar - hidden on desktop when inside a church (church layout has its own header).
-            On mobile we keep a slim row just for the hamburger button. */}
+        {/* Topbar — hidden entirely when inside a specific church (the
+            ChurchDetailsLayout renders its own combined hamburger + tab
+            row, so we don't need a second 44px strip above it). The
+            Kanban page is the exception: it has no tab row of its own,
+            so we keep the topbar for the hamburger trigger there. */}
         <div
-          className={isInsideChurch && !isKanbanPage ? 'lg:hidden' : ''}
+          className={isInsideChurch && !isKanbanPage ? 'hidden' : ''}
           style={{
             height: 44, flexShrink: 0,
             borderBottom: '1px solid rgba(255,255,255,0.07)',
