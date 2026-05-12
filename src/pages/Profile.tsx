@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
 import PasswordChangeForm from '@/components/auth/PasswordChangeForm'; // Importar el nuevo componente
+import MfaSettingsCard from '@/components/auth/MfaSettingsCard';
 
 const Profile = () => {
   const { session } = useSession();
@@ -104,6 +105,11 @@ const Profile = () => {
 
         {/* Right: Change Password */}
         <PasswordChangeForm />
+
+        {/* Full-width: 2FA + trusted devices */}
+        <div className="lg:col-span-2">
+          <MfaSettingsCard />
+        </div>
       </div>
     </div>
   );

@@ -47,6 +47,7 @@ import { usePermissions } from "./lib/permissions";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
+import { MfaGate } from "./components/auth/MfaGate";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
 import OnboardingForm from "./components/auth/OnboardingForm";
@@ -343,7 +344,9 @@ const AppRoutes = () => {
       {/* Admin Routes */}
       <Route path="/admin" element={
         <AdminRoute>
-          <AdminLayout />
+          <MfaGate>
+            <AdminLayout />
+          </MfaGate>
         </AdminRoute>
       }>
         <Route index element={<AdminRootRedirect />} />
