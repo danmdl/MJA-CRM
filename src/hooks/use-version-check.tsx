@@ -97,9 +97,40 @@ export function useVersionCheck() {
       }
     };
 
-    // First check fires after a small delay so we don't pile on top of
-    // the initial app boot (auth + profile + permissions queries are
-    // already in flight at mount).
+    // Fast-path: at boot, compare the entry chunk this tab is running
+    // against the entry chunk in the live HTML. If they already differ
+    // at mount, this tab is running stale code from a deploy that no
+    // longer exists on the CDN — every lazy chunk it tries to fetch
+    // is going to 404. Toast-and-wait is too gentle for that case
+    // (the user can't navigate to anything until they manually reload).
+    // Force a hard navigation with a cache-buster instead, immediately.
+    const fastCheck = async () => {
+      if (cancelled) return;
+      const liveSrc = await fetchHtmlSrc();
+      if (!liveSrc) return;
+      // The bundle currently running embeds its own entry script tag in
+      // the loaded document. Find it the same way fetchHtmlSrc does so
+      // we're comparing like with like.
+      const ownScripts = Array.from(document.querySelectorAll('script[src]')) as HTMLScriptElement[];
+      const ownEntry = ownScripts
+        .map(s => s.getAttribute('src') || '')
+        .find(src => /^\/assets\/index-[A-Za-z0-9_-]+\.js$/.test(src));
+      // Seed the baseline either way so the periodic poll doesn't re-fire.
+      baselineSrcRef.current = liveSrc;
+      if (ownEntry && ownEntry !== liveSrc) {
+        // Stale tab. Hard navigate to /reset, which wipes service
+        // workers + caches + localStorage and bounces to /login.
+        // _v cache-buster guards against the SW serving a stale
+        // /reset response too.
+        notifiedRef.current = true;
+        window.location.href = '/reset?_v=' + Date.now();
+      }
+    };
+    const fastTimer = window.setTimeout(fastCheck, 50);
+
+    // Slow-path: 3s after boot and every 5 min thereafter. This catches
+    // deploys that happen WHILE the tab is open (entry chunk on the
+    // server changes mid-session) — those still get the gentler toast.
     const initialTimer = window.setTimeout(check, 3000);
     const intervalTimer = window.setInterval(check, POLL_INTERVAL_MS);
 
@@ -110,6 +141,7 @@ export function useVersionCheck() {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(fastTimer);
       window.clearTimeout(initialTimer);
       window.clearInterval(intervalTimer);
       document.removeEventListener('visibilitychange', onVisibility);

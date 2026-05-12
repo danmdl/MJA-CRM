@@ -116,25 +116,23 @@ class ChunkErrorBoundary extends React.Component<{ children: React.ReactNode }, 
     // If it's a chunk load error caused by stale SW (MIME type error) or actual
     // chunk load failure — unregister any SW, clear caches, redirect to login.
     // Do NOT reload() — that would loop if the SW keeps serving stale content.
-    const isMimeError = error?.message?.includes('MIME') || error?.message?.includes('text/html');
-    const isChunkError = error?.message?.includes('Loading chunk') || error?.message?.includes('Failed to fetch') || error?.name === 'ChunkLoadError';
+    const msg = String(error?.message || '');
+    const isMimeError = msg.includes('MIME') || msg.includes('text/html');
+    const isChunkError =
+      msg.includes('Loading chunk') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('error loading dynamically imported module') ||
+      msg.includes('Importing a module script failed') ||
+      msg.includes('Failed to fetch dynamically imported module') ||
+      error?.name === 'ChunkLoadError';
     if (isMimeError || isChunkError) {
       this.setState({ isRetrying: true });
-      // Clean up SW and caches, then go to login (hard navigate, not reload)
-      const cleanup = async () => {
-        try {
-          if ('serviceWorker' in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map(r => r.unregister()));
-          }
-          if ('caches' in window) {
-            const names = await caches.keys();
-            await Promise.all(names.map(n => caches.delete(n)));
-          }
-        } catch(e) { /* ignore */ }
-        window.location.href = '/login';
-      };
-      cleanup();
+      // Send the user to /reset (full SW + cache + localStorage wipe).
+      // /reset is a non-lazy route — its component is bundled in the
+      // entry chunk, so navigating there still works even when every
+      // lazy chunk is 404'ing. Going there with a cache-buster also
+      // breaks any stale service worker that's intercepting `/`.
+      window.location.href = '/reset?_v=' + Date.now();
       return;
     }
     // removeChild crashes are almost always caused by browser auto-translate
