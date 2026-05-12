@@ -85,7 +85,7 @@ const AdminLayout = () => {
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
             zIndex: 40, display: 'block',
           }}
-          className="lg:hidden"
+          className="md:hidden"
         />
       )}
 
@@ -99,7 +99,7 @@ const AdminLayout = () => {
         transition: 'transform 0.25s ease',
         pointerEvents: sidebarOpen ? 'auto' : 'none',
         overflow: 'hidden',
-      }} className={isKanbanPage ? '' : 'lg:!relative lg:!transform-none lg:!translate-x-0 lg:!z-auto lg:!pointer-events-auto'}>
+      }} className={isKanbanPage ? '' : 'md:!relative md:!transform-none md:!translate-x-0 md:!z-auto md:!pointer-events-auto'}>
         <Sidebar onNavigate={() => setSidebarOpen(false)} onOpenSearch={() => setSearchOpen(true)} />
       </div>
 
@@ -123,7 +123,7 @@ const AdminLayout = () => {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setSidebarOpen(v => !v)}
-            className={isKanbanPage ? '' : 'lg:hidden'}
+            className={isKanbanPage ? '' : 'md:hidden'}
             style={{
               width: 36, height: 36, borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.1)',
@@ -163,7 +163,7 @@ const AdminLayout = () => {
         </div>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className={isInsideChurch ? 'lg:p-4' : 'lg:p-6'}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className={isInsideChurch ? 'md:p-4' : 'md:p-6'}>
           <Outlet />
         </main>
       </div>
