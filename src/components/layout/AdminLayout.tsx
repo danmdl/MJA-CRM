@@ -111,11 +111,15 @@ const AdminLayout = () => {
             Kanban page is the exception: it has no tab row of its own,
             so we keep the topbar for the hamburger trigger there. */}
         <div
-          className={isInsideChurch && !isKanbanPage ? 'hidden' : ''}
           style={{
+            // Inline display has to react to the hide condition — putting
+            // it in a className wouldn't work because the inline `display:
+            // flex` below would override Tailwind's `.hidden` rule. So we
+            // toggle `display` directly here.
+            display: (isInsideChurch && !isKanbanPage) ? 'none' : 'flex',
             height: 44, flexShrink: 0,
             borderBottom: '1px solid rgba(255,255,255,0.07)',
-            display: 'flex', alignItems: 'center',
+            alignItems: 'center',
             padding: '0 12px', gap: 8,
             background: '#09090b',
           }}
