@@ -161,11 +161,20 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
           // during the brief window between mount and SIGNED_IN return
           // empty/null and stay cached that way — which is exactly what
           // Dan reported as "no se carga todo a menos que refresque ni
-          // bien me logueaba". refetchType:'active' refetches only what's
-          // currently rendered; everything else is just marked stale and
-          // refetched lazily on next mount, saving a network burst on a
-          // login that lands on a page whose data was already correct.
-          queryClient.invalidateQueries({ refetchType: 'active' });
+          // bien me logueaba": refresh worked because the second mount
+          // already had the session in localStorage from the start.
+          // This is scoped to genuine logins (the lastLoggedUserId guard
+          // above), so hourly token refreshes don't trigger a full app
+          // refetch every time.
+          //
+          // NOTE: do NOT pass { refetchType: 'active' } here. With
+          // refetchOnMount=false in our QueryClient config, queries that
+          // ran pre-auth and got cached empty would be marked stale but
+          // never actually re-requested when the user later navigates to
+          // that page — they'd just keep serving the empty cached value.
+          // That reproduces the exact bug this whole block was added to
+          // fix. Refetch everything, even the inactive observers.
+          queryClient.invalidateQueries();
           // Log login success to activity_logs (keeps the existing feed)
           supabase.from('activity_logs').insert({
             user_id: session.user.id,
