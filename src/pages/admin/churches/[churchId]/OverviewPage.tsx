@@ -7,14 +7,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import PipelineSummaryCard from '@/components/admin/PipelineSummaryCard';
 import MetricsCharts from '@/components/admin/MetricsCharts';
@@ -140,7 +139,6 @@ const CompactList = ({ title, items, columns = 1 }: { title: string; items: { la
 
 const OverviewPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
-  const { profile } = useSession();
   const { canAccessAllChurches, canEditDeleteUsers } = usePermissions();
   const isAdminOrGeneral = canAccessAllChurches() || canEditDeleteUsers();
   

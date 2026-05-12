@@ -11,8 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Check, MessageSquare, ChevronDown } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
-type CreateMode = 'map';
-
 const RutasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const navigate = useNavigate();

@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, Shield, Users, Building, BarChart, UserPlus, Edit, Eye, UserCog, Search } from 'lucide-react';
+import { Check, X, Shield, Building, BarChart, UserPlus, Edit, Eye, UserCog, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface PermissionConfig {

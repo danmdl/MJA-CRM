@@ -19,13 +19,13 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, AlertCircle, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MessageSquare, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
+  Users, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { normalize } from '@/lib/normalize';
 import { isValidArgentinePhone } from '@/lib/phone-validation';
-import { isWithinGBA, getDistanceColor, getDistanceWarning, getDistanceBadgeClass } from '@/lib/geo-validation';
+import { isWithinGBA, getDistanceColor, getDistanceBadgeClass } from '@/lib/geo-validation';
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
@@ -40,7 +40,6 @@ const CsvImporter = lazy(() => import('@/components/admin/CsvImporter'));
 const BulkWhatsAppDialog = lazy(() => import('@/components/admin/BulkWhatsAppDialog'));
 const AddContactDialog = lazy(() => import('@/components/admin/AddContactDialog'));
 const DuplicateMergeDialog = lazy(() => import('@/components/admin/DuplicateMergeDialog'));
-import ContactPipelineBadge from '@/components/admin/ContactPipelineBadge';
 import type { Zona, Barrio, Cuerda, Cell, Contact } from './semillero/types';
 import { haversine } from './semillero/helpers';
 import { ResizableHeader } from './semillero/ResizableHeader';

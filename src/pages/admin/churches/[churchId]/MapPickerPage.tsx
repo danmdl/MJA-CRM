@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
-import { ChevronLeft, MapPin, Route as RouteIcon, Search, Filter, X, List, Map as MapIcon, Navigation } from 'lucide-react';
+import { ChevronLeft, MapPin, Route as RouteIcon, Search, X, List, Map as MapIcon, Navigation } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;

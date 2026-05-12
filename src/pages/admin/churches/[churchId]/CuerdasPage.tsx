@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 import { normalize as norm } from '@/lib/normalize';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -53,7 +53,7 @@ interface Cell {
 const CuerdasPage = () => {
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
-  const { canAddUsers, canEditDeleteUsers, canSeeBaseDatosTotal, canEditCuerdas } = usePermissions();
+  const { canSeeBaseDatosTotal, canEditCuerdas } = usePermissions();
   const queryClient = useQueryClient();
 
   const [expandedCuerda, setExpandedCuerda] = useState<string | null>(null);
