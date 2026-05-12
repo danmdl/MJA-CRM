@@ -62,6 +62,9 @@ const TerritoriosPage: React.FC = () => {
   // reference but not modify). Indexed by cuerda numero so we can
   // remove + add as needed.
   const readonlyPolygonsRef = useRef<Map<string, any>>(new Map());
+  // Label markers — one per polygon, showing the cuerda numero centred on
+  // the territory. Rebuilt in lockstep with the polygons.
+  const labelMarkersRef = useRef<any[]>([]);
   // Cell markers — small dots so the user knows where their cells
   // sit relative to the territory they're drawing.
   const cellMarkersRef = useRef<any[]>([]);
@@ -316,6 +319,8 @@ const TerritoriosPage: React.FC = () => {
     }
     readonlyPolygonsRef.current.forEach(p => p.setMap(null));
     readonlyPolygonsRef.current.clear();
+    labelMarkersRef.current.forEach(m => m.setMap(null));
+    labelMarkersRef.current = [];
 
     // Editing polygon — only for the selected cuerda IF the user can
     // edit it AND it has a territory.
@@ -343,6 +348,36 @@ const TerritoriosPage: React.FC = () => {
         attachEditListeners(polygon);
       } else {
         readonlyPolygonsRef.current.set(cuerda.numero, polygon);
+      }
+
+      // Centroid label so the user can read which cuerda each polygon
+      // represents at a glance. Average of the outer ring points — not
+      // a true centroid, but close enough at sub-city scale and cheap.
+      const outer = paths[0] || [];
+      if (outer.length >= 3) {
+        let lat = 0, lng = 0;
+        for (const p of outer) { lat += p.lat; lng += p.lng; }
+        const center = { lat: lat / outer.length, lng: lng / outer.length };
+        const labelMarker = new g.maps.Marker({
+          position: center,
+          map: mapInstanceRef.current,
+          clickable: false,
+          zIndex: isSelected ? 11 : 2,
+          icon: {
+            // 1×1 transparent SVG so only the label text renders.
+            url: 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%221%22 height%3D%221%22%2F%3E',
+            scaledSize: new g.maps.Size(1, 1),
+            anchor: new g.maps.Point(0, 0),
+          },
+          label: {
+            text: cuerda.numero,
+            color: '#ffffff',
+            fontSize: isSelected ? '18px' : '15px',
+            fontWeight: 'bold',
+            className: 'mja-cuerda-label',
+          },
+        });
+        labelMarkersRef.current.push(labelMarker);
       }
     }
 

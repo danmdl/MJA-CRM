@@ -71,3 +71,16 @@ body {
   background: linear-gradient(160deg, #FFC233 0%, #B8720A 100%);
   box-shadow: 0 1px 4px rgba(255,194,51,0.3);
 }
+
+/* Centroid labels for cuerda polygons on the Territorio map. White text
+   on transparent background, with a black halo so the number stays
+   readable over light parks/water tiles and dark roads alike. */
+.mja-cuerda-label {
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0    0   3px rgba(0,0,0,0.7);
+  pointer-events: none;
+}
