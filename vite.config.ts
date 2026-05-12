@@ -52,13 +52,43 @@ export default defineConfig(() => ({
         // Split only HEAVY LEAF deps that don't import React at module-load
         // time. The previous attempt also chunked radix/lucide/tanstack and
         // crashed prod with "createContext undefined" because a radix chunk
-        // loaded before React. These libs stay in the main bundle.
+        // loaded before React. Now we still keep React + react-dom +
+        // scheduler in the main bundle so they're guaranteed available
+        // before any chunk that uses createContext executes. Vite/Rollup
+        // emits <link rel="modulepreload"> for declared chunk deps so the
+        // browser parallel-fetches them in the right order.
         manualChunks: (id) => {
           if (id.includes('phone-validation')) return undefined;
+          // React + react-dom + scheduler MUST share one chunk that any
+          // React-using vendor chunk (radix, etc) imports from. Without
+          // this, Rollup sees that vendor-radix is the only "manual"
+          // chunk consuming react and hoists react into vendor-radix.
+          // Main bundle then imports its own copy from node_modules,
+          // leaving the app with two React instances → createContext
+          // returns different objects → Provider/Consumer mismatch
+          // → the "createContext is undefined" / blank-screen crash we
+          // saw on the previous attempt. Naming this chunk first also
+          // means Rollup writes its modulepreload before vendor-radix
+          // in index.html.
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/scheduler/')
+          ) {
+            return 'vendor-react';
+          }
           if (id.includes('node_modules/xlsx')) return 'vendor-xlsx';
           if (id.includes('node_modules/papaparse')) return 'vendor-papaparse';
           if (id.includes('node_modules/recharts')) return 'vendor-charts';
           if (id.includes('node_modules/date-fns')) return 'vendor-date';
+          // Radix is 35+ small packages, all in the "uses createContext
+          // on import" tier. They share one chunk + depend on vendor-react.
+          if (id.includes('node_modules/@radix-ui')) return 'vendor-radix';
+          // Sentry is dynamically imported in main.tsx, but isolate
+          // anything @sentry-namespaced regardless of how it gets reached.
+          if (id.includes('node_modules/@sentry') || id.includes('node_modules/@sentry-internal')) {
+            return 'vendor-sentry';
+          }
           return undefined;
         },
       },
