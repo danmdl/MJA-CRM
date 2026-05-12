@@ -526,6 +526,23 @@ const SemilleroPage = () => {
     () => new Map((teamMembers || []).map(m => [m.id, m])),
     [teamMembers],
   );
+  // Same trick for the three reference tables the row + dialogs hit on
+  // every re-render. Each row's `assignedCell`, `assignedCuerda`,
+  // `assignedZona` previously chained three `.find()` calls — O(N) per
+  // row for each one. Maps make the chain O(1) per row and stable across
+  // re-renders so memoization further up doesn't get invalidated.
+  const cellById = useMemo(
+    () => new Map((cells || []).map(c => [c.id, c])),
+    [cells],
+  );
+  const cuerdaById = useMemo(
+    () => new Map((cuerdas || []).map(c => [c.id, c])),
+    [cuerdas],
+  );
+  const zonaById = useMemo(
+    () => new Map((zonas || []).map(z => [z.id, z])),
+    [zonas],
+  );
 
   // ─── Auto-geocode contacts with address but no lat/lng (runs ONCE) ──────────
   const geocodedRef = useRef(false);
@@ -2185,8 +2202,8 @@ const SemilleroPage = () => {
                                 : <span className="text-[11px] font-medium text-red-400">⚠ Fuera de zona</span>;
                             })() : c.cell_id ? (() => {
                               // Already assigned to a cell — show the assignment
-                              const assignedCell = cells?.find(cl => cl.id === c.cell_id);
-                              const assignedCuerda = assignedCell?.cuerda_id ? cuerdas?.find(cr => cr.id === assignedCell.cuerda_id) : null;
+                              const assignedCell = c.cell_id ? cellById.get(c.cell_id) : undefined;
+                              const assignedCuerda = assignedCell?.cuerda_id ? cuerdaById.get(assignedCell.cuerda_id) : null;
                               return assignedCell ? (
                                 <div className="flex items-center gap-1 overflow-hidden">
                                   <Badge className="text-[9px] shrink-0 bg-blue-500/15 text-blue-400 hover:bg-blue-500/15">{assignedCell.name}</Badge>
@@ -2297,9 +2314,9 @@ const SemilleroPage = () => {
                               // before confirming.
                               (() => {
                                 const stagedCellId = (c as any).pending_assignment_cell_id as string;
-                                const stagedCell = cells?.find(cl => cl.id === stagedCellId);
-                                const stagedCuerda = stagedCell ? cuerdas?.find(cu => cu.id === stagedCell.cuerda_id) : null;
-                                const stagedZona = stagedCuerda ? zonas?.find(z => z.id === stagedCuerda.zona_id) : null;
+                                const stagedCell = stagedCellId ? cellById.get(stagedCellId) : undefined;
+                                const stagedCuerda = stagedCell?.cuerda_id ? cuerdaById.get(stagedCell.cuerda_id) : null;
+                                const stagedZona = stagedCuerda ? zonaById.get(stagedCuerda.zona_id) : null;
                                 return (
                                   <div className="flex items-center gap-1">
                                     <Button variant="default" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {

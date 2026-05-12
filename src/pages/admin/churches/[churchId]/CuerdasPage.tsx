@@ -225,12 +225,12 @@ const CuerdasPage = () => {
     const zonaCells = (cells || []).filter(c => c.cuerda_id && zonaCuerdaIds.includes(c.cuerda_id));
     if (zonaCells.length === 0) { showError('No hay células en esta zona.'); return; }
     if (!window.confirm(`¿Borrar las ${zonaCells.length} células de ${zonaNombre}? Los contactos asignados quedarán sin célula.`)) return;
-    // Unlink contacts
-    for (const cell of zonaCells) {
-      await supabase.from('contacts').update({ cell_id: null }).eq('cell_id', cell.id);
-    }
-    // Delete cells
     const cellIds = zonaCells.map(c => c.id);
+    // Unlink contacts in ONE round-trip rather than one per cell. PostgREST
+    // accepts an `in` filter so we update every contact attached to any of
+    // these cells at once. Was an N+1 loop; matters when a zone with 30+
+    // cells gets deleted.
+    await supabase.from('contacts').update({ cell_id: null }).in('cell_id', cellIds);
     const { error } = await supabase.from('cells').delete().in('id', cellIds);
     if (error) showError(error.message);
     else {
