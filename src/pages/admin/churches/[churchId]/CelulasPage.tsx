@@ -241,40 +241,42 @@ const CelulasPage = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-2xl font-bold">Células</h1>
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* Single header row: title + count + search + zona filter + actions */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">Células</h1>
           {missingCount > 0 && <span className="text-xs text-red-400">{missingCount} sin dirección</span>}
           <span className="text-sm text-muted-foreground">{filtered.length} de {(cells || []).length}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative w-52">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-8 h-9 text-sm" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
           {profile?.role === 'admin' && (cells?.length || 0) > 0 && (
             <Button variant="outline" size="sm" className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={deleteAllCells}>
-              <Trash2 className="mr-1.5 h-4 w-4" /> Borrar todas las células
+              <Trash2 className="mr-1.5 h-4 w-4" /> Borrar todas
             </Button>
           )}
           {(canEditCuerdas() || canAddUsers()) && (
             <>
               <Button variant="outline" size="sm" onClick={() => setCsvImporterOpen(true)}>
-                <Upload className="mr-1.5 h-4 w-4" /> Importar Células
+                <Upload className="mr-1.5 h-4 w-4" /> Importar
               </Button>
               <Button size="sm" onClick={() => setAddCellOpen(true)}>
-                <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Célula
+                <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva
               </Button>
             </>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8 h-8 text-sm" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => setZonaFilter('all')} className={`px-2.5 py-1 rounded text-xs border transition-colors ${zonaFilter === 'all' ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>Todas</button>
-          {zonas.map(z => (
-            <button key={z} onClick={() => setZonaFilter(z === zonaFilter ? 'all' : z)} className={`px-2.5 py-1 rounded text-xs border transition-colors ${zonaFilter === z ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>{z}</button>
-          ))}
-        </div>
+      {/* Zona chips — kept on their own row because they wrap a lot */}
+      <div className="flex flex-wrap gap-1.5">
+        <button onClick={() => setZonaFilter('all')} className={`px-2.5 py-1 rounded text-xs border transition-colors ${zonaFilter === 'all' ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>Todas</button>
+        {zonas.map(z => (
+          <button key={z} onClick={() => setZonaFilter(z === zonaFilter ? 'all' : z)} className={`px-2.5 py-1 rounded text-xs border transition-colors ${zonaFilter === z ? 'bg-primary/20 border-primary text-primary font-medium' : 'border-border text-muted-foreground hover:border-primary/50'}`}>{z}</button>
+        ))}
       </div>
 
       <div className="overflow-x-auto rounded border">

@@ -19,19 +19,18 @@ const ChurchTeamPage = () => {
 
   return (
     <div className="p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold">Equipo de la Iglesia</h1>
-        {canAddMembers() && (
-          <Button onClick={() => setIsInviteDialogOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Invitar Miembro
-          </Button>
-        )}
-      </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Miembros de la Iglesia</CardTitle>
-          <CardDescription>Ver, gestionar e invitar a miembros de esta iglesia.</CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <CardTitle className="text-2xl">Miembros de la Iglesia</CardTitle>
+            <CardDescription>Ver, gestionar e invitar a miembros de esta iglesia.</CardDescription>
+          </div>
+          {canAddMembers() && (
+            <Button onClick={() => setIsInviteDialogOpen(true)} className="shrink-0">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Invitar Miembro
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <ChurchUserTable churchId={churchId} />

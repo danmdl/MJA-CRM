@@ -157,158 +157,166 @@ const MantenimientoPage = () => {
   const PreviewIcon = selectedVariant.icon;
 
   return (
-    <div className="p-6 max-w-3xl">
-      <div className="flex items-center gap-3 mb-6">
-        <AlertTriangle className="h-6 w-6 text-amber-400" />
-        <h1 className="text-2xl font-bold">Mantenimiento</h1>
-      </div>
-
+    <div className="p-6 max-w-7xl">
       <Card>
-        <CardHeader>
-          <CardTitle>Anuncio global</CardTitle>
-          <CardDescription>
-            Mostrá un cartel visible en todas las páginas del admin. Útil para
-            avisar de mantenimientos programados, bugs conocidos o cambios
-            recientes. Cada usuario puede descartarlo, pero si edita este
-            mensaje o el tipo, el cartel aparece de nuevo para todos.
-          </CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-6 w-6 text-amber-400 mt-0.5 shrink-0" />
+            <div>
+              <CardTitle className="text-2xl">Mantenimiento</CardTitle>
+              <CardDescription>
+                Mostrá un cartel visible en todas las páginas del admin. Útil para
+                avisar de mantenimientos programados, bugs conocidos o cambios
+                recientes. Cada usuario puede descartarlo, pero si edita este
+                mensaje o el tipo, el cartel aparece de nuevo para todos.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
-            <>
-              {/* Enable / disable */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="banner-toggle" className="text-base">
-                    Mostrar anuncio
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Cuando está activado, todos los usuarios autenticados ven el cartel.
-                  </p>
-                </div>
-                <Button
-                  id="banner-toggle"
-                  variant={enabled ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setEnabled(v => !v)}
-                  className={enabled ? 'bg-amber-500 hover:bg-amber-600 text-black' : ''}
-                >
-                  {enabled ? 'Activado' : 'Desactivado'}
-                </Button>
-              </div>
-
-              {/* Variant picker */}
-              <div className="space-y-2">
-                <Label>Tipo de anuncio</Label>
-                <p className="text-xs text-muted-foreground">
-                  Define el color y el ícono. Elegí según la gravedad del aviso.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
-                  {VARIANT_OPTIONS.map(opt => {
-                    const Icon = opt.icon;
-                    const selected = variant === opt.key;
-                    return (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        onClick={() => setVariant(opt.key)}
-                        className={`text-left rounded-md border p-3 transition-colors ${
-                          selected
-                            ? `${opt.container} border-current ring-2 ring-current/30`
-                            : 'border-border hover:border-foreground/30 bg-card text-foreground'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Icon className={`h-4 w-4 ${selected ? opt.iconColor : 'text-muted-foreground'}`} />
-                          <span className="font-medium text-sm">{opt.label}</span>
-                        </div>
-                        <p className={`text-xs ${selected ? '' : 'text-muted-foreground'}`}>
-                          {opt.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Message */}
-              <div className="space-y-2">
-                <Label htmlFor="banner-message">Mensaje</Label>
-                <Textarea
-                  id="banner-message"
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  rows={3}
-                  placeholder="Ej: Mantenimiento programado el sábado a las 02:00."
-                />
-                <p className="text-xs text-muted-foreground">
-                  Texto plano. Los saltos de línea se respetan.
-                </p>
-              </div>
-
-              {/* Resurface interval */}
-              <div className="space-y-2">
-                <Label>Cuando el usuario cierra el cartel…</Label>
-                <p className="text-xs text-muted-foreground">
-                  Define cada cuánto reaparece para usuarios que ya lo cerraron.
-                  Editar el mensaje o el tipo siempre lo muestra de nuevo a todos,
-                  independientemente de esta opción.
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-1">
-                  {RESURFACE_OPTIONS.map(opt => {
-                    const selected = resurfaceMinutes === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setResurfaceMinutes(opt.value)}
-                        className={`text-left rounded-md border p-2 transition-colors ${
-                          selected
-                            ? 'border-primary ring-2 ring-primary/30 bg-primary/10 text-foreground'
-                            : 'border-border hover:border-foreground/30 bg-card text-foreground'
-                        }`}
-                        title={opt.description}
-                      >
-                        <p className="font-medium text-xs">{opt.label}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground italic">
-                  {RESURFACE_OPTIONS.find(o => o.value === resurfaceMinutes)?.description}
-                </p>
-              </div>
-
-              {/* Live preview — replicates the real banner exactly */}
-              <div className="space-y-2">
-                <Label>Vista previa</Label>
-                <div className={`rounded-md border-b-2 ${selectedVariant.container} shadow-md`}>
-                  <div className="px-4 sm:px-6 py-3 flex items-center gap-3 text-sm sm:text-base">
-                    <PreviewIcon className={`h-5 w-5 shrink-0 ${selectedVariant.iconColor}`} />
-                    <p className="flex-1 leading-snug whitespace-pre-line text-center font-medium">
-                      {message || <span className="italic opacity-50">El mensaje aparece acá</span>}
+            // Two-column layout on desktop: form on the left, live preview
+            // pinned on the right. On mobile they stack vertically.
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                {/* Enable / disable */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="banner-toggle" className="text-base">
+                      Mostrar anuncio
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Cuando está activado, todos los usuarios autenticados ven el cartel.
                     </p>
-                    <X className={`h-4 w-4 shrink-0 ${selectedVariant.iconColor} opacity-50`} />
+                  </div>
+                  <Button
+                    id="banner-toggle"
+                    variant={enabled ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEnabled(v => !v)}
+                    className={enabled ? 'bg-amber-500 hover:bg-amber-600 text-black' : ''}
+                  >
+                    {enabled ? 'Activado' : 'Desactivado'}
+                  </Button>
+                </div>
+
+                {/* Variant picker */}
+                <div className="space-y-2">
+                  <Label>Tipo de anuncio</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Define el color y el ícono. Elegí según la gravedad del aviso.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                    {VARIANT_OPTIONS.map(opt => {
+                      const Icon = opt.icon;
+                      const selected = variant === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setVariant(opt.key)}
+                          className={`text-left rounded-md border p-3 transition-colors ${
+                            selected
+                              ? `${opt.container} border-current ring-2 ring-current/30`
+                              : 'border-border hover:border-foreground/30 bg-card text-foreground'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Icon className={`h-4 w-4 ${selected ? opt.iconColor : 'text-muted-foreground'}`} />
+                            <span className="font-medium text-sm">{opt.label}</span>
+                          </div>
+                          <p className={`text-xs ${selected ? '' : 'text-muted-foreground'}`}>
+                            {opt.description}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+
+                {/* Message */}
+                <div className="space-y-2">
+                  <Label htmlFor="banner-message">Mensaje</Label>
+                  <Textarea
+                    id="banner-message"
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    rows={3}
+                    placeholder="Ej: Mantenimiento programado el sábado a las 02:00."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Texto plano. Los saltos de línea se respetan.
+                  </p>
+                </div>
+
+                {/* Resurface interval */}
+                <div className="space-y-2">
+                  <Label>Cuando el usuario cierra el cartel…</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Define cada cuánto reaparece para usuarios que ya lo cerraron.
+                    Editar el mensaje o el tipo siempre lo muestra de nuevo a todos,
+                    independientemente de esta opción.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
+                    {RESURFACE_OPTIONS.map(opt => {
+                      const selected = resurfaceMinutes === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setResurfaceMinutes(opt.value)}
+                          className={`text-left rounded-md border p-2 transition-colors ${
+                            selected
+                              ? 'border-primary ring-2 ring-primary/30 bg-primary/10 text-foreground'
+                              : 'border-border hover:border-foreground/30 bg-card text-foreground'
+                          }`}
+                          title={opt.description}
+                        >
+                          <p className="font-medium text-xs">{opt.label}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">
+                    {RESURFACE_OPTIONS.find(o => o.value === resurfaceMinutes)?.description}
+                  </p>
+                </div>
               </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between pt-2 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Última actualización: {lastUpdated}
-                </p>
-                <Button
-                  onClick={handleSave}
-                  disabled={saving || !hasUnsavedChanges || !message.trim()}
-                >
-                  {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  Guardar
-                </Button>
+              {/* Right column: live preview pinned + footer with save */}
+              <div className="space-y-4 lg:sticky lg:top-6 self-start">
+                <div className="space-y-2">
+                  <Label>Vista previa</Label>
+                  <div className={`rounded-md border-b-2 ${selectedVariant.container} shadow-md`}>
+                    <div className="px-4 sm:px-6 py-3 flex items-center gap-3 text-sm sm:text-base">
+                      <PreviewIcon className={`h-5 w-5 shrink-0 ${selectedVariant.iconColor}`} />
+                      <p className="flex-1 leading-snug whitespace-pre-line text-center font-medium">
+                        {message || <span className="italic opacity-50">El mensaje aparece acá</span>}
+                      </p>
+                      <X className={`h-4 w-4 shrink-0 ${selectedVariant.iconColor} opacity-50`} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Así lo ven los usuarios autenticados en cualquier página.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    Última actualización: {lastUpdated}
+                  </p>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving || !hasUnsavedChanges || !message.trim()}
+                  >
+                    {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    Guardar
+                  </Button>
+                </div>
               </div>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

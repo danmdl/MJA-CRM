@@ -150,17 +150,15 @@ const RutasPage = () => {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-2">
-        <RouteIcon className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Rutas</h1>
-      </div>
-      <p className="text-muted-foreground text-sm mb-4">
-        Cada proyecto de ruta es un mapa con contactos seleccionables, una ruta optimizada y un link compartible.
-      </p>
-
-      {canFilterByCuerda && (
-        <div className="flex items-center gap-2 mb-5">
-          <DropdownMenu>
+      {/* Header: title + cuerda filter on one row, description below */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-2">
+        <div className="flex items-center gap-3">
+          <RouteIcon className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Rutas</h1>
+        </div>
+        {canFilterByCuerda && (
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-1.5 text-sm font-normal">
                 {filterCuerdas.size === 0
@@ -200,13 +198,17 @@ const RutasPage = () => {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          {filterCuerdas.size > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {visibleProjects.length} proyecto{visibleProjects.length !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-      )}
+            {filterCuerdas.size > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {visibleProjects.length} proyecto{visibleProjects.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      <p className="text-muted-foreground text-sm mb-4">
+        Cada proyecto de ruta es un mapa con contactos seleccionables, una ruta optimizada y un link compartible.
+      </p>
 
       {/* Tighter grid + smaller cards. Each card used to be ~200px tall
           with 3 cols max — Dan asked to fit more on a page. Now: more

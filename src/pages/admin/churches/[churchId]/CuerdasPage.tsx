@@ -244,7 +244,7 @@ const CuerdasPage = () => {
   // ─── Render ────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {/* Header: title + search + new-cuerda all on one row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">Cuerdas</h1>
@@ -252,7 +252,13 @@ const CuerdasPage = () => {
             {canSeeAll ? 'Todas las cuerdas de la iglesia' : `Cuerda ${userCuerdaNumero || '—'}`}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 items-center flex-wrap">
+          {canSeeAll && (
+            <div className="relative w-60 max-w-full">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-8 h-9 text-sm" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+          )}
           {canManageCuerdas && (
             <Button variant="outline" size="sm" onClick={() => setAddCuerdaOpen(true)}>
               <PlusCircle className="mr-1.5 h-4 w-4" /> Nueva Cuerda
@@ -260,14 +266,6 @@ const CuerdasPage = () => {
           )}
         </div>
       </div>
-
-      {/* Search */}
-      {canSeeAll && (
-        <div className="relative w-72 max-w-full">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8 h-8 text-sm" placeholder="Buscar por cuerda, zona, célula..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-      )}
 
       {/* Cuerda badge when locked */}
       {!canSeeAll && userCuerdaNumero && (
