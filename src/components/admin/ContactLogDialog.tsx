@@ -18,7 +18,7 @@ interface ContactLogDialogProps {
   refreshSignal?: number;
 }
 
-const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange, churchId, contactId, refreshSignal }) => {
+const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange, contactId, refreshSignal }) => {
   const [logs, setLogs] = useState<any[]>([]);
   const [editingLog, setEditingLog] = useState<any | null>(null);
   const [editDate, setEditDate] = useState('');

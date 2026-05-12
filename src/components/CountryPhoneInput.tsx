@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,10 +20,8 @@ const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
   label = "Teléfono", 
   value, 
   onChange, 
-  defaultCountry = "AR", 
-  hintExample = "Ej: 5491122334455",
+  defaultCountry = "AR",
   disabled = false,
-  hideExample = false
 }) => {
   const [country, setCountry] = useState<CountryCode>(defaultCountry);
   const [phone, setPhone] = useState<string>(value || "");

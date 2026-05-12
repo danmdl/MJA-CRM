@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { normalize } from '@/lib/normalize';

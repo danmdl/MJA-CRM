@@ -1,8 +1,7 @@
-import { NavLink, Link } from 'react-router-dom';
-import { User, Database, Users, LayoutDashboard, Church, MessageSquare, Shield, BarChart } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { User, LayoutDashboard, Church, MessageSquare, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarFooter from './SidebarFooter';
-import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
 
 interface UserSidebarProps {
@@ -10,8 +9,7 @@ interface UserSidebarProps {
 }
 
 const UserSidebar = ({ isCollapsed }: UserSidebarProps) => {
-  const { profile } = useSession();
-  const { canAddUsers, canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
+  const { canEditDeleteUsers, canSeeAllAnalytics } = usePermissions();
 
   // Same navigation as admin sidebar - unified experience
   const navItems = [

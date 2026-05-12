@@ -1,10 +1,10 @@
 "use client";
-import React, { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Upload, CheckCircle2, X, MapPin, Loader2 } from 'lucide-react';
+import { Upload, X, MapPin, Loader2 } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';

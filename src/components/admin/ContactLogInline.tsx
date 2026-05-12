@@ -1,5 +1,4 @@
 "use client";
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -11,7 +10,7 @@ interface Props {
   refreshSignal: number;
 }
 
-const ContactLogInline = ({ churchId, contactId, refreshSignal }: Props) => {
+const ContactLogInline = ({ contactId, refreshSignal }: Props) => {
   const { data: logs } = useQuery({
     queryKey: ['contact-logs-inline', contactId, refreshSignal],
     queryFn: async () => {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu, X, Search } from 'lucide-react';

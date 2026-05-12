@@ -70,11 +70,6 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
 
   const allTargetFields = useMemo(() => [...requiredFields, ...optionalFields], [requiredFields, optionalFields]);
 
-  // Calculate unmappedRequiredFields in a useMemo hook so it's always up-to-date and accessible
-  const unmappedRequiredFields = useMemo(() => {
-    return requiredFields.filter(field => !columnMapping[field.key]);
-  }, [requiredFields, columnMapping]);
-
   const requiredMissing = useMemo(() => {
     // Required field is missing if it has no mapping (ignores don't apply to required fields)
     return requiredFields.filter(f => !columnMapping[f.key]);

@@ -7,7 +7,6 @@ import CountryPhoneInput from '@/components/CountryPhoneInput';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { logger } from '@/utils/logger';
 import { useSession } from '@/hooks/use-session';
 import { logEvent } from '@/utils/clientLogger';
 import AddressAutocomplete from './AddressAutocomplete';
@@ -60,31 +59,6 @@ const FormField = ({ label, id, value, onChange, type = "text", required = false
 
 const nativeSelectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-const SelectField = ({ label, value, onChange, options, loading, placeholder, disabled = false }: {
-  label: string;
-  value: string | null;
-  onChange: (value: string) => void;
-  options: Array<{ id: string; name: string }>;
-  loading: boolean;
-  placeholder: string;
-  disabled?: boolean;
-}) => (
-  <div className="space-y-2">
-    <label className="text-sm font-medium">{label}</label>
-    <select
-      className={nativeSelectClass}
-      value={value || 'none'}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled || loading}
-    >
-      <option value="none">{loading ? 'Cargando...' : 'Sin asignación'}</option>
-      {options.map((option) => (
-        <option key={option.id} value={option.id}>{option.name}</option>
-      ))}
-    </select>
-  </div>
-);
-
 const today = () => new Date().toISOString().split('T')[0];
 
 const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProps) => {
@@ -136,7 +110,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   };
 
 
-  const { data: cells, isLoading: isLoadingCells } = useQuery<Cell[]>({
+  useQuery<Cell[]>({
     queryKey: ['cells', churchId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -155,7 +129,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   // ambiguous addresses don't default to Capital Federal.
   const { data: churchCoords } = useChurchCoords(churchId);
 
-  const { data: leaders, isLoading: isLoadingLeaders } = useQuery<Leader[]>({
+  useQuery<Leader[]>({
     queryKey: ['leaders', churchId, !!session?.access_token],
     queryFn: async () => {
       if (session?.access_token) {

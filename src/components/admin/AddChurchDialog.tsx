@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -41,7 +41,7 @@ const AddChurchDialog = ({ onOpenChange }: AddChurchDialogProps) => {
   const onSubmit = async (values: z.infer<typeof addChurchSchema>) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('churches')
         .insert({ name: values.name })
         .select();

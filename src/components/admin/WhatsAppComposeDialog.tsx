@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,7 +41,7 @@ interface Props {
   onSent?: (message: string, templateName: string | null) => void;
 }
 
-const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, contactFirstName, contactLastName, contactPhone, contactPedidoDeOracion: propPedido, churchId, onSent }: Props) => {
+const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, contactFirstName, contactPhone, contactPedidoDeOracion: propPedido, churchId, onSent }: Props) => {
   const { session, profile } = useSession();
   const { canUseTemplates } = usePermissions();
   const userId = session?.user?.id;

@@ -1,13 +1,11 @@
 "use client";
 
-import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/ModeToggle';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 const TopNav = () => {
   const { profile } = useSession();

@@ -49,7 +49,6 @@ import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
-import PasswordChangeForm from "./components/auth/PasswordChangeForm";
 import OnboardingForm from "./components/auth/OnboardingForm";
 import { ThemeProvider } from "next-themes";
 import UserLayout from "./components/layout/UserLayout";

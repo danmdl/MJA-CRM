@@ -1,5 +1,4 @@
 "use client";
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -20,7 +19,7 @@ interface Props {
   transfers: any[];
 }
 
-const UnifiedTimeline = ({ contactId, churchId, transfers }: Props) => {
+const UnifiedTimeline = ({ contactId, transfers }: Props) => {
   const { data: activityLogs } = useQuery({
     queryKey: ['activity-logs', contactId],
     queryFn: async () => {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePermissions } from '@/lib/permissions';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,12 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Mail, MapPin, Home, Calendar, MessageSquare, ClipboardList, Send, X, History as HistoryIcon } from 'lucide-react';
-import { logger } from '@/utils/logger';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MapPin, Home, ClipboardList, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/hooks/use-session';
 import CountryPhoneInput from '@/components/CountryPhoneInput';
@@ -96,20 +91,6 @@ interface ContactProfileDialogProps {
   churchId: string;
 }
 
-const ProfilePictureSection = ({ contact }: { contact: Contact }) => (
-  <div className="flex flex-col items-start space-y-4">
-    <div className="relative">
-      <div className="bg-gray-200 border-2 border-dashed rounded-xl w-24 h-24 flex items-center justify-center">
-        <User className="h-12 w-12 text-gray-400" />
-      </div>
-      <Button size="sm" className="absolute -bottom-2 left-1/2 transform -translate-x-1/2" variant="outline">
-        Cambiar Foto
-      </Button>
-    </div>
-    {/* Name moved to the top-right section area below selects */}
-  </div>
-);
-
 const ContactInfoField = ({
   label,
   value,
@@ -188,33 +169,6 @@ const SelectField = ({
   </div>
 );
 
-const ContactLogsTable = ({ logs }: { logs: ContactLog[] }) => (
-  <Table>
-    <TableHeader>
-      <TableRow>
-        <TableHead className="w-32">Fecha</TableHead>
-        <TableHead className="w-32">Método</TableHead>
-        <TableHead>Notas</TableHead>
-        <TableHead className="w-32">Registrado por</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {logs.map((log) => (
-        <TableRow key={log.id}>
-          <TableCell>
-            {format(new Date(log.contact_date), "d 'de' MMM yyyy", { locale: es })}
-          </TableCell>
-          <TableCell>{log.contact_method || '-'}</TableCell>
-          <TableCell>{log.notes || '-'}</TableCell>
-          <TableCell className="text-sm text-muted-foreground">
-            {log.contacted_by_name}
-          </TableCell>
-        </TableRow>
-      ))}
-    </TableBody>
-  </Table>
-);
-
 const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: ContactProfileDialogProps) => {
   const [contact, setContact] = useState<Contact | null>(null);
   const [originalContact, setOriginalContact] = useState<string>('');
@@ -238,10 +192,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
   // On desktop the sidebar is always visible alongside the form.
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const queryClient = useQueryClient();
-  const [whatsappCell, setWhatsappCell] = useState<Cell | null>(null);
+  const [, setWhatsappCell] = useState<Cell | null>(null);
   const [pendingCuerdaChange, setPendingCuerdaChange] = useState<string | null>(null);
-  const [whatsappMsg, setWhatsappMsg] = useState('');
-  const [editingTemplate, setEditingTemplate] = useState(false);
+  const [, setWhatsappMsg] = useState('');
   const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; body: string; is_default?: boolean }[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
@@ -457,36 +410,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
     }
   };
 
-  const handleAddLog = async () => {
-    if (!contactId || !newLog.date) return;
-    const { data, error } = await supabase
-      .from('contact_logs')
-      .insert({
-        contact_id: contactId,
-        contacted_by: (await supabase.auth.getUser()).data.user?.id,
-        contact_date: newLog.date,
-        contact_method: newLog.method,
-        notes: newLog.notes,
-      })
-      .select(`
-        *,
-        contacted_by_profile:profiles(first_name, last_name)
-      `)
-      .single();
-    if (!error && data) {
-      const logWithContactedByName = {
-        ...data,
-        contacted_by_name: data.contacted_by_profile
-          ? `${data.contacted_by_profile.first_name} ${data.contacted_by_profile.last_name}`
-          : 'Desconocido'
-      };
-      setContactLogs([logWithContactedByName, ...contactLogs]);
-      setNewLog({ date: '', method: '', notes: '' });
-      showSuccess('Registro de contacto agregado con éxito.');
-    } else {
-      showError('Error al agregar el registro de contacto.');
-    }
-  };
 
   if (loading) {
     return (

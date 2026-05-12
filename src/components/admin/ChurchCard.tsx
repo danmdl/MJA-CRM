@@ -1,11 +1,9 @@
 "use client";
-import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Church, Users, Database, ArrowRight, MoreHorizontal, Pencil, Trash2, Pin, PinOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from '@/components/ui/dropdown-menu';
 
 // Definir el tipo de rol de usuario
@@ -29,7 +27,7 @@ interface ChurchCardProps {
   currentUserRole: UserRole | null | undefined; // Current user's role
 }
 
-const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId, currentUserRole }: ChurchCardProps) => {
+const ChurchCard = ({ church, onEdit, onDelete, currentUserRole }: ChurchCardProps) => {
   // Cells: filter out soft-deleted ones. The previous version counted every
   // cell including ones in the trash, which inflated the number on the card.
   const { data: cellsCount } = useQuery({
@@ -74,10 +72,6 @@ const ChurchCard = ({ church, onEdit, onDelete, onPinToggle, currentUserChurchId
     }
   });
 
-  const pastorName = church.pastor_id ? `Pastor ID: ${church.pastor_id.substring(0, 8)}...` : 'No asignado';
-  const isAdminOrGeneral = currentUserRole === 'admin' || currentUserRole === 'general';
-  const isAssignedToChurch = currentUserChurchId === church.id;
-  const canManageChurch = isAdminOrGeneral || isAssignedToChurch;
 
   return (
     <Card>

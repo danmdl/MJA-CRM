@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
@@ -159,10 +159,6 @@ const CuerdaCsvImporter = ({ open, onOpenChange, churchId, zonas, onSuccess }: C
       addressResolved: lat !== undefined && lng !== undefined,
     } : c));
     setEditingAddress(null);
-  };
-
-  const updateField = (index: number, field: keyof ParsedCuerda, value: string) => {
-    setParsedCuerdas(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c));
   };
 
   const fixZona = (index: number, zonaId: string) => {

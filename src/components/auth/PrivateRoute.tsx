@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
-import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
 
 interface PrivateRouteProps {
   children: React.ReactNode;

@@ -1,6 +1,6 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { logAuthEvent, getDeviceInfo } from '@/lib/auth-logger';
+import { logAuthEvent } from '@/lib/auth-logger';
 import { Session } from '@supabase/supabase-js';
 import { SessionContext } from '@/hooks/use-session';
 import { RoleKey } from '@/lib/roles';

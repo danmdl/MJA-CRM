@@ -49,7 +49,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [churchId, setChurchId] = useState('');
 
   // Cargar iglesias para el selector
-  const { data: churches, isLoading: isLoadingChurches, isError: isErrorChurches, error: errorChurches } = useQuery<Church[]>({
+  const { data: churches, isLoading: isLoadingChurches } = useQuery<Church[]>({
     queryKey: ['churches'],
     queryFn: fetchChurches,
     enabled: open,

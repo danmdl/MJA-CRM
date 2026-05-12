@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Bell } from 'lucide-react';
@@ -10,7 +10,6 @@ const NotificationBell = () => {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [newContacts, setNewContacts] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
-  const prevCountRef = useRef(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const userId = session?.user?.id;
@@ -54,7 +53,7 @@ const NotificationBell = () => {
         schema: 'public',
         table: 'message_recipients',
         filter: `recipient_id=eq.${userId}`,
-      }, async (payload: any) => {
+      }, async (_payload: any) => {
         loadUnreadCount();
         try { new Audio(NOTIF_SOUND_URL).play().catch(() => {}); } catch {}
         // Persist notification
