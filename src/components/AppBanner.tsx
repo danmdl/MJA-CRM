@@ -3,21 +3,52 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Info, AlertOctagon, X } from 'lucide-react';
+
+export type BannerVariant = 'info' | 'warning' | 'critical';
 
 interface AppBannerRow {
   id: number;
   enabled: boolean;
   message: string;
+  variant: BannerVariant | null;
   updated_at: string;
 }
 
 // Per-user dismissal lives in localStorage keyed by the banner's updated_at
-// timestamp. When an admin edits the message, updated_at changes and every
-// user sees the new banner again — they have to dismiss the new version
-// explicitly. This stops a stale "dismissed" state from hiding a fresh
-// announcement.
+// timestamp. When an admin edits the message or variant, updated_at changes
+// and every user sees the new banner again — they have to dismiss the new
+// version explicitly. This stops a stale "dismissed" state from hiding a
+// fresh announcement.
 const DISMISS_KEY = (updatedAt: string) => `mja.appBanner.dismissed:${updatedAt}`;
+
+// Style + icon for each variant. Tailwind classes are listed verbatim so
+// the JIT compiler doesn't tree-shake them away.
+const VARIANT_STYLES: Record<BannerVariant, {
+  container: string;
+  icon: typeof AlertTriangle;
+  iconColor: string;
+  dismissColor: string;
+}> = {
+  info: {
+    container: 'bg-blue-500/15 border-blue-500/40 text-blue-100',
+    icon: Info,
+    iconColor: 'text-blue-400',
+    dismissColor: 'text-blue-200/70 hover:text-blue-100',
+  },
+  warning: {
+    container: 'bg-amber-500/15 border-amber-500/40 text-amber-100',
+    icon: AlertTriangle,
+    iconColor: 'text-amber-400',
+    dismissColor: 'text-amber-200/70 hover:text-amber-100',
+  },
+  critical: {
+    container: 'bg-red-500/20 border-red-500/50 text-red-100',
+    icon: AlertOctagon,
+    iconColor: 'text-red-400',
+    dismissColor: 'text-red-200/70 hover:text-red-100',
+  },
+};
 
 export const AppBanner = () => {
   const { session } = useSession();
@@ -28,7 +59,7 @@ export const AppBanner = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('app_banner')
-        .select('id, enabled, message, updated_at')
+        .select('id, enabled, message, variant, updated_at')
         .eq('id', 1)
         .maybeSingle();
       if (error) {
@@ -68,18 +99,28 @@ export const AppBanner = () => {
     } catch { /* ignore quota errors */ }
   };
 
+  // Fall back to warning style for old rows that predate the variant
+  // column (shouldn't happen post-migration but guards against typos).
+  const variant: BannerVariant = (banner.variant && VARIANT_STYLES[banner.variant])
+    ? banner.variant
+    : 'warning';
+  const style = VARIANT_STYLES[variant];
+  const Icon = style.icon;
+
   return (
     <div
       role="status"
       aria-live="polite"
-      className="w-full bg-amber-500/15 border-b border-amber-500/40 text-amber-100"
+      className={`w-full border-b-2 ${style.container} shadow-md`}
     >
-      <div className="max-w-screen-2xl mx-auto px-4 py-2 flex items-start gap-2 text-sm">
-        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-400" />
-        <p className="flex-1 leading-snug whitespace-pre-line">{banner.message}</p>
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3 text-sm sm:text-base">
+        <Icon className={`h-5 w-5 shrink-0 ${style.iconColor}`} />
+        <p className="flex-1 leading-snug whitespace-pre-line text-center font-medium">
+          {banner.message}
+        </p>
         <button
           onClick={handleDismiss}
-          className="shrink-0 text-amber-200/70 hover:text-amber-100 transition-colors"
+          className={`shrink-0 transition-colors ${style.dismissColor}`}
           aria-label="Cerrar anuncio"
         >
           <X className="h-4 w-4" />

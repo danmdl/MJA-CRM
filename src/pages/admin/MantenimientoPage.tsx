@@ -8,9 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { showSuccess, showError } from '@/utils/toast';
-import { AlertTriangle, Save, Loader2 } from 'lucide-react';
+import {
+  AlertTriangle, Info, AlertOctagon, Save, Loader2, X,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
+import type { BannerVariant } from '@/components/AppBanner';
 
 const ART_TZ = 'America/Argentina/Buenos_Aires';
 
@@ -18,9 +21,48 @@ interface BannerRow {
   id: number;
   enabled: boolean;
   message: string;
+  variant: BannerVariant | null;
   updated_at: string;
   updated_by: string | null;
 }
+
+// Mirror of the variant styles in AppBanner so the live preview matches
+// exactly what the user will see. Kept inline rather than imported to
+// avoid coupling the admin page to the runtime banner implementation
+// (and because the lists are short).
+const VARIANT_OPTIONS: {
+  key: BannerVariant;
+  label: string;
+  description: string;
+  icon: typeof AlertTriangle;
+  container: string;
+  iconColor: string;
+}[] = [
+  {
+    key: 'info',
+    label: 'Info',
+    description: 'Anuncios neutros: nueva funcionalidad, recordatorios.',
+    icon: Info,
+    container: 'bg-blue-500/15 border-blue-500/40 text-blue-100',
+    iconColor: 'text-blue-400',
+  },
+  {
+    key: 'warning',
+    label: 'Aviso',
+    description: 'Mantenimiento programado, lentitud temporal, cosas que pueden fallar.',
+    icon: AlertTriangle,
+    container: 'bg-amber-500/15 border-amber-500/40 text-amber-100',
+    iconColor: 'text-amber-400',
+  },
+  {
+    key: 'critical',
+    label: 'Crítico',
+    description: 'Cosas urgentes: app caída, datos en riesgo, acción inmediata necesaria.',
+    icon: AlertOctagon,
+    container: 'bg-red-500/20 border-red-500/50 text-red-100',
+    iconColor: 'text-red-400',
+  },
+];
 
 const MantenimientoPage = () => {
   const { session } = useSession();
@@ -31,7 +73,7 @@ const MantenimientoPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('app_banner')
-        .select('id, enabled, message, updated_at, updated_by')
+        .select('id, enabled, message, variant, updated_at, updated_by')
         .eq('id', 1)
         .maybeSingle();
       if (error) throw error;
@@ -43,17 +85,21 @@ const MantenimientoPage = () => {
   // before saving. Initialized from the fetched row when it arrives.
   const [enabled, setEnabled] = useState(false);
   const [message, setMessage] = useState('');
+  const [variant, setVariant] = useState<BannerVariant>('warning');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (banner) {
       setEnabled(banner.enabled);
       setMessage(banner.message);
+      setVariant((banner.variant as BannerVariant) || 'warning');
     }
   }, [banner?.id, banner?.updated_at, banner]);
 
   const hasUnsavedChanges = banner
-    ? (banner.enabled !== enabled || banner.message !== message)
+    ? (banner.enabled !== enabled
+        || banner.message !== message
+        || (banner.variant || 'warning') !== variant)
     : false;
 
   const handleSave = async () => {
@@ -71,6 +117,7 @@ const MantenimientoPage = () => {
       .update({
         enabled,
         message: message.trim(),
+        variant,
         updated_at: new Date().toISOString(),
         updated_by: session.user.id,
       })
@@ -91,6 +138,9 @@ const MantenimientoPage = () => {
     ? format(toZonedTime(new Date(banner.updated_at), ART_TZ), "dd/MM/yyyy 'a las' HH:mm")
     : '—';
 
+  const selectedVariant = VARIANT_OPTIONS.find(v => v.key === variant)!;
+  const PreviewIcon = selectedVariant.icon;
+
   return (
     <div className="p-6 max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
@@ -105,14 +155,15 @@ const MantenimientoPage = () => {
             Mostrá un cartel visible en todas las páginas del admin. Útil para
             avisar de mantenimientos programados, bugs conocidos o cambios
             recientes. Cada usuario puede descartarlo, pero si edita este
-            mensaje, el cartel aparece de nuevo para todos.
+            mensaje o el tipo, el cartel aparece de nuevo para todos.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-6">
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
             <>
+              {/* Enable / disable */}
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="banner-toggle" className="text-base">
@@ -133,6 +184,41 @@ const MantenimientoPage = () => {
                 </Button>
               </div>
 
+              {/* Variant picker */}
+              <div className="space-y-2">
+                <Label>Tipo de anuncio</Label>
+                <p className="text-xs text-muted-foreground">
+                  Define el color y el ícono. Elegí según la gravedad del aviso.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                  {VARIANT_OPTIONS.map(opt => {
+                    const Icon = opt.icon;
+                    const selected = variant === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setVariant(opt.key)}
+                        className={`text-left rounded-md border p-3 transition-colors ${
+                          selected
+                            ? `${opt.container} border-current ring-2 ring-current/30`
+                            : 'border-border hover:border-foreground/30 bg-card text-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon className={`h-4 w-4 ${selected ? opt.iconColor : 'text-muted-foreground'}`} />
+                          <span className="font-medium text-sm">{opt.label}</span>
+                        </div>
+                        <p className={`text-xs ${selected ? '' : 'text-muted-foreground'}`}>
+                          {opt.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Message */}
               <div className="space-y-2">
                 <Label htmlFor="banner-message">Mensaje</Label>
                 <Textarea
@@ -147,16 +233,21 @@ const MantenimientoPage = () => {
                 </p>
               </div>
 
-              <div className="rounded-md border bg-amber-500/15 border-amber-500/40 p-3">
-                <p className="text-xs text-amber-200/70 mb-1">Vista previa</p>
-                <div className="flex items-start gap-2 text-sm text-amber-100">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-400" />
-                  <p className="whitespace-pre-line">
-                    {message || <span className="italic opacity-50">El mensaje aparece acá</span>}
-                  </p>
+              {/* Live preview — replicates the real banner exactly */}
+              <div className="space-y-2">
+                <Label>Vista previa</Label>
+                <div className={`rounded-md border-b-2 ${selectedVariant.container} shadow-md`}>
+                  <div className="px-4 sm:px-6 py-3 flex items-center gap-3 text-sm sm:text-base">
+                    <PreviewIcon className={`h-5 w-5 shrink-0 ${selectedVariant.iconColor}`} />
+                    <p className="flex-1 leading-snug whitespace-pre-line text-center font-medium">
+                      {message || <span className="italic opacity-50">El mensaje aparece acá</span>}
+                    </p>
+                    <X className={`h-4 w-4 shrink-0 ${selectedVariant.iconColor} opacity-50`} />
+                  </div>
                 </div>
               </div>
 
+              {/* Footer */}
               <div className="flex items-center justify-between pt-2 border-t">
                 <p className="text-xs text-muted-foreground">
                   Última actualización: {lastUpdated}
