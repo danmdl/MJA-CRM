@@ -22,9 +22,20 @@ interface BannerRow {
   enabled: boolean;
   message: string;
   variant: BannerVariant | null;
+  resurface_minutes: number | null;
   updated_at: string;
   updated_by: string | null;
 }
+
+// Predefined intervals — keeps the picker compact and makes the schema's
+// CHECK constraint (<= 7 days) impossible to violate from the UI.
+const RESURFACE_OPTIONS: { value: number; label: string; description: string }[] = [
+  { value: 0,    label: 'Para siempre',     description: 'Una vez cerrado, no vuelve hasta que edites el mensaje.' },
+  { value: 15,   label: 'Cada 15 minutos',  description: 'Bueno para avisos urgentes que deben recordarse seguido.' },
+  { value: 60,   label: 'Cada 1 hora',      description: 'Equilibrio entre insistencia y no molestar.' },
+  { value: 240,  label: 'Cada 4 horas',     description: 'Reaparece un par de veces durante la jornada.' },
+  { value: 1440, label: 'Cada 24 horas',    description: 'Una vez al día. Bueno para recordatorios suaves.' },
+];
 
 // Mirror of the variant styles in AppBanner so the live preview matches
 // exactly what the user will see. Kept inline rather than imported to
@@ -73,7 +84,7 @@ const MantenimientoPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('app_banner')
-        .select('id, enabled, message, variant, updated_at, updated_by')
+        .select('id, enabled, message, variant, resurface_minutes, updated_at, updated_by')
         .eq('id', 1)
         .maybeSingle();
       if (error) throw error;
@@ -86,6 +97,7 @@ const MantenimientoPage = () => {
   const [enabled, setEnabled] = useState(false);
   const [message, setMessage] = useState('');
   const [variant, setVariant] = useState<BannerVariant>('warning');
+  const [resurfaceMinutes, setResurfaceMinutes] = useState<number>(0);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -93,13 +105,15 @@ const MantenimientoPage = () => {
       setEnabled(banner.enabled);
       setMessage(banner.message);
       setVariant((banner.variant as BannerVariant) || 'warning');
+      setResurfaceMinutes(banner.resurface_minutes ?? 0);
     }
   }, [banner?.id, banner?.updated_at, banner]);
 
   const hasUnsavedChanges = banner
     ? (banner.enabled !== enabled
         || banner.message !== message
-        || (banner.variant || 'warning') !== variant)
+        || (banner.variant || 'warning') !== variant
+        || (banner.resurface_minutes ?? 0) !== resurfaceMinutes)
     : false;
 
   const handleSave = async () => {
@@ -118,6 +132,7 @@ const MantenimientoPage = () => {
         enabled,
         message: message.trim(),
         variant,
+        resurface_minutes: resurfaceMinutes,
         updated_at: new Date().toISOString(),
         updated_by: session.user.id,
       })
@@ -230,6 +245,39 @@ const MantenimientoPage = () => {
                 />
                 <p className="text-xs text-muted-foreground">
                   Texto plano. Los saltos de línea se respetan.
+                </p>
+              </div>
+
+              {/* Resurface interval */}
+              <div className="space-y-2">
+                <Label>Cuando el usuario cierra el cartel…</Label>
+                <p className="text-xs text-muted-foreground">
+                  Define cada cuánto reaparece para usuarios que ya lo cerraron.
+                  Editar el mensaje o el tipo siempre lo muestra de nuevo a todos,
+                  independientemente de esta opción.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-1">
+                  {RESURFACE_OPTIONS.map(opt => {
+                    const selected = resurfaceMinutes === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setResurfaceMinutes(opt.value)}
+                        className={`text-left rounded-md border p-2 transition-colors ${
+                          selected
+                            ? 'border-primary ring-2 ring-primary/30 bg-primary/10 text-foreground'
+                            : 'border-border hover:border-foreground/30 bg-card text-foreground'
+                        }`}
+                        title={opt.description}
+                      >
+                        <p className="font-medium text-xs">{opt.label}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground italic">
+                  {RESURFACE_OPTIONS.find(o => o.value === resurfaceMinutes)?.description}
                 </p>
               </div>
 
