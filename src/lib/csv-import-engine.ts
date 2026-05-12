@@ -51,7 +51,12 @@ const NUMBER_FIELDS = new Set(['edad']);
 const sanitizeValue = (key: string, val: string): any => {
   if (val === '' || val === null || val === undefined) return null;
   const trimmed = String(val).trim();
-  if (/^[.\-,…]+$/.test(trimmed) || trimmed === 'N/A' || trimmed === 'n/a' || trimmed === '') return null;
+  // Any value with no letters or digits is junk (e.g. ".", ", ,", ". .", "-",
+  // mixed whitespace + punctuation). Earlier we only caught a fixed set of
+  // characters and missed inputs that combined spaces with dots/commas, so the
+  // address column ended up storing ". ," and the "sin dirección" filter
+  // counted those rows as having an address.
+  if (!/[\p{L}\p{N}]/u.test(trimmed) || trimmed === 'N/A' || trimmed === 'n/a') return null;
 
   if (DATE_FIELDS.has(key)) {
     const dateOnly = trimmed.split(' ')[0];

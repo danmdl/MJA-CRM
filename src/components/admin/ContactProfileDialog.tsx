@@ -550,10 +550,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Zona</label>
-                  <input readOnly value={contact.zona || ''} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" placeholder="Se completa al elegir cuerda" />
-                </div>
-                <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha de nacimiento</label>
                   <div className="flex items-center gap-2">
                     <Input type="date" value={contact.date_of_birth || ''} onChange={(e) => setContact({ ...contact, date_of_birth: e.target.value || null })} className="flex-1" />

@@ -14,6 +14,7 @@ const contactFields: ContactField[] = [
   { key: 'fecha_contacto', label: 'Fecha de contacto', type: 'date' },
   { key: 'edad',       label: 'Edad', type: 'text' },
   { key: 'numero_cuerda', label: 'Cuerda', type: 'text' },
+  { key: 'address',    label: 'Dirección', type: 'text' },
 ];
 
 describe('normalizePhoneForDedupe', () => {
@@ -173,6 +174,25 @@ describe('dryRunImport', () => {
     });
     expect(result.errorSummary['Sexo es obligatorio (Masculino o Femenino).']).toBe(3);
     expect(result.invalidCount).toBe(3);
+  });
+
+  it('nulls out junk-only address values (".", ", ,", whitespace+punctuation)', () => {
+    const result = dryRunImport({
+      ...baseOpts,
+      columnMapping: { ...baseOpts.columnMapping, address: 'Direccion' },
+      data: [
+        { Nombre: 'A', Apellido: 'B', Sexo: 'm', Telefono: '1144556677', Direccion: '.' },
+        { Nombre: 'C', Apellido: 'D', Sexo: 'f', Telefono: '1144556678', Direccion: ', ,' },
+        { Nombre: 'E', Apellido: 'F', Sexo: 'm', Telefono: '1144556679', Direccion: '. .' },
+        { Nombre: 'G', Apellido: 'H', Sexo: 'f', Telefono: '1144556670', Direccion: '   ' },
+        { Nombre: 'I', Apellido: 'J', Sexo: 'm', Telefono: '1144556671', Direccion: 'Av. Mitre 123' },
+      ],
+    });
+    expect(result.rows[0].transformed?.address).toBeNull();
+    expect(result.rows[1].transformed?.address).toBeNull();
+    expect(result.rows[2].transformed?.address).toBeNull();
+    expect(result.rows[3].transformed?.address).toBeNull();
+    expect(result.rows[4].transformed?.address).toBe('Av. Mitre 123');
   });
 
   it('totalCount equals validCount + invalidCount', () => {
