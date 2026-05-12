@@ -16,11 +16,6 @@
 // query builder. The helper applies .order('id') and .range() to it.
 // Pass orderColumn if your table doesn't have an 'id' column.
 
-type SupabaseQueryBuilder<T> = {
-  order: (col: string) => SupabaseQueryBuilder<T>;
-  range: (from: number, to: number) => Promise<{ data: T[] | null; error: any }>;
-};
-
 const DEFAULT_PAGE_SIZE = 1000;
 const SAFETY_MAX_PAGES = 100; // 100k rows. Adjust if you ever need more.
 

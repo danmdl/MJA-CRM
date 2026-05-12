@@ -727,11 +727,10 @@ const LogsPage = () => {
                       }
                       groups.push([row]);
                     });
-                    return groups.map((group, gIdx) => {
+                    return groups.map((group) => {
                       const first = group[0];
                       const name = first.profiles ? [first.profiles.first_name, first.profiles.last_name].filter(Boolean).join(' ') : '';
                       const email = first.profiles?.email || first.user_email || '';
-                      const actionLabel = ACTION_LABELS[first.action] || first.action;
                       return (
                         <ActivityGroupRow
                           key={`${first.id}-group`}

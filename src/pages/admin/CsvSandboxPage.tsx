@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FlaskConical, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { FlaskConical, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 import { showError } from '@/utils/toast';
 import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,7 +57,6 @@ const CsvSandboxPage = () => {
   const [result, setResult] = useState<DryRunResult | null>(null);
   const [parsing, setParsing] = useState(false);
   const [running, setRunning] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<'invalid' | 'valid' | null>('invalid');
 
   // Churches the admin can pick as the dedupe target. Only roles that already
   // see across churches need the picker; for everyone else the sandbox auto-

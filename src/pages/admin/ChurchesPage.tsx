@@ -43,7 +43,7 @@ const fetchChurches = async (): Promise<Church[]> => {
 const ChurchesPage = () => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllChurches, canAddUsers, canEditDeleteUsers } = usePermissions();
+  const { canSeeAllChurches } = usePermissions();
 
   const canSeeAll = canSeeAllChurches();
   const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'conector', 'supervisor', 'anfitrion'].includes(profile?.role || '');

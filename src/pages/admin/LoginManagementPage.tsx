@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserPlus, Key, Shield, AlertCircle } from 'lucide-react';
@@ -10,7 +10,6 @@ import UserTable from '@/components/admin/UserTable';
 import ChurchUserTable from '@/components/admin/ChurchUserTable';
 import InviteUserDialog from '@/components/admin/InviteUserDialog';
 import CreateUserDialog from '@/components/admin/CreateUserDialog';
-import { showError } from '@/utils/toast';
 
 const LoginManagementPage = () => {
   const { profile } = useSession();

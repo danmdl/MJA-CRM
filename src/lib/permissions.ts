@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 
@@ -64,7 +64,6 @@ export const ROLE_LABELS: Record<string, string> = {
 
 export const usePermissions = () => {
   const { profile, loading: profileLoading } = useSession();
-  const queryClient = useQueryClient();
 
   const { data: permissions, isLoading: permsLoading } = useQuery<PermissionData[]>({
     queryKey: ['permissions'],
