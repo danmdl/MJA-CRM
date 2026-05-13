@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { useChurchUuid } from '@/hooks/use-church-uuid';
 import { normalize } from '@/lib/normalize';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +40,8 @@ interface Contact {
 }
 
 const RouteEditorPage = () => {
-  const { churchId, projectId } = useParams<{ churchId: string; projectId: string }>();
+  const { churchId: churchSlug, projectId } = useParams<{ churchId: string; projectId: string }>();
+  const churchId = useChurchUuid();
   // Bias address autocomplete toward the church area.
   const { data: churchCoords } = useChurchCoords(churchId);
   const navigate = useNavigate();
@@ -759,7 +761,7 @@ const RouteEditorPage = () => {
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <button
-          onClick={() => navigate(`/admin/churches/${churchId}/rutas`)}
+          onClick={() => navigate(`/admin/churches/${churchSlug}/rutas`)}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
           title="Volver a proyectos"
         >
@@ -991,7 +993,7 @@ const RouteEditorPage = () => {
               rather pick from a flat list. Putting both here means
               the user doesn't need to know there are two ways in. */}
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button size="lg" onClick={() => navigate(`/admin/churches/${churchId}/rutas/${projectId}/mapa`)} className="gap-2">
+            <Button size="lg" onClick={() => navigate(`/admin/churches/${churchSlug}/rutas/${projectId}/mapa`)} className="gap-2">
               <MapIcon className="h-4 w-4" /> Elegir desde el mapa
             </Button>
             <Button size="lg" variant="outline" onClick={openEditDialog} className="gap-2">

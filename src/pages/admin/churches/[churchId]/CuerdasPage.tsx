@@ -53,7 +53,8 @@ interface Cell {
 // ─── Component ───────────────────────────────────────────────────
 const CuerdasPage = () => {
   const confirm = useConfirm();
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const { profile } = useSession();
   const { canSeeBaseDatosTotal, canEditCuerdas } = usePermissions();
   const queryClient = useQueryClient();

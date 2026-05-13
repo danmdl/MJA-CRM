@@ -95,7 +95,7 @@ const Dashboard = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from('churches')
-        .select('id, name, is_pinned, pin_order')
+        .select('id, name, slug, is_pinned, pin_order')
         .order('is_pinned', { ascending: false })
         .order('pin_order', { ascending: true, nullsFirst: false })
         .order('name', { ascending: true })
@@ -271,7 +271,7 @@ const Dashboard = () => {
             ) : churches.slice(0, 3).map((church: any, i: number) => (
               <Link
                 key={church.id}
-                to={`/admin/churches/${church.id}/overview`}
+                to={`/admin/churches/${church.slug || church.id}/overview`}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 18px', textDecoration: 'none',

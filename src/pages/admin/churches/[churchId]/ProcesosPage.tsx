@@ -344,7 +344,8 @@ const PersonDetailDialog: React.FC<{
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const ProcesosPage = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const { session, profile } = useSession();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');

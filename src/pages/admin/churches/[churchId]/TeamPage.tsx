@@ -9,7 +9,8 @@ import ChurchUserTable from '@/components/admin/ChurchUserTable';
 import { usePermissions } from '@/lib/permissions';
 
 const ChurchTeamPage = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const { canAddMembers } = usePermissions();
 

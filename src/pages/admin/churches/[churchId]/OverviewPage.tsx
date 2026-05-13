@@ -133,7 +133,8 @@ const CompactList = ({ title, items, columns = 1 }: { title: string; items: { la
 };
 
 const OverviewPage = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const { canAccessAllChurches, canEditDeleteUsers } = usePermissions();
   const isAdminOrGeneral = canAccessAllChurches() || canEditDeleteUsers();
   

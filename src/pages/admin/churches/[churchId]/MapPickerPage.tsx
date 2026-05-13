@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { useChurchUuid } from '@/hooks/use-church-uuid';
 import { normalize } from '@/lib/normalize';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +30,8 @@ interface Contact {
 }
 
 const MapPickerPage = () => {
-  const { churchId, projectId } = useParams<{ churchId: string; projectId: string }>();
+  const { churchId: churchSlug, projectId } = useParams<{ churchId: string; projectId: string }>();
+  const churchId = useChurchUuid();
   // Bias address autocomplete toward the church area.
   const { data: churchCoords } = useChurchCoords(churchId);
   const navigate = useNavigate();
@@ -718,7 +720,7 @@ const MapPickerPage = () => {
       queryClient.invalidateQueries({ queryKey: ['route-project', projectId] });
       queryClient.invalidateQueries({ queryKey: ['route-projects'] });
       showSuccess(`${selectedIds.size} contacto${selectedIds.size === 1 ? '' : 's'} guardado${selectedIds.size === 1 ? '' : 's'}.`);
-      navigate(`/admin/churches/${churchId}/rutas/${projectId}`);
+      navigate(`/admin/churches/${churchSlug}/rutas/${projectId}`);
     } catch (e: any) {
       showError(e.message || 'Error al guardar.');
     } finally {
@@ -842,7 +844,7 @@ const MapPickerPage = () => {
           page (was flex-1 unbounded). */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2 px-1">
         <button
-          onClick={() => navigate(`/admin/churches/${churchId}/rutas`)}
+          onClick={() => navigate(`/admin/churches/${churchSlug}/rutas`)}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
           title="Volver a proyectos"
         >

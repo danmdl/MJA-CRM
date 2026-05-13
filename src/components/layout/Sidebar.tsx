@@ -5,6 +5,7 @@ import { usePermissions, ROLE_LABELS } from '@/lib/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import NotificationBell from '@/components/admin/NotificationBell';
+import { isUuid } from '@/lib/church-slug';
 
 interface NavItemConfig {
   to: string;
@@ -37,16 +38,21 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
   const lastChurchId = typeof window !== 'undefined' ? sessionStorage.getItem('last-church-id') : null;
   const currentChurchId = singleChurchId || activeChurchId || lastChurchId;
 
-  // Fetch church name when we have a church context
+  // Fetch church name + slug when we have a church context. `currentChurchId`
+  // can be a UUID (from profile.church_id or sessionStorage) or a slug (from
+  // the URL match). Look up by whichever it is so URLs in the sidebar always
+  // use the slug.
   const { data: churchData } = useQuery({
     queryKey: ['church-name-sidebar', currentChurchId],
     queryFn: async () => {
-      const { data } = await supabase.from('churches').select('name').eq('id', currentChurchId!).single();
+      const col = isUuid(currentChurchId!) ? 'id' : 'slug';
+      const { data } = await supabase.from('churches').select('name, slug').eq(col, currentChurchId!).single();
       return data;
     },
     enabled: !!currentChurchId,
     staleTime: 60_000,
   });
+  const currentChurchSlug = churchData?.slug || (currentChurchId && !isUuid(currentChurchId) ? currentChurchId : null);
 
   const handleLogout = async () => {
     // Flag manual logout so SessionProvider can distinguish it from session expiry
@@ -68,21 +74,21 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
     {
       title: churchData?.name || 'Iglesia',
       items: [
-        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/overview`, emoji: '📋', label: 'Resumen' }] : []),
+        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchSlug}/overview`, emoji: '📋', label: 'Resumen' }] : []),
         // Order matches the top bar exactly
-        ...(canSeePool() ? [{ to: `/admin/churches/${currentChurchId}/pool`, emoji: '🌱', label: 'Semillero' }] : []),
-        ...(canSeeProcesos() ? [{ to: `/admin/churches/${currentChurchId}/procesos`, emoji: '⚡', label: 'Procesos' }] : []),
-        ...(canSeeAsistencia() ? [{ to: `/admin/churches/${currentChurchId}/asistencia`, emoji: '✅', label: 'Asistencia' }] : []),
-        ...(canSeeCuerdas() ? [{ to: `/admin/churches/${currentChurchId}/cuerdas`, emoji: '🏘️', label: 'Cuerdas' }] : []),
-        ...(canSeeCelulas() ? [{ to: `/admin/churches/${currentChurchId}/celulas`, emoji: '🏠', label: 'Células' }] : []),
-        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/team`, emoji: '🤝', label: 'Equipo' }] : []),
-        ...(canSeeCelulas() ? [{ to: `/admin/churches/${currentChurchId}/hogares`, emoji: '🕊️', label: 'Hogares de Paz' }] : []),
-        ...((canSeeMapa() || canSeeCuerdas()) ? [{ to: `/admin/churches/${currentChurchId}/territorio`, emoji: '🗺️', label: 'Territorio' }] : []),
-        ...(canSeeRutas() ? [{ to: `/admin/churches/${currentChurchId}/rutas`, emoji: '🧭', label: 'Rutas' }] : []),
-        ...(canSeeEventos() ? [{ to: `/admin/churches/${currentChurchId}/eventos`, emoji: '📅', label: 'Eventos' }] : []),
-        ...(canSeeHistorial() ? [{ to: `/admin/churches/${currentChurchId}/historial`, emoji: '📋', label: 'Historial' }] : []),
-        ...(canSeeValidador() ? [{ to: `/admin/churches/${currentChurchId}/validator`, emoji: '🛡️', label: 'Validador' }] : []),
-        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchId}/papelera`, emoji: '🗑️', label: 'Papelera' }] : []),
+        ...(canSeePool() ? [{ to: `/admin/churches/${currentChurchSlug}/pool`, emoji: '🌱', label: 'Semillero' }] : []),
+        ...(canSeeProcesos() ? [{ to: `/admin/churches/${currentChurchSlug}/procesos`, emoji: '⚡', label: 'Procesos' }] : []),
+        ...(canSeeAsistencia() ? [{ to: `/admin/churches/${currentChurchSlug}/asistencia`, emoji: '✅', label: 'Asistencia' }] : []),
+        ...(canSeeCuerdas() ? [{ to: `/admin/churches/${currentChurchSlug}/cuerdas`, emoji: '🏘️', label: 'Cuerdas' }] : []),
+        ...(canSeeCelulas() ? [{ to: `/admin/churches/${currentChurchSlug}/celulas`, emoji: '🏠', label: 'Células' }] : []),
+        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchSlug}/team`, emoji: '🤝', label: 'Equipo' }] : []),
+        ...(canSeeCelulas() ? [{ to: `/admin/churches/${currentChurchSlug}/hogares`, emoji: '🕊️', label: 'Hogares de Paz' }] : []),
+        ...((canSeeMapa() || canSeeCuerdas()) ? [{ to: `/admin/churches/${currentChurchSlug}/territorio`, emoji: '🗺️', label: 'Territorio' }] : []),
+        ...(canSeeRutas() ? [{ to: `/admin/churches/${currentChurchSlug}/rutas`, emoji: '🧭', label: 'Rutas' }] : []),
+        ...(canSeeEventos() ? [{ to: `/admin/churches/${currentChurchSlug}/eventos`, emoji: '📅', label: 'Eventos' }] : []),
+        ...(canSeeHistorial() ? [{ to: `/admin/churches/${currentChurchSlug}/historial`, emoji: '📋', label: 'Historial' }] : []),
+        ...(canSeeValidador() ? [{ to: `/admin/churches/${currentChurchSlug}/validator`, emoji: '🛡️', label: 'Validador' }] : []),
+        ...((canSeeAllAnalytics() || canSeeOwnChurchAnalytics()) ? [{ to: `/admin/churches/${currentChurchSlug}/papelera`, emoji: '🗑️', label: 'Papelera' }] : []),
       ],
     },
     {

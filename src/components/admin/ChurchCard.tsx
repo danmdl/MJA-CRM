@@ -12,6 +12,7 @@ type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'gestor_de_cuerda
 interface ChurchProps {
   id: string;
   name: string;
+  slug: string | null;
   pastor_id: string | null;
   created_at: string;
   is_pinned: boolean;
@@ -81,7 +82,7 @@ const ChurchCard = ({ church, onEdit, onDelete, currentUserRole }: ChurchCardPro
       </CardHeader>
       <CardContent className="flex items-center justify-between">
         <Button asChild>
-          <a href={`/admin/churches/${church.id}/overview`}>Ver Detalles</a>
+          <a href={`/admin/churches/${church.slug || church.id}/overview`}>Ver Detalles</a>
         </Button>
         {currentUserRole === 'admin' && (
           <DropdownMenu>

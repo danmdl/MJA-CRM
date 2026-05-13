@@ -19,6 +19,7 @@ import { usePermissions } from '@/lib/permissions';
 interface Church {
   id: string;
   name: string;
+  slug: string | null;
   pastor_id: string | null;
   created_at: string;
   is_pinned: boolean;
@@ -75,9 +76,14 @@ const ChurchesPage = () => {
   // landing page for everyone now.
   useEffect(() => {
     if (!isLoading && !isAdminOrGeneral && isChurchRole && profile?.church_id) {
-      navigate(`/admin/churches/${profile.church_id}/pool`);
+      // Prefer the slug from the churches list (if loaded) so the URL is
+      // friendly on first hop. Otherwise fall back to the UUID — the layout
+      // will redirect to the slug URL after lookup.
+      const myChurch = churches?.find(c => c.id === profile.church_id);
+      const slugOrId = myChurch?.slug || profile.church_id;
+      navigate(`/admin/churches/${slugOrId}/pool`);
     }
-  }, [isLoading, isAdminOrGeneral, isChurchRole, profile?.church_id, navigate]);
+  }, [isLoading, isAdminOrGeneral, isChurchRole, profile?.church_id, churches, navigate]);
 
   const handleEditChurch = (church: Church) => {
     setSelectedChurch(church);

@@ -41,7 +41,8 @@ const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', '
 
 const HogaresDePazPage = () => {
   const confirm = useConfirm();
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const { data: churchCoords } = useChurchCoords(churchId);
   const queryClient = useQueryClient();
   const { canEditCelulas, canSeeBaseDatosTotal, canEditCuerdas, canAddUsers } = usePermissions();

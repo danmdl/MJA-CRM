@@ -26,7 +26,8 @@ interface DeletedItem {
 const GRACE_DAYS = 7;
 
 const PapeleraPage = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const queryClient = useQueryClient();
   const { canRestoreDeleted } = usePermissions();
   const [confirmAction, setConfirmAction] = useState<{ type: 'restore' | 'purge'; item: DeletedItem } | null>(null);

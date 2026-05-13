@@ -64,7 +64,8 @@ const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 // ─── Page ─────────────────────────────────────────────────────────────
 
 const AsistenciaPage = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const { profile } = useSession();
   const queryClient = useQueryClient();
 
