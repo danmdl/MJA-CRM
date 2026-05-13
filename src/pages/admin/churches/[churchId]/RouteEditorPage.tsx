@@ -347,7 +347,16 @@ const RouteEditorPage = () => {
     if (selectedContacts.length === 0) { showError('Seleccioná al menos un contacto.'); return; }
     if (!startLat || !startLng) { showError('Ingresá un punto de partida.'); return; }
     setCalculating(true);
-    setRouteData(null);
+    // Intentionally NOT clearing routeData here. Doing so flipped
+    // hasRoute false for a tick, which unmounted the map div, made
+    // mapInstance.current point at an orphaned DOM node, and caused
+    // a visible "hard refresh" flash every time we recalculated
+    // (most commonly after closing the contact-edit dialog). The
+    // new directions callback below overwrites routeData with the
+    // fresh result, so the user sees the old route → new route
+    // transition in place, no remount, no flash. If the calc fails
+    // we keep the previous route on screen and surface the failure
+    // via the error toast.
 
     const waitForGoogle = () => new Promise<void>((resolve) => {
       const check = () => {
