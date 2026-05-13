@@ -482,7 +482,12 @@ export function applyFilterTab(contacts: any[], filters: FilterTabFilters): any[
     return null;
   })();
   return contacts.filter(c => {
-    if (filters.mjaReceived && !c.received_from_mja_at) return false;
+    // 'mjaReceived' is a misnomer at this point — semantics are
+    // "any MJA-boundary crossing applies to this contact". The
+    // receiving side gets exactly one of the two flags depending
+    // on who assigned, so OR catches both directions without the
+    // filter needing to know the caller's role.
+    if (filters.mjaReceived && !c.received_from_mja_at && !c.sent_to_mja_at) return false;
     if (cuerdaSet && !cuerdaSet.has(c.numero_cuerda || '')) return false;
     if (filters.responsable === '__none__') {
       if (c.responsable_id) return false;

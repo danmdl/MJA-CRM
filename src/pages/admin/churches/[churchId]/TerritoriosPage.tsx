@@ -92,9 +92,25 @@ const TerritoriosPage: React.FC = () => {
   const [mapReady, setMapReady] = useState(false);
   const [showCells, setShowCells] = useState(false);
   const [showContacts, setShowContacts] = useState(true);
+  // "Solo mi zona" — hides every other cuerda's polygon overlay.
+  // Useful when two cuerdas (e.g. men/women) share territory and the
+  // overlapping fills make it hard to see which one is yours.
+  const [onlyMyZone, setOnlyMyZone] = useState(false);
   const [selectedCuerdaNumero, setSelectedCuerdaNumero] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Privileged roles see the whole iglesia's cuerdas in the picker.
+  // Everyone else (referente, conector, encargado_de_celula, anfitrion,
+  // consolidador) is locked to their own cuerda — they have no business
+  // viewing another cuerda's territorio. Source of truth for the
+  // dropdown render below and the auto-selection effect on mount.
+  const isPrivilegedRole = !!profile && (
+    profile.role === 'admin'
+    || profile.role === 'general'
+    || profile.role === 'pastor'
+    || profile.role === 'supervisor'
+  );
 
   // ─── Load data ───────────────────────────────────────────────────
   const { data: zonas } = useQuery<{ id: string }[]>({
@@ -327,6 +343,10 @@ const TerritoriosPage: React.FC = () => {
       const paths = geoJsonToGooglePaths(cuerda.territory_geojson as any);
       if (!paths) continue;
       const isSelected = cuerda.numero === selectedCuerdaNumero;
+      // When "Solo mi zona" is on, skip every other cuerda's polygon
+      // so overlapping fills don't clutter the view. The selected
+      // cuerda still renders (with its label) regardless.
+      if (onlyMyZone && !isSelected) continue;
       const isEditable = isSelected && canEditCuerda(cuerda);
       const color = colorForCuerda(cuerda.numero);
       const polygon = new g.maps.Polygon({
@@ -380,7 +400,7 @@ const TerritoriosPage: React.FC = () => {
     }
 
     setHasUnsavedChanges(false);
-  }, [mapReady, cuerdas, selectedCuerdaNumero, profile?.role, profile?.numero_cuerda]);
+  }, [mapReady, cuerdas, selectedCuerdaNumero, profile?.role, profile?.numero_cuerda, onlyMyZone]);
 
   // ─── Render cell markers (toggled via showCells checkbox) ────────
   useEffect(() => {
@@ -714,8 +734,8 @@ const TerritoriosPage: React.FC = () => {
           </span>
         )}
         <select
-          disabled={cuerdasLoading}
-          className="h-8 px-2 rounded border bg-background text-sm"
+          disabled={cuerdasLoading || !isPrivilegedRole}
+          className="h-8 px-2 rounded border bg-background text-sm disabled:opacity-100 disabled:cursor-default"
           value={selectedCuerdaNumero}
           onChange={(e) => {
             if (hasUnsavedChanges) {
@@ -724,9 +744,16 @@ const TerritoriosPage: React.FC = () => {
             if (isDrawing) cancelDrawing();
             setSelectedCuerdaNumero(e.target.value);
           }}
+          title={isPrivilegedRole ? undefined : 'Solo podés ver tu propia cuerda'}
         >
+          {/* Non-privileged users only ever see their own cuerda in the
+              picker. Letting a referente switch to another cuerda's
+              delineation invites confusion (and edits to a territory
+              they don't own). Globals / pastor / supervisor keep the
+              full picker so they can audit every cuerda. */}
           {(cuerdas || [])
             .filter(c => !c.is_church_cuerda)
+            .filter(c => isPrivilegedRole || c.numero === profile?.numero_cuerda)
             .sort((a, b) => a.numero.localeCompare(b.numero))
             .map(c => (
               <option key={c.id} value={c.numero}>
@@ -734,6 +761,20 @@ const TerritoriosPage: React.FC = () => {
               </option>
             ))}
         </select>
+
+        {/* "Solo mi zona" checkbox — hides every other cuerda's polygon
+            on the map. Useful when men/women cuerdas overlap and the
+            translucent fills stack visually. The selected cuerda still
+            renders regardless. */}
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none ml-1">
+          <input
+            type="checkbox"
+            checked={onlyMyZone}
+            onChange={(e) => setOnlyMyZone(e.target.checked)}
+            className="rounded border-input"
+          />
+          Solo mi zona
+        </label>
 
         {selectedCuerda && (
           <>
