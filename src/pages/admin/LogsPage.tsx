@@ -459,38 +459,21 @@ const LogsPage = () => {
   const { data: perPersonUsers, isLoading: perPersonLoading } = useQuery<any[]>({
     queryKey: ['per_person_users'],
     queryFn: async () => {
-      const [profilesRes, actRes, cliRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .order('first_name', { ascending: true }),
-        supabase
-          .from('activity_logs')
-          .select('user_id, created_at')
-          .eq('action', 'login')
-          .order('created_at', { ascending: false })
-          .limit(2000),
-        supabase
-          .from('client_logs')
-          .select('user_id, created_at')
-          .eq('action', 'login_success')
-          .order('created_at', { ascending: false })
-          .limit(2000),
-      ]);
-      const lastByUser: Record<string, string> = {};
-      (actRes.data || []).forEach((r: any) => {
-        if (r.user_id && !lastByUser[r.user_id]) lastByUser[r.user_id] = r.created_at;
-      });
-      (cliRes.data || []).forEach((r: any) => {
-        if (r.user_id) {
-          const prev = lastByUser[r.user_id];
-          if (!prev || new Date(r.created_at).getTime() > new Date(prev).getTime()) {
-            lastByUser[r.user_id] = r.created_at;
-          }
-        }
-      });
-      return (profilesRes.data || []).map((p: any) => {
-        const lastLogin = lastByUser[p.id] || null;
+      // last_login_at is now maintained directly on profiles by a
+      // trigger on activity_logs / client_logs (migration 0035). The
+      // old approach scanned the most recent N login records and
+      // joined client-side, which silently capped at Supabase's
+      // 1000-row response limit. That made anyone whose login was
+      // older than the 1000th most-recent appear as "never logged
+      // in". Reading profiles.last_login_at is O(profile count)
+      // regardless of how many login events have accumulated.
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, last_login_at')
+        .order('first_name', { ascending: true });
+      if (error) throw error;
+      return (data || []).map((p: any) => {
+        const lastLogin = p.last_login_at || null;
         const name = [p.first_name, p.last_name].filter(Boolean).join(' ');
         return {
           id: p.id,
