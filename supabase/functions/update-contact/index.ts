@@ -40,7 +40,7 @@ serve(async (req) => {
 
     const { data: callerProfile, error: callerErr } = await supabaseAdmin
       .from("profiles")
-      .select("role, church_id")
+      .select("role, church_id, numero_cuerda")
       .eq("id", userData.user.id)
       .single()
     if (callerErr || !callerProfile) {
@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const { data: targetContact, error: contactErr } = await supabaseAdmin
       .from("contacts")
-      .select("id, church_id")
+      .select("id, church_id, numero_cuerda, responsable_id")
       .eq("id", contactId)
       .eq("church_id", churchId)
       .single()
@@ -71,6 +71,30 @@ serve(async (req) => {
       })
     }
 
+    // Cuerda-isolation for non-privileged roles. A 'conector' /
+    // 'anfitrion' / 'consolidador' / etc. in the same church but a
+    // different cuerda was previously able to edit ANY contact in
+    // the church via this endpoint. Now they're constrained to
+    // contacts of their own cuerda (or contacts where they're the
+    // responsable, for users without a cuerda). admin/general/pastor/
+    // supervisor pass through (they oversee everyone in the church).
+    if (!isAdminOrGeneral && callerProfile.role !== "pastor" && callerProfile.role !== "supervisor") {
+      const callerCuerda = (callerProfile as any).numero_cuerda || null;
+      if (callerCuerda) {
+        if (targetContact.numero_cuerda !== callerCuerda) {
+          return new Response(JSON.stringify({ error: "Forbidden: out-of-cuerda contact" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          })
+        }
+      } else if (targetContact.responsable_id !== userData.user.id) {
+        return new Response(JSON.stringify({ error: "Forbidden: not your contact" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+    }
+
     // Capture before/after snapshots for activity_logs.
     const { data: before } = await supabaseAdmin
       .from("contacts")
@@ -78,6 +102,20 @@ serve(async (req) => {
       .eq("id", contactId)
       .eq("church_id", churchId)
       .single()
+
+    // Sensitive fields: cuerda assignment + cell/zona/responsable
+    // routing. Below pastor/supervisor cannot change these via this
+    // endpoint — they have to be routed through the dedicated assign
+    // flow which is admin/supervisor only. Audit flagged this as the
+    // path that let a conector silently reassign a contact across
+    // cuerdas.
+    const SENSITIVE_KEYS = new Set([
+      "numero_cuerda", "cell_id", "zona", "zona_id",
+      "leader_assigned", "responsable_id", "conector",
+    ]);
+    const canEditSensitive = isAdminOrGeneral
+      || callerProfile.role === "pastor"
+      || callerProfile.role === "supervisor";
 
     const allowedKeys = new Set([
       "first_name", "last_name", "email", "phone", "address",
@@ -88,8 +126,20 @@ serve(async (req) => {
       "lat", "lng", "conector",
     ])
     const sanitized: Record<string, unknown> = {}
+    const rejected: string[] = []
     for (const k in data) {
-      if (allowedKeys.has(k)) sanitized[k] = data[k]
+      if (!allowedKeys.has(k)) continue;
+      if (SENSITIVE_KEYS.has(k) && !canEditSensitive) {
+        // Silently drop sensitive fields for non-privileged callers
+        // and log the attempt so admins can audit. Better than 4xx
+        // because the rest of the update should still succeed.
+        rejected.push(k);
+        continue;
+      }
+      sanitized[k] = data[k];
+    }
+    if (rejected.length > 0) {
+      console.warn(`[update-contact] dropped sensitive fields for ${callerProfile.role}`, { userId: userData.user.id, rejected });
     }
 
     const { error: updateErr } = await supabaseAdmin

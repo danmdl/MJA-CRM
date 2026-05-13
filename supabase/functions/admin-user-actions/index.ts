@@ -137,6 +137,39 @@ serve(async (req) => {
           return new Response('Forbidden: Only administrators or generals can update user roles.', { status: 403, headers: corsHeaders });
         }
 
+        // Hardening: validate the role against the enum so a caller
+        // can't slip in garbage that the DB then rejects (or worse,
+        // silently accepts if the enum ever gains a value). Mirror
+        // the user_role enum exactly.
+        const VALID_ROLES = ['admin','general','pastor','supervisor','referente','gestor_de_cuerda','encargado_de_celula','consolidador','conector','anfitrion'];
+        if (!newRole || !VALID_ROLES.includes(newRole)) {
+          return new Response(JSON.stringify({ error: 'Invalid role' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Last-admin guard: prevent demoting the only remaining admin.
+        // If we're moving someone OUT of admin, count remaining admins
+        // first and refuse if this would leave zero.
+        const { data: targetProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+        if (targetProfile?.role === 'admin' && newRole !== 'admin') {
+          const { count: adminCount } = await supabaseAdmin
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'admin');
+          if ((adminCount ?? 0) <= 1) {
+            return new Response(JSON.stringify({ error: 'Cannot demote the last admin' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
         const { error } = await supabaseAdmin
           .from('profiles')
           .update({ role: newRole })
@@ -144,11 +177,24 @@ serve(async (req) => {
 
         if (error) {
           console.error('[admin-user-actions] Error updating user role:', error);
-          return new Response(JSON.stringify({ error: error.message }), {
+          return new Response(JSON.stringify({ error: 'No se pudo actualizar el rol' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        // Audit log — every role change must leave a trail.
+        await supabaseAdmin.from('activity_logs').insert({
+          user_id: userAuth.user.id,
+          action: 'role_changed',
+          entity_type: 'profile',
+          entity_id: userId,
+          before_data: { role: targetProfile?.role || null },
+          after_data: { role: newRole },
+          church_id: profile.church_id || null,
+        }).then(({ error: logErr }: any) => {
+          if (logErr) console.error('[admin-user-actions] audit log failed (non-fatal):', logErr);
+        });
 
         return new Response(JSON.stringify({ message: 'User role updated successfully' }), {
           status: 200,
@@ -161,19 +207,58 @@ serve(async (req) => {
           return new Response('Forbidden: Only administrators or generals can update user roles.', { status: 403, headers: corsHeaders });
         }
 
-        // For now, just update the primary role
+        const VALID_ROLES = ['admin','general','pastor','supervisor','referente','gestor_de_cuerda','encargado_de_celula','consolidador','conector','anfitrion'];
+        const newPrimary = Array.isArray(roles) ? roles[0] : null;
+        if (!newPrimary || !VALID_ROLES.includes(newPrimary)) {
+          return new Response(JSON.stringify({ error: 'Invalid role' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Last-admin guard mirrors updateUserRole.
+        const { data: targetProfile2 } = await supabaseAdmin
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+        if (targetProfile2?.role === 'admin' && newPrimary !== 'admin') {
+          const { count: adminCount } = await supabaseAdmin
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'admin');
+          if ((adminCount ?? 0) <= 1) {
+            return new Response(JSON.stringify({ error: 'Cannot demote the last admin' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
         const { error } = await supabaseAdmin
           .from('profiles')
-          .update({ role: roles[0] })
+          .update({ role: newPrimary })
           .eq('id', userId);
 
         if (error) {
           console.error('[admin-user-actions] Error updating user roles:', error);
-          return new Response(JSON.stringify({ error: error.message }), {
+          return new Response(JSON.stringify({ error: 'No se pudo actualizar el rol' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        await supabaseAdmin.from('activity_logs').insert({
+          user_id: userAuth.user.id,
+          action: 'role_changed',
+          entity_type: 'profile',
+          entity_id: userId,
+          before_data: { role: targetProfile2?.role || null },
+          after_data: { role: newPrimary },
+          church_id: profile.church_id || null,
+        }).then(({ error: logErr }: any) => {
+          if (logErr) console.error('[admin-user-actions] audit log failed (non-fatal):', logErr);
+        });
 
         return new Response(JSON.stringify({ success: true }), {
           status: 200,
@@ -186,15 +271,54 @@ serve(async (req) => {
           return new Response('Forbidden: Only administrators or generals can delete users.', { status: 403, headers: corsHeaders });
         }
 
+        // Self-delete guard.
+        if (userId === userAuth.user.id) {
+          return new Response(JSON.stringify({ error: 'Cannot delete your own account' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Last-admin guard.
+        const { data: targetProfileD } = await supabaseAdmin
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+        if (targetProfileD?.role === 'admin') {
+          const { count: adminCount } = await supabaseAdmin
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'admin');
+          if ((adminCount ?? 0) <= 1) {
+            return new Response(JSON.stringify({ error: 'Cannot delete the last admin' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
         const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
         if (error) {
           console.error('[admin-user-actions] Error deleting user:', error);
-          return new Response(JSON.stringify({ error: error.message }), {
+          return new Response(JSON.stringify({ error: 'No se pudo eliminar el usuario' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        await supabaseAdmin.from('activity_logs').insert({
+          user_id: userAuth.user.id,
+          action: 'user_deleted',
+          entity_type: 'profile',
+          entity_id: userId,
+          before_data: { role: targetProfileD?.role || null },
+          after_data: null,
+          church_id: profile.church_id || null,
+        }).then(({ error: logErr }: any) => {
+          if (logErr) console.error('[admin-user-actions] audit log failed (non-fatal):', logErr);
+        });
 
         return new Response(JSON.stringify({ message: 'User deleted successfully' }), {
           status: 200,
@@ -207,15 +331,37 @@ serve(async (req) => {
           return new Response('Forbidden: Only administrators or generals can reset passwords.', { status: 403, headers: corsHeaders });
         }
 
+        // Minimum password policy. Supabase Auth has its own default
+        // but this guards against an admin accidentally setting a
+        // dangerously short / empty password.
+        if (typeof newPassword !== 'string' || newPassword.length < 8) {
+          return new Response(JSON.stringify({ error: 'Password must be at least 8 characters' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
 
         if (error) {
           console.error('[admin-user-actions] Error resetting password:', error);
-          return new Response(JSON.stringify({ error: error.message }), {
+          return new Response(JSON.stringify({ error: 'No se pudo restablecer la contraseña' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        await supabaseAdmin.from('activity_logs').insert({
+          user_id: userAuth.user.id,
+          action: 'password_reset_by_admin',
+          entity_type: 'profile',
+          entity_id: userId,
+          before_data: null,
+          after_data: null,
+          church_id: profile.church_id || null,
+        }).then(({ error: logErr }: any) => {
+          if (logErr) console.error('[admin-user-actions] audit log failed (non-fatal):', logErr);
+        });
 
         return new Response(JSON.stringify({ message: 'Password reset successfully' }), {
           status: 200,
