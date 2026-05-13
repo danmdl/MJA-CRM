@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle2, X, MapPin, Loader2 } from 'lucide-react';
-import Papa from 'papaparse';
+// Papa lazy-loaded inside handleFile — see CsvImporter for rationale.
+type PapaModule = typeof import('papaparse');
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
@@ -78,9 +79,10 @@ const CuerdaCsvImporter = ({ open, onOpenChange, churchId, zonas, onSuccess }: C
   };
 
   // ─── Step 1: Parse CSV ─────────────────────────────────────────
-  const handleFile = (f: File) => {
+  const handleFile = async (f: File) => {
     setFile(f);
     setImportResult(null);
+    const Papa = (await import('papaparse')).default as PapaModule['default'];
     Papa.parse(f, {
       header: true,
       skipEmptyLines: 'greedy',
