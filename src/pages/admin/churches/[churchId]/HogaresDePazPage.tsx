@@ -174,9 +174,9 @@ const HogaresDePazPage = () => {
     try {
       if (showNew) {
         if (!h.cuerda_id) { showError('Seleccioná una cuerda.'); setSaving(false); return; }
-        const { error } = await supabase.from('hogares_de_paz').insert({
-          church_id: churchId,
-          name: h.name || null,
+        const { data: created, error } = await supabase.from('hogares_de_paz').insert({
+          church_id: churchId!,
+          name: h.name || '',
           leader_name: h.leader_name || null,
           anfitrion_name: h.anfitrion_name || null,
           address: h.address || null,
@@ -187,13 +187,14 @@ const HogaresDePazPage = () => {
           fecha_cierre_estimada: h.fecha_cierre_estimada || null,
           cuerda_id: h.cuerda_id || null,
           created_by: session?.user?.id,
-        });
+        }).select('id').single();
         if (error) throw error;
         await supabase.from('activity_logs').insert({
           user_id: session?.user?.id,
           church_id: churchId,
           action: 'create',
           entity_type: 'hogar_de_paz',
+          entity_id: created!.id,
           after_data: { name: h.name, cuerda_id: h.cuerda_id, address: h.address },
         });
         showSuccess('Hogar de Paz creado.');

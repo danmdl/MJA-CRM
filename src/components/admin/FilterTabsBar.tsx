@@ -314,7 +314,7 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
 
       if (tab) {
         const { data, error } = await supabase.from('seedling_filter_tabs')
-          .update({ name: name.trim(), filters: cleaned })
+          .update({ name: name.trim(), filters: cleaned as unknown as import('@/integrations/supabase/database.types').Json })
           .eq('id', tab.id)
           .select()
           .single();
@@ -324,7 +324,7 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
       } else {
         const nextPosition = existingPositions.length > 0 ? Math.max(...existingPositions) + 1 : 0;
         const { data, error } = await supabase.from('seedling_filter_tabs')
-          .insert({ user_id: userId, church_id: churchId, name: name.trim(), filters: cleaned, position: nextPosition })
+          .insert({ user_id: userId, church_id: churchId, name: name.trim(), filters: cleaned as unknown as import('@/integrations/supabase/database.types').Json, position: nextPosition })
           .select()
           .single();
         if (error) throw error;

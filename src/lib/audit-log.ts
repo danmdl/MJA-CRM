@@ -12,6 +12,7 @@
 // failing to delete a contact the user just clicked is not.
 
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/database.types';
 
 export type AdminAction =
   | 'role_change'
@@ -62,13 +63,13 @@ export const logAdminAction = async (input: LogAdminActionInput): Promise<void> 
   try {
     const userId = await getCurrentUserId();
     await supabase.from('activity_logs').insert({
-      user_id: userId,
-      church_id: input.churchId ?? null,
+      user_id: userId ?? undefined,
+      church_id: input.churchId ?? undefined,
       action: input.action,
       entity_type: input.entityType,
       entity_id: input.entityId,
-      before_data: input.beforeData ?? null,
-      after_data: input.afterData ?? null,
+      before_data: (input.beforeData ?? undefined) as Json | undefined,
+      after_data: (input.afterData ?? undefined) as Json | undefined,
     });
   } catch {
     // Audit insert MUST NOT throw into the caller. Caller already

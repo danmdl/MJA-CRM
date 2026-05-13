@@ -76,12 +76,15 @@ export function useLoginNotifications() {
 
       // ── Unread messages in the last 24h. Same filter as NotificationBell.
       const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-      const { count: msgCount } = await supabase
+      // Cast through any — the inner-join on `messages!inner` produces a
+      // type the supabase-js inference can't resolve in finite time, so
+      // we'd hit TS2589 ("type instantiation excessively deep") otherwise.
+      const { count: msgCount } = await (supabase as any)
         .from('message_recipients')
         .select('*, messages!inner(created_at)', { count: 'exact', head: true })
         .eq('user_id', userId)
         .is('read_at', null)
-        .gte('messages.created_at', since);
+        .gte('messages.created_at', since) as { count: number | null };
       const unreadMessages = msgCount || 0;
 
       // Mark shown before firing so re-renders during the timeout don't

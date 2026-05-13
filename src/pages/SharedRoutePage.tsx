@@ -87,8 +87,8 @@ const SharedRoutePage = () => {
         setError('Este link expiró.'); setLoading(false); return;
       }
       setRoute(data);
-      setVisited(data.visited || {});
-      setContactNotes(data.contact_notes || {});
+      setVisited((data.visited as unknown as Record<string, boolean>) || {});
+      setContactNotes((data.contact_notes as unknown as Record<string, ContactNote>) || {});
       // Fetch the contacts in order
       const { data: cs } = await supabase.from('contacts')
         .select('id, first_name, last_name, address, lat, lng')
@@ -291,7 +291,7 @@ const SharedRoutePage = () => {
     if (notesSaveTimers.current[contactId]) clearTimeout(notesSaveTimers.current[contactId]);
     setSavingContactId(contactId);
     notesSaveTimers.current[contactId] = setTimeout(async () => {
-      await supabase.from('shared_routes').update({ contact_notes: nextAll }).eq('id', route.id);
+      await supabase.from('shared_routes').update({ contact_notes: nextAll as unknown as import('@/integrations/supabase/database.types').Json }).eq('id', route.id);
       setSavingContactId(curr => (curr === contactId ? null : curr));
     }, 800);
   };
