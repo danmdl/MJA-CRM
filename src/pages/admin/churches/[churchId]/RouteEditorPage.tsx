@@ -13,6 +13,13 @@ import { useChurchCoords } from '@/hooks/use-church-coords';
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { loadGoogleMaps } from '@/lib/google-maps';
 import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
+import {
+  groupStopsByLocation,
+  buildGroupLabel,
+  buildGroupTitle,
+  markerScaleFor,
+  markerFontSizeFor,
+} from '@/lib/route-stops';
 import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, ChevronDown, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 // Lazy: profile dialog chunk only loads when a contact card is clicked.
@@ -422,22 +429,41 @@ const RouteEditorPage = () => {
       },
       title: 'Punto de partida',
     }));
-    routeData.orderedContacts.forEach((c: Contact, idx: number) => {
-      if (!isStopInRange(idx)) return;
-      const isVisited = visited.has(c.id);
+    // Group overlapping stops so two contacts at the same address get
+    // a single pin labeled "2 y 3" (or "2, 3, 4" / "2-5" for bigger
+    // groups) instead of one pin hiding the other.
+    const stopsForMarkers = routeData.orderedContacts
+      .map((c: Contact, idx: number) => ({ c, idx }))
+      .filter(({ idx, c }: { idx: number; c: Contact }) =>
+        isStopInRange(idx) && c.lat != null && c.lng != null,
+      )
+      .map(({ c, idx }: { c: Contact; idx: number }) => ({
+        number: idx + 1,
+        lat: c.lat as number,
+        lng: c.lng as number,
+        title: `${c.first_name} ${c.last_name || ''}`.trim(),
+        visited: visited.has(c.id),
+      }));
+    const groups = groupStopsByLocation(stopsForMarkers);
+    groups.forEach(g => {
       customMarkers.current.push(new google.maps.Marker({
-        position: { lat: c.lat!, lng: c.lng! },
+        position: { lat: g.lat, lng: g.lng },
         map: mapInstance.current,
-        label: { text: String(idx + 1), color: 'white', fontSize: '13px', fontWeight: 'bold' },
+        label: {
+          text: buildGroupLabel(g.numbers),
+          color: 'white',
+          fontSize: markerFontSizeFor(g),
+          fontWeight: 'bold',
+        },
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 14,
-          fillColor: isVisited ? '#6b7280' : '#FFC233',
-          fillOpacity: isVisited ? 0.6 : 1,
+          scale: markerScaleFor(g),
+          fillColor: g.allVisited ? '#6b7280' : '#FFC233',
+          fillOpacity: g.allVisited ? 0.6 : 1,
           strokeColor: 'white',
           strokeWeight: 2,
         },
-        title: `${idx + 1}. ${c.first_name} ${c.last_name || ''}${isVisited ? ' (visitado)' : ''}`,
+        title: buildGroupTitle(g),
       }));
     });
   };
