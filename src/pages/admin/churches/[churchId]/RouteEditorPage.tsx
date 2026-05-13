@@ -12,7 +12,7 @@ import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { loadGoogleMaps } from '@/lib/google-maps';
-import { buildGoogleMapsChunks } from '@/lib/google-maps-urls';
+import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
 import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, ChevronDown, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 // Lazy: profile dialog chunk only loads when a contact card is clicked.
@@ -63,11 +63,12 @@ const RouteEditorPage = () => {
   const [contactNotes, setContactNotes] = useState<Record<string, { text: string; date: string }>>({});
   const [savingContactId, setSavingContactId] = useState<string | null>(null);
   const notesSaveTimers = useRef<Record<string, any>>({});
-  // Display filter for the polyline drawn on the map. When the user
-  // collapses to 'first N' the rendered route line and contact pins
-  // both narrow — the chunked Google Maps share links keep covering
-  // every stop regardless.
-  const [stopsLimit, setStopsLimit] = useState<number | 'all'>('all');
+  // Which segment of the route to draw on the embedded map. Picking a
+  // range (e.g. 5–10) hides the directions polyline and replaces it
+  // with a straight line through just the in-range stops so earlier
+  // legs don't crowd the canvas. Pure display filter — the chunked
+  // GMaps share links still cover every stop.
+  const [stopsRange, setStopsRange] = useState<StopRange | 'all'>('all');
   // Dropdown for the chunked Google Maps links (route with >10 stops).
   const [gmapsMenuOpen, setGmapsMenuOpen] = useState(false);
 
@@ -75,6 +76,10 @@ const RouteEditorPage = () => {
   const mapInstance = useRef<any>(null);
   const directionsRenderer = useRef<any>(null);
   const customMarkers = useRef<any[]>([]);
+  // Manual polyline used when the user picks a partial range (e.g. 5–10).
+  // We hide the DirectionsRenderer and draw a straight line connecting
+  // just the in-range stops so the earlier road-routed legs disappear.
+  const customPolyline = useRef<any>(null);
   const projectHydratedRef = useRef(false);
   const autoCalcedRef = useRef(false);
 
@@ -393,6 +398,11 @@ const RouteEditorPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, selectedIds, startLat, startLng, project]);
 
+  const isStopInRange = (idx: number) => {
+    if (stopsRange === 'all') return true;
+    return idx + 1 >= stopsRange.from && idx + 1 <= stopsRange.to;
+  };
+
   const refreshMarkers = () => {
     if (!routeData || !mapInstance.current) return;
     const google = (window as any).google;
@@ -412,13 +422,9 @@ const RouteEditorPage = () => {
       },
       title: 'Punto de partida',
     }));
-    const limit = stopsLimit === 'all' ? routeData.orderedContacts.length : stopsLimit;
     routeData.orderedContacts.forEach((c: Contact, idx: number) => {
+      if (!isStopInRange(idx)) return;
       const isVisited = visited.has(c.id);
-      // Markers beyond the user's "first N" preference still render so
-      // they can see where the rest of the route sits — but dimmed and
-      // gray so the focus stays on the highlighted prefix.
-      const inFocus = idx < limit;
       customMarkers.current.push(new google.maps.Marker({
         position: { lat: c.lat!, lng: c.lng! },
         map: mapInstance.current,
@@ -426,14 +432,51 @@ const RouteEditorPage = () => {
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: 14,
-          fillColor: isVisited ? '#6b7280' : (inFocus ? '#FFC233' : '#9CA3AF'),
-          fillOpacity: isVisited ? 0.6 : (inFocus ? 1 : 0.5),
+          fillColor: isVisited ? '#6b7280' : '#FFC233',
+          fillOpacity: isVisited ? 0.6 : 1,
           strokeColor: 'white',
           strokeWeight: 2,
         },
         title: `${idx + 1}. ${c.first_name} ${c.last_name || ''}${isVisited ? ' (visitado)' : ''}`,
       }));
     });
+  };
+
+  // Toggle between the road-routed directions polyline (range = 'all')
+  // and a straight-line polyline through the in-range stops (partial
+  // range). Called from the routeData effect and the stopsRange effect.
+  const refreshPolyline = () => {
+    if (!routeData || !mapInstance.current) return;
+    const google = (window as any).google;
+    if (customPolyline.current) {
+      customPolyline.current.setMap(null);
+      customPolyline.current = null;
+    }
+    if (stopsRange === 'all') {
+      // Restore the directions polyline.
+      if (directionsRenderer.current) directionsRenderer.current.setMap(mapInstance.current);
+      return;
+    }
+    // Hide directions polyline for partial range and draw a straight
+    // line through the in-range stops. Not road-routed, but enough
+    // visual anchor for "this segment" without the earlier legs.
+    if (directionsRenderer.current) directionsRenderer.current.setMap(null);
+    const path: { lat: number; lng: number }[] = [];
+    routeData.orderedContacts.forEach((c: Contact, idx: number) => {
+      if (isStopInRange(idx) && c.lat != null && c.lng != null) {
+        path.push({ lat: c.lat, lng: c.lng });
+      }
+    });
+    if (path.length >= 2) {
+      customPolyline.current = new google.maps.Polyline({
+        path,
+        map: mapInstance.current,
+        strokeColor: '#FFC233',
+        strokeOpacity: 0.9,
+        strokeWeight: 5,
+        geodesic: false,
+      });
+    }
   };
 
   // Render map when routeData changes
@@ -458,6 +501,7 @@ const RouteEditorPage = () => {
     }
     directionsRenderer.current.setDirections(routeData.result);
     refreshMarkers();
+    refreshPolyline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeData, startLat, startLng]);
 
@@ -486,11 +530,12 @@ const RouteEditorPage = () => {
     return () => ro.disconnect();
   }, []);
 
-  // Re-color markers when visited or stopsLimit changes
+  // Re-color markers and toggle polyline mode when visited / range change.
   useEffect(() => {
     refreshMarkers();
+    refreshPolyline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visited, stopsLimit]);
+  }, [visited, stopsRange]);
 
   const toggleVisited = async (contactId: string) => {
     const next = new Set(visited);
@@ -753,25 +798,40 @@ const RouteEditorPage = () => {
         // through the DB trigger. Paradas keep a wider column so the
         // per-stop note textarea has room to breathe.
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Display filter for the polyline. Applies to the route line
-              and pins drawn on this page's embedded map only — the
-              chunked GMaps share links always cover every stop. */}
-          {routeData.orderedContacts.length > 3 && (
+          {/* Range filter for the polyline. Each range button hides
+              earlier road legs so the user can review a segment
+              cleanly — replaces the polyline with a straight line
+              through just the in-range stops. The paradas list and
+              the chunked GMaps share links still cover every stop. */}
+          {makeStopRanges(routeData.orderedContacts.length).length > 0 && (
             <div className="lg:col-span-12 flex flex-wrap items-center gap-2 text-xs -mb-2">
               <span className="text-muted-foreground">Mostrar en el mapa:</span>
-              {([3, 5, 10, 'all'] as const).map(opt => (
-                <button
-                  key={String(opt)}
-                  onClick={() => setStopsLimit(opt)}
-                  className={`px-2.5 py-0.5 rounded-full border transition-colors ${
-                    stopsLimit === opt
-                      ? 'bg-primary/15 border-primary/40 text-primary font-medium'
-                      : 'border-border text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {opt === 'all' ? `Todas (${routeData.orderedContacts.length})` : `Primeras ${opt}`}
-                </button>
-              ))}
+              {makeStopRanges(routeData.orderedContacts.length).map(r => {
+                const isActive = stopsRange !== 'all' && stopsRange.from === r.from && stopsRange.to === r.to;
+                return (
+                  <button
+                    key={`${r.from}-${r.to}`}
+                    onClick={() => setStopsRange(r)}
+                    className={`px-2.5 py-0.5 rounded-full border transition-colors ${
+                      isActive
+                        ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {r.from}–{r.to}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setStopsRange('all')}
+                className={`px-2.5 py-0.5 rounded-full border transition-colors ${
+                  stopsRange === 'all'
+                    ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                    : 'border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Todas ({routeData.orderedContacts.length})
+              </button>
             </div>
           )}
           {/* Stops + per-stop notes */}

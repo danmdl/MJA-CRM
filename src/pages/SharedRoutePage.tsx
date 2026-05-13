@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Route as RouteIcon, AlertCircle, MessageCircle, Copy, ChevronDown } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
-import { buildGoogleMapsChunks } from '@/lib/google-maps-urls';
+import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
@@ -48,17 +48,25 @@ const SharedRoutePage = () => {
   const [contactNotes, setContactNotes] = useState<Record<string, ContactNote>>({});
   const [savingContactId, setSavingContactId] = useState<string | null>(null);
   const notesSaveTimers = useRef<Record<string, any>>({});
-  // How many stops to render on the map's route line. Defaults to 'all'
-  // but the user can collapse to the first N so overlapping legs don't
-  // crowd the canvas. Pure display filter — the underlying contact
-  // list and the Google Maps share links use every stop regardless.
-  const [stopsLimit, setStopsLimit] = useState<number | 'all'>('all');
+  // Which range of stops to render on the map. Defaults to 'all'. When
+  // the route has more than 5 stops, the user can pick a segment
+  // (1-5, 5-10, 10-15, …) so earlier paths don't crowd the canvas.
+  // Pure display filter — the parada list and the Google Maps share
+  // links still cover every stop regardless of this selection.
+  const [stopsRange, setStopsRange] = useState<StopRange | 'all'>('all');
   // "Open in Google Maps" dropdown — when the route has more than ~10
   // stops we split into multiple chunked URLs and let the user pick.
   const [gmapsMenuOpen, setGmapsMenuOpen] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const customMarkers = useRef<any[]>([]);
+  // Polyline drawn manually when the user picks a partial range. The
+  // full road-routed directions polyline only renders when range='all';
+  // anything narrower hides directions and replaces it with a straight
+  // line connecting the visible stops, which is enough to anchor the
+  // visual without showing earlier path legs.
+  const customPolyline = useRef<any>(null);
+  const directionsRendererRef = useRef<any>(null);
 
   useEffect(() => {
     (async () => {
@@ -97,16 +105,18 @@ const SharedRoutePage = () => {
     document.head.appendChild(script);
   }, [route]);
 
-  // Stops actually plotted on the route line. Respects `stopsLimit` so
-  // the user can isolate the first N stops when the polyline overlaps.
-  const stopsOnMap = useMemo(() => {
-    if (stopsLimit === 'all') return contacts;
-    return contacts.slice(0, stopsLimit);
-  }, [contacts, stopsLimit]);
+  // Available range buttons (e.g. [{1,5},{5,10},…]) and a predicate
+  // that tells the renderer which stop indexes count as "in range".
+  // 1-indexed UI vs. 0-indexed array → adjust at the boundary.
+  const availableRanges = useMemo(() => makeStopRanges(contacts.length), [contacts.length]);
+  const isStopInRange = (idx: number) => {
+    if (stopsRange === 'all') return true;
+    return idx + 1 >= stopsRange.from && idx + 1 <= stopsRange.to;
+  };
 
   // Render map + route
   useEffect(() => {
-    if (!route || !mapRef.current || stopsOnMap.length === 0) return;
+    if (!route || !mapRef.current || contacts.length === 0) return;
     const tryRender = () => {
       const google = (window as any).google;
       if (!google?.maps) { setTimeout(tryRender, 200); return; }
@@ -119,45 +129,81 @@ const SharedRoutePage = () => {
         });
       }
 
-      const ds = new google.maps.DirectionsService();
-      const dr = new google.maps.DirectionsRenderer({
-        suppressMarkers: true,
-        polylineOptions: { strokeColor: '#FFC233', strokeWeight: 5 },
-      });
-      dr.setMap(mapInstance.current);
-
-      // Google's Directions API also caps waypoints around 23. When the
-      // user kept stopsLimit='all' and the route is huge, skip the
-      // server-side directions request and just plot pins — the polyline
-      // would fail anyway. Pins still let the user see the spread; the
-      // chunked "Open in Google Maps" links handle the actual driving.
-      const PLOT_LINE_LIMIT = 23;
-      const stopsForLine = stopsOnMap.length > PLOT_LINE_LIMIT
-        ? stopsOnMap.slice(0, PLOT_LINE_LIMIT)
-        : stopsOnMap;
-
-      if (stopsForLine.length >= 1) {
-        const waypoints = stopsForLine.slice(0, -1).map(c => ({
-          location: new google.maps.LatLng(c.lat!, c.lng!),
-          stopover: true,
-        }));
-        const dest = stopsForLine[stopsForLine.length - 1];
-        ds.route({
-          origin: new google.maps.LatLng(Number(route.start_lat), Number(route.start_lng)),
-          destination: new google.maps.LatLng(dest.lat!, dest.lng!),
-          waypoints,
-          optimizeWaypoints: false, // already ordered
-          travelMode: google.maps.TravelMode.DRIVING,
-          region: 'AR',
-        }, (result: any, status: string) => {
-          if (status === 'OK') dr.setDirections(result);
+      // Lazily create the DirectionsRenderer once. We toggle its map
+      // attachment based on whether the user wants the full route or
+      // a single range — for ranges we replace it with a custom
+      // straight-line polyline so earlier legs disappear.
+      if (!directionsRendererRef.current) {
+        directionsRendererRef.current = new google.maps.DirectionsRenderer({
+          suppressMarkers: true,
+          polylineOptions: { strokeColor: '#FFC233', strokeWeight: 5 },
         });
       }
 
-      // Custom numbered markers — always paint every stop in the
-      // ordered contact list, even those beyond stopsForLine. That way
-      // the user sees where the rest of the route lives even when the
-      // polyline is collapsed to the first N.
+      // Clear the previous custom polyline (if any) before we decide
+      // whether to draw a new one or restore the directions polyline.
+      if (customPolyline.current) {
+        customPolyline.current.setMap(null);
+        customPolyline.current = null;
+      }
+
+      if (stopsRange === 'all') {
+        // Full road-routed polyline via DirectionsService. The API
+        // caps waypoints around 23 — past that, skip the line render
+        // (pins still show, and the chunked GMaps links handle the
+        // actual driving directions).
+        directionsRendererRef.current.setMap(mapInstance.current);
+        const PLOT_LINE_LIMIT = 23;
+        const stopsForLine = contacts.length > PLOT_LINE_LIMIT
+          ? contacts.slice(0, PLOT_LINE_LIMIT)
+          : contacts;
+        if (stopsForLine.length >= 1) {
+          const ds = new google.maps.DirectionsService();
+          const waypoints = stopsForLine.slice(0, -1).map(c => ({
+            location: new google.maps.LatLng(c.lat!, c.lng!),
+            stopover: true,
+          }));
+          const dest = stopsForLine[stopsForLine.length - 1];
+          ds.route({
+            origin: new google.maps.LatLng(Number(route.start_lat), Number(route.start_lng)),
+            destination: new google.maps.LatLng(dest.lat!, dest.lng!),
+            waypoints,
+            optimizeWaypoints: false,
+            travelMode: google.maps.TravelMode.DRIVING,
+            region: 'AR',
+          }, (result: any, status: string) => {
+            if (status === 'OK') directionsRendererRef.current.setDirections(result);
+          });
+        }
+      } else {
+        // Partial range: hide the directions polyline (otherwise it
+        // would still draw the full road route underneath) and
+        // replace it with a straight-line polyline through just the
+        // in-range stops. Less precise but visually unambiguous —
+        // earlier paths are gone.
+        directionsRendererRef.current.setMap(null);
+        const path: { lat: number; lng: number }[] = [];
+        contacts.forEach((c, idx) => {
+          if (isStopInRange(idx) && c.lat != null && c.lng != null) {
+            path.push({ lat: c.lat, lng: c.lng });
+          }
+        });
+        if (path.length >= 2) {
+          customPolyline.current = new google.maps.Polyline({
+            path,
+            map: mapInstance.current,
+            strokeColor: '#FFC233',
+            strokeOpacity: 0.9,
+            strokeWeight: 5,
+            geodesic: false,
+          });
+        }
+      }
+
+      // Custom numbered markers — only render in-range stops when the
+      // user picked a range, so the canvas doesn't show pins for
+      // stops outside the segment they're focused on. The starting
+      // point ★ always renders so users keep their bearing.
       customMarkers.current.forEach(m => m.setMap(null));
       customMarkers.current = [];
       customMarkers.current.push(new google.maps.Marker({
@@ -168,8 +214,8 @@ const SharedRoutePage = () => {
         title: 'Punto de partida',
       }));
       contacts.forEach((c, idx) => {
+        if (!isStopInRange(idx)) return;
         const isVisited = !!visited[c.id];
-        const isPlottedOnLine = idx < stopsForLine.length;
         customMarkers.current.push(new google.maps.Marker({
           position: { lat: c.lat!, lng: c.lng! },
           map: mapInstance.current,
@@ -177,8 +223,8 @@ const SharedRoutePage = () => {
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 14,
-            fillColor: isVisited ? '#6b7280' : (isPlottedOnLine ? '#FFC233' : '#9CA3AF'),
-            fillOpacity: isVisited ? 0.6 : (isPlottedOnLine ? 1 : 0.5),
+            fillColor: isVisited ? '#6b7280' : '#FFC233',
+            fillOpacity: isVisited ? 0.6 : 1,
             strokeColor: 'white',
             strokeWeight: 2,
           },
@@ -187,7 +233,8 @@ const SharedRoutePage = () => {
       });
     };
     tryRender();
-  }, [route, contacts, visited, stopsOnMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, contacts, visited, stopsRange]);
 
   const toggleVisited = async (contactId: string) => {
     const next = { ...visited, [contactId]: !visited[contactId] };
@@ -329,25 +376,39 @@ const SharedRoutePage = () => {
           </div>
         </div>
 
-        {/* Display filter: how many stops to plot on the map line.
-            The chunked GMaps links and the paradas list always show
-            everything — this is purely about the polyline. */}
-        {contacts.length > 3 && (
+        {/* Range filter: which segment of the route to draw on the map.
+            Clicking a range hides earlier paths so they don't overlap
+            with the section the user is reviewing. The parada list
+            and the chunked GMaps links still cover every stop. */}
+        {availableRanges.length > 0 && (
           <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
             <span className="text-muted-foreground">Mostrar en el mapa:</span>
-            {([3, 5, 10, 'all'] as const).map(opt => (
-              <button
-                key={String(opt)}
-                onClick={() => setStopsLimit(opt)}
-                className={`px-2.5 py-0.5 rounded-full border transition-colors ${
-                  stopsLimit === opt
-                    ? 'bg-primary/15 border-primary/40 text-primary font-medium'
-                    : 'border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {opt === 'all' ? `Todas (${contacts.length})` : `Primeras ${opt}`}
-              </button>
-            ))}
+            {availableRanges.map(r => {
+              const isActive = stopsRange !== 'all' && stopsRange.from === r.from && stopsRange.to === r.to;
+              return (
+                <button
+                  key={`${r.from}-${r.to}`}
+                  onClick={() => setStopsRange(r)}
+                  className={`px-2.5 py-0.5 rounded-full border transition-colors ${
+                    isActive
+                      ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {r.from}–{r.to}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setStopsRange('all')}
+              className={`px-2.5 py-0.5 rounded-full border transition-colors ${
+                stopsRange === 'all'
+                  ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                  : 'border-border text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Todas ({contacts.length})
+            </button>
           </div>
         )}
 
