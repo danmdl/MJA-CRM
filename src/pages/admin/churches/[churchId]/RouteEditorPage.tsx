@@ -1133,13 +1133,26 @@ const RouteEditorPage = () => {
         <Suspense fallback={null}>
           <ContactProfileDialog
             open
-            onOpenChange={(o) => {
+            onOpenChange={async (o) => {
               if (!o) {
                 setEditingContactId(null);
-                queryClient.invalidateQueries({ queryKey: ['rutas-contacts', churchId] });
-                // Force a recalc so updated coordinates flow into the map
-                setRouteData(null);
+                // Refetch contacts so the recalc picks up the
+                // contact's new address / coordinates. We do NOT
+                // setRouteData(null) up front anymore — that wiped
+                // the route to the "Ruta vacía" placeholder for a
+                // beat, and if the auto-recalc effect didn't pick
+                // up the refetch (stale dep refs, cancelled
+                // refetch, etc.) the route stayed gone until a hard
+                // refresh. Now we keep the old route on screen
+                // until calculateRoute() (which itself sets routeData
+                // to null and calculating to true synchronously)
+                // transitions us through the "Calculando ruta..."
+                // state and replaces it with the recomputed route.
                 autoCalcedRef.current = false;
+                await queryClient.refetchQueries({ queryKey: ['rutas-contacts', churchId] });
+                if (selectedIds.size > 0 && startLat && startLng) {
+                  calculateRoute();
+                }
               }
             }}
             contactId={editingContactId}
