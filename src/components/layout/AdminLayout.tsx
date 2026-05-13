@@ -32,7 +32,15 @@ function getPageTitle(pathname: string): string {
 const AdminLayout = () => {
   const { pathname } = useLocation();
   const title = getPageTitle(pathname);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Default the sidebar open on desktop (md+) so the layout matches
+  // what users were used to before — but still let them collapse it
+  // via the hamburger. On mobile we start closed so the page content
+  // owns the viewport. Reading window once on mount is fine here;
+  // the layout doesn't need to track resize to a different default.
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(min-width: 768px)').matches;
+  });
   const [searchOpen, setSearchOpen] = useState(false);
   // Daily nudge for users with contacts pending in their MJA outbox.
   // Internally throttled to once per user per day.
@@ -103,7 +111,20 @@ const AdminLayout = () => {
         transition: 'transform 0.25s ease',
         pointerEvents: sidebarOpen ? 'auto' : 'none',
         overflow: 'hidden',
-      }} className={isKanbanPage ? '' : 'md:!relative md:!transform-none md:!translate-x-0 md:!z-auto md:!pointer-events-auto'}>
+      }} className={
+        // Sidebar layout rules:
+        //   - Kanban (Procesos): always overlay so the kanban gets the
+        //     full viewport. Hamburger is the only way in/out.
+        //   - Anywhere else: pin into the flex row on md+ ONLY when
+        //     the user has it open. Closing the sidebar (hamburger
+        //     click) drops it back into translate(-220px) overlay
+        //     mode so the main content reclaims the space.
+        isKanbanPage
+          ? ''
+          : sidebarOpen
+            ? 'md:!relative md:!transform-none md:!translate-x-0 md:!z-auto md:!pointer-events-auto'
+            : ''
+      }>
         <Sidebar onNavigate={() => setSidebarOpen(false)} onOpenSearch={() => setSearchOpen(true)} />
       </div>
 
@@ -128,10 +149,11 @@ const AdminLayout = () => {
             background: '#09090b',
           }}
         >
-          {/* Hamburger — mobile only */}
+          {/* Hamburger — always visible so the user can collapse the
+              sidebar on any page to reclaim space, not just on
+              Procesos. */}
           <button
             onClick={() => setSidebarOpen(v => !v)}
-            className={isKanbanPage ? '' : 'md:hidden'}
             style={{
               width: 36, height: 36, borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.1)',

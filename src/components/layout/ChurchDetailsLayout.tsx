@@ -87,14 +87,16 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
           scrollable tab bar. On desktop the sidebar is always visible so
           the hamburger is hidden and the tab strip uses the full width. */}
       <div className="border-b bg-background flex items-stretch">
-        {/* Mobile hamburger — emits a window event that AdminLayout
-            listens to. Keeps this layout decoupled from AdminLayout's
-            sidebar state without dragging a shared store in. */}
+        {/* Hamburger — visible at every breakpoint now so users can
+            collapse the sidebar on any church page, same as on the
+            kanban (Procesos) view. Emits a window event that
+            AdminLayout listens to; keeps this layout decoupled from
+            AdminLayout's sidebar state without a shared store. */}
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('mja-toggle-sidebar'))}
-          className="md:hidden flex items-center justify-center w-10 shrink-0 border-r text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-          aria-label="Abrir menú"
+          className="flex items-center justify-center w-10 shrink-0 border-r text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          aria-label="Alternar menú"
         >
           <Menu className="h-4 w-4" />
         </button>
