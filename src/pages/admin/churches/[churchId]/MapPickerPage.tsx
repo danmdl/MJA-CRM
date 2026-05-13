@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { normalize } from '@/lib/normalize';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
@@ -303,7 +304,12 @@ const MapPickerPage = () => {
     // marker count at zero so Google Maps doesn't render thousands of
     // pins on first load.
     if (requireFilterBeforePainting) return [];
-    const term = search.trim().toLowerCase();
+    // normalize() strips accents and lowercases so "maría", "María"
+    // and "maria" all match the same set. The earlier toLowerCase()
+    // kept the accent on the haystack, which is why Dan was seeing
+    // different result orders for the same query with/without the
+    // tilde.
+    const term = normalize(search);
     return (contacts || []).filter(c => {
       if (onlyWithNumber && !/\d/.test(c.address || '')) return false;
       if (filterResponsableId === '__none__') {
@@ -320,8 +326,8 @@ const MapPickerPage = () => {
         if (!isPointInTerritory(c.lat, c.lng, activeTerritoryPaths)) return false;
       }
       if (term) {
-        const name = `${c.first_name} ${c.last_name || ''}`.toLowerCase();
-        const addr = (c.address || '').toLowerCase();
+        const name = normalize(`${c.first_name} ${c.last_name || ''}`);
+        const addr = normalize(c.address || '');
         if (!name.includes(term) && !addr.includes(term)) return false;
       }
       return true;

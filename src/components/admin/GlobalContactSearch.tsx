@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
+import { normalize } from '@/lib/normalize';
 import ContactProfileDialog from './ContactProfileDialog';
 
 interface SearchResult {
@@ -64,15 +65,19 @@ const GlobalContactSearch = ({ open, onOpenChange }: GlobalContactSearchProps) =
     queryKey: ['global-contact-search', debouncedQuery, profile?.id, canSeeAllCuerdas, canSeeAllChurches],
     queryFn: async () => {
       if (debouncedQuery.length < 2) return [];
-      // ilike with %term% on three columns. Phone is stored verbatim (with
-      // dashes / spaces sometimes) so the match is fuzzy on that too. Limit
-      // 20 keeps the UI responsive — if the user wants more they should
-      // refine the term.
+      // search_name is the accent-stripped + lowercased version of
+      // first_name + last_name kept in sync by trigger (migration 0033).
+      // Normalize the query the same way and match against that column
+      // so "maría", "María" and "maria" all hit the same rows.
+      // Phone is stored verbatim (with dashes / spaces sometimes) so
+      // the match is fuzzy on that too. Limit 20 keeps the UI
+      // responsive — if the user wants more they should refine the term.
+      const normalizedQuery = normalize(debouncedQuery);
       let q = supabase
         .from('contacts')
         .select('id, first_name, last_name, phone, numero_cuerda, church_id, churches!inner(name)')
         .is('deleted_at', null)
-        .or(`first_name.ilike.%${debouncedQuery}%,last_name.ilike.%${debouncedQuery}%,phone.ilike.%${debouncedQuery}%`)
+        .or(`search_name.ilike.%${normalizedQuery}%,phone.ilike.%${debouncedQuery}%`)
         .limit(20);
       // Below-supervisor: only own cuerda. If the user has no cuerda set
       // they shouldn't be searching at all — return empty to avoid leaking.

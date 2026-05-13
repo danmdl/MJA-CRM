@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { normalize } from '@/lib/normalize';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -268,7 +269,10 @@ const RouteEditorPage = () => {
 
   // ─── Derived ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    // normalize() so "maría" and "maria" return the same set. The
+    // earlier toLowerCase() left accents intact on both sides, which
+    // meant the haystack had to match the user's exact diacritics.
+    const term = normalize(search);
     return (contacts || []).filter(c => {
       if (onlyWithNumber && !/\d/.test(c.address || '')) return false;
       if (filterResponsableId === '__none__') {
@@ -280,8 +284,8 @@ const RouteEditorPage = () => {
         if (!isPointInTerritory(c.lat, c.lng, activeTerritoryPaths)) return false;
       }
       if (term) {
-        const name = `${c.first_name} ${c.last_name || ''}`.toLowerCase();
-        const addr = (c.address || '').toLowerCase();
+        const name = normalize(`${c.first_name} ${c.last_name || ''}`);
+        const addr = normalize(c.address || '');
         if (!name.includes(term) && !addr.includes(term)) return false;
       }
       return true;
