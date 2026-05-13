@@ -1153,6 +1153,21 @@ const RouteEditorPage = () => {
                 if (selectedIds.size > 0 && startLat && startLng) {
                   calculateRoute();
                 }
+                // Same resize-trick applyEditAndCalculate uses to
+                // un-black the map: the dialog close transition
+                // doesn't change the map div's measured size (it's
+                // been the same width/height the whole time, just
+                // covered by an overlay), so Chrome's IntersectionObserver
+                // / ResizeObserver path can skip the redraw. Trigger
+                // a manual 'resize' on the Google Maps instance plus
+                // a fitBounds on the next frame so the tiles repaint.
+                requestAnimationFrame(() => {
+                  const google = (window as any).google;
+                  if (!google?.maps || !mapInstance.current) return;
+                  google.maps.event.trigger(mapInstance.current, 'resize');
+                  const bounds = directionsRenderer.current?.getDirections?.()?.routes?.[0]?.bounds;
+                  if (bounds) mapInstance.current.fitBounds(bounds);
+                });
               }
             }}
             contactId={editingContactId}
