@@ -80,6 +80,58 @@ export const inferDeviceName = (): string => {
   return `${browser} en ${os}`;
 };
 
+// ─── Location-trust ──────────────────────────────────────────────────
+//
+// Companion check to the device-trust above. The MFA gate skips the
+// challenge when the user's CURRENT IP geolocates to the same
+// country + (region or city) as ANY trusted device they have on
+// file. So once a user has logged in with MFA from Buenos Aires on
+// any device, a fresh browser in Buenos Aires won't get prompted
+// again — same prove-once-per-region UX they were asking for.
+// Different region (someone with an IP outside Buenos Aires) still
+// gets the challenge.
+
+interface ClientLocation {
+  country: string | null;
+  region: string | null;
+  city: string | null;
+}
+
+let cachedLocation: ClientLocation | null = null;
+let cachedLocationAt = 0;
+
+/**
+ * Returns the current browser's IP-based geolocation via ipapi.co
+ * (free, no API key, HTTPS + CORS). Result is cached for 10 min so
+ * navigations within a session don't keep hammering the API. On any
+ * failure (network down, rate-limited, blocked) it returns nulls and
+ * the caller falls back to device-trust only.
+ */
+export const getClientLocation = async (): Promise<ClientLocation> => {
+  if (cachedLocation && Date.now() - cachedLocationAt < 10 * 60_000) {
+    return cachedLocation;
+  }
+  try {
+    const res = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
+    if (!res.ok) return { country: null, region: null, city: null };
+    const data: any = await res.json();
+    // ipapi.co returns { country_name, country_code, region, region_code,
+    // city, ... } on success and { error: true, reason: '...' } on
+    // rate-limit / failure. Guard explicitly.
+    if (data?.error) return { country: null, region: null, city: null };
+    const loc: ClientLocation = {
+      country: data.country_name || data.country || null,
+      region: data.region || data.region_code || null,
+      city: data.city || null,
+    };
+    cachedLocation = loc;
+    cachedLocationAt = Date.now();
+    return loc;
+  } catch {
+    return { country: null, region: null, city: null };
+  }
+};
+
 /**
  * Returns true if this browser is in trusted_devices for the given user.
  */
@@ -101,14 +153,43 @@ export const isCurrentDeviceTrusted = async (userId: string): Promise<boolean> =
 };
 
 /**
+ * Returns true if the user's CURRENT IP geolocates to the same
+ * country AND (region or city) as ANY of their trusted_devices rows.
+ * Returns false if the geolocation lookup fails or the user has no
+ * trusted devices with location data yet — in either case the caller
+ * falls back to the regular device-trust check or the MFA challenge.
+ */
+export const isCurrentLocationTrusted = async (userId: string): Promise<boolean> => {
+  try {
+    const loc = await getClientLocation();
+    if (!loc.country) return false;
+    const { data, error } = await supabase
+      .from('trusted_devices')
+      .select('last_country, last_region, last_city')
+      .eq('user_id', userId)
+      .not('last_country', 'is', null);
+    if (error || !data || data.length === 0) return false;
+    return data.some(d =>
+      d.last_country === loc.country &&
+      ((loc.region && d.last_region === loc.region) || (loc.city && d.last_city === loc.city)),
+    );
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Registers the current browser as trusted for the given user. Called
  * after a successful TOTP verify. Upserts on (user_id, device_id_hash)
  * so re-trusting an existing device just refreshes last_seen_at.
+ * Also captures the current IP geolocation so a future fresh browser
+ * in the same region can be skipped via the location-trust check.
  */
 export const markCurrentDeviceTrusted = async (userId: string): Promise<void> => {
   try {
     const deviceId = getOrCreateDeviceId();
     const hash = await sha256Hex(deviceId);
+    const loc = await getClientLocation();
     await supabase
       .from('trusted_devices')
       .upsert(
@@ -118,6 +199,9 @@ export const markCurrentDeviceTrusted = async (userId: string): Promise<void> =>
           device_name: inferDeviceName(),
           user_agent: (navigator.userAgent || '').slice(0, 500),
           last_seen_at: new Date().toISOString(),
+          last_country: loc.country,
+          last_region: loc.region,
+          last_city: loc.city,
         },
         { onConflict: 'user_id,device_id_hash' },
       );
@@ -131,14 +215,23 @@ export const markCurrentDeviceTrusted = async (userId: string): Promise<void> =>
  * Refresh the last_seen_at column for the current device without
  * inserting a new row. Called on successful login when the device is
  * already trusted, so the Trusted Devices list shows a recent date.
+ * Also opportunistically updates the location columns — if the user
+ * moves to a new city the row reflects their latest location.
  */
 export const touchCurrentDevice = async (userId: string): Promise<void> => {
   try {
     const deviceId = getOrCreateDeviceId();
     const hash = await sha256Hex(deviceId);
+    const loc = await getClientLocation();
+    const patch: Record<string, any> = { last_seen_at: new Date().toISOString() };
+    // Only patch the location columns when we actually got a value
+    // back from the geolocator — never blow away good data with nulls.
+    if (loc.country) patch.last_country = loc.country;
+    if (loc.region) patch.last_region = loc.region;
+    if (loc.city) patch.last_city = loc.city;
     await supabase
       .from('trusted_devices')
-      .update({ last_seen_at: new Date().toISOString() })
+      .update(patch)
       .eq('user_id', userId)
       .eq('device_id_hash', hash);
   } catch { /* best-effort */ }

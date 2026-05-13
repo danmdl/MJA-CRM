@@ -217,7 +217,11 @@ const AsistenciaPage = () => {
         )}
       </div>
 
-      {/* Etapa tabs — Calendario first, one tab per stage, then Resumen. */}
+      {/* Etapa tabs — Calendario first, one tab per stage, then
+          Resumen. Full stage labels (Nuevas Personas Domingos,
+          Liberación, etc.) instead of the 6-char short codes — the
+          short ones were unreadable per Dan's feedback. The row
+          scrolls horizontally on narrow viewports. */}
       <div className="flex items-center gap-1 border-b border-border mb-2 overflow-x-auto pb-px shrink-0">
         <EtapaTab active={tab === 'todos'} onClick={() => setTab('todos')} label="Calendario" />
         {PROCESS_STAGES.map(s => (
@@ -225,7 +229,7 @@ const AsistenciaPage = () => {
             key={s.key}
             active={tab === s.key}
             onClick={() => setTab(s.key)}
-            label={s.short}
+            label={s.label}
             fullLabel={s.label}
             color={s.color}
           />
