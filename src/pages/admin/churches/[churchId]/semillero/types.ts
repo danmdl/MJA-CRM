@@ -24,4 +24,10 @@ export interface Contact {
   responsable_id?: string | null;
   created_by?: string | null;
   created_at?: string | null;
+  // Set by the mark_contact_received_from_mja trigger when a user from
+  // an is_church_cuerda=true cuerda (MJA Central, MJA CABA, MJA Moreno,
+  // Puerta 8, …) reassigns this contact to a regular cuerda. Cleared
+  // back to null when the receiving cuerda's tab is clicked.
+  received_from_mja_at?: string | null;
+  received_from_mja_seen_at?: string | null;
 }

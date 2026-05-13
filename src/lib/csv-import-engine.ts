@@ -57,6 +57,15 @@ const sanitizeValue = (key: string, val: string): any => {
   // address column ended up storing ". ," and the "sin dirección" filter
   // counted those rows as having an address.
   if (!/[\p{L}\p{N}]/u.test(trimmed) || trimmed === 'N/A' || trimmed === 'n/a') return null;
+  // Address-specific rule: if the part before the first comma has no
+  // letters or digits (e.g. ", Villa Maipu" or ". , Caseros"), the
+  // value is a barrio masquerading as an address. The street part is
+  // what makes an address an address; without it we'd render leading
+  // junk in the UI. NULL it out — the barrio column handles the rest.
+  if (key === 'address' && trimmed.includes(',')) {
+    const streetPart = trimmed.split(',')[0].trim();
+    if (!/[\p{L}\p{N}]/u.test(streetPart)) return null;
+  }
 
   if (DATE_FIELDS.has(key)) {
     const dateOnly = trimmed.split(' ')[0];
