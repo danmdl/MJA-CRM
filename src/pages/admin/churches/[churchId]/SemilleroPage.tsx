@@ -32,7 +32,7 @@ import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsAppComposeDialog';
-import FilterTabsBar, { applyFilterTab, FilterTabFilters } from '@/components/admin/FilterTabsBar';
+import FilterTabsBar, { applyFilterTab, FilterTabFilters, MJA_RECEIVED_TAB_ID } from '@/components/admin/FilterTabsBar';
 // Heavy dialogs are lazy: they're conditionally rendered (open && <Dialog>),
 // so the chunk only downloads when the user actually opens one. Pulled out
 // roughly 70KB of JS from the SemilleroPage initial load.
@@ -331,7 +331,7 @@ const SemilleroPage = () => {
       const all: Contact[] = [];
       for (let page = 0; ; page++) {
         let q = supabase.from('contacts')
-          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, pending_external_send, pending_assignment_cell_id, responsable_id, created_by, created_at')
+          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, pending_external_send, pending_assignment_cell_id, responsable_id, created_by, created_at, received_from_mja_at, received_from_mja_seen_at')
           .eq('church_id', churchId!)
           .is('deleted_at', null)
           .order('fecha_contacto', { ascending: false })
@@ -885,6 +885,30 @@ const SemilleroPage = () => {
     return { total, withAddress, withoutAddress: total - withAddress };
   }, [allContacts, externalIds, pendingDispatchIds, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
   const inboxTotalCount = inboxCounts.total;
+
+  // Count of "received from MJA" contacts the receiving cuerda hasn't
+  // marked seen yet. Drives the red badge on the locked "Recibidos de
+  // MJA" tab. Globals see the whole iglesia's count; everyone else
+  // sees only their own cuerda's. The set is computed in-memory off
+  // allContacts so no extra query — the field is already part of the
+  // contacts select.
+  const mjaUnseenCount = useMemo(() => {
+    if (!allContacts) return 0;
+    return allContacts.reduce((n, c: any) => {
+      if (!c.received_from_mja_at) return n;
+      if (c.received_from_mja_seen_at) return n;
+      // Visibility: same rule as the main pool. Referentes only count
+      // their own cuerda; globals count everyone.
+      if (!canSeeContactsFromAllCuerdas) {
+        if (userCuerdaNumero) {
+          if (c.numero_cuerda !== userCuerdaNumero) return n;
+        } else if (c.responsable_id !== session?.user?.id) {
+          return n;
+        }
+      }
+      return n + 1;
+    }, 0);
+  }, [allContacts, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
 
   // How many contacts are autoassign-able for THIS user — visible to them
   // and currently without a cell_id. Used by the "Autoasignar todos (N)"
@@ -1497,7 +1521,26 @@ const SemilleroPage = () => {
             <FilterTabsBar
               churchId={churchId}
               activeTabId={activeTabId}
+              mjaUnseenCount={mjaUnseenCount}
               onActiveTabChange={(id, filters) => {
+                // Switching to the locked "Recibidos de MJA" tab → mark
+                // every currently-unseen MJA arrival as seen, in the
+                // user's cuerda. RPC runs as SECURITY DEFINER and
+                // returns the number of rows it touched; we refetch
+                // contacts so the badge clears immediately. Globals
+                // without a numero_cuerda skip the RPC — there's no
+                // single cuerda for them to mark as receiver.
+                if (id === MJA_RECEIVED_TAB_ID && userCuerdaNumero && churchId) {
+                  (async () => {
+                    const { error } = await supabase.rpc('mark_mja_contacts_seen', {
+                      p_church_id: churchId,
+                      p_cuerda: userCuerdaNumero,
+                    });
+                    if (!error) {
+                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                    }
+                  })();
+                }
                 setActiveTabId(id);
                 setActiveTabFilters(filters);
                 // Reset all ad-hoc filters when the user switches tabs.

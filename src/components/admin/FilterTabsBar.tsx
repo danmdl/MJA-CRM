@@ -29,6 +29,10 @@ export interface FilterTabFilters {
   hasAddress?: 'yes' | 'no' | '';
   hasCoords?: 'yes' | 'no' | '';
   zonaStatus?: 'in' | 'out' | '';
+  // Only contacts the trigger flagged as "received from an MJA-side
+  // cuerda" (is_church_cuerda=true). Driven by the locked
+  // MJA_RECEIVED_TAB_ID tab, not exposed in the save-tab dialog.
+  mjaReceived?: boolean;
 }
 
 export interface FilterTab {
@@ -51,12 +55,22 @@ interface FilterTabsBarProps {
   cuerdas: Cuerda[];
   teamMembers: TeamMember[];
   zonas: Zona[];
+  // Count of "received from MJA" contacts the receiving cuerda hasn't
+  // marked seen yet. Drives the badge next to the locked MJA tab. The
+  // parent (SemilleroPage) owns the query so the bar stays presentational.
+  mjaUnseenCount?: number;
 }
 
 const EMPTY_FILTERS: FilterTabFilters = {};
 const TODOS_TAB_ID = '__all__';
+// Locked tab that always sits second. Filters Semillero to contacts
+// whose received_from_mja_at column is non-null. Tab can't be edited
+// or deleted from the UI — it's part of the bar's contract with the
+// Semillero page (which also marks contacts as seen on click).
+export const MJA_RECEIVED_TAB_ID = '__mja_received__';
+const MJA_RECEIVED_FILTERS: FilterTabFilters = { mjaReceived: true };
 
-const FilterTabsBar = ({ churchId, activeTabId, onActiveTabChange, cuerdas, teamMembers, zonas }: FilterTabsBarProps) => {
+const FilterTabsBar = ({ churchId, activeTabId, onActiveTabChange, cuerdas, teamMembers, zonas, mjaUnseenCount = 0 }: FilterTabsBarProps) => {
   const { session } = useSession();
   const userId = session?.user?.id;
   const queryClient = useQueryClient();
@@ -95,6 +109,10 @@ const FilterTabsBar = ({ churchId, activeTabId, onActiveTabChange, cuerdas, team
       onActiveTabChange(null, EMPTY_FILTERS);
       return;
     }
+    if (tabId === MJA_RECEIVED_TAB_ID) {
+      onActiveTabChange(MJA_RECEIVED_TAB_ID, MJA_RECEIVED_FILTERS);
+      return;
+    }
     const tab = tabs.find(t => t.id === tabId);
     if (tab) onActiveTabChange(tab.id, tab.filters);
   };
@@ -102,11 +120,21 @@ const FilterTabsBar = ({ churchId, activeTabId, onActiveTabChange, cuerdas, team
   return (
     <>
       <div className="flex items-center gap-1 border-b border-border overflow-x-auto pb-px scrollbar-thin">
-        {/* "Todos" default tab */}
+        {/* "Todos" default tab — always first, can't be edited/deleted. */}
         <TabButton
           isActive={activeTabId === null}
           onClick={() => handleSelectTab(null)}
           label="Todos"
+        />
+        {/* "Recibidos de MJA" — always second. Filters to contacts the
+            trigger flagged as coming in from an MJA-side cuerda. Badge
+            count shows unseen arrivals; the Semillero clears them on
+            tab click. Locked: no edit/delete buttons rendered. */}
+        <TabButton
+          isActive={activeTabId === MJA_RECEIVED_TAB_ID}
+          onClick={() => handleSelectTab(MJA_RECEIVED_TAB_ID)}
+          label="Recibidos de MJA"
+          badge={mjaUnseenCount > 0 ? mjaUnseenCount : undefined}
         />
         {tabs.map(tab => (
           <TabButton
@@ -150,20 +178,26 @@ const FilterTabsBar = ({ churchId, activeTabId, onActiveTabChange, cuerdas, team
   );
 };
 
-const TabButton = ({ isActive, onClick, label, onEdit, onDelete }: {
+const TabButton = ({ isActive, onClick, label, onEdit, onDelete, badge }: {
   isActive: boolean;
   onClick: () => void;
   label: string;
   onEdit?: () => void;
   onDelete?: () => void;
+  badge?: number;
 }) => {
   return (
     <div className={`group flex items-center rounded-t-md whitespace-nowrap ${isActive ? 'bg-card border-x border-t border-border -mb-px' : 'hover:bg-muted/30'}`}>
       <button
         onClick={onClick}
-        className={`px-3 py-1.5 text-sm font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+        className={`px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
       >
         {label}
+        {badge !== undefined && badge > 0 && (
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
       </button>
       {onEdit && isActive && (
         <button
@@ -448,6 +482,7 @@ export function applyFilterTab(contacts: any[], filters: FilterTabFilters): any[
     return null;
   })();
   return contacts.filter(c => {
+    if (filters.mjaReceived && !c.received_from_mja_at) return false;
     if (cuerdaSet && !cuerdaSet.has(c.numero_cuerda || '')) return false;
     if (filters.responsable === '__none__') {
       if (c.responsable_id) return false;

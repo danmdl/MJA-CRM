@@ -326,6 +326,13 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         // ". .", mixed whitespace + punctuation, etc. Keep this in sync with
         // csv-import-engine.ts:sanitizeValue.
         if (!/[\p{L}\p{N}]/u.test(trimmed) || trimmed === 'N/A' || trimmed === 'n/a') return null;
+        // Address with no street part (everything before the first
+        // comma is empty / punctuation) → NULL it. See engine for the
+        // longer rationale; mirror the logic here.
+        if (key === 'address' && trimmed.includes(',')) {
+          const streetPart = trimmed.split(',')[0].trim();
+          if (!/[\p{L}\p{N}]/u.test(streetPart)) return null;
+        }
 
         if (DATE_FIELDS.has(key)) {
           // Strip time part from timestamps like "2026-02-06 00:00:00"

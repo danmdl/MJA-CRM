@@ -176,6 +176,23 @@ describe('dryRunImport', () => {
     expect(result.invalidCount).toBe(3);
   });
 
+  it('nulls out addresses whose street part (before first comma) is empty', () => {
+    const result = dryRunImport({
+      ...baseOpts,
+      columnMapping: { ...baseOpts.columnMapping, address: 'Direccion' },
+      data: [
+        { Nombre: 'A', Apellido: 'B', Sexo: 'm', Telefono: '1144556677', Direccion: ', Villa Maipu' },
+        { Nombre: 'C', Apellido: 'D', Sexo: 'f', Telefono: '1144556678', Direccion: '., Caseros' },
+        { Nombre: 'E', Apellido: 'F', Sexo: 'm', Telefono: '1144556679', Direccion: ' . , San Andrés' },
+        { Nombre: 'G', Apellido: 'H', Sexo: 'f', Telefono: '1144556670', Direccion: 'Av. Mitre 123, Villa Maipu' },
+      ],
+    });
+    expect(result.rows[0].transformed?.address).toBeNull();
+    expect(result.rows[1].transformed?.address).toBeNull();
+    expect(result.rows[2].transformed?.address).toBeNull();
+    expect(result.rows[3].transformed?.address).toBe('Av. Mitre 123, Villa Maipu');
+  });
+
   it('nulls out junk-only address values (".", ", ,", whitespace+punctuation)', () => {
     const result = dryRunImport({
       ...baseOpts,
