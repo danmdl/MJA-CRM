@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Search, MapPin, Pencil, Lock, Unlock, PlusCircle, Upload, Trash2 } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError } from '@/utils/toast';
+import { useConfirm } from '@/hooks/use-confirm';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { usePermissions } from '@/lib/permissions';
@@ -36,6 +37,7 @@ interface CellRow {
 }
 
 const CelulasPage = () => {
+  const confirm = useConfirm();
   const { churchId } = useParams<{ churchId: string }>();
   // Bias address autocomplete toward the church area.
   const { data: churchCoords } = useChurchCoords(churchId);
@@ -179,8 +181,18 @@ const CelulasPage = () => {
   const deleteAllCells = async () => {
     const count = cells?.length || 0;
     if (count === 0) return;
-    if (!window.confirm(`¿BORRAR TODAS las ${count} células de esta iglesia? Esta acción no se puede deshacer.`)) return;
-    if (!window.confirm(`CONFIRMACIÓN FINAL: ¿Estás seguro de borrar las ${count} células? Los contactos asignados quedarán sin célula.`)) return;
+    if (!(await confirm({
+      title: `¿BORRAR TODAS las ${count} células?`,
+      description: 'Esta acción no se puede deshacer.',
+      confirmLabel: 'Continuar',
+      destructive: true,
+    }))) return;
+    if (!(await confirm({
+      title: 'CONFIRMACIÓN FINAL',
+      description: `¿Estás seguro de borrar las ${count} células? Los contactos asignados quedarán sin célula.`,
+      confirmLabel: 'Borrar todo',
+      destructive: true,
+    }))) return;
     await supabase.from('contacts').update({ cell_id: null }).eq('church_id', churchId!).not('cell_id', 'is', null);
     const { error } = await supabase.from('cells').delete().eq('church_id', churchId!);
     if (error) { showError(error.message); return; }

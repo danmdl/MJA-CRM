@@ -110,10 +110,20 @@ const PapeleraPage = () => {
     const { error } = await supabase.from(table).update({ deleted_at: null, deleted_by: null }).eq('id', item.id);
     if (error) { showError(error.message); return; }
     showSuccess(`${item.type === 'contact' ? 'Contacto' : 'Célula'} "${item.name}" restaurado/a.`);
+    // Narrow invalidations. The audit flagged `['contacts']` and
+    // `['cells']` as too-broad keys that matched every cached query
+    // starting with those segments — restoring one contact would
+    // stampede the entire Semillero queryset (page + counts +
+    // distinct + every cache shape), plus every cells query. Hit
+    // only the views that actually need to see the restored row.
     queryClient.invalidateQueries({ queryKey: ['papelera'] });
-    queryClient.invalidateQueries({ queryKey: ['contacts'] });
-    queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
-    queryClient.invalidateQueries({ queryKey: ['cells'] });
+    if (item.type === 'contact') {
+      queryClient.invalidateQueries({ queryKey: ['pool-page', churchId] });
+      queryClient.invalidateQueries({ queryKey: ['pool-counts', churchId] });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
+      queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
+    }
     setConfirmAction(null);
   };
 

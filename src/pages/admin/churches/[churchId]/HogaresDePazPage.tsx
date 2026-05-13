@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Search, MapPin, Pencil, Lock, Unlock, PlusCircle, Home, Trash2 } from 'lucide-react';
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError } from '@/utils/toast';
+import { useConfirm } from '@/hooks/use-confirm';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { usePermissions } from '@/lib/permissions';
@@ -39,6 +40,7 @@ interface HogarRow {
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 const HogaresDePazPage = () => {
+  const confirm = useConfirm();
   const { churchId } = useParams<{ churchId: string }>();
   const { data: churchCoords } = useChurchCoords(churchId);
   const queryClient = useQueryClient();
@@ -234,7 +236,12 @@ const HogaresDePazPage = () => {
 
   // ─── Soft delete ───────────────────────────────────────────────
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`¿Eliminar "${name || 'este hogar'}"? Se puede recuperar desde Papelera.`)) return;
+    if (!(await confirm({
+      title: `¿Eliminar "${name || 'este hogar'}"?`,
+      description: 'Se puede recuperar desde Papelera.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    }))) return;
     const { error } = await supabase.from('hogares_de_paz').update({
       deleted_at: new Date().toISOString(),
       deleted_by: session?.user?.id,

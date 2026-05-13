@@ -42,6 +42,7 @@ import SetupAccount from "./pages/SetupAccount";
 import SharedRoutePage from "./pages/SharedRoutePage";
 import WelcomeMessageAlert from "./components/WelcomeMessageAlert";
 import { SessionProvider } from "./components/SessionProvider";
+import { ConfirmProvider } from "./hooks/use-confirm";
 import { useSession } from "./hooks/use-session";
 import { usePermissions } from "./lib/permissions";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -438,14 +439,16 @@ const App = () => (
       <BrowserRouter>
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <PasswordSetupGate>
-              <div className="h-screen flex flex-col">
-                <main className="flex-grow">
-                  <AppRoutes />
-                </main>
-                <WelcomeMessageAlert />
-              </div>
-            </PasswordSetupGate>
+            <ConfirmProvider>
+              <PasswordSetupGate>
+                <div className="h-screen flex flex-col">
+                  <main className="flex-grow">
+                    <AppRoutes />
+                  </main>
+                  <WelcomeMessageAlert />
+                </div>
+              </PasswordSetupGate>
+            </ConfirmProvider>
           </ThemeProvider>
         </SessionProvider>
       </BrowserRouter>
