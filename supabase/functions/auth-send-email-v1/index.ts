@@ -1,10 +1,28 @@
 // auth-send-email-v1
 // Supabase Auth Hook — replaces all auth email sending.
-// For password-reset (recovery) emails it appends a daily counter to the
-// subject so Gmail creates a new thread each time instead of stacking them.
+//
+// SECURITY HARDENING (audit 2026-05-13):
+//   1. HMAC signature verification against SEND_EMAIL_HOOK_SECRET
+//      (Standard Webhooks / Svix scheme). Without this, anyone with
+//      the function URL could trigger arbitrary password-reset /
+//      signup / invite emails to any user_id, with an
+//      attacker-controlled `redirect_to` → account-takeover-grade
+//      phishing primitive.
+//   2. `redirect_to` is allow-listed against ALLOWED_REDIRECT_HOSTS.
+//      A redirect to anywhere else falls back to SITE_URL.
+//   3. user_metadata values that flow into the email HTML are
+//      escapeHTML'd. Previously an inviter could put `<script>` or
+//      HTML formatting into the invite metadata and it would land
+//      verbatim in the recipient's email.
+//   4. fail-OPEN -> fail-CLOSED. Errors return 4xx/5xx instead of
+//      200; if the hook secret is missing the function refuses to
+//      start (would otherwise accept anything).
 //
 // Setup:
-//   1. Add RESEND_API_KEY to Edge Function secrets in Supabase Dashboard.
+//   1. Add RESEND_API_KEY and SEND_EMAIL_HOOK_SECRET to Edge Function
+//      secrets in Supabase Dashboard. The hook secret is the one
+//      shown by Authentication > Hooks > Send Email > HTTP Hook
+//      (format: `v1,whsec_<base64>`).
 //   2. Go to Authentication > Hooks > Send Email > HTTP Hook.
 //   3. Point it at this function's URL.
 
@@ -13,13 +31,124 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const RESEND_API_KEY    = Deno.env.get('RESEND_API_KEY')!;
 const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const HOOK_SECRET_RAW   = Deno.env.get('SEND_EMAIL_HOOK_SECRET') || '';
 const FROM_EMAIL        = 'noreply@mjatu.casa';
 const FROM_NAME         = 'MJA CRM';
 const SITE_URL          = 'https://mjatu.casa';
 
+// Redirect allow-list — anything not on this list falls back to
+// SITE_URL. The Supabase Site URL setting in Auth dashboard already
+// covers some of this server-side, but mirroring it here means an
+// attacker who bypasses Supabase's check (e.g. a future config drift)
+// can't still smuggle a phishing redirect via this function.
+const ALLOWED_REDIRECT_HOSTS = new Set([
+  'mjatu.casa',
+  'www.mjatu.casa',
+  'mja-one.vercel.app',
+]);
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE);
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+// Decode the v1,whsec_<base64> secret format Supabase Auth uses.
+// Returns the raw secret bytes ready for HMAC, or null if not
+// configured / malformed.
+function decodeHookSecret(): Uint8Array | null {
+  if (!HOOK_SECRET_RAW) return null;
+  // Two accepted formats: `v1,whsec_<base64>` (current) and a plain
+  // base64-encoded secret (older). Strip prefix if present.
+  const cleaned = HOOK_SECRET_RAW.replace(/^v1,whsec_/, '').replace(/^whsec_/, '');
+  try {
+    const bin = atob(cleaned);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+const SECRET_KEY_PROMISE = (async () => {
+  const raw = decodeHookSecret();
+  if (!raw) return null;
+  return await crypto.subtle.importKey(
+    'raw',
+    raw,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+})();
+
+async function verifyWebhookSignature(
+  body: string,
+  msgId: string | null,
+  msgTimestamp: string | null,
+  msgSignature: string | null,
+): Promise<boolean> {
+  const key = await SECRET_KEY_PROMISE;
+  if (!key) return false;
+  if (!msgId || !msgTimestamp || !msgSignature) return false;
+
+  // Reject stamps older than 5 minutes (replay protection).
+  const tsNum = Number(msgTimestamp);
+  if (!Number.isFinite(tsNum)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - tsNum) > 5 * 60) return false;
+
+  const payload = `${msgId}.${msgTimestamp}.${body}`;
+  const sigBytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  const expected = btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+
+  // The header carries a space-separated list of versioned signatures
+  // (e.g. `v1,base64sig v1,base64sig2`). Any match wins. Constant-time
+  // compare per candidate.
+  for (const part of msgSignature.split(' ')) {
+    const [, candidate] = part.split(',');
+    if (!candidate) continue;
+    if (constantTimeEqual(candidate, expected)) return true;
+  }
+  return false;
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+// Minimal HTML escape — every user-controlled string that lands in
+// the email body MUST go through this. Otherwise an inviter who can
+// edit user_metadata can put script-equivalent payloads into the
+// recipient's email.
+function esc(s: unknown): string {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeRedirect(redirectTo: string | undefined): string {
+  if (!redirectTo) return SITE_URL;
+  try {
+    const u = new URL(redirectTo);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return SITE_URL;
+    if (!ALLOWED_REDIRECT_HOSTS.has(u.host)) {
+      console.warn(`[auth-send-email-v1] redirect_to host not allow-listed: ${u.host} — falling back to ${SITE_URL}`);
+      return SITE_URL;
+    }
+    return u.toString();
+  } catch {
+    return SITE_URL;
+  }
+}
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const res = await fetch('https://api.resend.com/emails', {
@@ -37,7 +166,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
 }
 
 function buildConfirmationUrl(tokenHash: string, type: string, redirectTo: string): string {
-  return `${SUPABASE_URL}/auth/v1/verify?token=${tokenHash}&type=${type}&redirect_to=${encodeURIComponent(redirectTo)}`;
+  return `${SUPABASE_URL}/auth/v1/verify?token=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}&redirect_to=${encodeURIComponent(redirectTo)}`;
 }
 
 // Shared HTML shell — dark theme matching the app
@@ -47,10 +176,10 @@ function emailShell(title: string, preheader: string, bodyHtml: string): string 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${title}</title>
+  <title>${esc(title)}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#09090b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <div style="display:none;max-height:0;overflow:hidden;font-size:1px;color:#09090b;">${preheader}</div>
+  <div style="display:none;max-height:0;overflow:hidden;font-size:1px;color:#09090b;">${esc(preheader)}</div>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#09090b;">
     <tr><td align="center" style="padding:48px 16px;">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"
@@ -78,10 +207,14 @@ function emailShell(title: string, preheader: string, bodyHtml: string): string 
 }
 
 function goldButton(url: string, label: string): string {
+  // url is built from server-controlled SUPABASE_URL + the
+  // already-allow-listed redirect — safe to use unescaped here.
+  // label is a static string we control. esc'ing both as defense in depth.
+  const safeUrl = esc(url);
   return `<tr><td align="center" style="padding:32px 48px 8px 48px;">
     <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
       <td align="center" style="border-radius:10px;background:linear-gradient(160deg,#FFE07A 0%,#FFC233 45%,#B8720A 100%);box-shadow:0 6px 20px rgba(255,194,51,0.32);">
-        <a href="${url}" target="_blank"
+        <a href="${safeUrl}" target="_blank"
            style="display:inline-block;padding:15px 44px;font-size:15px;font-weight:700;color:#1a0e00;text-decoration:none;border-radius:10px;">
           ${label}
         </a>
@@ -91,7 +224,7 @@ function goldButton(url: string, label: string): string {
   <tr><td align="center" style="padding:16px 48px 0 48px;">
     <p style="margin:0;font-size:11px;color:#71717a;">¿El botón no funciona? Copiá este enlace:</p>
     <p style="margin:6px 0 0 0;font-size:11px;color:#a1a1aa;word-break:break-all;">
-      <a href="${url}" style="color:#FFC233;text-decoration:none;">${url}</a>
+      <a href="${safeUrl}" style="color:#FFC233;text-decoration:none;">${safeUrl}</a>
     </p>
   </td></tr>`;
 }
@@ -127,8 +260,13 @@ function buildRecoveryEmail(confirmUrl: string, subject: string) {
   return emailShell(subject, 'Restablecé tu contraseña de MJA CRM', body);
 }
 
-function buildInviteEmail(confirmUrl: string, meta: Record<string, string>) {
-  const { invited_by_name = 'Alguien', first_name = '', invited_to_church_name = '', numero_cuerda = '' } = meta;
+function buildInviteEmail(confirmUrl: string, meta: Record<string, unknown>) {
+  // Every value coming out of user_metadata is attacker-influenced
+  // (inviter can put anything in metadata). Always esc().
+  const invited_by_name = esc(meta.invited_by_name || 'Alguien');
+  const first_name = esc(meta.first_name || '');
+  const invited_to_church_name = esc(meta.invited_to_church_name || '');
+  const numero_cuerda = esc(meta.numero_cuerda || '');
   const infoBox = (invited_to_church_name || numero_cuerda) ? `
     <tr><td align="left" style="padding:24px 48px 0 48px;">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
@@ -190,7 +328,7 @@ function buildGenericEmail(confirmUrl: string, actionType: string) {
   const title = titles[actionType] || 'Acción requerida';
   const body = `
     <tr><td align="center" style="padding:20px 40px 0 40px;">
-      <h1 style="margin:0;font-size:26px;font-weight:700;color:#fafafa;">${title}</h1>
+      <h1 style="margin:0;font-size:26px;font-weight:700;color:#fafafa;">${esc(title)}</h1>
     </td></tr>
     <tr><td align="left" style="padding:24px 48px 0 48px;">
       <p style="margin:0;font-size:16px;line-height:1.6;color:#d4d4d8;">
@@ -208,35 +346,67 @@ Deno.serve(async (req: Request) => {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
+  // Refuse to operate without the hook secret. Without it we'd be
+  // back to the pre-hardening state where any caller could request
+  // arbitrary emails.
+  if (!HOOK_SECRET_RAW) {
+    console.error('[auth-send-email-v1] SEND_EMAIL_HOOK_SECRET is not configured — refusing all requests');
+    return new Response(JSON.stringify({ error: 'hook not configured' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Read the raw body once for signature verification AND parsing.
+  const rawBody = await req.text();
+  const msgId = req.headers.get('webhook-id');
+  const msgTimestamp = req.headers.get('webhook-timestamp');
+  const msgSignature = req.headers.get('webhook-signature');
+
+  const valid = await verifyWebhookSignature(rawBody, msgId, msgTimestamp, msgSignature);
+  if (!valid) {
+    console.warn('[auth-send-email-v1] invalid signature', { msgId, hasTimestamp: !!msgTimestamp, hasSignature: !!msgSignature });
+    return new Response(JSON.stringify({ error: 'invalid signature' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
-    const payload = await req.json();
+    const payload = JSON.parse(rawBody);
     const { user_id, email_data } = payload;
     const {
       token_hash,
       redirect_to,
       email_action_type: actionType,
-      site_url,
     } = email_data ?? {};
 
-    // Fetch user email via admin API
+    if (!user_id || !token_hash || !actionType) {
+      return new Response(JSON.stringify({ error: 'missing required fields' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(user_id);
     if (userErr || !user?.email) {
-      console.error('Could not fetch user', userErr);
-      return new Response('{}', { status: 200 }); // fail-open
+      console.error('[auth-send-email-v1] could not fetch user', userErr);
+      // Don't fail-open silently — return 404 so Supabase logs it.
+      return new Response(JSON.stringify({ error: 'user not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
     const userEmail = user.email;
 
-    // Build confirmation URL
-    const effectiveSiteUrl = site_url || SITE_URL;
-    const effectiveRedirect = redirect_to || effectiveSiteUrl;
-    const confirmUrl = buildConfirmationUrl(token_hash, actionType, effectiveRedirect);
+    const safeRedirect = normalizeRedirect(redirect_to);
+    const confirmUrl = buildConfirmationUrl(token_hash, actionType, safeRedirect);
 
     let subject: string;
     let html: string;
 
     if (actionType === 'recovery') {
-      // Increment daily counter and build subject
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split('T')[0];
       const { data: countData, error: cntErr } = await supabase.rpc('increment_email_counter', {
         p_email: userEmail,
         p_date: today,
@@ -249,7 +419,8 @@ Deno.serve(async (req: Request) => {
 
     } else if (actionType === 'invite') {
       const meta = user.user_metadata ?? {};
-      subject = `${meta.invited_by_name || 'Alguien'} te invitó a MJA CRM`;
+      const inviterName = esc(meta.invited_by_name || 'Alguien');
+      subject = `${inviterName} te invitó a MJA CRM`;
       html = buildInviteEmail(confirmUrl, meta);
 
     } else {
@@ -263,8 +434,10 @@ Deno.serve(async (req: Request) => {
     return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   } catch (err) {
-    console.error('auth-send-email-v1 error:', err);
-    // Return 200 to prevent Supabase from retrying indefinitely
-    return new Response('{}', { status: 200 });
+    console.error('[auth-send-email-v1] unhandled error:', err);
+    return new Response(JSON.stringify({ error: 'internal error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 });
