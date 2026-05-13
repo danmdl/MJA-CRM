@@ -9,7 +9,6 @@ import { Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
 // Papa and XLSX are loaded lazily inside parseFile() so the ~400KB
 // xlsx chunk doesn't ship with the SemilleroPage / CelulasPage
 // initial loads. The audit flagged xlsx as the worst bundle whale.
-type PapaModule = typeof import('papaparse');
 type XLSXModule = typeof import('xlsx');
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
@@ -124,7 +123,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       reader.readAsArrayBuffer(selectedFile);
     } else {
       // Parse CSV with PapaParse — lazy-loaded with xlsx.
-      const Papa = (await import('papaparse')).default as PapaModule['default'];
+      const Papa = await import('papaparse');
       const reader = new FileReader();
       reader.onload = (e) => {
         let text = e.target?.result as string;
@@ -140,7 +139,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
               setCsvHeaders([]); setDataToImport([]);
             }
           },
-          error: (error) => {
+          error: (error: Error) => {
             console.error("Error parsing CSV:", error);
             showError("Error al leer el archivo CSV.");
             setCsvHeaders([]); setDataToImport([]);

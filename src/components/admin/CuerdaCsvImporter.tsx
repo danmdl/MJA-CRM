@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle2, X, MapPin, Loader2 } from 'lucide-react';
 // Papa lazy-loaded inside handleFile — see CsvImporter for rationale.
-type PapaModule = typeof import('papaparse');
 import { normalize } from '@/lib/normalize';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
@@ -82,7 +81,7 @@ const CuerdaCsvImporter = ({ open, onOpenChange, churchId, zonas, onSuccess }: C
   const handleFile = async (f: File) => {
     setFile(f);
     setImportResult(null);
-    const Papa = (await import('papaparse')).default as PapaModule['default'];
+    const Papa = await import('papaparse');
     Papa.parse(f, {
       header: true,
       skipEmptyLines: 'greedy',
@@ -136,8 +135,8 @@ const CuerdaCsvImporter = ({ open, onOpenChange, churchId, zonas, onSuccess }: C
         zona_nombre: zonaNombre,
         zona_id: matchedZona?.id || null,
         address,
-        lat: null,
-        lng: null,
+        lat: null as number | null,
+        lng: null as number | null,
         referente_name: referente,
         meeting_day: day,
         meeting_time: time,

@@ -391,8 +391,8 @@ const LogsPage = () => {
         .limit(200);
       return (data || []).map(f => ({
         ...f,
-        profiles: null,
-        entity_type: null,
+        profiles: null as { first_name: string | null; last_name: string | null } | null,
+        entity_type: null as string | null,
       }));
     },
     refetchInterval: 30_000,

@@ -58,7 +58,7 @@ import { BulkAssignDialog } from './semillero/BulkAssignDialog';
 
 // ─── Main Component ──────────────────────────────────────────────
 const SemilleroPage = () => {
-  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const { churchId: _churchSlug } = useParams<{ churchId: string }>();
   const churchId = useChurchUuid();
   const { session, profile } = useSession();
   const queryClient = useQueryClient();

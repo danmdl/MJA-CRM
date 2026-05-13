@@ -13,10 +13,10 @@ function makeFakeBuilder(allRows: any[], opts: { failOnPage?: number } = {}) {
       order(_col: string) { return this; },
       async range(from: number, to: number) {
         if (opts.failOnPage === thisBuild) {
-          return { data: null, error: { message: 'simulated failure' } };
+          return { data: null as unknown[] | null, error: { message: 'simulated failure' } };
         }
         const slice = allRows.slice(from, to + 1);
-        return { data: slice, error: null };
+        return { data: slice, error: null as { message: string } | null };
       },
     };
   };
