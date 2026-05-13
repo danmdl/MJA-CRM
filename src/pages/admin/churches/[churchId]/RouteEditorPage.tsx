@@ -12,7 +12,8 @@ import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { loadGoogleMaps } from '@/lib/google-maps';
-import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
+import { buildGoogleMapsChunks } from '@/lib/google-maps-urls';
+import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, ChevronDown, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 // Lazy: profile dialog chunk only loads when a contact card is clicked.
 const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
@@ -56,9 +57,19 @@ const RouteEditorPage = () => {
   const [sharing, setSharing] = useState(false);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
-  const notesSaveTimer = useRef<any>(null);
+  // Per-stop notes (replaces the old route-wide notes textarea). Stored
+  // in shared_routes.contact_notes JSONB and synced automatically into
+  // contacts.observaciones by the DB trigger added in migration 0026.
+  const [contactNotes, setContactNotes] = useState<Record<string, { text: string; date: string }>>({});
+  const [savingContactId, setSavingContactId] = useState<string | null>(null);
+  const notesSaveTimers = useRef<Record<string, any>>({});
+  // Display filter for the polyline drawn on the map. When the user
+  // collapses to 'first N' the rendered route line and contact pins
+  // both narrow — the chunked Google Maps share links keep covering
+  // every stop regardless.
+  const [stopsLimit, setStopsLimit] = useState<number | 'all'>('all');
+  // Dropdown for the chunked Google Maps links (route with >10 stops).
+  const [gmapsMenuOpen, setGmapsMenuOpen] = useState(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -167,7 +178,7 @@ const RouteEditorPage = () => {
     if (project.start_lat) setStartLat(Number(project.start_lat));
     if (project.start_lng) setStartLng(Number(project.start_lng));
     if (hasPicks) setSelectedIds(new Set(project.ordered_contact_ids));
-    if (project.notes) setNotes(project.notes);
+    if (project.contact_notes) setContactNotes(project.contact_notes);
     if (project.visited) {
       const vSet = new Set<string>();
       Object.entries(project.visited).forEach(([id, v]) => { if (v) vSet.add(id); });
@@ -401,8 +412,13 @@ const RouteEditorPage = () => {
       },
       title: 'Punto de partida',
     }));
+    const limit = stopsLimit === 'all' ? routeData.orderedContacts.length : stopsLimit;
     routeData.orderedContacts.forEach((c: Contact, idx: number) => {
       const isVisited = visited.has(c.id);
+      // Markers beyond the user's "first N" preference still render so
+      // they can see where the rest of the route sits — but dimmed and
+      // gray so the focus stays on the highlighted prefix.
+      const inFocus = idx < limit;
       customMarkers.current.push(new google.maps.Marker({
         position: { lat: c.lat!, lng: c.lng! },
         map: mapInstance.current,
@@ -410,8 +426,8 @@ const RouteEditorPage = () => {
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: 14,
-          fillColor: isVisited ? '#6b7280' : '#FFC233',
-          fillOpacity: isVisited ? 0.6 : 1,
+          fillColor: isVisited ? '#6b7280' : (inFocus ? '#FFC233' : '#9CA3AF'),
+          fillOpacity: isVisited ? 0.6 : (inFocus ? 1 : 0.5),
           strokeColor: 'white',
           strokeWeight: 2,
         },
@@ -470,11 +486,11 @@ const RouteEditorPage = () => {
     return () => ro.disconnect();
   }, []);
 
-  // Re-color markers when visited changes
+  // Re-color markers when visited or stopsLimit changes
   useEffect(() => {
     refreshMarkers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visited]);
+  }, [visited, stopsLimit]);
 
   const toggleVisited = async (contactId: string) => {
     const next = new Set(visited);
@@ -490,25 +506,49 @@ const RouteEditorPage = () => {
     }
   };
 
-  const handleNotesChange = (value: string) => {
-    setNotes(value);
+  // Per-stop note save: debounced 800ms per contact. DB trigger
+  // sync_route_contact_notes_to_observaciones mirrors each entry into
+  // contacts.observaciones with an idempotent "[Ruta <short> · DATE]"
+  // prefix so subsequent edits replace the same line.
+  const todayInART = () => {
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+    return fmt.format(new Date());
+  };
+  const handleContactNoteChange = (contactId: string, value: string) => {
+    const date = contactNotes[contactId]?.date || todayInART();
+    const nextAll = { ...contactNotes, [contactId]: { text: value, date } };
+    if (!value.trim()) delete nextAll[contactId];
+    setContactNotes(nextAll);
     if (!project?.id) return;
-    if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
-    setSavingNotes(true);
-    notesSaveTimer.current = setTimeout(async () => {
-      await supabase.from('shared_routes').update({ notes: value }).eq('id', project.id);
-      setSavingNotes(false);
+    if (notesSaveTimers.current[contactId]) clearTimeout(notesSaveTimers.current[contactId]);
+    setSavingContactId(contactId);
+    notesSaveTimers.current[contactId] = setTimeout(async () => {
+      await supabase.from('shared_routes').update({ contact_notes: nextAll }).eq('id', project.id);
+      setSavingContactId(curr => (curr === contactId ? null : curr));
     }, 800);
   };
 
-  const openInGoogleMaps = () => {
-    if (!routeData) return;
-    const origin = `${startLat},${startLng}`;
-    const last = routeData.orderedContacts[routeData.orderedContacts.length - 1];
-    const destination = `${last.lat},${last.lng}`;
-    const waypoints = routeData.orderedContacts.slice(0, -1).map((c: Contact) => `${c.lat},${c.lng}`).join('|');
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${encodeURIComponent(waypoints)}&travelmode=driving`;
+  // Chunked Google Maps URLs. Routes with more than 10 stops can't fit
+  // in a single web URL, so we hand the user one URL per chunk —
+  // chunks overlap by one point so following them in order traces the
+  // whole route without gaps.
+  const gmapsUrls = useMemo(() => {
+    if (!routeData || !startLat || !startLng) return [];
+    const allStops = [
+      { lat: startLat, lng: startLng },
+      ...routeData.orderedContacts.map((c: Contact) => ({ lat: c.lat!, lng: c.lng! })),
+    ];
+    return buildGoogleMapsChunks(allStops);
+  }, [routeData, startLat, startLng]);
+
+  const openGmapsUrl = (idx: number) => {
+    const url = gmapsUrls[idx];
+    if (!url) return;
     window.open(url, '_blank');
+    setGmapsMenuOpen(false);
   };
 
   const shareUrl = project?.share_token ? `${window.location.origin}/r/${project.share_token}` : '';
@@ -659,9 +699,36 @@ const RouteEditorPage = () => {
             <Button size="sm" variant="outline" onClick={openEditDialog} className="gap-1.5">
               <Pencil className="h-3.5 w-3.5" /> Editar contactos
             </Button>
-            <Button size="sm" variant="outline" onClick={openInGoogleMaps} className="gap-1.5">
-              <ExternalLink className="h-3.5 w-3.5" /> Google Maps
-            </Button>
+            {/* Google Maps — single link when short, dropdown of parts
+                when the route has more than 10 stops and we had to
+                chunk. Each chunk's URL covers up to 10 stops and starts
+                where the previous one ended. */}
+            {gmapsUrls.length > 1 ? (
+              <div className="relative">
+                <Button size="sm" variant="outline" onClick={() => setGmapsMenuOpen(o => !o)} className="gap-1.5">
+                  <ExternalLink className="h-3.5 w-3.5" /> Google Maps ({gmapsUrls.length} partes)
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+                {gmapsMenuOpen && (
+                  <div className="absolute right-0 mt-1 z-20 bg-card border rounded-md shadow-lg min-w-[180px] overflow-hidden">
+                    {gmapsUrls.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => openGmapsUrl(i)}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/50 flex items-center justify-between gap-3"
+                      >
+                        <span>Parte {i + 1} de {gmapsUrls.length}</span>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => openGmapsUrl(0)} className="gap-1.5" disabled={gmapsUrls.length === 0}>
+                <ExternalLink className="h-3.5 w-3.5" /> Google Maps
+              </Button>
+            )}
             {project?.share_token && (
               <>
                 <Button size="sm" variant="outline" onClick={shareWhatsApp} className="gap-1.5 border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300">
@@ -680,17 +747,37 @@ const RouteEditorPage = () => {
       </div>
 
       {hasRoute ? (
-        // ─── Calculated route view: 3 columns (matches public shared view) ───
-        // Grid balanced for the map to dominate. Side panels (paradas /
-        // notas) used to take 7 of 12 columns combined; now they take 6,
-        // and the map gets 6 (was 5). Gap bumped from 4 to 5 so the
-        // panels feel less glued to the map. On smaller screens
-        // everything still stacks single-column.
+        // ─── Calculated route view: 2 columns ───
+        // The standalone "Notas compartidas" column is gone — notes now
+        // live inline with each stop and sync to contacts.observaciones
+        // through the DB trigger. Paradas keep a wider column so the
+        // per-stop note textarea has room to breathe.
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Stops */}
-          <div className="lg:col-span-3 border rounded-lg p-4 bg-card flex flex-col">
+          {/* Display filter for the polyline. Applies to the route line
+              and pins drawn on this page's embedded map only — the
+              chunked GMaps share links always cover every stop. */}
+          {routeData.orderedContacts.length > 3 && (
+            <div className="lg:col-span-12 flex flex-wrap items-center gap-2 text-xs -mb-2">
+              <span className="text-muted-foreground">Mostrar en el mapa:</span>
+              {([3, 5, 10, 'all'] as const).map(opt => (
+                <button
+                  key={String(opt)}
+                  onClick={() => setStopsLimit(opt)}
+                  className={`px-2.5 py-0.5 rounded-full border transition-colors ${
+                    stopsLimit === opt
+                      ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {opt === 'all' ? `Todas (${routeData.orderedContacts.length})` : `Primeras ${opt}`}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Stops + per-stop notes */}
+          <div className="lg:col-span-5 border rounded-lg p-4 bg-card flex flex-col">
             <h3 className="text-sm font-semibold mb-3">Paradas ({routeData.orderedContacts.length})</h3>
-            <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+            <div className="space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
               <div className="flex items-center gap-2 text-xs">
                 <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-[14px] shrink-0">★</span>
                 <div className="flex-1 min-w-0">
@@ -700,26 +787,43 @@ const RouteEditorPage = () => {
               </div>
               {routeData.orderedContacts.map((c: Contact, idx: number) => {
                 const isVisited = visited.has(c.id);
+                const note = contactNotes[c.id]?.text || '';
                 return (
-                  <div key={c.id} className={`flex items-center gap-2 text-xs p-2 rounded border ${isVisited ? 'opacity-60 border-muted' : 'border-transparent hover:border-border'}`}>
-                    <span className={`w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-[12px] shrink-0 ${isVisited ? 'bg-gray-500' : 'bg-primary'}`}>{idx + 1}</span>
-                    <div className={`flex-1 min-w-0 ${isVisited ? 'line-through' : ''}`}>
-                      <div className="font-medium truncate">{c.first_name} {c.last_name || ''}</div>
-                      <div className="text-muted-foreground truncate">{c.address}</div>
+                  <div key={c.id} className={`flex flex-col gap-2 text-xs p-2 rounded border ${isVisited ? 'opacity-60 border-muted' : 'border-transparent hover:border-border'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-[12px] shrink-0 ${isVisited ? 'bg-gray-500' : 'bg-primary'}`}>{idx + 1}</span>
+                      <div className={`flex-1 min-w-0 ${isVisited ? 'line-through' : ''}`}>
+                        <div className="font-medium truncate">{c.first_name} {c.last_name || ''}</div>
+                        <div className="text-muted-foreground truncate">{c.address}</div>
+                      </div>
+                      <button
+                        onClick={() => setEditingContactId(c.id)}
+                        className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted shrink-0"
+                        title="Editar contacto"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => toggleVisited(c.id)}
+                        className={`text-[11px] px-2.5 py-1 rounded border whitespace-nowrap shrink-0 ${isVisited ? 'border-gray-500 text-gray-400' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
+                      >
+                        {isVisited ? '✓' : 'Marcar'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setEditingContactId(c.id)}
-                      className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted shrink-0"
-                      title="Editar contacto"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => toggleVisited(c.id)}
-                      className={`text-[11px] px-2.5 py-1 rounded border whitespace-nowrap shrink-0 ${isVisited ? 'border-gray-500 text-gray-400' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
-                    >
-                      {isVisited ? '✓' : 'Marcar'}
-                    </button>
+                    <div className="ml-9">
+                      <textarea
+                        value={note}
+                        onChange={(e) => handleContactNoteChange(c.id, e.target.value)}
+                        placeholder="Notas de esta visita (se guardan en el perfil del contacto)..."
+                        className="w-full rounded border border-input bg-background px-2 py-1 text-[11px] resize-y"
+                        style={{ minHeight: 40 }}
+                      />
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {savingContactId === c.id
+                          ? 'Guardando…'
+                          : note ? 'Sincroniza al perfil del contacto' : ''}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -727,28 +831,8 @@ const RouteEditorPage = () => {
           </div>
 
           {/* Map */}
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-7">
             <div ref={mapRef} className="w-full rounded-lg border" style={{ height: 'calc(100vh - 220px)', minHeight: 400 }} />
-          </div>
-
-          {/* Notes */}
-          <div className="lg:col-span-3 border rounded-lg p-4 bg-card flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold">Notas compartidas</h3>
-              <span className="text-[10px] text-muted-foreground">
-                {savingNotes ? 'Guardando...' : 'Auto'}
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mb-2">
-              Cualquiera con el link puede leer y editar.
-            </p>
-            <textarea
-              value={notes}
-              onChange={(e) => handleNotesChange(e.target.value)}
-              placeholder="Escribí acá observaciones, quién atendió, qué se habló, próximos pasos..."
-              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-              style={{ minHeight: 'calc(100vh - 300px)' }}
-            />
           </div>
         </div>
       ) : (
