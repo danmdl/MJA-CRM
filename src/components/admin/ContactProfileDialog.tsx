@@ -577,6 +577,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     )}
                   </div>
                 </div>
+                {/* Three columns now: Fecha nac · Fecha contacto · Conector.
+                    Conector used to live as a full-width row below — moving
+                    it up here fills the empty third column that was
+                    visually awkward. */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha de nacimiento</label>
                   <div className="flex items-center gap-2">
@@ -590,9 +594,26 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha de contacto</label>
                   <Input type="date" value={contact.fecha_contacto || ''} onChange={(e) => setContact({ ...contact, fecha_contacto: e.target.value || null })} />
                 </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conector</label>
+                  <input
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    value={contact.conector || ''}
+                    onChange={(e) => setContact({ ...contact, conector: e.target.value || null })}
+                    onBlur={(e) => {
+                      const cleaned = normalizeName(e.target.value);
+                      setContact(prev => prev ? { ...prev, conector: cleaned || null } : prev);
+                    }}
+                    placeholder="Quién hizo el primer contacto"
+                  />
+                </div>
               </div>
 
-              {/* Row 4b: Sexo / Estado civil */}
+              {/* Row 4b: Sexo · Estado civil · Referente de Cuerda
+                  (read-only, resolved from cuerda — moved up from
+                  the bottom of the form to fill the empty third
+                  column and keep "yo / mis referentes" visible next
+                  to the personal info instead of buried). */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sexo</label>
@@ -623,7 +644,20 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                     <option value="No brindó información">No brindó información</option>
                   </select>
                 </div>
-                <div />
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Referente de Cuerda</label>
+                  <input readOnly value={(() => {
+                    if (!contact.numero_cuerda || !leaders?.length) return '—';
+                    // Pick the referente / gestor_de_cuerda / supervisor that
+                    // owns this cuerda, in that priority order. gestor_de_cuerda
+                    // is the helper tier so a real referente wins.
+                    const ref =
+                      leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'referente') ||
+                      leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'gestor_de_cuerda') ||
+                      leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'supervisor');
+                    return ref ? `${ref.first_name || ''} ${ref.last_name || ''}`.trim() || '—' : '—';
+                  })()} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
+                </div>
               </div>
 
               {/* Row 5: Estado / Célula / Líder */}
@@ -667,42 +701,10 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <SelectField label="Líder de Célula" value={contact.leader_assigned} onChange={(v) => setContact({ ...contact, leader_assigned: v })} options={leaders.map(l => ({ id: l.id, name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || 'Sin nombre' }))} placeholder="Sin líder" />
               </div>
 
-              {/* Conector — quien hizo el primer contacto. Free text to keep
-                  it flexible (sometimes it's a person's name, sometimes 'evento
-                  X' or 'campaña Y'). Editable always; survives reassignments. */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Conector</label>
-                <input
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                  value={contact.conector || ''}
-                  onChange={(e) => setContact({ ...contact, conector: e.target.value || null })}
-                  onBlur={(e) => {
-                    // Normalize on blur so the user sees the cleaned form
-                    // (Title Case, no accents) before they hit Save. The DB
-                    // trigger does the same thing on insert/update; this is
-                    // for visual consistency.
-                    const cleaned = normalizeName(e.target.value);
-                    setContact(prev => prev ? { ...prev, conector: cleaned || null } : prev);
-                  }}
-                  placeholder="Quién hizo el primer contacto"
-                />
-              </div>
-
-              {/* Referente (readonly — resolved from cuerda) */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Referente de Cuerda</label>
-                <input readOnly value={(() => {
-                  if (!contact.numero_cuerda || !leaders?.length) return '—';
-                  // Pick the referente / gestor_de_cuerda / supervisor that
-                  // owns this cuerda, in that priority order. gestor_de_cuerda
-                  // is the helper tier so a real referente wins.
-                  const ref =
-                    leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'referente') ||
-                    leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'gestor_de_cuerda') ||
-                    leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'supervisor');
-                  return ref ? `${ref.first_name || ''} ${ref.last_name || ''}`.trim() || '—' : '—';
-                })()} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
-              </div>
+              {/* Conector + Referente de Cuerda used to live here as
+                  two full-width rows; they're now folded into rows
+                  4a / 4b above (filling the empty third columns) so
+                  this section is cleaner. */}
 
               {/* Save bar at top of form */}
               {(canEditDeleteContacts() || profile?.role === 'conector') && hasUnsavedChanges && (

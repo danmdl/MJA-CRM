@@ -1176,41 +1176,30 @@ const RouteEditorPage = () => {
         <Suspense fallback={null}>
           <ContactProfileDialog
             open
-            onOpenChange={async (o) => {
+            onOpenChange={(o) => {
               if (!o) {
                 setEditingContactId(null);
-                // Refetch contacts so the recalc picks up the
-                // contact's new address / coordinates. We do NOT
-                // setRouteData(null) up front anymore — that wiped
-                // the route to the "Ruta vacía" placeholder for a
-                // beat, and if the auto-recalc effect didn't pick
-                // up the refetch (stale dep refs, cancelled
-                // refetch, etc.) the route stayed gone until a hard
-                // refresh. Now we keep the old route on screen
-                // until calculateRoute() (which itself sets routeData
-                // to null and calculating to true synchronously)
-                // transitions us through the "Calculando ruta..."
-                // state and replaces it with the recomputed route.
+                // Reset the once-only auto-calc latch and invalidate
+                // the contacts query. When the refetch lands and
+                // React re-renders with the fresh contacts array, the
+                // auto-recalc useEffect sees autoCalcedRef=false +
+                // updated deps and fires calculateRoute() — which
+                // captures the FRESH selectedContacts because the
+                // useMemo derived from the new contacts has already
+                // recomputed in this render pass.
+                //
+                // Earlier versions of this handler called
+                // calculateRoute() directly after awaiting the refetch.
+                // That ran BEFORE React had a chance to re-render with
+                // the new contacts, so the closure-captured
+                // selectedContacts inside calculateRoute() was still
+                // the stale list — Dan reported the contact stayed
+                // at its old address after the first edit and only
+                // moved on a second edit + refresh. Letting the
+                // useEffect handle it after the refetch-driven render
+                // is the correct fix.
                 autoCalcedRef.current = false;
-                await queryClient.refetchQueries({ queryKey: ['rutas-contacts', churchId] });
-                if (selectedIds.size > 0 && startLat && startLng) {
-                  calculateRoute();
-                }
-                // Same resize-trick applyEditAndCalculate uses to
-                // un-black the map: the dialog close transition
-                // doesn't change the map div's measured size (it's
-                // been the same width/height the whole time, just
-                // covered by an overlay), so Chrome's IntersectionObserver
-                // / ResizeObserver path can skip the redraw. Trigger
-                // a manual 'resize' on the Google Maps instance plus
-                // a fitBounds on the next frame so the tiles repaint.
-                requestAnimationFrame(() => {
-                  const google = (window as any).google;
-                  if (!google?.maps || !mapInstance.current) return;
-                  google.maps.event.trigger(mapInstance.current, 'resize');
-                  const bounds = directionsRenderer.current?.getDirections?.()?.routes?.[0]?.bounds;
-                  if (bounds) mapInstance.current.fitBounds(bounds);
-                });
+                queryClient.invalidateQueries({ queryKey: ['rutas-contacts', churchId] });
               }
             }}
             contactId={editingContactId}
