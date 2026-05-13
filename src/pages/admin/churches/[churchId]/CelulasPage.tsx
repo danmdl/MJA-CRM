@@ -39,7 +39,7 @@ interface CellRow {
 
 const CelulasPage = () => {
   const confirm = useConfirm();
-  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const { churchId: _churchSlug } = useParams<{ churchId: string }>();
   const churchId = useChurchUuid();
   // Bias address autocomplete toward the church area.
   const { data: churchCoords } = useChurchCoords(churchId);

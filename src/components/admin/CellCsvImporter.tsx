@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, X, MapPin, Loader2 } from 'lucide-react';
 // Papa + XLSX lazy-loaded inside handleFile; see CsvImporter.tsx
 // for the same pattern + audit rationale (bundle whale).
-type PapaModule = typeof import('papaparse');
 type XLSXModule = typeof import('xlsx');
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
@@ -119,7 +118,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
       };
       reader.readAsArrayBuffer(f);
     } else {
-      const Papa = (await import('papaparse')).default as PapaModule['default'];
+      const Papa = await import('papaparse');
       const reader = new FileReader();
       reader.onload = (e) => {
         let text = e.target?.result as string;
@@ -154,7 +153,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
 
       return {
         name, cuerda_numero: cuerdaNum, cuerda_id: matchedCuerda?.id || null,
-        address, lat: null, lng: null, leader_name: leaderName, anfitrion_name: anfitrionName,
+        address, lat: null as number | null, lng: null as number | null, leader_name: leaderName, anfitrion_name: anfitrionName,
         meeting_day: day, meeting_time: time, addressResolved: false,
         originalRow: idx + 2,
         error: !cuerdaNum ? 'Falta número de cuerda' : undefined,

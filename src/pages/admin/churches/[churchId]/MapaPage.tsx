@@ -78,7 +78,7 @@ const geocodeAddress = async (
 
 interface MapaPageProps { forcedViewMode?: 'cells' | 'contacts'; hideToggle?: boolean; }
 const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
-  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const { churchId: _churchSlug } = useParams<{ churchId: string }>();
   const churchId = useChurchUuid();
   const { profile } = useSession();
   const mapRef = useRef<HTMLDivElement>(null);

@@ -430,7 +430,7 @@ const AppRoutes = () => {
 // Tiny no-render component that just runs the version-check hook.
 // Lives at the App root so it ticks for every authenticated and
 // unauthenticated session — the toast is global anyway via Sonner.
-const VersionChecker = () => {
+const VersionChecker = (): null => {
   useVersionCheck();
   return null;
 };

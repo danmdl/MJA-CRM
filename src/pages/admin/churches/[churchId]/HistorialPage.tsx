@@ -118,7 +118,7 @@ const HistorialRow = ({ row }: { row: ActivityRow }) => {
 };
 
 const HistorialPage = () => {
-  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const { churchId: _churchSlug } = useParams<{ churchId: string }>();
   const churchId = useChurchUuid();
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');

@@ -54,7 +54,7 @@ interface Cell {
 // ─── Component ───────────────────────────────────────────────────
 const CuerdasPage = () => {
   const confirm = useConfirm();
-  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const { churchId: _churchSlug } = useParams<{ churchId: string }>();
   const churchId = useChurchUuid();
   const { profile } = useSession();
   const { canSeeBaseDatosTotal, canEditCuerdas } = usePermissions();
