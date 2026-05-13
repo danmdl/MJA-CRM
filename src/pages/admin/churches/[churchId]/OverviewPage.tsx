@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useChurchUuid } from '@/hooks/use-church-uuid';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';

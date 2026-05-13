@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState, useMemo, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
+import { useChurchUuid } from '@/hooks/use-church-uuid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MapPin, Loader2, Users, Building2 } from 'lucide-react';
