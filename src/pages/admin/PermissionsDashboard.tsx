@@ -7,6 +7,7 @@ import { Check, X, Shield, Building, BarChart, UserPlus, Edit, Eye, UserCog, Sea
 import { Input } from '@/components/ui/input';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
+import { normalize } from '@/lib/normalize';
 import { logAdminAction } from '@/lib/audit-log';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -367,7 +368,7 @@ const PermissionsDashboard = () => {
               <thead>
                 <tr>
                   <th className="text-left font-medium text-muted-foreground pb-4 pr-4 min-w-[120px] sticky left-0 bg-card z-10">Rol</th>
-                  {permissionColumns.filter(c => !permSearch || c.label.toLowerCase().includes(permSearch.toLowerCase())).map((column) => (
+                  {permissionColumns.filter(c => !permSearch || normalize(c.label).includes(normalize(permSearch))).map((column) => (
                     <th key={column.key} className="text-center font-medium text-muted-foreground pb-4 px-2 min-w-[90px]">
                       <column.icon className="h-4 w-4 mx-auto mb-1" />
                       <span className="block leading-tight">{column.label}</span>
@@ -384,7 +385,7 @@ const PermissionsDashboard = () => {
                     {config.label}
                   </Badge>
                 </td>
-                {permissionColumns.filter(c => !permSearch || c.label.toLowerCase().includes(permSearch.toLowerCase())).map((column) => (
+                {permissionColumns.filter(c => !permSearch || normalize(c.label).includes(normalize(permSearch))).map((column) => (
                   <td key={column.key} className="text-center py-3 px-2">
                     <Button
                       variant="outline"

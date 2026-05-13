@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, Search, Check, X as XIcon, Trash2, Pencil, ChevronLeft, ChevronRight, BarChart3, UserPlus } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { PROCESS_STAGES, stageColor, stageLabel, isCourseStage, type ProcessStageKey } from '@/lib/process-stages';
+import { normalize } from '@/lib/normalize';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -674,10 +675,10 @@ const EnrolledList = ({ churchId, stage, enrolled, loading, isPrivileged, userCu
 
   const filtered = useMemo(() => {
     if (!search.trim()) return enrolled;
-    const t = search.toLowerCase();
+    const t = normalize(search);
     return enrolled.filter(p =>
-      `${p.contacts?.first_name || ''} ${p.contacts?.last_name || ''}`.toLowerCase().includes(t) ||
-      (p.contacts?.numero_cuerda || '').toLowerCase().includes(t),
+      normalize(`${p.contacts?.first_name || ''} ${p.contacts?.last_name || ''}`).includes(t) ||
+      normalize(p.contacts?.numero_cuerda || '').includes(t),
     );
   }, [enrolled, search]);
 
@@ -794,13 +795,16 @@ const AddPersonDialog = ({ churchId, stage, userId, existingContactIds, onClose,
     queryKey: ['asistencia-add-person-search', churchId, search],
     queryFn: async () => {
       if (search.trim().length < 2) return [];
-      const t = search.trim();
+      // search_name (migration 0033) is unaccent(lower(first + ' ' +
+      // last)) maintained by trigger, so the query is accent + case
+      // insensitive. Normalize the user's input the same way.
+      const t = normalize(search);
       const { data, error } = await supabase
         .from('contacts')
         .select('id, first_name, last_name, numero_cuerda')
         .eq('church_id', churchId)
         .is('deleted_at', null)
-        .or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%`)
+        .ilike('search_name', `%${t}%`)
         .order('first_name')
         .limit(40);
       if (error) throw error;
@@ -1158,8 +1162,8 @@ const TomarAsistenciaDialog = ({ event, churchId, userCuerda, isPrivileged, onCl
       list = list.filter(c => c.numero_cuerda === userCuerda);
     }
     if (search.trim()) {
-      const t = search.toLowerCase();
-      list = list.filter(c => `${c.first_name} ${c.last_name || ''}`.toLowerCase().includes(t));
+      const t = normalize(search);
+      list = list.filter(c => normalize(`${c.first_name} ${c.last_name || ''}`).includes(t));
     }
     return list;
   }, [enrolled, isPrivileged, userCuerda, search]);
