@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { useConfirm } from '@/hooks/use-confirm';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface ContactLogDialogProps {
@@ -19,6 +20,7 @@ interface ContactLogDialogProps {
 }
 
 const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange, contactId, refreshSignal }) => {
+  const confirm = useConfirm();
   const [logs, setLogs] = useState<any[]>([]);
   const [editingLog, setEditingLog] = useState<any | null>(null);
   const [editDate, setEditDate] = useState('');
@@ -78,7 +80,7 @@ const ContactLogDialog: React.FC<ContactLogDialogProps> = ({ open, onOpenChange,
       showError('No puedes eliminar este registro (más de 24 horas).');
       return;
     }
-    if (!window.confirm('¿Eliminar este registro?')) return;
+    if (!(await confirm({ title: '¿Eliminar este registro?', confirmLabel: 'Eliminar', destructive: true }))) return;
     const { error } = await supabase.from('contact_logs').delete().eq('id', row.id);
     if (error) {
       showError(error.message || 'Error al eliminar registro.');

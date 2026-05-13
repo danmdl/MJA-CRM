@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { showSuccess, showError } from '@/utils/toast';
+import { useConfirm } from '@/hooks/use-confirm';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -51,6 +52,7 @@ interface Cell {
 
 // ─── Component ───────────────────────────────────────────────────
 const CuerdasPage = () => {
+  const confirm = useConfirm();
   const { churchId } = useParams<{ churchId: string }>();
   const { profile } = useSession();
   const { canSeeBaseDatosTotal, canEditCuerdas } = usePermissions();
@@ -124,13 +126,21 @@ const CuerdasPage = () => {
   const { data: attendeeCounts } = useQuery<Record<string, number>>({
     queryKey: ['cellAttendeeCounts', churchId],
     queryFn: async () => {
-      const { data } = await supabase.from('contacts').select('id, cell_id').eq('church_id', churchId!);
+      // Pre-aggregated server-side via get_contacts_per_cell RPC
+      // (matview-backed since the post-audit migration). Replaces the
+      // previous `select('id, cell_id')` of every contact in the
+      // church — at 500k that was a 25MB+ payload just to compute
+      // attendees-per-cell counts.
+      const { data, error } = await supabase.rpc('get_contacts_per_cell', { p_church_id: churchId! });
+      if (error) throw error;
       const counts: Record<string, number> = {};
-      (data || []).forEach((c: any) => { if (c.cell_id) counts[c.cell_id] = (counts[c.cell_id] || 0) + 1; });
+      (data || []).forEach((row: { cell_id: string; contact_count: number }) => {
+        counts[row.cell_id] = Number(row.contact_count);
+      });
       return counts;
     },
     enabled: !!churchId,
-    staleTime: 30_000,
+    staleTime: 60_000,
   });
 
   // ─── Computed data ─────────────────────────────────────────────
@@ -197,7 +207,7 @@ const CuerdasPage = () => {
 
   // ─── Actions ───────────────────────────────────────────────────
   const deleteCell = async (id: string) => {
-    if (!window.confirm('¿Eliminar esta célula?')) return;
+    if (!(await confirm({ title: '¿Eliminar esta célula?', confirmLabel: 'Eliminar', destructive: true }))) return;
     const { error } = await supabase.from('cells').delete().eq('id', id);
     if (error) showError(error.message);
     else {
@@ -207,7 +217,12 @@ const CuerdasPage = () => {
   };
 
   const deleteCuerda = async (id: string, numero: string) => {
-    if (!window.confirm(`¿Eliminar la cuerda #${numero}? Las células vinculadas quedarán sin cuerda.`)) return;
+    if (!(await confirm({
+      title: `¿Eliminar la cuerda #${numero}?`,
+      description: 'Las células vinculadas quedarán sin cuerda.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    }))) return;
     await supabase.from('cells').update({ cuerda_id: null }).eq('cuerda_id', id);
     const { error } = await supabase.from('cuerdas').delete().eq('id', id);
     if (error) showError(error.message);
@@ -224,7 +239,12 @@ const CuerdasPage = () => {
     const zonaCuerdaIds = cuerdas.filter(c => c.zona_id === zonaId).map(c => c.id);
     const zonaCells = (cells || []).filter(c => c.cuerda_id && zonaCuerdaIds.includes(c.cuerda_id));
     if (zonaCells.length === 0) { showError('No hay células en esta zona.'); return; }
-    if (!window.confirm(`¿Borrar las ${zonaCells.length} células de ${zonaNombre}? Los contactos asignados quedarán sin célula.`)) return;
+    if (!(await confirm({
+      title: `¿Borrar las ${zonaCells.length} células de ${zonaNombre}?`,
+      description: 'Los contactos asignados quedarán sin célula.',
+      confirmLabel: 'Borrar',
+      destructive: true,
+    }))) return;
     const cellIds = zonaCells.map(c => c.id);
     // Unlink contacts in ONE round-trip rather than one per cell. PostgREST
     // accepts an `in` filter so we update every contact attached to any of

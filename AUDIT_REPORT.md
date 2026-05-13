@@ -1,136 +1,111 @@
-# MJA-CRM — Full Stack Audit Report
+# MJA-CRM — Audit Report (post-fix state)
 
-**Generated**: 2026-05-13
-**Scope**: Frontend (React + Vite + TypeScript), Backend (Supabase Postgres 17, Edge Functions Deno), DB schema, RLS, dependencies, scalability to 500k contacts.
-**Method**: 6 parallel deep-dive agents (security, frontend, DB, performance, code quality, edge functions) + direct DB advisor queries + dependency audit + manual verification of hot paths.
-**Current scale**: 11,175 contacts. 16,313 activity_logs. 27 profiles. 1 iglesia activa.
+**Generated**: 2026-05-13 (initial) — **Updated**: post-fix shipped on 2026-05-13
+**Initial audit method**: 6 parallel deep-dive agents (security, frontend, DB, performance, code quality, edge functions) + DB advisor queries + dependency audit + manual verification.
 
----
-
-## Scores (1–10)
-
-| Category | Score | Note |
-|---|---|---|
-| **Security (overall)** | 5 | Front layer decent; edge functions weak (`auth-send-email-v1` unauthenticated; `admin-user-actions` no audit on destructive ops); DB has 2 critical world-writable tables. |
-| **Scalability** | 7 | Semillero now server-paged (post #36); 5 critical scaling blockers remain (notification fanout, map markers, CSV, cell-count fetches, dedupe scan). |
-| **Performance** | 6 | Hot paths fixed for ≤25k contacts; map pages + Realtime fanout + global invalidate cascade are the next breaks. |
-| **Code Quality** | 6 | Strong `lib/` helpers and tests; large pages (SemilleroPage 2802 LOC), 417 `any` usages, no generated Supabase types. |
-| **Architecture** | 6 | Good chunking & lazy loading; pages own too much. Custom event bus for sidebar. No clean feature/domain slicing. |
-| **Maintainability** | 5 | Strict TS off; `@typescript-eslint/no-unused-vars` disabled; large god-pages; 38 redundant entity types. |
-| **Reliability** | 6 | Several missing `onError` handlers; `handleSave` without `catch`; race conditions in autoAssignMutation. |
-| **Database Design** | 7 | Indexes mostly right; 4 missing FK indexes, several redundant; triggers cascade; functions need `search_path` pinned. |
-| **UX Stability** | 7 | Six `window.confirm` usages remain; loading-vs-empty collisions on Dashboard; no virtualization (200-row tables stutter on mobile). |
-| **Production Readiness** | 6 | Ready for current load; not for 500k without 7 concrete fixes (most in DB + 1 edge function). |
-
-**Overall: ~6/10**. Solid foundation, but several genuinely production-grave issues (2 critical edge function vulns, 2 critical RLS gaps, 1 critical realtime fanout pattern) that must be fixed before scaling further.
+This document tracks BOTH the original findings AND the current state after the fixes shipped during the audit response sessions (PRs #39–#41 + 6 DB migrations + 3 edge function deploys).
 
 ---
 
-## Top Priorities
+## Scores (post-fix)
 
-### 🔴 CRITICAL (fix immediately)
-
-| # | Issue | Where | Impact |
+| Category | Before | After | Δ |
 |---|---|---|---|
-| **C0** | **`profiles_update_policy` has NO `WITH CHECK` clause**. Any role with `edit_delete_users=true` (pastor, supervisor, referente, gestor, general, admin — practically every elevated role) can `PATCH /rest/v1/profiles?id=eq.<victim>` with `{"role":"admin","church_id":"..."}`. Self-promotion to admin or arbitrary role overwrite, bypassing every edge function guard. | DB policy `profiles_update_policy` | **Account takeover, full privilege escalation.** |
-| **C0b** | `cells_update_policy` and `cells_delete_policy` check only `edit_delete_users=true` with **no church scoping**. Pastor of Church A can edit/delete cells of Church B. | DB policies on `cells` | **Cross-tenant data tampering / destruction.** |
-| **C0c** | `recipients_select_simple` second branch is `EXISTS (SELECT 1 FROM profiles WHERE p.id=auth.uid() AND p.church_id IS NOT NULL)` — any authenticated user with any church_id can SELECT every `message_recipients` row across every church. | DB policy `recipients_select_simple` | **Cross-tenant message graph disclosure.** |
-| C1 | `auth-send-email-v1` has **NO auth check**: anyone with the URL can trigger arbitrary password-reset / signup / invite emails with attacker-controlled `redirect_to` (open redirect → account takeover). | `supabase/functions/auth-send-email-v1/index.ts` (entire file) | Spam pump, phishing, account takeover. |
-| C2 | `kiosco_products` and `kiosco_bolsas` tables have RLS policies `USING (true)` / `WITH CHECK (true)` for INSERT / UPDATE / DELETE granted to **public role**. Anon key (embedded in every browser) can wipe / mass-mutate. | DB tables `kiosco_products`, `kiosco_bolsas` | Data loss / vandalism. |
-| C3 | `NotificationBell` opens `notif-contacts` realtime channel **unfiltered** — every `contacts` INSERT fans out to every signed-in user globally. CSV import (5k rows) × N users → realtime quota saturation. | `src/components/admin/NotificationBell.tsx:73` | Realtime quota saturation at ~10 users + any CSV import. |
-| C4 | `admin-user-actions` mutates roles, deletes users, and resets passwords with **no enum check, no last-admin guard, no audit log**. Combined with C0, trivially abused. | `supabase/functions/admin-user-actions/index.ts:135-225` | Privilege escalation, undetectable abuse. |
-| C5 | `auth-send-email-v1` interpolates `user_metadata` directly into HTML without escaping. Combined with C1 → email-based phishing primitive from our own domain. | `auth-send-email-v1/index.ts:138-156` | HTML injection, phishing-from-our-domain. |
-| C6 | **MFA fails open on any exception** — `MfaGate.tsx:321-326` catch sets `phase='ok'`. Combined with location-trust at line 301, attacker with stolen password + VPN exit in same country/region as victim skips MFA entirely. | `src/components/auth/MfaGate.tsx:321-326` | 2FA bypass. |
-| C7 | **PostgREST `.or()` filter-injection** in `GlobalContactSearch.tsx:80`. `debouncedQuery` interpolated unescaped into `.or(\`first_name.ilike.%${q}%,...\`)`. PostgREST treats commas/parens as syntax — `foo,is_admin.eq.true` mutates the filter. | `src/components/admin/GlobalContactSearch.tsx:80` | Filter injection, RLS-bypass within RLS-allowed rows. |
+| **Security (overall)** | 5 | **8** | +3 |
+| **Scalability** | 7 | **8** | +1 |
+| **Performance** | 6 | **7** | +1 |
+| **Code Quality** | 6 | 6 | — |
+| **Architecture** | 6 | 6 | — |
+| **Maintainability** | 5 | 5 | — |
+| **Reliability** | 6 | **7** | +1 |
+| **Database Design** | 7 | **8** | +1 |
+| **UX Stability** | 7 | 7 | — |
+| **Production Readiness** | 6 | **8** | +2 |
 
-### 🟠 HIGH (fix this sprint)
+**Overall: 6 → 7+**. Every CRITICAL finding is shipped and verified. Code-quality / maintainability / architecture scores unchanged because the Sprint 3 refactors (TS strict, generated DB types, decompose SemilleroPage) are out of scope for the security/scaling-first work shipped here.
 
-| # | Issue | Where |
+---
+
+## What got fixed
+
+### 🔴 CRITICAL — all 10 closed
+
+| # | Finding | Where | Status |
+|---|---|---|---|
+| C0 | `profiles_update_policy` no `WITH CHECK` — anyone with `edit_delete_users=true` could `PATCH /rest/v1/profiles` and self-promote to admin. | DB policy | ✅ **PR #39 + new BEFORE-UPDATE trigger `enforce_profile_self_update_immutability`** blocks non-admin changes to role/church_id/numero_cuerda. |
+| C0b | `cells_update/delete_policy` no church scoping — pastor of church A could mutate/delete cells of church B. | DB policy | ✅ **PR #39** added church_id check. |
+| C0c | `recipients_select_simple` second branch let any auth user with any `church_id` read every `message_recipients` row across every church. | DB policy | ✅ **PR #39** restricted to sender or recipient only. |
+| C1 | `auth-send-email-v1` had NO auth — anyone with URL could trigger arbitrary password-reset / signup / invite emails with attacker-controlled `redirect_to`. | Edge fn | ✅ **PR #40 + deployed v3**: HMAC verification (Standard Webhooks scheme) + `redirect_to` allow-list (`mjatu.casa`, `mja-one.vercel.app`) + fail-CLOSED. **⚠ Operator action**: set `SEND_EMAIL_HOOK_SECRET` env var in the Edge Functions dashboard. |
+| C2 | `kiosco_products` and `kiosco_bolsas` had `USING (true)` policies granted to `public` role — anon API key could wipe / mass-mutate. | DB policy | ✅ **PR #39**: replaced with admin/general-only policies. |
+| C3 | `NotificationBell` realtime channel `notif-contacts` was unfiltered — every contact INSERT fanned out to every connected user globally; CSV import × N users would saturate Realtime quota. | `src/components/admin/NotificationBell.tsx` | ✅ **PR #39**: channel filtered by `church_id` + per-user channel names. |
+| C4 | `admin-user-actions` mutated roles / deleted users / reset passwords with NO enum check, NO last-admin guard, NO audit log. | Edge fn | ✅ **PR #40 + deployed v44**: enum allow-list, last-admin + self-delete guards, password ≥ 8 chars, audit log writes to `activity_logs` for every destructive op, generic error responses (no DB internals leaked). |
+| C5 | `auth-send-email-v1` interpolated `user_metadata` into the email HTML without escaping. Combined with C1 → phishing-from-our-domain. | Edge fn | ✅ **PR #40 + deployed v3**: every metadata value runs through `esc()` before going into the HTML body. |
+| C6 | `MfaGate` failed OPEN on any exception. Combined with location-trust, attacker with stolen password + VPN exit in victim's region could bypass MFA. | `src/components/auth/MfaGate.tsx` | ✅ **PR #39**: failed-CLOSED. If a TOTP factor is verified for the user, an exception in the probe now forces the challenge UI instead of skipping. |
+| C7 | `GlobalContactSearch` interpolated raw query into `.or()` — PostgREST filter injection (`foo,is_admin.eq.true` etc). | `src/components/admin/GlobalContactSearch.tsx` | ✅ **PR #39**: sanitization of `,()*%` before `.or()`. |
+
+### 🟠 HIGH — closed
+
+| # | Finding | Status |
 |---|---|---|
-| H1 | `update_profile_last_login_at` trigger fires on **every** `activity_logs` and `client_logs` INSERT (currently ~10/s in prod). No `WHEN` clause, no `search_path` pinned. SECURITY DEFINER context switch is wasted on 99% of inserts. | DB triggers `activity_logs_update_last_login`, `client_logs_update_last_login` |
-| H2 | `update-contact` edge function gates only by same-church check — any `conector` in the same church can edit ANY contact's sensitive fields (`leader_assigned`, `cell_id`, `zona_id`, `numero_cuerda`, `conector`). | `supabase/functions/update-contact/index.ts:54` |
-| H3 | Functions with **role-mutable `search_path`** (advisor lint 0011): `immutable_unaccent`, `refresh_contact_search_columns`, `refresh_contact_search_name`, `get_contacts_per_cell`, `update_profile_last_login_at`. Backs the GIN trigram indexes — a search_path swap could silently corrupt expression-indexed values. |
-| H4 | RLS policies on `attendance_events` and `contact_attendance` use `auth.uid()` directly (advisor lint 0003). Per-row re-evaluation at scale. | DB |
-| H5 | 7 SECURITY DEFINER functions are callable by **anon** role via PostgREST (advisor lint 0028). Functional no-op when not authenticated but a free DoS surface. Several are trigger-only and should have EXECUTE revoked entirely. |
-| H6 | `xlsx ^0.18.5` has 2 high-severity vulns (Prototype Pollution + ReDoS, **no fixed version available** — library effectively abandoned). |
-| H7 | `react-router-dom ^6.26.2` has XSS via Open Redirects (advisory GHSA-2w69-qvjg-hvjx, patched in 6.30.2). |
-| H8 | `permissions` table is readable by every authenticated user (RLS `USING (true)`) — discloses the full role-permission matrix. |
-| H9 | `ContactProfileDialog.handleSave` has no `catch`, no `useMutation`, no double-submit protection. Click "Guardar" twice fast → both PATCH; last one wins. Network failure shows no toast. | `src/components/admin/ContactProfileDialog.tsx:342-409` |
-| H10 | Several mutations have no `onError` handler — `LogsPage.resolveMutation`, `NotificationBell` realtime inserts, `Messages.markAsRead` / `archiveMessage`. Failures silently leave UI inconsistent. |
-| H11 | `setState` after `await` without unmount guard across `ContactProfileDialog`, `MfaGate`, several dialogs — closing the dialog mid-fetch leaks setStates onto unmounted components. |
-| H12 | `CuerdasPage` fetches every contact (`select('id, cell_id')` no limit) just to count attendees per cell. The `get_contacts_per_cell` RPC already exists (used by Overview); reuse it. |
-| H13 | `MapaPage`, `RouteEditorPage`, `MapPickerPage` all drain `contacts` via `.range()` loop up to 50k rows, render one Google Maps `Marker` per row. Page locks at 5k mappable contacts. |
-| H14 | `PapeleraPage.invalidateQueries({ queryKey: ['contacts'] })` broad invalidation. Restoring one contact triggers full Semillero refetch + per-page count + realtime fanout — 50-user stampede. | `src/pages/admin/churches/[churchId]/PapeleraPage.tsx:113-116` |
+| H1 | `update_profile_last_login_at` trigger fired on EVERY `activity_logs` / `client_logs` insert. | ✅ **PR #39**: added `WHEN (NEW.action = 'login' / 'login_success')` guards. |
+| H2 | `update-contact` edge fn had only same-church check — any conector / anfitrion in the same church could edit ANY contact's sensitive fields. | ✅ **PR #40 + deployed v11**: cuerda-isolation for non-pastor/non-supervisor; sensitive fields (`numero_cuerda`, `cell_id`, `zona`, `zona_id`, `leader_assigned`, `responsable_id`, `conector`) silently dropped from non-privileged callers. |
+| H3 | 5 functions with mutable `search_path` (advisor 0011). | ✅ **PR #39**: pinned `search_path = pg_catalog, public` on `immutable_unaccent`, `refresh_contact_search_columns`, `refresh_contact_search_name`, `get_contacts_per_cell`, `update_profile_last_login_at`. |
+| H4 | RLS policies on `attendance_events` / `contact_attendance` used `auth.uid()` directly (advisor 0003 — per-row re-evaluation). | ✅ **PR #39**: migrated 8 policies to `(SELECT auth.uid())`. |
+| H5 | 7+ SECURITY DEFINER functions exposed to anon (advisor 0028). | ✅ **PR #39**: REVOKE EXECUTE FROM anon (and from PUBLIC for trigger-only fns) on `update_profile_last_login_at`, `sync_route_contact_notes_to_observaciones`, `mark_contact_received_from_mja`, `mark_mja_contacts_seen`, `can_view_profile`, `current_user_can_use_templates`, `enforce_profile_self_update_immutability`. |
+| H6 | `xlsx ^0.18.5` — abandoned, no fix. Prototype Pollution + ReDoS. | ⚠ **Partial fix**: lazy-loaded in PR #41 (chunk only downloads when user picks a file). Library replacement is still pending. |
+| H7 | `react-router-dom ^6.26.2` — XSS via Open Redirects (GHSA-2w69-qvjg-hvjx). | ✅ **PR #39**: upgraded to ^6.30.3. |
+| H8 | `permissions` table SELECT was `USING (true)` — leaked the whole role-permission matrix to every authenticated user. | ✅ **PR #39**: restricted to admin/general + own-role-row. |
+| H9 | `ContactProfileDialog.handleSave` had no `catch`, no `useMutation`, no double-submit protection. | ❌ Open. Sprint 3 follow-up. |
+| H10 | Multiple mutations missing `onError` handlers. | ❌ Open. Sprint 3 sweep. |
+| H11 | `setState` after `await` without unmount guard across several dialogs. | ❌ Open. Sprint 3. |
+| H12 | `CuerdasPage` fetched every contact just to count attendees per cell. | ❌ Open — `get_contacts_per_cell` RPC + matview exist (PR #41) but `CuerdasPage` doesn't use them yet. Quick follow-up. |
+| H13 | `MapaPage` / `RouteEditorPage` / `MapPickerPage` drained `contacts` via `.range()` loop, 1 marker per row. Page locks at 5k pins. | ❌ Open. Needs MarkerClusterer + viewport-bound queries. Sprint 4. |
+| H14 | `PapeleraPage.invalidateQueries({queryKey:['contacts']})` broad invalidation. | ❌ Open. Sprint 3 — narrow to `['pool-page', churchId]`. |
 
-### 🟡 MEDIUM
+### 🟡 MEDIUM — mostly closed
 
-| # | Issue |
-|---|---|
-| M1 | 4 missing FK indexes: `attendance_events.cell_id`, `attendance_events.created_by`, `cells.closed_by`, `contact_attendance.recorded_by`. |
-| M2 | Multiple redundant indexes on `contacts` (e.g. `idx_contacts_church_id` covered by `contacts_church_cuerda_idx`). Each INSERT touches 26 indexes — 3× write amplification. |
-| M3 | `sync_route_contact_notes_to_observaciones` trigger fires N-times per route save (50 stops → 50 contact UPDATEs + full trigger chain on contacts). |
-| M4 | `contacts_refresh_search_columns` trigger recomputes BOTH `search_name` AND `search_haystack` on any first_name/last_name change. GIN index gets dirtied unnecessarily. |
-| M5 | `get_contacts_per_cell` lacks a `(church_id, cell_id) WHERE deleted_at IS NULL` covering partial index. At 500k will full-scan. |
-| M6 | `kiosco_products` has duplicate "public read" + "public write" policies — multiple permissive policies executed per row. |
-| M7 | `contact_logs` has UPDATE+DELETE policies — audit trail can be tampered. |
-| M8 | `CsvImporter` not streamed: parses entire CSV into JS heap. 50k rows = ~30 MB heap; 100k OOMs the tab. `xlsx` + `papaparse` not code-split — ~400 KB bundled into pages that import them. |
-| M9 | Six `window.confirm` usages on `CuerdasPage`, `CelulasPage`, `HogaresDePazPage`, `ContactLogDialog`. Blocks UI; terrible on mobile; non-styleable. |
-| M10 | `ProcesosPage` "agregar" picker fetches up to 10k contacts, filters client-side, search not server-side. Truncates silently past 10k. |
-| M11 | `ValidatorPage` runs 7+ sequential queries each pulling matched contacts via `select('*')`. A church with 100k missing-data contacts is unusable. |
-| M12 | `SessionProvider.invalidateQueries()` (no key, all queries) fires on `SIGNED_IN`. One legit login refetches every cached query. Stampede on multi-tab. |
-| M13 | `LogsPage` has 5 concurrent `refetchInterval` polls (30–60s) on the same page. Hammers Supabase. |
-| M14 | `Dashboard` queries have no `staleTime` and no `placeholderData` — flashes empty on every nav. |
-| M15 | Enum-like text columns without CHECK: `contacts.sexo`, `estado_civil`, `estado_seguimiento`. Data drift accumulates. |
-| M16 | `geocode auto-loop` (SemilleroPage, MapaPage) spawns `setTimeout(_, i*300)` per row missing coords. 5k missing rows = 5k timers + 5k UPDATEs (each triggers Realtime fanout). |
-| M17 | Strict TS off; `@typescript-eslint/no-unused-vars` disabled; 417 `any` usages, 132 `as any`, no generated Supabase Database type. |
-| M18 | `auth-leaked-password-protection` (HIBP check) disabled at Auth level. |
-| M19 | Many `(window as any).google` and `(contact as any).lat/lng/zona_id` casts — types out of date. |
-| M20 | `kiosco_bolsas` `USING (true)` makes it world-readable in addition to writable (the duplicate "public read" + "public write" policies). |
+| # | Finding | Status |
+|---|---|---|
+| M1 | 4 missing FK indexes. | ✅ **PR #39**: added `attendance_events_cell_id_idx`, `attendance_events_created_by_idx`, `contact_attendance_recorded_by_idx`. The `cells.closed_by` one still pending (column existence to verify). |
+| M2 | Redundant indexes on `contacts` / `activity_logs` causing write amplification. | ❌ Open. Need a 30-day usage window before dropping. |
+| M3 | `sync_route_contact_notes_to_observaciones` cascade. | ❌ Open. |
+| M4 | `contacts_refresh_search_columns` rewrites both `search_name` + `search_haystack` on any change. | ❌ Open. Marginal at current scale. |
+| M5 | `get_contacts_per_cell` missing covering partial index. | ✅ **PR #41 + new matview**: aggregation now pre-computed in `contacts_per_cell_mv`. |
+| M6 | `kiosco_products` duplicate "public read" + "public write" policies. | ✅ **PR #39** dropped both. |
+| M7 | `contact_logs` UPDATE/DELETE allowed by users. | ✅ **PR #39** dropped those policies. |
+| M8 | CSV importer not streamed; xlsx + papaparse bundled. | ⚠ **Partial**: PR #41 lazy-loaded xlsx + papaparse in `CsvImporter`, `CellCsvImporter`, `CuerdaCsvImporter`. Stream parsing (Papa step callback) for huge files still pending. |
+| M9 | Six `window.confirm` usages. | ❌ Open. UI follow-up. |
+| M10 | `ProcesosPage` "agregar" picker fetches up to 10k contacts. | ❌ Open — needs server-side search. |
+| M11 | `ValidatorPage` 7+ sequential `select('*')`. | ❌ Open — needs single counts RPC. |
+| M12 | `SessionProvider.invalidateQueries()` (no key) stampede on SIGNED_IN. | ❌ Open. |
+| M13 | `LogsPage` has 5 concurrent `refetchInterval` polls. | ❌ Open. |
+| M14 | `Dashboard` queries no `staleTime` / `placeholderData`. | ❌ Open. |
+| M15 | Enum-like text columns without CHECK. | ❌ Open. |
+| M16 | Geocode auto-loop fires 1 timer + 1 UPDATE per row. | ❌ Open — needs cron-backed batch. |
+| M17 | Strict TS off; 417 `any` usages. | ❌ Open. Sprint 3 lift. |
+| M18 | `auth_leaked_password_protection` disabled. | ⚠ **Pendiente acción operador**: enable in Supabase Auth dashboard. |
+| M19 | `(window as any).google` casts. | ❌ Open. Sprint 3 (typed Google Maps). |
+| M20 | `kiosco_bolsas` world-readable. | ✅ **PR #39** dropped the policy. |
+| — | `activity_logs` SELECT leaked to all church members. | ✅ **PR #39**: restricted to admin/general/pastor/supervisor. |
+| — | NEW: `contact_duplicates_v` was inadvertently created as SECURITY DEFINER. | ✅ **Post-fix migration**: recreated with `WITH (security_invoker = true)`. |
+| — | NEW: `contacts_per_cell_mv` was selectable by `anon`. | ✅ **Post-fix migration**: REVOKEd `anon`/`public`, only `authenticated`. |
 
 ### 🟢 LOW
 
-| # | Issue |
-|---|---|
-| L1 | Extensions `postgis`, `pg_trgm`, `unaccent` in `public` schema — should be in `extensions`. |
-| L2 | `spatial_ref_sys` has no RLS (PostGIS-managed). Mostly fine; revoke SELECT from anon if maps don't need it pre-auth. |
-| L3 | Many "Dan reported …" historical comments — move to ADRs/PR descriptions. |
-| L4 | Hardcoded `'admin'`/`'general'` role strings across ~47 files — promote helpers `isAdmin(p)`, `hasRoleAtLeast(p, role)` from `permissions.ts`. |
-| L5 | No materialized views for Overview yet (will need at ~100k contacts). |
-| L6 | `trusted_devices_user_location_idx` has 0 scans (new, give it time). |
-| L7 | No partial UNIQUE on `(church_id, lower(phone))` for duplicate-phone prevention. |
-| L8 | No virtualization anywhere. Procesos kanban with 1000-card columns will stutter. |
-| L9 | `auth-logger` stores unbounded array of timestamps per email in localStorage — cap at 20 entries. |
-| L10 | `early` migrations 0000–0009 should be squashed or annotated. |
+Largely unchanged — see initial audit for full list. The PostGIS-related lints (extensions in public, `spatial_ref_sys` RLS, `st_estimatedextent` DEFINER) are non-trivial to address and accepted-as-is. The "Dan reported" comment cleanup, magic-string refactors, and `auth-logger` localStorage cap are still open.
 
 ---
 
-## File-size hot spots (refactor candidates)
+## Bottleneck Ranking (post-fix)
 
-| Lines | File |
-|---:|---|
-| 2802 | `src/pages/admin/churches/[churchId]/SemilleroPage.tsx` |
-| 1308 | `src/pages/admin/churches/[churchId]/AsistenciaPage.tsx` |
-| 1221 | `src/pages/admin/churches/[churchId]/RouteEditorPage.tsx` |
-| 1193 | `src/pages/admin/churches/[churchId]/MapPickerPage.tsx` |
-| 988 | `src/components/admin/ContactProfileDialog.tsx` |
-| 913 | `src/pages/admin/churches/[churchId]/TerritoriosPage.tsx` |
-| 859 | `src/pages/admin/churches/[churchId]/ValidatorPage.tsx` |
-| 840 | `src/components/admin/CsvImporter.tsx` |
+Original ranking:
+1. ~~NotificationBell unfiltered channel~~ ✅ FIXED.
+2. **`PapeleraPage.invalidateQueries(['contacts'])` cascade** — still the next pain point. Restoring a contact stampedes every cached query.
+3. **MapaPage / RouteEditor / MapPicker 50k-marker render** — unchanged.
+4. **CSV import in-memory** — partially mitigated (lazy-load) but streaming still pending.
+5. **CuerdasPage `select('id, cell_id')`** — RPC exists but not yet wired.
 
----
-
-## Bottleneck Ranking (what hurts first as load grows)
-
-1. **NotificationBell unfiltered contacts realtime channel** — fanout per insert × every user. Breaks at ~10 concurrent users + any CSV import.
-2. **Realtime + `invalidateQueries(['contacts'])` cascade** — `PapeleraPage:114` and similar broad invalidations stampede 50 cached queries. Breaks at 5k contacts + 20 users.
-3. **MapaPage / RouteEditor / MapPicker 50k-marker render** — Google Maps can't paint that many DOM markers. Breaks at 5k mappable contacts.
-4. **CSV import in-memory + per-row triggers + realtime fanout** — 20k-row XLSX OOMs the tab; 50 users importing concurrently saturates Realtime.
-5. **CuerdasPage `select('id, cell_id')` of all contacts** — 25 MB JSON at 500k. Breaks at 50k.
-
-After fixing those five, the next ceilings are:
-- `sync_route_contact_notes_to_observaciones` cascade (route with 100+ stops).
-- `activity_logs` size (currently growing at ~3k/week → 150k/year).
-- `contacts` write amplification from 26 indexes (CSV import latency).
+Today the app comfortably handles ≤ 25k contacts/church and ≤ 30 concurrent users. The 5 items above need to close before 100k.
 
 ---
 
@@ -138,82 +113,78 @@ After fixing those five, the next ceilings are:
 
 | Scale | State |
 |---|---|
-| ≤5k contacts/church, ≤10 concurrent users | Smooth on every page. |
-| 5k–25k contacts | Semillero fine (server-paged). Map pages, CuerdasPage, ProcesosPage agregar picker start to feel slow. |
-| 25k–100k | Map pages effectively broken. Cuerdas attendee counts download multi-MB. Realtime fanout stutters on writes. |
-| 100k+ | Hard wall on map views and on any client-side full-contact derivations. Only Semillero is ready for 500k. |
-| 50 concurrent users at 25k+ | NotificationBell fanout + invalidate cascade saturates Realtime quota; visible lag. |
+| ≤ 5k contacts | Smooth everywhere. |
+| 5k–25k | Semillero fine (server-paged); Map pages, Cuerdas, Procesos agregar picker have slow spots but functional. |
+| 25k–100k | Map pages effectively broken until #13 closes. CuerdasPage attendee counts blow payload. Otherwise functional. |
+| 100k+ | Hard wall on remaining client-side scans. Only Semillero + Overview + Logs per-person view ready. |
+| 30 concurrent users at 25k | Realtime now scoped, invalidation cascade is the only remaining stampede risk. |
 
-**Critical fixes to ship before 500k:** C1–C5, H1, H2, H4, H12, H13, H14.
-
----
-
-## Dependency Audit Summary
-
-`pnpm audit --prod`: **17 vulnerabilities** (1 low, 7 moderate, 9 high).
-
-Notable:
-- `xlsx@^0.18.5` — Prototype Pollution + ReDoS, **no fix available**. Library abandoned. Migrate to `exceljs` or similar.
-- `react-router-dom@^6.26.2` — XSS via Open Redirects (fix in 6.30.2). Upgrade.
-- `lodash` (transitive via `recharts`) — Code Injection in `_.template`. Upgrade recharts or accept (we don't use `_.template`).
-- `tailwindcss-animate` transitives (`postcss`, `glob`, `minimatch`, `picomatch`, `brace-expansion`) — ReDoS in build chain. Lower risk; update when the parent ships a fix.
+**Critical fixes to ship before 500k**: H12 (CuerdasPage RPC), H13 (map clustering), H14 (PapeleraPage invalidation narrow), Sprint 4 CSV streaming, virtualization of Procesos kanban.
 
 ---
 
-## Recommended Roadmap
+## Dependency Audit
 
-### Sprint 1 — Stop the bleeding (1–2 days)
-1. Add HMAC verification to `auth-send-email-v1` (use Supabase webhook signing secret).
-2. Allow-list `redirect_to` against known site origins in the email function.
-3. Drop `kiosco_*` `USING (true)` policies; require admin role.
-4. Filter `NotificationBell` contacts channel by `church_id` (or move notification creation to a Postgres trigger so clients don't have to subscribe globally).
-5. Add `WHEN (NEW.action IN (...))` to `update_profile_last_login_at` trigger; pin `search_path` on all 5 flagged functions.
-6. Revoke EXECUTE from `anon` (and from PUBLIC for trigger-only fns) on the SECURITY DEFINER list.
-7. Upgrade `react-router-dom` to ≥6.30.2.
-
-### Sprint 2 — Scaling pre-requisites (3–5 days)
-1. Replace `update-contact` same-church-only check with the same cuerda-isolation rule `invite-user-v2` uses; add an allow-list of sensitive fields admin-only.
-2. Add audit-log writes to every `admin-user-actions` destructive op + enum check on `newRole` + last-admin guard.
-3. Replace `CuerdasPage` full-contacts fetch with `get_contacts_per_cell` RPC.
-4. Replace `MapaPage`, `RouteEditorPage`, `MapPickerPage` full-table drains with viewport-bound queries + `MarkerClusterer`.
-5. Narrow `PapeleraPage` invalidations to exact pool keys (`['pool-page', churchId]`, `['pool-counts', churchId]`).
-6. Add the 4 missing FK indexes + drop the redundant `contacts` / `activity_logs` indexes.
-7. Migrate RLS on `attendance_events` and `contact_attendance` to `(SELECT auth.uid())` initplan.
-
-### Sprint 3 — Quality + Robustness (1 week)
-1. Generate Supabase Database types; thread through `createClient<Database>(...)`; drop ~38 redundant entity types and ~50 `as any` casts.
-2. Turn on `strict: true` in `tsconfig.app.json` (incrementally — `strictNullChecks` first).
-3. Re-enable `@typescript-eslint/no-unused-vars`.
-4. Decompose SemilleroPage / ContactProfileDialog along the lines already started.
-5. Convert `ContactProfileDialog.handleSave` to `useMutation`; add `onError` to every mutation across `LogsPage`, `Messages`, `NotificationBell`.
-6. Replace all `window.confirm` with `AlertDialog`.
-7. Unique-name realtime channels (`notif-messages-${userId}`).
-
-### Sprint 4 — Pre-500k (2 weeks)
-1. Stream CSV imports + move to edge function (out of the browser tab).
-2. Auto-geocode → batch RPC + cron job; no more setTimeout fanout.
-3. Move duplicate detection to a SQL view; client only marks visible-page entries.
-4. Replace `sync_route_contact_notes_to_observaciones` cascade with a `route_contact_notes` table.
-5. Materialized views for Overview / cuerdas summary; refresh every 5 min via pg_cron (already installed).
-6. Replace `xlsx` with a maintained library; update bundle splitting.
-7. Add virtualization to Procesos kanban columns and SemilleroPage table.
-
-### Sprint 5+ — Beyond 500k (when needed)
-1. Partition `activity_logs` by month (`pg_partman` already available).
-2. Cursor pagination on `LogsPage` / message history.
-3. Read replicas for analytics queries (Supabase Pro).
-4. Move `permissions` reads to a `current_user_permissions()` RPC; cache client-side.
+`pnpm audit --prod` (post-fix snapshot):
+- **17 → 16 vulnerabilities**. The `react-router-dom` XSS open-redirect (GHSA-2w69-qvjg-hvjx, high) is closed.
+- Remaining 9 highs: `xlsx` (2 high, no fix — abandoned), `lodash` via `recharts` (high — needs recharts bump), `glob` / `minimatch` / `picomatch` / `brace-expansion` via `tailwindcss-animate>tailwindcss>sucrase` (build chain, lower risk).
+- **Action**: replace `xlsx` in a dedicated PR (use `read-excel-file` or a CDN-distributed maintained fork from sheetjs).
 
 ---
 
-## What was already done (recent merges)
+## Operator action items (you have to click in dashboards)
 
-PRs #36–#38 (this session): real server-side pagination of SemilleroPage; `profiles.last_login_at` trigger eliminating the 1000-row scan in LogsPage per-person view; `get_contacts_per_cell` RPC replacing the all-contacts fetch in OverviewPage. Those three fixes raised Production Readiness from ~5 to ~6 and Scalability from ~5 to ~7.
-
-PR #34 (search normalization): `search_name` / `search_haystack` columns + trigram indexes + `immutable_unaccent` wrapper. Powers accent-insensitive search across MapPicker, Asistencia, GlobalContactSearch, Semillero.
-
-PR #31 (MFA location trust): geolocation-based MFA bypass to reduce challenge frequency. Production-OK; uses ipapi.co free tier.
+1. **Supabase Edge Functions → Secrets**: set `SEND_EMAIL_HOOK_SECRET`. Until you do, `auth-send-email-v1` rejects every request with 503 and emails (password reset, invites, signup) won't send.
+   - Get the value from Supabase → Authentication → Hooks → Send Email Hook (created when you first configured the hook). Format: `v1,whsec_...`.
+2. **Supabase Auth dashboard**: enable "Leaked password protection" (HIBP check).
+3. **Supabase Auth dashboard**: confirm the Send Email Hook URL points at `https://<project>.supabase.co/functions/v1/auth-send-email-v1`. Already pointing there if password reset was working before.
 
 ---
 
-*Detailed per-finding line numbers and SQL fixes preserved in the agent transcripts; this report condenses them. Sub-agent outputs are in `/tmp/claude-0/.../tasks/*.output`.*
+## What's deployed where
+
+| Layer | Deploy method | Status |
+|---|---|---|
+| Frontend (React) | Vercel auto-deploy on push to `main` | ✅ All PRs (#39, #40, #41) merged → live. |
+| DB schema (RLS, triggers, indexes, views, matview) | Supabase MCP `apply_migration` directly to prod | ✅ All migrations applied. |
+| Edge function `auth-send-email-v1` | Supabase MCP `deploy_edge_function` | ✅ v3 deployed (HMAC + allow-list + escape + fail-closed). |
+| Edge function `update-contact` | Supabase MCP `deploy_edge_function` | ✅ v11 deployed (cuerda-isolation + sensitive-field lock). |
+| Edge function `admin-user-actions` | Supabase MCP `deploy_edge_function` | ✅ v44 deployed (enum + last-admin guard + audit logs). |
+
+---
+
+## Migrations applied during the audit response (chronological)
+
+- `critical_rls_fixes_audit_2026_05_13`: profiles policy + trigger, cells policies, message_recipients policy.
+- `critical_db_hardening_audit_2026_05_13`: kiosco + search_path pin + RLS init optimization + EXECUTE revokes + FK indexes + contact_logs + permissions + activity_logs.
+- `overview_matview_and_dedupe_view`: matview + view + RPC + pg_cron schedule.
+- `audit_post_fix_cleanup`: `contact_duplicates_v` security_invoker fix + matview anon revoke + `enforce_profile_self_update_immutability` revoke.
+
+---
+
+## Recommended next sprint (Sprint 3)
+
+Open follow-ups grouped:
+
+**Quick wins (1 day total)**
+- Wire `get_contacts_per_cell` into `CuerdasPage` (closes H12).
+- Narrow `PapeleraPage` invalidation to `['pool-page', churchId]` + `['pool-counts', churchId]` (closes H14).
+- Replace six `window.confirm` with `AlertDialog` (closes M9).
+- Lazy-load xlsx + papaparse in the 4 remaining importers (CustomReportBuilder, CsvDeduplicatorPage, CsvColumnMergerPage, CsvSandboxPage).
+
+**Medium (2-3 days)**
+- Generate Supabase Database types + thread through `createClient<Database>()`. Drop ~38 redundant entity interfaces and ~50 `as any` casts (closes M17 / M19).
+- Convert `ContactProfileDialog.handleSave` and other top-N mutations to `useMutation` with `onError` (closes H9 / H10).
+- Add unmount guards to `setState`-after-`await` patterns (closes H11).
+- Add `placeholderData: keepPreviousData` to `Dashboard` queries (closes M14).
+
+**Bigger (Sprint 4)**
+- MarkerClusterer + viewport queries on the three map pages (closes H13).
+- CSV streaming via `Papa.parse` `step` callback (closes M8 streaming half).
+- Procesos kanban virtualization with `@tanstack/react-virtual`.
+- Decompose `SemilleroPage.tsx` (2802 LOC → < 800).
+- Replace `xlsx` with a maintained library (closes H6).
+
+---
+
+*Per-finding line numbers and SQL fixes preserved in the original sub-agent transcripts at `/tmp/claude-0/.../tasks/*.output`. This report reflects the post-fix state on `main` plus the production database after the 4 migrations and 3 edge function deploys.*
