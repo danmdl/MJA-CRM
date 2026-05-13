@@ -201,7 +201,8 @@ const TerritoriosPage: React.FC = () => {
     if (cuerda.is_church_cuerda) return false; // hard rule everywhere
     if (profile.role === 'admin' || profile.role === 'general') return true;
     if (profile.role === 'pastor') return true; // pastor scoped to their iglesia by sidebar/route already
-    if (profile.role === 'referente') {
+    if (profile.role === 'referente' || profile.role === 'gestor_de_cuerda') {
+      // Both referente and gestor_de_cuerda only edit their own cuerda's territory.
       return profile.numero_cuerda === cuerda.numero;
     }
     return false;

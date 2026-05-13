@@ -151,7 +151,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         });
         if (resp.ok) {
           const data = await resp.json();
-          const leaderRoles = ['pastor', 'referente', 'encargado_de_celula', 'general'];
+          const leaderRoles = ['pastor', 'referente', 'gestor_de_cuerda', 'encargado_de_celula', 'general'];
           return (data || [])
             .filter((u: any) => leaderRoles.includes(u.role))
             .map((u: any) => ({

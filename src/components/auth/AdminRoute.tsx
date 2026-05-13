@@ -57,7 +57,7 @@ const AdminRoute = ({ children, requiredPermission }: AdminRouteProps) => {
   // otherwise consolidadores would be locked out of /admin entirely.
   if (location.pathname.startsWith('/admin')) {
     const userRole = profile?.role;
-    const isChurchRole = ['pastor', 'referente', 'encargado_de_celula', 'consolidador', 'conector', 'supervisor', 'anfitrion'].includes(userRole || '');
+    const isChurchRole = ['pastor', 'referente', 'gestor_de_cuerda', 'encargado_de_celula', 'consolidador', 'conector', 'supervisor', 'anfitrion'].includes(userRole || '');
     const hasBroadAccess = canSeeAllChurches();
 
     if (!hasBroadAccess && !isChurchRole) {

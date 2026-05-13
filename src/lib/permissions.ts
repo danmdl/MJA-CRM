@@ -42,7 +42,10 @@ export interface PermissionData {
 
 // Role hierarchy: higher index = higher privilege.
 // anfitrion is the lowest tier (household/cell host).
-const ROLE_HIERARCHY: string[] = ['anfitrion', 'conector', 'consolidador', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
+// gestor_de_cuerda sits between encargado_de_celula and referente:
+// same permission grants as referente but explicitly subordinate so
+// canManageUser correctly treats the referente as the one in charge.
+const ROLE_HIERARCHY: string[] = ['anfitrion', 'conector', 'consolidador', 'encargado_de_celula', 'gestor_de_cuerda', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
 
 export const getRoleLevel = (role: string): number => {
   const idx = ROLE_HIERARCHY.indexOf(role);
@@ -55,6 +58,7 @@ export const ROLE_LABELS: Record<string, string> = {
   general: 'General',
   pastor: 'Pastor',
   referente: 'Referente',
+  gestor_de_cuerda: 'Gestor de Cuerda',
   encargado_de_celula: 'Líder de Célula',
   consolidador: 'Consolidador',
   conector: 'Conector',
