@@ -318,11 +318,36 @@ export const MfaGate: React.FC<{ children: React.ReactNode }> = ({ children }) =
         } else {
           setPhase('ok'); // optional — user can enable from Profile later
         }
-      } catch {
-        // If anything in the MFA probe blows up, fail-open so we don't
-        // lock the user out of their own app. The Profile screen still
-        // lets them enroll/manage manually.
-        if (!cancelled) setPhase('ok');
+      } catch (probeError) {
+        // Fail-OPEN was the previous behavior, but that combined with
+        // location-trust meant an attacker with stolen password + a VPN
+        // exit node in the user's region could skip MFA entirely whenever
+        // the probe hit a transient failure (which the catch swallowed).
+        // Fail-CLOSED for users who have MFA enrolled: surface the
+        // challenge so they have to prove their second factor. Only
+        // fail-open for users with no factor — no second factor to
+        // demand — and even there we log loudly so the operator sees
+        // the probe failures.
+        console.error('[MfaGate] probe failed', probeError);
+        if (cancelled) return;
+        try {
+          const { data: factors } = await supabase.auth.mfa.listFactors();
+          const verifiedTotp = factors?.totp?.find((f: any) => f.status === 'verified');
+          if (verifiedTotp) {
+            // Force the challenge — never let a probe failure bypass MFA
+            // for a user who has set it up.
+            setFactorId(verifiedTotp.id);
+            setPhase('challenge');
+            return;
+          }
+        } catch (e2) {
+          // Even listFactors failed — at this point we genuinely can't
+          // tell whether MFA is required. Choose to render children
+          // (consistent with prior behavior) but log the double-failure
+          // for ops.
+          console.error('[MfaGate] listFactors fallback also failed', e2);
+        }
+        setPhase('ok');
       }
     })();
     return () => { cancelled = true; };

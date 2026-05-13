@@ -46,8 +46,20 @@ const NotificationBell = () => {
     loadUnreadCount();
     loadNewContacts();
 
-    // Subscribe to new messages
-    const msgChannel = supabase.channel('notif-messages')
+    // Channel names are per-user so two tabs / two NotificationBell
+    // instances don't collide. The generic 'notif-messages' /
+    // 'notif-contacts' names that used to be here meant the second
+    // mount's removeChannel could tear down the first's subscription.
+    //
+    // contacts subscription is scoped server-side to the user's church
+    // (filter: church_id=eq.X). The old unfiltered subscription was a
+    // serious scalability hazard: every contact INSERT across every
+    // church fanned out to every connected user, and the client then
+    // wrote one notifications row per delivery. A CSV import of 5k
+    // contacts × N users would saturate Realtime quota immediately
+    // and storm the notifications table. Filtering at the channel
+    // level pushes that filter to the Realtime broker.
+    const msgChannel = supabase.channel(`notif-messages-${userId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -56,48 +68,61 @@ const NotificationBell = () => {
       }, async (_payload: any) => {
         loadUnreadCount();
         try { new Audio(NOTIF_SOUND_URL).play().catch(() => {}); } catch {}
-        // Persist notification
-        await supabase.from('notifications').insert({
-          user_id: userId,
-          church_id: profile?.church_id || null,
-          type: 'message',
-          title: 'Nuevo mensaje',
-          message: 'Tenés un mensaje sin leer.',
-          link: '/admin/messages',
-          read: false,
-        });
-      })
-      .subscribe();
-
-    // Subscribe to new contacts
-    const contactChannel = supabase.channel('notif-contacts')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'contacts',
-      }, async (payload: any) => {
-        loadNewContacts();
-        const contact = payload.new;
-        if (contact?.created_by !== userId) {
+        try {
           await supabase.from('notifications').insert({
             user_id: userId,
             church_id: profile?.church_id || null,
-            type: 'contact',
-            title: 'Nuevo contacto',
-            message: `${contact?.first_name || 'Alguien'} fue agregado al Semillero.`,
-            link: `/admin/churches/${profile?.church_id}/pool`,
+            type: 'message',
+            title: 'Nuevo mensaje',
+            message: 'Tenés un mensaje sin leer.',
+            link: '/admin/messages',
             read: false,
           });
+        } catch (e) {
+          console.error('[NotificationBell] failed to persist message notification', e);
         }
       })
       .subscribe();
+
+    // Only listen to contacts in the user's own church. Globals
+    // (admin/general without a church_id) keep the unfiltered behavior
+    // by skipping this subscription entirely — they'd be drowned in
+    // events from every iglesia otherwise.
+    const contactChannel = profile?.church_id
+      ? supabase.channel(`notif-contacts-${userId}`)
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'contacts',
+            filter: `church_id=eq.${profile.church_id}`,
+          }, async (payload: any) => {
+            loadNewContacts();
+            const contact = payload.new;
+            if (contact?.created_by !== userId) {
+              try {
+                await supabase.from('notifications').insert({
+                  user_id: userId,
+                  church_id: profile.church_id,
+                  type: 'contact',
+                  title: 'Nuevo contacto',
+                  message: `${contact?.first_name || 'Alguien'} fue agregado al Semillero.`,
+                  link: `/admin/churches/${profile.church_id}/pool`,
+                  read: false,
+                });
+              } catch (e) {
+                console.error('[NotificationBell] failed to persist contact notification', e);
+              }
+            }
+          })
+          .subscribe()
+      : null;
 
     // Refresh every 60s
     const interval = setInterval(() => { loadUnreadCount(); loadNewContacts(); }, 60000);
 
     return () => {
       supabase.removeChannel(msgChannel);
-      supabase.removeChannel(contactChannel);
+      if (contactChannel) supabase.removeChannel(contactChannel);
       clearInterval(interval);
     };
   }, [userId, profile?.church_id]);

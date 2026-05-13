@@ -72,12 +72,22 @@ const GlobalContactSearch = ({ open, onOpenChange }: GlobalContactSearchProps) =
       // Phone is stored verbatim (with dashes / spaces sometimes) so
       // the match is fuzzy on that too. Limit 20 keeps the UI
       // responsive — if the user wants more they should refine the term.
-      const normalizedQuery = normalize(debouncedQuery);
+      // PostgREST .or() takes a raw filter string and treats commas /
+      // parens / dots as syntax. Without escaping, a query like
+      // "foo,is_admin.eq.true" or "foo)),first_name.ilike.%a%" would
+      // mutate the filter and let an attacker compose additional
+      // clauses inside the OR group. Strip those characters from
+      // anything that goes through .or(); they have no useful meaning
+      // for a name / phone search anyway. SQL injection-equivalent
+      // for this layer.
+      const safeForOr = (s: string) => s.replace(/[,()*]/g, '').replace(/%/g, '');
+      const normalizedQuery = safeForOr(normalize(debouncedQuery));
+      const safePhone = safeForOr(debouncedQuery);
       let q = supabase
         .from('contacts')
         .select('id, first_name, last_name, phone, numero_cuerda, church_id, churches!inner(name)')
         .is('deleted_at', null)
-        .or(`search_name.ilike.%${normalizedQuery}%,phone.ilike.%${debouncedQuery}%`)
+        .or(`search_name.ilike.%${normalizedQuery}%,phone.ilike.%${safePhone}%`)
         .limit(20);
       // Below-supervisor: only own cuerda. If the user has no cuerda set
       // they shouldn't be searching at all — return empty to avoid leaking.
