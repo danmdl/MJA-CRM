@@ -6,8 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+// Papa and XLSX are loaded lazily inside parseFile() so the ~400KB
+// xlsx chunk doesn't ship with the SemilleroPage / CelulasPage
+// initial loads. The audit flagged xlsx as the worst bundle whale.
+type PapaModule = typeof import('papaparse');
+type XLSXModule = typeof import('xlsx');
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
   Select,
@@ -82,7 +85,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
     }
   };
 
-  const parseFile = (selectedFile: File) => {
+  const parseFile = async (selectedFile: File) => {
     setFile(selectedFile);
     setImportSuccess(false);
     setImportErrors([]);
@@ -93,7 +96,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
     const isXlsx = /\.xlsx?$/i.test(selectedFile.name);
 
     if (isXlsx) {
-      // Parse XLSX with SheetJS
+      // Parse XLSX with SheetJS — load the library only when the user
+      // actually picks an .xlsx file (saves ~400KB on the initial
+      // load of pages that mount CsvImporter).
+      const XLSX = (await import('xlsx')) as XLSXModule;
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -117,7 +123,8 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       };
       reader.readAsArrayBuffer(selectedFile);
     } else {
-      // Parse CSV with PapaParse
+      // Parse CSV with PapaParse — lazy-loaded with xlsx.
+      const Papa = (await import('papaparse')).default as PapaModule['default'];
       const reader = new FileReader();
       reader.onload = (e) => {
         let text = e.target?.result as string;

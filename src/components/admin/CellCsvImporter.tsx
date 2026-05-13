@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, X, MapPin, Loader2 } from 'lucide-react';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+// Papa + XLSX lazy-loaded inside handleFile; see CsvImporter.tsx
+// for the same pattern + audit rationale (bundle whale).
+type PapaModule = typeof import('papaparse');
+type XLSXModule = typeof import('xlsx');
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -76,7 +78,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
     setImporting(false); setImportResult(null);
   };
 
-  const handleFile = (f: File) => {
+  const handleFile = async (f: File) => {
     setFile(f); setImportResult(null);
     const isXlsx = /\.xlsx?$/i.test(f.name);
 
@@ -102,6 +104,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
     };
 
     if (isXlsx) {
+      const XLSX = (await import('xlsx')) as XLSXModule;
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -116,6 +119,7 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
       };
       reader.readAsArrayBuffer(f);
     } else {
+      const Papa = (await import('papaparse')).default as PapaModule['default'];
       const reader = new FileReader();
       reader.onload = (e) => {
         let text = e.target?.result as string;
