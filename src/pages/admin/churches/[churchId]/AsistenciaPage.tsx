@@ -198,15 +198,15 @@ const AsistenciaPage = () => {
   };
 
   // ── Render ─────────────────────────────────────────────────────────
-  // The page uses a column-flex layout with the calendar branch
-  // claiming the remaining vertical space. The whole shell is
-  // h-full so the AdminLayout's <main overflow:auto> doesn't get a
-  // chance to scroll — the calendar's own MonthGrid sizes are tight
-  // enough to fit 12 months in a single viewport at xl+.
+  // The page is content-sized — let AdminLayout's <main overflow:auto>
+  // handle scroll if the year calendar ever overflows. We don't try
+  // to force fit-in-viewport with h-full + flex-1 anymore because
+  // that was stretching the month grids vertically and squashing the
+  // month labels against their top edge with empty space underneath.
   return (
-    <div className="h-full flex flex-col p-3 sm:p-4">
+    <div className="p-3 sm:p-4">
       {/* Header: title + Nuevo evento. Compact, single row. */}
-      <div className="flex flex-wrap items-center gap-3 mb-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-3 mb-2">
         <h1 className="text-lg sm:text-xl font-bold">Asistencia</h1>
         <span className="text-xs text-muted-foreground hidden md:inline">Registro ligado a las etapas de Procesos</span>
         <div className="flex-1" />
@@ -243,12 +243,14 @@ const AsistenciaPage = () => {
         </div>
       ) : tab === 'todos' ? (
         // ─── Calendario view ─────────────────────────────────────────
-        // Fills the remaining viewport height. The legend + year nav
-        // sit on a single shrink-0 row; the calendar grid takes the
-        // rest with flex-1 + overflow-hidden so 12 months render
-        // without forcing a page scroll.
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 shrink-0 text-[11px]">
+        // Sized to content — let the year grid pack itself tightly
+        // instead of stretching to fill the viewport. The 6×2
+        // layout already keeps the 12 months above the fold on
+        // desktop; making the container flex-1 was just inflating
+        // each month box and visually squishing the month label
+        // against the top.
+        <div className="overflow-y-auto">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-[11px]">
             <div className="inline-flex items-center gap-1 border rounded-md">
               <button onClick={() => setYear(y => y - 1)} className="p-1 hover:bg-muted/50 rounded-l-md" title="Año anterior">
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -392,9 +394,14 @@ const YearCalendar = ({ year, events, onDayClick, onEventClick, onEventEdit, onE
   // fits in the viewport without page scroll. Drops to 4×3 on lg,
   // 3×4 on md, 2×6 on sm, 1×12 on phone (mobile keeps scroll —
   // making 12 mini-calendars share a phone viewport is hostile).
+  // No h-full on the grid: each MonthGrid sizes to its content
+  // (~210px) so the boxes don't stretch to fill empty space when
+  // the viewport is taller than the calendar needs. The month
+  // name stays full-size at the top instead of getting visually
+  // squashed by an oversized container.
   return (
-    <div className="relative flex-1 min-h-0">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 h-full">
+    <div className="relative">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
         {Array.from({ length: 12 }, (_, monthIdx) => (
           <MonthGrid
             key={monthIdx}
@@ -460,8 +467,8 @@ const MonthGrid = ({ year, month, byDate, onDayClick }: {
   // = ~360px, comfortably under a typical viewport's calendar
   // budget after the page header / etapa tabs / legend.
   return (
-    <div className="border rounded-md p-1.5 bg-card flex flex-col min-h-0">
-      <div className="text-[11px] font-semibold mb-1 leading-none">{MONTH_NAMES[month]}</div>
+    <div className="border rounded-md p-1.5 bg-card">
+      <div className="text-xs font-semibold mb-1.5 leading-tight">{MONTH_NAMES[month]}</div>
       <div className="grid grid-cols-7 gap-px text-[9px] text-muted-foreground mb-0.5">
         {WEEKDAYS.map((d, i) => <div key={i} className="text-center leading-none">{d}</div>)}
       </div>

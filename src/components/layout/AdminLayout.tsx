@@ -147,11 +147,15 @@ const AdminLayout = () => {
             so we keep the topbar for the hamburger trigger there. */}
         <div
           style={{
-            // Inline display has to react to the hide condition — putting
-            // it in a className wouldn't work because the inline `display:
-            // flex` below would override Tailwind's `.hidden` rule. So we
-            // toggle `display` directly here.
-            display: (isInsideChurch && !isFullWidthPage) ? 'none' : 'flex',
+            // Hide the top bar entirely once we're inside a specific
+            // church — ChurchDetailsLayout renders its own hamburger
+            // on the tab row so duplicating one up here just eats
+            // 44px of vertical space and confuses the user. Previously
+            // we exempted "full width" pages (Procesos, Asistencia)
+            // but those have the ChurchDetailsLayout hamburger too,
+            // so the exemption was a leftover from when those pages
+            // weren't nested under ChurchDetailsLayout.
+            display: isInsideChurch ? 'none' : 'flex',
             height: 44, flexShrink: 0,
             borderBottom: '1px solid rgba(255,255,255,0.07)',
             alignItems: 'center',
