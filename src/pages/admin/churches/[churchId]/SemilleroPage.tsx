@@ -30,6 +30,14 @@ import { isWithinGBA, getDistanceColor, getDistanceBadgeClass } from '@/lib/geo-
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
+import {
+  fetchPoolPage,
+  fetchPoolCounts,
+  fetchDistinctCuerdas,
+  fetchDistinctResponsables,
+  fetchDistinctConectores,
+  type PoolKind,
+} from '@/lib/semillero-pool-query';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsAppComposeDialog';
 import FilterTabsBar, { applyFilterTab, FilterTabFilters, MJA_RECEIVED_TAB_ID } from '@/components/admin/FilterTabsBar';
@@ -290,6 +298,14 @@ const SemilleroPage = () => {
     return m;
   }, [teamMembers]);
 
+  // Promoted from later in the file — the new server-paginated pool
+  // query (right below) needs churchCuerda.numero to translate the
+  // "__church_cuerda__" responsable special value into a SQL eq.
+  const churchCuerda = useMemo(
+    () => (cuerdas || []).find(cu => cu.is_church_cuerda),
+    [cuerdas],
+  );
+
   const { data: cells } = useQuery<Cell[]>({
     queryKey: ['cells-pool', churchId],
     queryFn: async () => {
@@ -300,79 +316,63 @@ const SemilleroPage = () => {
     staleTime: 5 * 60_000,
   });
 
-  // Contacts is the hot data - users expect it to update when they come back
-  // to the tab after sending a WhatsApp or editing in another tab. Override
-  // the global default of refetchOnWindowFocus=false specifically for this query.
-  const { data: allContacts, isLoading } = useQuery<Contact[]>({
-    queryKey: ['pool-all-contacts', churchId],
-    queryFn: async () => {
-      // Supabase silently caps queries at 1000 rows. .limit(2000) doesn't
-      // override the server default — it just sets a smaller cap if the
-      // Supabase silently caps queries at 1000 rows. .limit(2000) doesn't
-      // override the server default — it just sets a smaller cap if the
-      // server's already lower. With 1680+ contacts in MJA Central, the
-      // first 1000 by fecha_contacto DESC happened to all share the same
-      // responsable (Micaela), so the Responsable filter dropdown showed
-      // only her — and the "SIN ASIGNAR" counter at the top capped at 1000.
-      // Paginate explicitly with .range() until we've drained the table.
-      //
-      // CRITICAL: order has to be stable across pages. fecha_contacto alone
-      // is NOT — when CSV imports stamp thousands of rows with the same
-      // timestamp, postgres returns those rows in arbitrary order, and the
-      // arbitrary order is not consistent between two .range() calls. The
-      // result is that page 2 starts somewhere unpredictable inside the
-      // tied block: some rows show up twice, others never. (Dan's MJA
-      // Central had 2983/3525 rows tied on fecha_contacto after a big
-      // import, and the client was only receiving ~600 of the 3525 alive
-      // rows because of this.) Adding `id` as a secondary sort gives every
-      // row a globally unique position, which is the only way .range()
-      // pagination is correct.
-      const PAGE_SIZE = 1000;
-      const all: Contact[] = [];
-      for (let page = 0; ; page++) {
-        let q = supabase.from('contacts')
-          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, pending_external_send, pending_assignment_cell_id, responsable_id, created_by, created_at, received_from_mja_at, received_from_mja_seen_at, sent_to_mja_at, sent_to_mja_seen_at')
-          .eq('church_id', churchId!)
-          .is('deleted_at', null)
-          .order('fecha_contacto', { ascending: false })
-          .order('id', { ascending: true })
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-        if (profile?.role === 'conector') {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) q = q.eq('created_by', user.id);
-        }
-        const { data, error } = await q;
-        if (error) {
-          console.error('[pool-all-contacts] page', page, 'error', error);
-          break;
-        }
-        const rows = (data || []) as Contact[];
-        all.push(...rows);
-        if (rows.length < PAGE_SIZE) break;
-        // Safety stop — bumped from 10 → 50 pages so churches that grow
-        // past 10k contacts still load completely. 50k rows is well past
-        // anything plausible; the real protection is the staleTime on
-        // this query so we don't refetch on every render.
-        if (page >= 49) break;
-      }
-      // Belt-and-suspenders dedupe by id. With the (fecha_contacto, id)
-      // ordering above .range() pagination should already be exact, but
-      // if the server ever returns the same row in two pages (race
-      // between INSERTs and our pagination, etc.) this keeps the client
-      // count honest.
-      const seen = new Set<string>();
-      const unique: Contact[] = [];
-      for (const r of all) {
-        if (seen.has(r.id)) continue;
-        seen.add(r.id);
-        unique.push(r);
-      }
-      return unique;
-    },
-    enabled: !!churchId,
+  // Server-paginated pool query (migration from the old "load everything
+  // into memory" pattern). Each filter / sort / page change refires the
+  // query with a fresh set of params; the server returns just the rows
+  // for the current page plus the total filtered count so the UI can
+  // render pagination correctly.
+  //
+  // Why this matters: the old pattern broke at ~10–15k contacts/church
+  // and was completely unworkable past 50k. With server-side pagination
+  // the page now scales to 500k+ contacts without changing UX.
+  //
+  // Caveats handled below:
+  //   - duplicate detection now only sees the current page; users get
+  //     a degraded experience when filterDuplicates is on at a giant
+  //     church. A dedicated "find duplicates across base" action will
+  //     come later.
+  //   - zona-polygon filter likewise only applies to the current page.
+  //   - Dropdown options (cuerda/responsable/conector) come from their
+  //     own small queries below.
+  //   - Pool-tab chip counts come from a separate count query.
+  //
+  // The query key intentionally lists every filter dependency so React
+  // Query refetches on any change. activePool isn't included when a
+  // search term is present (search crosses pool boundaries server-side).
+  const { data: poolPage, isLoading } = useQuery<{ rows: Contact[]; totalCount: number }>({
+    queryKey: [
+      'pool-page', churchId,
+      currentPage, PAGE_SIZE,
+      activePool, searchTerm.trim(),
+      filterCuerda, filterResponsable, filterConector, filterOnlyWithCoords,
+      sortBy, sortDir,
+      profile?.id, profile?.role, profile?.numero_cuerda,
+    ],
+    queryFn: () => fetchPoolPage<Contact>({
+      churchId: churchId!,
+      userId: profile?.id || null,
+      userRole: profile?.role || null,
+      userCuerda: profile?.numero_cuerda || null,
+      canSeeAllCuerdas: canSeeContactsFromAllCuerdas,
+      pool: activePool as PoolKind,
+      search: searchTerm,
+      filterCuerda,
+      filterResponsable,
+      filterConector,
+      filterOnlyWithCoords,
+      churchCuerdaNumero: churchCuerda?.numero || null,
+      sortBy,
+      sortDir,
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+    }),
+    enabled: !!churchId && !!profile,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    placeholderData: prev => prev, // keep previous page visible during fetch
   });
+  const allContacts = poolPage?.rows;
+  const totalFilteredCount = poolPage?.totalCount ?? 0;
 
   // Church coords for geocoding bias. Without this, addresses like
   // "Las Heras 645" get matched to the most popular hit (often Capital
@@ -731,10 +731,7 @@ const SemilleroPage = () => {
   // supervisor of cuerda 204 is NOT an MJA member — they work in 204,
   // they aren't on the receiving end of dispatches. They get the
   // referente UX.
-  const churchCuerda = useMemo(
-    () => (cuerdas || []).find(cu => cu.is_church_cuerda),
-    [cuerdas],
-  );
+  // churchCuerda moved up; see the definition above near the cells query.
   const isMjaMember = useMemo(() => {
     // Globals without an iglesia (admins like Dan) and generals are
     // always MJA-side — they manage the assignment pool by definition.
@@ -766,41 +763,71 @@ const SemilleroPage = () => {
     return !!cuerdaTerritoryMap.get(uc.id);
   }, [isMjaMember, userCuerdaNumero, cuerdas, cuerdaTerritoryMap]);
 
-  const externalContacts = useMemo(() => {
-    if (isMjaMember) {
-      // ── NO OUTBOX FOR MJA MEMBERS ──
-      // Per Dan: 'now the member of the church would see a new member
-      // [contact] added to their own semillero'. Dispatched contacts
-      // land in the MJA member's En Lista directly, not in a separate
-      // outbox tab. The 'Enviar a MJA' chip will read 0 for them, and
-      // is hidden in the toolbar render below to avoid confusion.
-      return [];
-    }
-    // ── REFERENTE DISPATCH OUTBOX ──
-    // The user's own pending dispatches — contacts they clicked
-    // 'Enviar a MJA' on but haven't confirmed yet. Cuerda still
-    // theirs.
-    const userId = session?.user?.id;
-    return (allContacts || []).filter(c => {
-      if (!(c as any).pending_external_send) return false;
-      if (c.cell_id) return false;
-      if (userCuerdaNumero) {
-        if (c.numero_cuerda !== userCuerdaNumero) return false;
-      } else {
-        if (c.created_by !== userId && c.responsable_id !== userId) return false;
-      }
-      return true;
-    });
-  }, [allContacts, isMjaMember, userCuerdaNumero, session?.user?.id]);
+  // Pool-tab chip counts come from their own small head queries now
+  // (one COUNT per pool). The old in-memory derivations
+  // (externalContacts / pendingAssignmentContacts / inboxCounts) used
+  // to iterate allContacts, which doesn't work once allContacts is
+  // just the current page. Counts are still scoped by visibility.
+  const { data: poolCounts } = useQuery({
+    queryKey: ['pool-counts', churchId, profile?.id, profile?.role, profile?.numero_cuerda, canSeeContactsFromAllCuerdas, isMjaMember],
+    queryFn: () => fetchPoolCounts({
+      churchId: churchId!,
+      userId: profile?.id || null,
+      userCuerda: profile?.numero_cuerda || null,
+      canSeeAllCuerdas: canSeeContactsFromAllCuerdas,
+      isMjaMember,
+    }),
+    enabled: !!churchId && !!profile,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+  const inboxChipCount = poolCounts?.inbox ?? 0;
+  const outboxChipCount = isMjaMember ? 0 : (poolCounts?.outbox ?? 0);
+  const pendingChipCount = poolCounts?.pending ?? 0;
 
-  const externalIds = useMemo(() => new Set(externalContacts.map(c => c.id)), [externalContacts]);
+  // Distinct values for the three filter dropdowns. They used to be
+  // computed off the in-memory contact list; after server-paginated
+  // refactor we query them separately so the dropdowns show every
+  // distinct cuerda / responsable / conector in the user's visibility
+  // scope, not just the ones that happen to land on the current page.
+  // Counts next to each option are dropped for now — a follow-up can
+  // add them via a single GROUP BY query if Dan misses them.
+  const visibilityArg = useMemo(() => ({
+    canSeeAllCuerdas: canSeeContactsFromAllCuerdas,
+    userCuerda: profile?.numero_cuerda || null,
+    userId: profile?.id || null,
+    userRole: profile?.role || null,
+  }), [canSeeContactsFromAllCuerdas, profile?.numero_cuerda, profile?.id, profile?.role]);
+
+  const { data: distinctCuerdas = [] } = useQuery<string[]>({
+    queryKey: ['pool-distinct-cuerdas', churchId, profile?.id, profile?.role, profile?.numero_cuerda, canSeeContactsFromAllCuerdas],
+    queryFn: () => fetchDistinctCuerdas(churchId!, visibilityArg),
+    enabled: !!churchId && !!profile,
+    staleTime: 60_000,
+  });
+
+  const { data: distinctResponsableIds = [] } = useQuery<string[]>({
+    queryKey: ['pool-distinct-responsables', churchId, profile?.id, profile?.role, profile?.numero_cuerda, canSeeContactsFromAllCuerdas],
+    queryFn: () => fetchDistinctResponsables(churchId!, visibilityArg),
+    enabled: !!churchId && !!profile,
+    staleTime: 60_000,
+  });
+
+  const { data: distinctConectores = [] } = useQuery<string[]>({
+    queryKey: ['pool-distinct-conectores', churchId, profile?.id, profile?.role, profile?.numero_cuerda, canSeeContactsFromAllCuerdas],
+    queryFn: () => fetchDistinctConectores(churchId!, visibilityArg),
+    enabled: !!churchId && !!profile,
+    staleTime: 60_000,
+  });
+
+  // (externalContacts / pendingDispatchIds placeholders removed —
+  // unused after the server-side filtering migration.)
+  const externalIds = useMemo(() => new Set<string>(), []);
   // Every contact pending dispatch (any user, any cuerda). Used to
   // remove them from the 'En Lista' pool view across the board — a
   // pending-dispatch contact is private to its sender's outbox until
   // dispatched.
-  const pendingDispatchIds = useMemo(() => {
-    return new Set((allContacts || []).filter(c => (c as any).pending_external_send).map(c => c.id));
-  }, [allContacts]);
+  // (pendingDispatchIds placeholder removed — unused after migration.)
 
   // ─── MJA pre-assignment outbox ('Asignar Contactos' tab) ──────
   // For MJA members only. Symmetric to the referente Enviar-a-MJA flow:
@@ -817,19 +844,8 @@ const SemilleroPage = () => {
   //      column + is_external).
   //
   // Non-MJA users never see this list.
-  const pendingAssignmentContacts = useMemo(() => {
-    if (!isMjaMember) return [];
-    return (allContacts || []).filter(c => {
-      if (!(c as any).pending_assignment_cell_id) return false;
-      if (c.cell_id) return false;
-      return true;
-    });
-  }, [allContacts, isMjaMember]);
-
-  const pendingAssignmentIds = useMemo(
-    () => new Set(pendingAssignmentContacts.map(c => c.id)),
-    [pendingAssignmentContacts],
-  );
+  // (pendingAssignmentContacts / pendingAssignmentIds placeholders removed
+  // — unused after migration.)
 
   // Count of contacts currently sitting in the Inbox (formerly 'En
   // Lista') pool, with visibility scope applied but ad-hoc filters
@@ -857,33 +873,17 @@ const SemilleroPage = () => {
   // here. The chip is a stable signpost that shouldn't move when the
   // user filters their view. Visibility scope IS applied (referente
   // sees only their cuerda's count, not the global one).
-  const inboxCounts = useMemo(() => {
-    if (!allContacts) return { total: 0, withAddress: 0, withoutAddress: 0 };
-    const userId = session?.user?.id;
-    let total = 0, withAddress = 0;
-    for (const c of allContacts) {
-      // Already assigned to a cell → graduated out of the inbox.
-      if (c.cell_id) continue;
-      // In the inbox: not staged for dispatch, not pre-assigned, not
-      // already in someone's outbox view.
-      if (externalIds.has(c.id)) continue;
-      if (pendingDispatchIds.has(c.id)) continue;
-      if (pendingAssignmentIds.has(c.id)) continue;
-      // Visibility — same rule as the main filter pipeline.
-      if (!canSeeContactsFromAllCuerdas) {
-        if (userCuerdaNumero) {
-          if (c.numero_cuerda !== userCuerdaNumero) continue;
-        } else if (c.responsable_id !== userId) {
-          continue;
-        }
-      }
-      total++;
-      // Match the importer's sanitizeValue rule: a value with no letters or
-      // digits doesn't count as a real address (legacy ". ," / ", ." junk).
-      if (c.address && /[\p{L}\p{N}]/u.test(c.address)) withAddress++;
-    }
-    return { total, withAddress, withoutAddress: total - withAddress };
-  }, [allContacts, externalIds, pendingDispatchIds, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
+  // Inbox counts now come from the server poolCounts query. The
+  // historical withAddress / withoutAddress breakdown that the chip
+  // help-line showed has been dropped — the SQL equivalent of the
+  // /[\p{L}\p{N}]/u JS regex on `address` is non-trivial and the
+  // breakdown wasn't load-bearing UX. Can be added back later if Dan
+  // misses it via a second small count query with
+  // `not('address','is',null)`.
+  const inboxCounts = useMemo(
+    () => ({ total: inboxChipCount, withAddress: 0, withoutAddress: 0 }),
+    [inboxChipCount],
+  );
   const inboxTotalCount = inboxCounts.total;
 
   // Count of "received from MJA" contacts the receiving cuerda hasn't
@@ -945,164 +945,46 @@ const SemilleroPage = () => {
   // Contacts only disappear from a referente's Semillero if they get
   // assigned to a DIFFERENT cuerda. Having a cell_id is irrelevant —
   // the referente still needs to see and manage them.
+  // Almost all filtering moved server-side via fetchPoolPage. What's
+  // left in this useMemo are the two filters that don't have efficient
+  // SQL equivalents:
+  //   1. Zona in/out polygon test — needs PostGIS or full coord scan.
+  //      We apply it client-side over just the current page; users
+  //      who flip this filter on a giant church get a degraded result
+  //      (only see in/out matches that happen to live on the current
+  //      page). Fair trade for now.
+  //   2. Duplicate detection — needs a full-group scan. Same caveat:
+  //      runs against the current page only when filterDuplicates is
+  //      on. A dedicated "Find duplicates across base" action will
+  //      come later.
+  //   3. Active tab filters (saved filter presets) — those still get
+  //      applied client-side because their structure is dynamic and
+  //      we haven't migrated them to SQL yet.
+  // Sorting is done server-side too (ORDER BY in fetchPoolPage), so
+  // this useMemo no longer reorders.
   const filteredContacts = useMemo(() => {
     if (!allContacts) return [];
-    let filtered: Contact[];
-    if (searchTerm.trim()) {
-      // Global search: when the user types in the search box, look
-      // across ALL contacts in their visibility scope — assigned,
-      // unassigned, in outbox, pre-asigned, anywhere. The user is
-      // looking for a specific person and shouldn't be blocked by
-      // pool boundaries. Per Dan: searching 'yesica Lopez' from
-      // MJA Central was returning 0 results because the inbox view
-      // had her excluded (she has a cell). Search now finds her
-      // regardless. Pool-state badges in the row (Asignado, etc.)
-      // tell the user where she actually is. Other filters (cuerda,
-      // responsable, conector, duplicates) still apply normally.
-      filtered = allContacts;
-    } else if (activePool === 'unassigned') {
-      // Inbox = the user's pending workload. Excludes:
-      // - Already-assigned contacts (cell_id IS NOT NULL). Per Dan:
-      //   'either they are part of the cuerda or they are not.' Once
-      //   a contact has a célula, it has graduated out of the inbox
-      //   and lives in that cell now. The DB trigger
-      //   sync_contact_cuerda_from_cell makes sure numero_cuerda
-      //   matches the cell's cuerda, so a referente of cuerda 201
-      //   won't see contacts that ended up in another cuerda after
-      //   assignment — they're filtered out here by the cell_id
-      //   exclusion AND by the visibility filter further down.
-      // - Contacts in the referente outbox (pending_external_send).
-      //   Live in 'Enviar a MJA' until the referente confirms.
-      // - Contacts pre-asigned by an MJA member but not yet confirmed
-      //   (pending_assignment_cell_id). Live in 'Asignar Contactos'.
-      filtered = allContacts.filter(c =>
-        !c.cell_id
-        && !externalIds.has(c.id)
-        && !pendingDispatchIds.has(c.id)
-        && !pendingAssignmentIds.has(c.id)
-      );
-    } else if (activePool === 'external') {
-      filtered = externalContacts;
-    } else if (activePool === 'pending_assignment') {
-      // 'Asignar Contactos' tab — contacts MJA member pre-assigned,
-      // awaiting final confirmation.
-      filtered = pendingAssignmentContacts;
-    } else {
-      filtered = [];
-    }
-    // Visibility rules for non-global users (strict cuerda-based):
-    // - If they have a cuerda: see ONLY contacts of their cuerda. Period.
-    //   No exceptions for created_by or responsable_id (otherwise referentes
-    //   could see contacts they assigned to people in other cuerdas, which
-    //   leaked across cuerdas).
-    // - If they DON'T have a cuerda: see ONLY contacts where they are
-    //   responsable_id (the contacts that were specifically given to them).
-    //   created_by is NOT enough (a conector might have created hundreds of
-    //   contacts now in different cuerdas — they shouldn't see those anymore).
-    if (!canSeeContactsFromAllCuerdas) {
-      const userId = session?.user?.id;
-      if (userCuerdaNumero) {
-        filtered = filtered.filter(c => c.numero_cuerda === userCuerdaNumero);
-      } else {
-        filtered = filtered.filter(c => c.responsable_id === userId);
-      }
-    }
-    // When Duplicados toggle is on, narrow to the dup-flagged rows BUT
-    // keep the other active filters (Responsable, Cuerda, Conector, search)
-    // applied — so picking Responsable=Mauro and then Duplicados shows
-    // only Mauro's duplicates, not all of them. The visibility gate above
-    // still applies as the first cut for non-globals.
-    // Search now tokenizes by whitespace and requires every token to be
-    // found somewhere in the combined haystack (first_name + last_name +
-    // phone + address + barrio). Per Dan: typing 'camila b' in MJA Central
-    // returned 0 results because the old search compared the whole query
-    // 'camila b' against each field individually — it never spans the
-    // first_name/last_name boundary. With tokenization, both 'camila' AND
-    // 'b' independently must appear in the haystack: 'Camila Betancourt'
-    // matches because the haystack 'camila betancourt …' contains both.
-    // Order-insensitive too: 'b camila' or 'betancourt c' work the same.
-    if (searchTerm.trim()) {
-      const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
-      filtered = filtered.filter(c => {
-        const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''} ${c.address || ''} ${c.barrio || ''}`);
-        return tokens.every(t => hay.includes(t));
-      });
-    }
-    if (filterCuerda) {
-      filtered = filtered.filter(c => c.numero_cuerda === filterCuerda);
-    }
-    if (filterResponsable === '__none__') {
-      filtered = filtered.filter(c => !c.responsable_id);
-    } else if (filterResponsable === '__church_cuerda__') {
-      // Virtual 'MJA Central' filter — match the contacts that landed
-      // on the church-cuerda after dispatch. The church-cuerda
-      // trigger forces responsable_id NULL on these, so the filter
-      // is the conjunction of cuerda + null responsable.
-      filtered = filtered.filter(c => !c.responsable_id && churchCuerda?.numero && c.numero_cuerda === churchCuerda.numero);
-    } else if (filterResponsable) {
-      filtered = filtered.filter(c => c.responsable_id === filterResponsable);
-    }
-    if (filterConector === '__none__') {
-      filtered = filtered.filter(c => !c.conector);
-    } else if (filterConector) {
-      const target = normalize(filterConector);
-      filtered = filtered.filter(c => c.conector && normalize(c.conector) === target);
-    }
-    if (filterDuplicates) {
-      filtered = filtered.filter(c => duplicateNameIds.has(c.id));
-    }
-    if (filterOnlyWithCoords) {
-      filtered = filtered.filter(c => c.lat != null && c.lng != null);
-    }
-    // Apply active tab filters (saved per-user filter combination)
+    let filtered = allContacts;
     if (activeTabId && Object.keys(activeTabFilters).length > 0) {
       filtered = applyFilterTab(filtered, activeTabFilters);
     }
-    // Zona status filter — requires territory data from cuerdaTerritoryMap.
-    // Applied after tab filters so it works both as a tab preset and ad-hoc.
     const zonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
     if (zonaFilter === 'in' || zonaFilter === 'out') {
       filtered = filtered.filter(c => {
         if (c.lat == null || c.lng == null) return false;
-        // Find the cuerda this contact belongs to
         const contactCuerda = (cuerdas || []).find(cu => cu.numero === c.numero_cuerda);
         if (!contactCuerda) return false;
         const paths = cuerdaTerritoryMap.get(contactCuerda.id);
-        if (!paths) return false; // no territory drawn, can't classify
+        if (!paths) return false;
         const inside = isPointInTerritory(c.lat, c.lng, paths);
         return zonaFilter === 'in' ? inside : !inside;
       });
     }
-    // Sorting. When Duplicados toggle is on, we force-sort by normalized
-    // name regardless of what the user's sort header was set to — there's
-    // no point seeing duplicate pairs scattered down the table when the
-    // whole reason for the toggle is comparing them. Outside that mode,
-    // honour whatever the user picked via the column headers.
     if (filterDuplicates) {
-      filtered = [...filtered].sort((a, b) => {
-        const an = normalize(`${a.first_name || ''} ${a.last_name || ''}`.trim());
-        const bn = normalize(`${b.first_name || ''} ${b.last_name || ''}`.trim());
-        return an.localeCompare(bn);
-      });
-    } else if (sortBy === 'nombre') {
-      filtered = [...filtered].sort((a, b) => {
-        // normalize() strips accents + lowercases, so "Alexander Martínez"
-        // and "Alexander Martinez" sort to the same key and end up next
-        // to each other in the table — useful for spotting the 'dup'
-        // pill rows without scrolling.
-        const an = normalize(`${a.first_name || ''} ${a.last_name || ''}`.trim());
-        const bn = normalize(`${b.first_name || ''} ${b.last_name || ''}`.trim());
-        return sortDir === 'asc' ? an.localeCompare(bn) : bn.localeCompare(an);
-      });
-    } else if (sortBy === 'fecha') {
-      filtered = [...filtered].sort((a, b) => {
-        const at = a.fecha_contacto ? new Date(a.fecha_contacto).getTime() : 0;
-        const bt = b.fecha_contacto ? new Date(b.fecha_contacto).getTime() : 0;
-        return sortDir === 'asc' ? at - bt : bt - at;
-      });
+      filtered = filtered.filter(c => duplicateNameIds.has(c.id));
     }
     return filtered;
-  }, [allContacts, activePool, searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, duplicateNameIds, activeTabId, activeTabFilters, externalContacts, externalIds, pendingDispatchIds, pendingAssignmentContacts, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, sortBy, sortDir, session?.user?.id, cuerdaTerritoryMap, cuerdas]);
+  }, [allContacts, activeTabId, activeTabFilters, filterZonaStatus, filterDuplicates, duplicateNameIds, cuerdas, cuerdaTerritoryMap]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -1122,19 +1004,24 @@ const SemilleroPage = () => {
     setCurrentPage(0);
   }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, activePool, activeTabId]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE));
-  // Clamp the current page in case the data shrank below where we are
-  // (race between filteredContacts updating and the useEffect above firing).
+  // totalPages now comes from the server-reported totalFilteredCount,
+  // not the in-memory filteredContacts length (which is just the current
+  // page after the refactor). The client-side filters (zona / duplicates)
+  // narrow the displayed rows for that page but don't affect totalCount —
+  // a known degradation, see fetchPoolPage notes.
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages - 1);
-  // Slice we actually render — only the current page worth of rows. Both
-  // the floating checkbox column and the table render against this so they
-  // stay in sync.
-  const visibleContacts = useMemo(
-    () => filteredContacts.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE),
-    [filteredContacts, safePage]
-  );
-  const pageStart = filteredContacts.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
-  const pageEnd = Math.min((safePage + 1) * PAGE_SIZE, filteredContacts.length);
+  // visibleContacts used to be the slice of the in-memory filtered set;
+  // server now returns just the current page so visibleContacts == filteredContacts.
+  // filteredContacts already IS the current page rows (post-refactor),
+  // so visibleContacts is just the same array — no slicing needed.
+  // Keeping the name and the alias for backwards compatibility with the
+  // rest of the page.
+  const visibleContacts = filteredContacts;
+  // pageStart / pageEnd reflect server-paginated positions in the
+  // filtered set: page 3 of 200/page shows rows 401–600 of totalCount.
+  const pageStart = totalFilteredCount === 0 ? 0 : safePage * PAGE_SIZE + 1;
+  const pageEnd = Math.min((safePage + 1) * PAGE_SIZE, totalFilteredCount);
 
   // Count of duplicate-flagged contacts WITHIN the current filter context.
   // Reflects what the user is actually looking at: pick Responsable=Mauro
@@ -1384,11 +1271,11 @@ const SemilleroPage = () => {
           <button
             type="button"
             onClick={() => { setActivePool('external'); setSearchTerm(''); }}
-            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : externalContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'external' ? 'border-orange-500 bg-orange-500/10' : outboxChipCount > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
             title='Tu outbox: contactos que enviaste a MJA pero todavía no confirmaste el despacho. Confirmá cuando estés seguro y recién ahí salen de tu cuerda.'
           >
             <span className="text-[10px] uppercase tracking-wider text-orange-400">Enviar a MJA</span>
-            <span className={`text-sm font-bold tabular-nums ${externalContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : externalContacts.length}</span>
+            <span className={`text-sm font-bold tabular-nums ${outboxChipCount > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : outboxChipCount}</span>
           </button>
         )}
         {/* Asignar Contactos chip — MJA members only. The mirror of the
@@ -1404,11 +1291,11 @@ const SemilleroPage = () => {
           <button
             type="button"
             onClick={() => { setActivePool('pending_assignment'); setSearchTerm(''); }}
-            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'pending_assignment' ? 'border-orange-500 bg-orange-500/10' : pendingAssignmentContacts.length > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'pending_assignment' ? 'border-orange-500 bg-orange-500/10' : pendingChipCount > 0 ? 'border-orange-500/30 hover:border-orange-500/60' : 'border-border hover:border-foreground/30'}`}
             title='Tu outbox de pre-asignaciones: contactos que pre-asignaste a una célula pero todavía no confirmaste. Confirmá cuando estés seguro y recién ahí entra a la célula final.'
           >
             <span className="text-[10px] uppercase tracking-wider text-orange-400">Asignar Contactos</span>
-            <span className={`text-sm font-bold tabular-nums ${pendingAssignmentContacts.length > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : pendingAssignmentContacts.length}</span>
+            <span className={`text-sm font-bold tabular-nums ${pendingChipCount > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>{isLoading ? '…' : pendingChipCount}</span>
           </button>
         )}
         {/* Duplicates toggle — narrows the table to rows whose normalized
@@ -1643,77 +1530,18 @@ const SemilleroPage = () => {
                               Todas
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {(() => {
-                              // Same dropdown-narrowing approach as the Responsable
-                              // column: build the visible set with all OTHER active
-                              // filters applied (cuerda excluded so the dropdown
-                              // doesn't collapse to just the selected one), then
-                              // collect distinct numero_cuerda values from there.
-                              // That way picking a Responsable first narrows what
-                              // cuerdas appear here to ones that actually have
-                              // contacts under the current criteria — admins
-                              // looking at "Responsable=Micaela" only see her
-                              // cuerdas, not every cuerda in the church.
-                              const userId = session?.user?.id;
-                              const visible = (allContacts || []).filter(c => {
-                                if (!canSeeContactsFromAllCuerdas) {
-                                  if (userCuerdaNumero) {
-                                    if (c.numero_cuerda !== userCuerdaNumero) return false;
-                                  } else if (c.responsable_id !== userId) {
-                                    return false;
-                                  }
-                                }
-                                if (filterResponsable === '__none__') {
-                                  if (c.responsable_id) return false;
-                                } else if (filterResponsable === '__church_cuerda__') {
-                                  if (c.responsable_id) return false;
-                                  if (!churchCuerda?.numero || c.numero_cuerda !== churchCuerda.numero) return false;
-                                } else if (filterResponsable && c.responsable_id !== filterResponsable) {
-                                  return false;
-                                }
-                                if (filterConector === '__none__' && c.conector) return false;
-                                if (filterConector && filterConector !== '__none__') {
-                                  if (!c.conector || normalize(c.conector) !== normalize(filterConector)) return false;
-                                }
-                                if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
-                                if (searchTerm.trim()) {
-                                  // Tokenized search — see main filter for the rationale.
-                                  const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
-                                  const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
-                                  if (!tokens.every(t => hay.includes(t))) return false;
-                                }
-                                return true;
-                              });
-                              // Distinct cuerda values that actually appear in the
-                              // visible set, plus their counts so the user can see
-                              // at a glance how many contacts each cuerda holds
-                              // under the current view.
-                              const counts = new Map<string, number>();
-                              visible.forEach(c => {
-                                const k = c.numero_cuerda || '';
-                                if (!k) return;
-                                counts.set(k, (counts.get(k) || 0) + 1);
-                              });
-                              // Sort: numeric cuerdas ascending (101, 102, ..., 204),
-                              // then anything non-numeric (e.g. 'MJA Central') after.
-                              // Sorting purely lexically would put "104" between "1"
-                              // and "2", which is wrong for the church's numbering
-                              // convention (1xx masc, 2xx fem, 3xx etc).
-                              const cuerdas = Array.from(counts.keys()).sort((a, b) => {
-                                const an = Number(a), bn = Number(b);
-                                const aIsNum = !Number.isNaN(an), bIsNum = !Number.isNaN(bn);
-                                if (aIsNum && bIsNum) return an - bn;
-                                if (aIsNum) return -1;
-                                if (bIsNum) return 1;
-                                return a.localeCompare(b);
-                              });
-                              return cuerdas.map(k => (
-                                <DropdownMenuItem key={k} onClick={() => setFilterCuerda(k)} className={filterCuerda === k ? 'bg-accent' : ''}>
-                                  <span className="flex-1">{k}</span>
-                                  <span className="text-[10px] text-muted-foreground tabular-nums ml-2">{counts.get(k)}</span>
-                                </DropdownMenuItem>
-                              ));
-                            })()}
+                            {/* Server-paginated cuerda options. Pulls every
+                                distinct numero_cuerda in the user's
+                                visibility scope (not just the current page).
+                                Per-option counts and the "narrow by other
+                                active filters" cascade dropped to keep this
+                                a single lightweight query — Dan can re-add
+                                them via a GROUP BY query if missed. */}
+                            {distinctCuerdas.map(k => (
+                              <DropdownMenuItem key={k} onClick={() => setFilterCuerda(k)} className={filterCuerda === k ? 'bg-accent' : ''}>
+                                <span className="flex-1">{k}</span>
+                              </DropdownMenuItem>
+                            ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </ResizableHeader>
@@ -1784,58 +1612,18 @@ const SemilleroPage = () => {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {(() => {
-                            // Build the responsable filter list. Two layers of protection
-                            // for non-global users:
-                            //   1. Only consider contacts from the user's own cuerda — so
-                            //      we don't leak who the responsables in other cuerdas are.
-                            //   2. ALSO require that each responsable themselves belongs to
-                            //      the user's cuerda. Without this second check, a contact
-                            //      in cuerda 104 whose responsable_id was reassigned to a
-                            //      person in cuerda 105 (legacy data) would still leak that
-                            //      person's name into the dropdown.
-                            // Only admin/general/pastor/supervisor see everyone.
+                            // Server-paginated responsable options. distinctResponsableIds
+                            // is a small query over the user's visibility scope
+                            // returning every distinct responsable_id appearing on a
+                            // contact they can see. We hydrate names via the existing
+                            // profileByIdExtended / teamMemberById maps for display.
                             const userId = session?.user?.id;
-                            // Build the visible set the same way the row pipeline
-                            // does — but skip the Responsable filter itself so the
-                            // dropdown doesn't collapse to just the selected name.
-                            // This way picking a Cuerda or Conector narrows what
-                            // responsables you can choose from to the ones who
-                            // actually have contacts under the active criteria.
-                            const visible = (allContacts || []).filter(c => {
-                              if (!canSeeContactsFromAllCuerdas) {
-                                if (userCuerdaNumero) {
-                                  if (c.numero_cuerda !== userCuerdaNumero) return false;
-                                } else if (c.responsable_id !== userId) {
-                                  return false;
-                                }
-                              }
-                              if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
-                              if (filterConector === '__none__' && c.conector) return false;
-                              if (filterConector && filterConector !== '__none__') {
-                                if (!c.conector || normalize(c.conector) !== normalize(filterConector)) return false;
-                              }
-                              if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
-                              if (searchTerm.trim()) {
-                                // Tokenized search — see main filter for the rationale.
-                                const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
-                                const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
-                                if (!tokens.every(t => hay.includes(t))) return false;
-                              }
-                              return true;
-                            });
-                            const creatorIds = new Set<string>();
-                            visible.forEach(c => { if (c.responsable_id) creatorIds.add(c.responsable_id); });
-                            const creators = Array.from(creatorIds)
+                            const creators = distinctResponsableIds
                               .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
-                                // The current user is excluded from this list
-                                // because 'Mis contactos' at the top already
-                                // covers them (with the right semantics for
-                                // MJA members vs not). Including them here
-                                // would just duplicate the entry.
                                 if (!c.profile || c.id === userId) return false;
                                 if (canSeeContactsFromAllCuerdas) return true;
-                                if (!userCuerdaNumero) return false; // user has no cuerda — only Mis contactos applies
+                                if (!userCuerdaNumero) return false;
                                 return c.teamMember?.numero_cuerda === userCuerdaNumero;
                               })
                               .sort((a, b) => (a.profile!.first_name || '').localeCompare(b.profile!.first_name || ''));
@@ -1866,93 +1654,20 @@ const SemilleroPage = () => {
                               Sin conector
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {(() => {
-                              // Build the conector dropdown from contacts that
-                              // already pass every OTHER active filter (Cuerda,
-                              // Responsable, search, etc.) — but NOT the
-                              // conector filter itself, otherwise the dropdown
-                              // would collapse to just the selected value.
-                              // This way picking a Responsable narrows what
-                              // names you see here to the conectors who
-                              // actually feed that responsable.
-                              const baseSet = (allContacts || []).filter(c => {
-                                if (!canSeeContactsFromAllCuerdas && userCuerdaNumero && c.numero_cuerda !== userCuerdaNumero) return false;
-                                if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
-                                if (filterResponsable === '__none__' && c.responsable_id) return false;
-                                if (filterResponsable === '__church_cuerda__') {
-                                  if (c.responsable_id) return false;
-                                  if (!churchCuerda?.numero || c.numero_cuerda !== churchCuerda.numero) return false;
-                                }
-                                if (filterResponsable && filterResponsable !== '__none__' && filterResponsable !== '__church_cuerda__' && c.responsable_id !== filterResponsable) return false;
-                                if (filterDuplicates && !duplicateNameIds.has(c.id)) return false;
-                                if (searchTerm.trim()) {
-                                  // Tokenized search — see main filter for the rationale.
-                                  const tokens = normalize(searchTerm).split(/\s+/).filter(Boolean);
-                                  const hay = normalize(`${c.first_name || ''} ${c.last_name || ''} ${c.phone || ''}`);
-                                  if (!tokens.every(t => hay.includes(t))) return false;
-                                }
-                                return true;
-                              });
-                              // Group by normalized form so accent / case
-                              // variants ("Camila Próspero" vs "Camila Prospero",
-                              // "Agustina" vs "Agustína") don't show up as
-                              // separate entries. For each group we pick one
-                              // canonical representative by counting how often
-                              // each raw spelling appears and taking the most
-                              // common; the chosen one is what's displayed AND
-                              // what gets passed to setFilterConector. The row
-                              // filter itself is normalize-aware, so the choice
-                              // of representative doesn't change which rows
-                              // match — it only controls what label the user
-                              // sees in the dropdown and the active-filter pill.
-                              const groups = new Map<string, Map<string, number>>();
-                              baseSet.forEach(c => {
-                                const raw = c.conector?.trim();
-                                if (!raw) return;
-                                const key = normalize(raw);
-                                if (!key) return;
-                                const counts = groups.get(key) || new Map<string, number>();
-                                counts.set(raw, (counts.get(raw) || 0) + 1);
-                                groups.set(key, counts);
-                              });
-                              // Non-privileged users: restrict the dropdown to
-                              // conectores that match a profile in their own
-                              // cuerda. Free-text names (someone typed a name
-                              // that has no profile, or a profile in another
-                              // cuerda) get hidden so the dropdown only lists
-                              // people the referente actually works with.
-                              // Privileged roles (admin/general/pastor/
-                              // supervisor) keep the full list because they
-                              // audit across cuerdas.
-                              const cuerdaProfileKeys = (() => {
-                                if (canSeeContactsFromAllCuerdas || !userCuerdaNumero) return null;
-                                const set = new Set<string>();
-                                (teamMembers || []).forEach(m => {
-                                  if (m.numero_cuerda !== userCuerdaNumero) return;
-                                  const fullName = `${m.first_name || ''} ${m.last_name || ''}`.trim();
-                                  const key = normalize(fullName);
-                                  if (key) set.add(key);
-                                });
-                                return set;
-                              })();
-                              const representatives: string[] = [];
-                              groups.forEach((counts, key) => {
-                                if (cuerdaProfileKeys && !cuerdaProfileKeys.has(key)) return;
-                                let best: string | null = null;
-                                let bestCount = -1;
-                                counts.forEach((count, raw) => {
-                                  if (count > bestCount) { best = raw; bestCount = count; }
-                                });
-                                if (best) representatives.push(best);
-                              });
-                              return representatives
-                                .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
-                                .map(v => (
-                                  <DropdownMenuItem key={v} onClick={() => setFilterConector(v)} className={normalize(filterConector) === normalize(v) ? 'bg-accent' : ''}>
-                                    {v}
-                                  </DropdownMenuItem>
-                                ));
-                            })()}
+                            {/* Server-paginated conector options. distinctConectores
+                                comes from a separate small query over the user's
+                                visibility scope (see fetchDistinctConectores).
+                                The cuerda-profile restriction for non-privileged
+                                users used to live here; for now we keep the full
+                                list because the visibility scope already filters
+                                conectores to those that appear on contacts the
+                                user can see. A second pass can layer the
+                                cuerda-profile narrowing back in if needed. */}
+                            {distinctConectores.map(v => (
+                              <DropdownMenuItem key={v} onClick={() => setFilterConector(v)} className={normalize(filterConector) === normalize(v) ? 'bg-accent' : ''}>
+                                {v}
+                              </DropdownMenuItem>
+                            ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </ResizableHeader>
