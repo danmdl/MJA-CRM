@@ -19,6 +19,40 @@ export interface Stop {
 }
 
 /**
+ * Inclusive 1-indexed range of stops to render on the map.
+ * Used by the route viewer's "show range" buttons so the user can focus
+ * on a segment of a long route without earlier path overlap.
+ */
+export interface StopRange { from: number; to: number; }
+
+/**
+ * Build display ranges for a route with `total` stops, anchored at
+ * multiples of 5 with a 1-stop overlap between consecutive ranges:
+ *
+ *   17 stops → [1-5], [5-10], [10-15], [15-17]
+ *   12 stops → [1-5], [5-10], [10-12]
+ *   20 stops → [1-5], [5-10], [10-15], [15-20]
+ *
+ * Returns an empty array when the route is short enough (≤ 5 stops)
+ * that no segmentation is needed.
+ */
+export function makeStopRanges(total: number): StopRange[] {
+  if (total <= 5) return [];
+  const anchors: number[] = [1];
+  let v = 5;
+  while (v < total) {
+    anchors.push(v);
+    v += 5;
+  }
+  anchors.push(total);
+  const ranges: StopRange[] = [];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    ranges.push({ from: anchors[i], to: anchors[i + 1] });
+  }
+  return ranges;
+}
+
+/**
  * Split an ordered list of (origin + stops) into Google Maps URLs.
  *
  * Input: the starting point + every contact stop in visit order.

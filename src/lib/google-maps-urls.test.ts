@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGoogleMapsChunks, MAX_STOPS_PER_LINK } from './google-maps-urls';
+import { buildGoogleMapsChunks, makeStopRanges, MAX_STOPS_PER_LINK } from './google-maps-urls';
 
 const stop = (n: number) => ({ lat: -34 - n * 0.001, lng: -58 - n * 0.001 });
 
@@ -44,5 +44,44 @@ describe('buildGoogleMapsChunks', () => {
 
   it('exposes the chunk size constant', () => {
     expect(MAX_STOPS_PER_LINK).toBe(10);
+  });
+});
+
+describe('makeStopRanges', () => {
+  it('returns no ranges for short routes (≤5 stops)', () => {
+    expect(makeStopRanges(0)).toEqual([]);
+    expect(makeStopRanges(3)).toEqual([]);
+    expect(makeStopRanges(5)).toEqual([]);
+  });
+
+  it('produces overlapping 5-step ranges for the examples Dan asked for', () => {
+    expect(makeStopRanges(17)).toEqual([
+      { from: 1, to: 5 },
+      { from: 5, to: 10 },
+      { from: 10, to: 15 },
+      { from: 15, to: 17 },
+    ]);
+    expect(makeStopRanges(20)).toEqual([
+      { from: 1, to: 5 },
+      { from: 5, to: 10 },
+      { from: 10, to: 15 },
+      { from: 15, to: 20 },
+    ]);
+    expect(makeStopRanges(12)).toEqual([
+      { from: 1, to: 5 },
+      { from: 5, to: 10 },
+      { from: 10, to: 12 },
+    ]);
+  });
+
+  it('handles routes at anchor boundaries', () => {
+    expect(makeStopRanges(10)).toEqual([
+      { from: 1, to: 5 },
+      { from: 5, to: 10 },
+    ]);
+    expect(makeStopRanges(6)).toEqual([
+      { from: 1, to: 5 },
+      { from: 5, to: 6 },
+    ]);
   });
 });
