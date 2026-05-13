@@ -399,23 +399,54 @@ const ProcesosPage = () => {
   });
 
   const { data: availableContacts } = useQuery<{ id: string; first_name: string; last_name: string | null; phone: string | null }[]>({
-    queryKey: ['process-available-contacts', churchId],
+    queryKey: ['process-available-contacts', churchId, isGlobal, userCuerda],
     queryFn: async () => {
-      let q = supabase
-        .from('contacts')
-        .select('id, first_name, last_name, phone, numero_cuerda')
-        .eq('church_id', churchId!)
-        .is('deleted_at', null);
-      if (!isGlobal && userCuerda) q = q.eq('numero_cuerda', userCuerda);
+      // Paginate the contacts query. Supabase silently caps each
+      // response at 1000 rows and the unbounded `await q` was hitting
+      // that ceiling for users in cuerdas with >1000 contacts — Dan
+      // reported the "agregar al proceso" picker felt suspiciously
+      // short. Walk pages with .range() until we get a partial page,
+      // capped at 10k for safety.
+      const PAGE_SIZE = 1000;
+      const all: { id: string; first_name: string; last_name: string | null; phone: string | null; numero_cuerda: string | null }[] = [];
+      for (let page = 0; ; page++) {
+        let q = supabase
+          .from('contacts')
+          .select('id, first_name, last_name, phone, numero_cuerda')
+          .eq('church_id', churchId!)
+          .is('deleted_at', null)
+          .order('first_name', { ascending: true })
+          .order('id', { ascending: true })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (!isGlobal && userCuerda) q = q.eq('numero_cuerda', userCuerda);
+        const { data, error } = await q;
+        if (error) {
+          console.error('[process-available-contacts] page', page, error);
+          break;
+        }
+        const rows = (data || []) as typeof all;
+        all.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        if (page >= 9) break;
+      }
 
-      const { data: allContacts } = await q;
-      const { data: inProcess } = await supabase
-        .from('contact_processes')
-        .select('contact_id')
-        .eq('church_id', churchId!);
+      // Same pagination on the in-process exclusion list. Less likely
+      // to break 1000 rows in practice but cheap insurance.
+      const usedIds = new Set<string>();
+      for (let page = 0; ; page++) {
+        const { data, error } = await supabase
+          .from('contact_processes')
+          .select('contact_id')
+          .eq('church_id', churchId!)
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (error) break;
+        const rows = data || [];
+        rows.forEach(p => usedIds.add(p.contact_id));
+        if (rows.length < PAGE_SIZE) break;
+        if (page >= 9) break;
+      }
 
-      const usedIds = new Set((inProcess || []).map(p => p.contact_id));
-      return (allContacts || []).filter(c => !usedIds.has(c.id));
+      return all.filter(c => !usedIds.has(c.id));
     },
     enabled: !!churchId && !!addDialogStage,
     staleTime: 10_000,
