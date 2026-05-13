@@ -52,8 +52,12 @@ const AdminLayout = () => {
   // name + tabs in a compact row, so we hide the redundant top-bar title to
   // save vertical space.
   const isInsideChurch = /^\/admin\/churches\/[^/]+\//.test(pathname);
-  // Procesos is a kanban board that needs full width — auto-collapse sidebar
-  const isKanbanPage = pathname.endsWith('/procesos');
+  // Procesos (kanban) and Asistencia (calendario / lista por etapa)
+  // both need full viewport width — the sidebar auto-collapses on
+  // these pages and only the hamburger can bring it back. Keep this
+  // list small: only add pages here when the content truly needs
+  // 100% width and the sidebar would just be eating room.
+  const isFullWidthPage = pathname.endsWith('/procesos') || pathname.endsWith('/asistencia');
 
   // Global keyboard shortcut: Cmd+K (mac) / Ctrl+K (win/linux) opens the
   // contact search from anywhere in the admin area. preventDefault is
@@ -125,7 +129,7 @@ const AdminLayout = () => {
         //     the user has it open. Closing the sidebar (hamburger
         //     click) drops it back into translate(-220px) overlay
         //     mode so the main content reclaims the space.
-        isKanbanPage
+        isFullWidthPage
           ? ''
           : sidebarOpen
             ? 'md:!relative md:!transform-none md:!translate-x-0 md:!z-auto md:!pointer-events-auto'
@@ -147,7 +151,7 @@ const AdminLayout = () => {
             // it in a className wouldn't work because the inline `display:
             // flex` below would override Tailwind's `.hidden` rule. So we
             // toggle `display` directly here.
-            display: (isInsideChurch && !isKanbanPage) ? 'none' : 'flex',
+            display: (isInsideChurch && !isFullWidthPage) ? 'none' : 'flex',
             height: 44, flexShrink: 0,
             borderBottom: '1px solid rgba(255,255,255,0.07)',
             alignItems: 'center',
