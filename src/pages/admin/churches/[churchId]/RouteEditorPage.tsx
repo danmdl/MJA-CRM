@@ -947,33 +947,50 @@ const RouteEditorPage = () => {
             <div ref={mapRef} className="w-full rounded-lg border" style={{ height: 'calc(100vh - 220px)', minHeight: 400 }} />
           </div>
         </div>
+      ) : (projectLoading || contactsLoading || ((project?.ordered_contact_ids?.length ?? 0) > 0 && !routeData) || calculating) ? (
+        // ─── Loading state ─────────────────────────────────────────
+        // Distinguishes "this route really has nothing yet" from
+        // "we just landed here and the saved data hasn't loaded
+        // yet". Opening an already-saved route used to flash the
+        // "Ruta vacía / Elegir desde el mapa / Elegir desde lista"
+        // placeholder for 1-2s until the project + contacts queries
+        // resolved and the auto-calc effect kicked in, which is
+        // exactly what Dan reported. If the project has saved picks
+        // (or any query is in flight, or we're mid-calc) we show a
+        // neutral "Cargando ruta..." card instead of inviting the
+        // user to start over.
+        <div className="border-2 border-dashed border-border rounded-lg p-12 text-center flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 200px)' }}>
+          <RouteIcon className="h-12 w-12 text-muted-foreground/60 mb-3 animate-pulse" />
+          <h2 className="text-base font-semibold mb-1">Cargando ruta...</h2>
+          <p className="text-sm text-muted-foreground max-w-md">
+            {calculating
+              ? 'Calculando el orden óptimo para visitar todos los contactos.'
+              : 'Trayendo los contactos guardados y armando el mapa.'}
+          </p>
+        </div>
       ) : (
         // ─── Empty state: invite the user to add contacts ───────────────────
         <div className="border-2 border-dashed border-border rounded-lg p-12 text-center flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 200px)' }}>
           <RouteIcon className="h-12 w-12 text-muted-foreground/60 mb-3" />
-          <h2 className="text-base font-semibold mb-1">{calculating ? 'Calculando ruta...' : 'Ruta vacía'}</h2>
+          <h2 className="text-base font-semibold mb-1">Ruta vacía</h2>
           <p className="text-sm text-muted-foreground mb-5 max-w-md">
-            {calculating
-              ? 'Calculando el orden óptimo para visitar todos los contactos.'
-              : 'Agregá contactos a la ruta y un punto de partida para calcular el orden óptimo de visita.'}
+            Agregá contactos a la ruta y un punto de partida para calcular el orden óptimo de visita.
           </p>
-          {!calculating && (
-            // Two actions side-by-side. Primary (filled) is the map
-            // picker — that's the same flow the user took to create
-            // the project, so it's what they expect to see when they
-            // come back to a route they hadn't filled in yet. The
-            // dialog (outline) is the alternative for people who'd
-            // rather pick from a flat list. Putting both here means
-            // the user doesn't need to know there are two ways in.
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button size="lg" onClick={() => navigate(`/admin/churches/${churchId}/rutas/${projectId}/mapa`)} className="gap-2">
-                <MapIcon className="h-4 w-4" /> Elegir desde el mapa
-              </Button>
-              <Button size="lg" variant="outline" onClick={openEditDialog} className="gap-2">
-                <Plus className="h-4 w-4" /> Elegir desde lista
-              </Button>
-            </div>
-          )}
+          {/* Two actions side-by-side. Primary (filled) is the map
+              picker — that's the same flow the user took to create
+              the project, so it's what they expect to see when they
+              come back to a route they hadn't filled in yet. The
+              dialog (outline) is the alternative for people who'd
+              rather pick from a flat list. Putting both here means
+              the user doesn't need to know there are two ways in. */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button size="lg" onClick={() => navigate(`/admin/churches/${churchId}/rutas/${projectId}/mapa`)} className="gap-2">
+              <MapIcon className="h-4 w-4" /> Elegir desde el mapa
+            </Button>
+            <Button size="lg" variant="outline" onClick={openEditDialog} className="gap-2">
+              <Plus className="h-4 w-4" /> Elegir desde lista
+            </Button>
+          </div>
         </div>
       )}
 
