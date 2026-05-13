@@ -93,13 +93,14 @@ const AdminLayout = () => {
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
       <UpdateBanner />
 
-      {/* Mobile overlay — only renders on mobile. The inline
-          `display:'block'` was overriding the `md:hidden` class
-          because inline styles beat class styles, so on desktop the
-          dim overlay was sitting on top of the whole app once the
-          sidebar defaulted open. We now drop the inline display
-          entirely (div is block by default) so md:hidden can do its
-          job at md+ and the overlay only appears on mobile. */}
+      {/* Dim overlay — click outside the sidebar to close.
+          Mobile: always renders so the user can dismiss.
+          Desktop: only on full-width pages (Procesos / Asistencia)
+          where the sidebar is in overlay mode and covers the
+          ChurchDetailsLayout hamburger; without this the user
+          couldn't reach any close affordance once the sidebar was
+          open. On regular church pages the sidebar pins into the
+          flex row (no overlap) so the overlay isn't needed. */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
@@ -107,7 +108,7 @@ const AdminLayout = () => {
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
             zIndex: 40,
           }}
-          className="md:hidden"
+          className={isFullWidthPage ? '' : 'md:hidden'}
         />
       )}
 
