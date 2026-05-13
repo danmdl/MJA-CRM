@@ -439,11 +439,14 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       // Per-row fallback used when a whole batch errors — keeps the
       // exact same per-row error-handling semantics the old code had.
       const insertOneRow = async (rowIdx: number) => {
-        const { data: inserted, error } = await supabase
+        // Generic CSV importer — tableName is dynamic so we cast through
+        // any to avoid the union-of-all-tables type intersection that
+        // would otherwise reject every row shape.
+        const { data: inserted, error } = await (supabase as any)
           .from(tableName)
           .insert(recordsToInsert[rowIdx])
           .select()
-          .single();
+          .single() as { data: { id: string } | null; error: { message: string } | null };
         if (error) {
           const colMatch = error.message.match(/syntax for type [^:]+: "([^"]+)"/);
           setImportErrors(prev => [...prev, {
@@ -478,10 +481,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         if (includedIdxs.length === 0) continue;
 
         const batchRows = includedIdxs.map(idx => recordsToInsert[idx]);
-        const { data: insertedBatch, error: batchErr } = await supabase
+        const { data: insertedBatch, error: batchErr } = await (supabase as any)
           .from(tableName)
           .insert(batchRows)
-          .select();
+          .select() as { data: Array<{ id: string }> | null; error: { message: string } | null };
 
         if (batchErr || !insertedBatch) {
           // Fallback: insert this batch row-by-row so a single bad row
@@ -519,7 +522,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         // Historial coverage intact (every contact gets a row) but
         // collapses 100 round-trips into 1.
         if (auditEntries.length > 0) {
-          await supabase.from('activity_logs').insert(auditEntries);
+          await (supabase.from('activity_logs') as any).insert(auditEntries);
         }
       }
       
@@ -541,19 +544,19 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
         }));
         await supabase.from('csv_import_logs').insert({
           user_id: session?.user?.id,
-          church_id: churchId || null,
+          church_id: churchId || undefined,
           entity_type: tableName === 'contacts' ? 'contact' : tableName,
-          filename: file?.name || null,
+          filename: file?.name || undefined,
           total_rows: recordsToInsert.length,
           success_count: successCount,
           failure_count: failed.length,
-          failures: failuresPayload,
+          failures: failuresPayload as unknown as import('@/integrations/supabase/database.types').Json,
           // Store the original CSV row data for every successful insert,
           // pinned to the contact's id so we can render the historical
           // view independent of whatever happens to the contact later.
           // This is what lets Historial answer "what did the file say?"
           // versus "what does the contact look like now?".
-          imported_rows: importedRows,
+          imported_rows: importedRows as unknown as import('@/integrations/supabase/database.types').Json,
         });
       } catch (e) {
         // Logging the import shouldn't fail the import itself — best effort.
