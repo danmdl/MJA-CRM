@@ -6,13 +6,14 @@ import { usePermissions } from "@/lib/permissions";
 import { showError } from "@/utils/toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Menu } from "lucide-react";
+import { useChurchBySlugOrId } from "@/hooks/use-church-by-slug";
 
 interface ChurchDetailsLayoutProps {
   children?: React.ReactNode;
 }
 
 const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: param } = useParams<{ churchId: string }>();
   const { profile, loading: sessionLoading } = useSession();
   const { canAccessAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canAddMembers, canSeeMapa, canSeeValidador, canSeePapelera, canSeeProcesos, canSeeRutas, canSeeEventos, canSeeAsistencia } = usePermissions();
   const canSeeOverview = canAccessAllChurches() || canSeeOwnChurchAnalytics();
@@ -21,13 +22,35 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
   const [accessChecked, setAccessChecked] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // Resolve the URL param (slug OR uuid) into the real church row.
+  // If the user landed on the UUID URL, `redirectTo` is the
+  // equivalent slug URL — we rewrite the URL bar quietly so links
+  // displayed and shared from here always show the friendly form.
+  const { church, redirectTo, isLoading: churchLoading, notFound } = useChurchBySlugOrId(param);
+  const churchId = church?.id || null;
+  const churchSlug = church?.slug || param || ''; // fall back to URL value while resolving
+
   useEffect(() => {
-    if (sessionLoading) {
+    if (redirectTo) {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [redirectTo, navigate]);
+
+  useEffect(() => {
+    if (sessionLoading || churchLoading) {
       return;
     }
 
-    if (!churchId) {
+    if (!param) {
       showError("Error: No se encontró el ID de la iglesia.");
+      navigate("/admin/churches", { replace: true });
+      return;
+    }
+
+    if (notFound || !churchId) {
+      // Param looked valid but no row matched. Either a stale
+      // bookmark or a deleted iglesia — bounce to the list.
+      showError("Iglesia no encontrada.");
       navigate("/admin/churches", { replace: true });
       return;
     }
@@ -35,14 +58,13 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     const canAccessAll = canAccessAllChurches();
     const isAssignedToChurch = profile?.church_id === churchId;
 
-
     if (!canAccessAll && !isAssignedToChurch) {
       showError("No tienes permiso para acceder a los detalles de esta iglesia.");
       navigate("/admin/churches", { replace: true });
     } else {
       setAccessChecked(true);
     }
-  }, [churchId, profile, sessionLoading, navigate, location.pathname]);
+  }, [churchId, param, churchLoading, notFound, profile, sessionLoading, navigate, location.pathname]);
 
   const activeTab = (() => {
     const p = location.pathname;
@@ -69,7 +91,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
     if (!accessChecked || sessionLoading) return;
     const p = location.pathname;
     if (p.endsWith('/overview') && !canSeeOverview) {
-      navigate(`/admin/churches/${churchId}/pool`, { replace: true });
+      navigate(`/admin/churches/${churchSlug}/pool`, { replace: true });
     }
   }, [accessChecked, sessionLoading, location.pathname, canSeeOverview, churchId, navigate]);
 
@@ -103,7 +125,7 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
         <div className="flex-1 overflow-x-auto px-1 min-w-0">
           <Tabs
             value={activeTab}
-            onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchId}/${val}`))}
+            onValueChange={(val) => startTransition(() => navigate(`/admin/churches/${churchSlug}/${val}`))}
             className="w-full"
           >
             <TabsList className="mb-0 w-max">

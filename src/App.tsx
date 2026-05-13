@@ -45,6 +45,7 @@ import { SessionProvider } from "./components/SessionProvider";
 import { ConfirmProvider } from "./hooks/use-confirm";
 import { useSession } from "./hooks/use-session";
 import { usePermissions } from "./lib/permissions";
+import { useChurchSlugByUuid } from "./hooks/use-church-slug";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
@@ -63,6 +64,7 @@ import Profile from "./pages/Profile";
 const AdminRootRedirect = () => {
   const { canSeeAllAnalytics, permissionsReady } = usePermissions();
   const { profile } = useSession();
+  const churchSlug = useChurchSlugByUuid(profile?.church_id);
 
   // If we redirect before permissions have loaded, canSeeAllAnalytics()
   // returns false during the loading window — which sends an admin
@@ -88,7 +90,17 @@ const AdminRootRedirect = () => {
     // debería defaultear siempre en semillero'. Resumen is still
     // reachable via its tab on tablet/desktop, but the day-to-day
     // landing is the Semillero where they actually do their work.
-    return <Navigate to={`churches/${profile.church_id}/pool`} replace />;
+    // Wait for slug to resolve so we navigate to the friendly URL on the
+    // very first redirect — otherwise the user sees the UUID URL flash
+    // before being replaced by the slug URL.
+    if (!churchSlug) {
+      return (
+        <div className="min-h-[40vh] flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      );
+    }
+    return <Navigate to={`churches/${churchSlug}/pool`} replace />;
   }
   return <Navigate to="churches" replace />;
 };

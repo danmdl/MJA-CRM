@@ -90,7 +90,16 @@ export function useLoginNotifications() {
       try { sessionStorage.setItem(ssKey, '1'); } catch {}
 
       if (mjaCount > 0) {
-        const semilleroPath = `/admin/churches/${churchId}/pool`;
+        // Resolve church slug so the toast links to the friendly URL.
+        // Falls back to UUID if the lookup fails — the layout redirects
+        // UUID URLs to slug URLs anyway.
+        const { data: churchRow } = await supabase
+          .from('churches')
+          .select('slug')
+          .eq('id', churchId)
+          .maybeSingle();
+        const slugOrId = (churchRow as { slug: string } | null)?.slug || churchId;
+        const semilleroPath = `/admin/churches/${slugOrId}/pool`;
         const headline = userIsMjaSide
           ? `Tenés ${mjaCount} ${mjaCount === 1 ? 'nuevo contacto recibido' : 'nuevos contactos recibidos'} de otras cuerdas`
           : `Tenés ${mjaCount} ${mjaCount === 1 ? 'nuevo contacto asignado' : 'nuevos contactos asignados'} por MJA`;

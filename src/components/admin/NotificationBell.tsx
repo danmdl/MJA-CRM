@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
+import { useChurchSlugByUuid } from '@/hooks/use-church-slug';
 import { Bell } from 'lucide-react';
 
 const NOTIF_SOUND_URL = 'data:audio/wav;base64,UklGRl4FAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToFAACAgICAgICAgICAgICBh46Xoamwt7y/wL67trCon5WMhH57eXl7f4SMlZ+osbe8v8C+u7awqJ+VjIR+e3l5e3+EjJWfqLG3vL/Avru2sA==';
 
 const NotificationBell = () => {
   const { session, profile } = useSession();
+  const churchSlug = useChurchSlugByUuid(profile?.church_id);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [newContacts, setNewContacts] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -106,7 +108,7 @@ const NotificationBell = () => {
                   type: 'contact',
                   title: 'Nuevo contacto',
                   message: `${contact?.first_name || 'Alguien'} fue agregado al Semillero.`,
-                  link: `/admin/churches/${profile.church_id}/pool`,
+                  link: `/admin/churches/${churchSlug || profile.church_id}/pool`,
                   read: false,
                 });
               } catch (e) {
@@ -208,7 +210,7 @@ const NotificationBell = () => {
               </a>
             )}
             {newContacts > 0 && (
-              <a href={`/admin/churches/${profile?.church_id}/pool`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', textDecoration: 'none' }} onClick={() => setShowDropdown(false)}>
+              <a href={`/admin/churches/${churchSlug || profile?.church_id}/pool`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', textDecoration: 'none' }} onClick={() => setShowDropdown(false)}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22c55e', flexShrink: 0 }}></span>
                 <div>
                   <p style={{ fontSize: 11, color: '#fafafa', margin: 0 }}>{newContacts} contacto{newContacts !== 1 ? 's' : ''} nuevo{newContacts !== 1 ? 's' : ''}</p>

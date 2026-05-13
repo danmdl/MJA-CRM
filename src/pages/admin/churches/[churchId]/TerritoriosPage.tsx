@@ -47,7 +47,8 @@ function colorForCuerda(numero: string): string {
 }
 
 const TerritoriosPage: React.FC = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const { profile } = useSession();
   const queryClient = useQueryClient();
 

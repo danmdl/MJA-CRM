@@ -41,7 +41,8 @@ const CHECKS = [
 ];
 
 const ValidatorPage = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const navigate = useNavigate();
   const { profile } = useSession();
   const [loading, setLoading] = useState(true);
@@ -764,7 +765,7 @@ const ValidatorPage = () => {
                         className="text-sm font-medium text-primary hover:underline text-left"
                         onClick={() => {
                           if (item.entity === 'contact') setProfileContactId(item.entityId);
-                          else if (item.entity === 'cell') navigate(`/admin/churches/${churchId}/celulas`);
+                          else if (item.entity === 'cell') navigate(`/admin/churches/${churchSlug}/celulas`);
                         }}
                       >
                         {item.name}
@@ -773,12 +774,12 @@ const ValidatorPage = () => {
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {item.entity === 'contact' && (
-                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => navigate(`/admin/churches/${churchId}/pool`)}>
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => navigate(`/admin/churches/${churchSlug}/pool`)}>
                         Ir al Semillero
                       </Button>
                     )}
                     {item.entity === 'cell' && (
-                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => navigate(`/admin/churches/${churchId}/celulas`)}>
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => navigate(`/admin/churches/${churchSlug}/celulas`)}>
                         Ir a Células
                       </Button>
                     )}

@@ -12,7 +12,8 @@ import { Plus, Route as RouteIcon, ExternalLink, Copy, Trash2, MapPin, Check, Me
 import { showError, showSuccess } from '@/utils/toast';
 
 const RutasPage = () => {
-  const { churchId } = useParams<{ churchId: string }>();
+  const { churchId: churchSlug } = useParams<{ churchId: string }>();
+  const churchId = useChurchUuid();
   const navigate = useNavigate();
   const { profile } = useSession();
   const queryClient = useQueryClient();
@@ -115,7 +116,7 @@ const RutasPage = () => {
       queryClient.invalidateQueries({ queryKey: ['route-projects'] });
       setCreateOpen(false);
       // Always go to the map editor — that's the only flow now.
-      navigate(`/admin/churches/${churchId}/rutas/${data.id}/mapa`);
+      navigate(`/admin/churches/${churchSlug}/rutas/${data.id}/mapa`);
     } catch (e: any) {
       showError(e.message || 'Error al crear el proyecto.');
     } finally {
@@ -262,7 +263,7 @@ const RutasPage = () => {
           return (
             <div
               key={p.id}
-              onClick={() => navigate(`/admin/churches/${churchId}/rutas/${p.id}`)}
+              onClick={() => navigate(`/admin/churches/${churchSlug}/rutas/${p.id}`)}
               className={`border rounded-lg p-3 bg-card hover:bg-card/80 cursor-pointer transition-colors flex flex-col ${
                 hasUnseenNotes
                   ? 'border-red-500/60 ring-1 ring-red-500/30'
@@ -333,7 +334,7 @@ const RutasPage = () => {
                 </div>
               </div>
               <div className="flex gap-1 mt-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
-                <Button size="sm" variant="outline" className="flex-1 h-7 text-[11px] gap-1 px-2" onClick={() => navigate(`/admin/churches/${churchId}/rutas/${p.id}`)}>
+                <Button size="sm" variant="outline" className="flex-1 h-7 text-[11px] gap-1 px-2" onClick={() => navigate(`/admin/churches/${churchSlug}/rutas/${p.id}`)}>
                   Editar
                 </Button>
                 {stops > 0 && (
