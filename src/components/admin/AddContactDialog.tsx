@@ -104,7 +104,14 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     setDateOfBirth(''); setFechaContacto(today());
     setSexo(null); setEstadoCivil('');
     setObservaciones(''); setPedidoDeOracion('');
-    setConector('');
+    // Re-apply the conector default (the logged-in user's normalized
+    // full name) so "Guardar y agregar otro" doesn't leave the
+    // second contact with an empty conector. The dialog's auto-fill
+    // useEffect only runs when `open` transitions false→true, which
+    // doesn't happen in the keepOpen flow — Micaela reported this
+    // exact issue.
+    const ownName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
+    setConector(ownName ? normalizeName(ownName) : '');
     setLeaderAssigned(null); setCellId(null);
     setContactLat(null); setContactLng(null);
   };
