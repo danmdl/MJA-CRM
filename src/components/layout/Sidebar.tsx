@@ -167,8 +167,35 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px', color: '#fafafa' }}>MJA CRM</div>
           <div style={{ fontSize: 11, color: '#a1a1aa' }}>Panel de administración</div>
         </div>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
           <NotificationBell />
+          {/* Close button — only rendered when the parent layout
+              passed an onNavigate handler (it doubles as a "close
+              the sidebar" callback). Lets the user dismiss the
+              sidebar from inside on any page, especially Procesos /
+              Asistencia where the sidebar overlays the page tabs
+              and the ChurchDetailsLayout hamburger ends up behind
+              it. */}
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate()}
+              title="Cerrar menú"
+              style={{
+                width: 24, height: 24, borderRadius: 6,
+                background: 'transparent', border: 'none', color: '#a1a1aa',
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = '#18181b')}
+              onMouseOut={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
