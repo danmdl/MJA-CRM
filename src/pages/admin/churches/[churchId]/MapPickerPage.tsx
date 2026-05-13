@@ -326,9 +326,13 @@ const MapPickerPage = () => {
         if (!isPointInTerritory(c.lat, c.lng, activeTerritoryPaths)) return false;
       }
       if (term) {
+        // Name-only match. Address was included before, but a street
+        // called "Maria Asunta" pushed unrelated contacts to the top of
+        // the list when Dan searched "maria" — confusing because the
+        // first hit wasn't a Maria at all. If the user wants to filter
+        // by address there's a different toolbar for that.
         const name = normalize(`${c.first_name} ${c.last_name || ''}`);
-        const addr = normalize(c.address || '');
-        if (!name.includes(term) && !addr.includes(term)) return false;
+        if (!name.includes(term)) return false;
       }
       return true;
     });
