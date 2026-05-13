@@ -12,7 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -21,7 +21,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, Search, Undo2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
+  Users, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -51,10 +51,16 @@ const BulkWhatsAppDialog = lazy(() => import('@/components/admin/BulkWhatsAppDia
 const AddContactDialog = lazy(() => import('@/components/admin/AddContactDialog'));
 const DuplicateMergeDialog = lazy(() => import('@/components/admin/DuplicateMergeDialog'));
 import type { Zona, Barrio, Cuerda, Cell, Contact } from './semillero/types';
-import { haversine } from './semillero/helpers';
+import {
+  haversine,
+  detectZonaForContact as detectZonaForContactPure,
+  getCellsByDistance as getCellsByDistancePure,
+} from './semillero/helpers';
 import { ResizableHeader } from './semillero/ResizableHeader';
 import { BulkDeleteDialog } from './semillero/BulkDeleteDialog';
 import { BulkAssignDialog } from './semillero/BulkAssignDialog';
+import { PaginationControls } from './semillero/PaginationControls';
+import { AssignConfirmDialog, type ConfirmDialogState } from './semillero/AssignConfirmDialog';
 
 // ─── Main Component ──────────────────────────────────────────────
 const SemilleroPage = () => {
@@ -107,16 +113,7 @@ const SemilleroPage = () => {
   // every contact in the same name-group as the one the user clicked on.
   const [mergeGroup, setMergeGroup] = useState<Contact[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    type: 'auto' | 'manual' | 'cuerda_only' | 'auto_selected' | 'pre_assign';
-    contactId?: string;
-    cellId?: string;
-    cellName?: string;
-    cuerdaNum?: string;
-    zonaName?: string;
-    cuerdaZonaId?: string;
-    preview?: { label: string; count: number }[];
-  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [undoData, setUndoData] = useState<{
     contactIds: string[];
     prevStates: { zona_id: string | null; zona: string | null; numero_cuerda: string | null; cell_id: string | null }[];
@@ -600,85 +597,19 @@ const SemilleroPage = () => {
   }, [allContacts, churchId, queryClient, church?.lat, church?.lng, church?.address]);
 
   // ─── Cell suggestion by distance ───────────────────────────────
-  // First detect zona from barrio/address text, then find cells in that zona sorted by distance
-  const detectZonaForContact = useCallback((contact: Contact): Zona | null => {
-    if (!zonas?.length) return null;
-    const text = normalize((contact.barrio || '') + ' ' + (contact.address || ''));
-    if (!text.trim()) return null;
-    if (barrios?.length) {
-      for (const barrio of barrios) {
-        if (text.includes(normalize(barrio.nombre))) return zonas.find(z => z.id === barrio.zona_id) || null;
-      }
-    }
-    return zonas.find(z => text.includes(normalize(z.nombre))) || null;
-  }, [zonas, barrios]);
+  // detectZonaForContact + getCellsByDistance are pure helpers in
+  // ./semillero/helpers — these are just the memoized partials bound
+  // to the current React Query results.
+  const detectZonaForContact = useCallback(
+    (contact: Contact) => detectZonaForContactPure(contact, zonas, barrios),
+    [zonas, barrios],
+  );
 
-  // Get the cuerda number for a cell
-  const getCuerdaNumero = useCallback((cell: Cell): string | null => {
-    if (!cell.cuerda_id || !cuerdas?.length) return null;
-    const cuerda = cuerdas.find(c => c.id === cell.cuerda_id);
-    return cuerda?.numero || null;
-  }, [cuerdas]);
-
-  // Filter cells by gender: 1xx = Masculino, 2xx = Femenino, 3xx = either
-  const filterCellsByGender = useCallback((allCells: Cell[], sexo: string | null | undefined): Cell[] => {
-    if (!sexo) return allCells; // Unknown gender → show all cells
-    const isFemale = sexo.toLowerCase() === 'femenino';
-    const isMale = sexo.toLowerCase() === 'masculino';
-    if (!isFemale && !isMale) return allCells;
-
-    return allCells.filter(cell => {
-      const num = getCuerdaNumero(cell);
-      if (!num) return true; // No cuerda → include
-      const prefix = parseInt(num.charAt(0));
-      if (prefix === 3) return true; // 3xx → gender-neutral
-      if (isFemale) return prefix === 2; // Women → 2xx only
-      if (isMale) return prefix === 1; // Men → 1xx only
-      return true;
-    });
-  }, [getCuerdaNumero]);
-
-  // Get cells sorted by distance to a contact (filtered by gender)
-  const getCellsByDistance = useCallback((contact: Contact, filterZona?: Zona | null): Cell[] => {
-    if (!cells?.length) return [];
-
-    // FIRST: filter by gender — 1xx for men, 2xx for women
-    const genderFiltered = filterCellsByGender(cells, contact.sexo);
-
-    // If contact has VALID coordinates, use PURE distance on gender-filtered cells
-    if (contact.lat != null && contact.lng != null && isWithinGBA(contact.lat, contact.lng)) {
-      const cellsWithDist = genderFiltered
-        .filter(c => c.lat != null && c.lng != null && isWithinGBA(c.lat, c.lng))
-        .map(cell => ({
-          cell,
-          dist: haversine(contact.lat!, contact.lng!, cell.lat!, cell.lng!),
-        }));
-      return cellsWithDist.sort((a, b) => a.dist - b.dist).map(x => x.cell);
-    }
-
-    // No coordinates — use zona filtering + text matching as fallback
-    let candidates = genderFiltered;
-    if (filterZona && cuerdas?.length) {
-      const zonaCuerdaIds = cuerdas.filter(c => c.zona_id === filterZona.id).map(c => c.id);
-      const zonaCells = genderFiltered.filter(c => c.cuerda_id && zonaCuerdaIds.includes(c.cuerda_id));
-      if (zonaCells.length > 0) candidates = zonaCells;
-    }
-
-    const cellsWithScore = candidates.map(cell => {
-      let score = 999;
-      const contactText = normalize((contact.address || '') + ' ' + (contact.barrio || ''));
-      const cellText = normalize(cell.address || '');
-      if (cellText && contactText) {
-        const contactWords = new Set(contactText.split(/\s+/).filter(w => w.length > 2));
-        const cellWords = cellText.split(/\s+/).filter(w => w.length > 2);
-        const shared = cellWords.filter(w => contactWords.has(w)).length;
-        score = shared > 0 ? (100 - shared * 10) : 500;
-      }
-      return { cell, score };
-    });
-
-    return cellsWithScore.sort((a, b) => a.score - b.score).map(x => x.cell);
-  }, [cells, cuerdas, filterCellsByGender]);
+  const getCellsByDistance = useCallback(
+    (contact: Contact, filterZona?: Zona | null) =>
+      getCellsByDistancePure(contact, cells, cuerdas, filterZona),
+    [cells, cuerdas],
+  );
 
   // Compute suggestion: closest cell + its cuerda + zona
   const suggestions = useMemo(() => {
@@ -1174,55 +1105,17 @@ const SemilleroPage = () => {
   // ─── Render ────────────────────────────────────────────────────
   // Pagination block, declared once and rendered both above and below the
   // table so the user can flip pages without scrolling the whole list.
-  // Hidden when the filtered set fits in a single page so the toolbar
-  // doesn't get visually busy for small results.
-  const paginationControls = !isLoading && totalPages > 1 ? (
-    <div className="flex items-center justify-between gap-2 px-3 py-2 border-t text-xs">
-      <div className="text-muted-foreground tabular-nums">
-        Mostrando <span className="font-semibold text-foreground">{pageStart.toLocaleString('es-AR')}–{pageEnd.toLocaleString('es-AR')}</span> de {filteredContacts.length.toLocaleString('es-AR')}
-      </div>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setCurrentPage(0)}
-          disabled={safePage === 0}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Primera página"
-        >
-          <ChevronsLeft className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-          disabled={safePage === 0}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Página anterior"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" />
-        </button>
-        <span className="px-2 tabular-nums text-muted-foreground">
-          Página <span className="font-semibold text-foreground">{safePage + 1}</span> de {totalPages}
-        </span>
-        <button
-          type="button"
-          onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-          disabled={safePage >= totalPages - 1}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Página siguiente"
-        >
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setCurrentPage(totalPages - 1)}
-          disabled={safePage >= totalPages - 1}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Última página"
-        >
-          <ChevronsRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
+  // Rendered twice — top and bottom of the table — so users on a tall
+  // page don't need to scroll back to switch pages.
+  const paginationControls = !isLoading ? (
+    <PaginationControls
+      page={safePage}
+      totalPages={totalPages}
+      pageStart={pageStart}
+      pageEnd={pageEnd}
+      totalRows={filteredContacts.length}
+      onPageChange={setCurrentPage}
+    />
   ) : null;
 
   return (
@@ -2285,153 +2178,108 @@ const SemilleroPage = () => {
         </CardContent>
       </Card>
 
-      {/* Confirmation Dialog */}
-      <Dialog open={!!confirmDialog} onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{
-              confirmDialog?.type === 'auto' ? 'Autoasignar contactos'
-              : confirmDialog?.type === 'auto_selected' ? `Autoasignar ${visibleSelectedCount} seleccionados`
-              : confirmDialog?.type === 'pre_assign' ? 'Pre-asignar contacto'
-              : 'Confirmar asignación'
-            }</DialogTitle>
-            <DialogDescription asChild>
-              <div>
-                {confirmDialog?.type === 'auto' ? (
-                  <>
-                    <p>Se asignarán los contactos a la célula más cercana según su dirección.</p>
-                    {confirmDialog.preview && confirmDialog.preview.length > 0 && (
-                      <div className="mt-3 space-y-1 border rounded-md p-3 bg-muted/50">
-                        <p className="text-xs font-medium text-foreground mb-2">Vista previa:</p>
-                        {confirmDialog.preview.map(p => (
-                          <div key={p.label} className="flex justify-between text-xs py-0.5 border-b border-border/50 last:border-0">
-                            <span>{p.label}</span>
-                            <span className="font-mono font-medium tabular-nums">{p.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : confirmDialog?.type === 'auto_selected' ? (
-                  <p>Se asignarán los <strong>{visibleSelectedCount}</strong> contactos seleccionados a la célula más cercana según su dirección. Solo se asignarán los que tengan dirección y no estén ya asignados a una célula.</p>
-                ) : confirmDialog?.type === 'pre_assign' ? (
-                  <>
-                    <p>
-                      ¿Pre-asignar a <strong>{confirmDialog?.cellName}</strong>
-                      {confirmDialog?.cuerdaNum && <> (Cuerda {confirmDialog.cuerdaNum})</>}
-                      {confirmDialog?.zonaName && <> — {confirmDialog.zonaName}</>}?
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Va a quedar pendiente en tu outbox <strong>"Asignar Contactos"</strong> hasta que confirmes la asignación final.
-                    </p>
-                  </>
-                ) : (
-                  <p>
-                    ¿Asignar a <strong>{confirmDialog?.cellName}</strong>
-                    {confirmDialog?.cuerdaNum && <> (Cuerda {confirmDialog.cuerdaNum})</>}
-                    {confirmDialog?.zonaName && <> — {confirmDialog.zonaName}</>}?
-                  </p>
-                )}
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
-            <Button
-              onClick={async () => {
-                if (confirmDialog?.type === 'auto') autoAssignMutation.mutate();
-                else if (confirmDialog?.type === 'auto_selected') {
-                  // Auto-assign only selected contacts that don't have a cell yet
-                  const toAssign = filteredContacts.filter(c => selectedIds.has(c.id) && !c.cell_id);
-                  let count = 0;
-                  for (const c of toAssign) {
-                    const sug = suggestions[c.id];
-                    if (!sug?.cell) continue;
-                    const cell = sug.cell;
-                    let zonaId: string | null = null;
-                    let zonaName: string | null = null;
-                    let cuerdaNum: string | null = null;
-                    if (cell.cuerda_id && cuerdas?.length) {
-                      const cuerda = cuerdas.find(cr => cr.id === cell.cuerda_id);
-                      if (cuerda) {
-                        cuerdaNum = cuerda.numero;
-                        const zona = zonas?.find(z => z.id === cuerda.zona_id);
-                        if (zona) { zonaId = zona.id; zonaName = zona.nombre; }
-                      }
-                    }
-                    const { error } = await supabase.from('contacts').update({
-                      cell_id: cell.id, zona_id: zonaId, zona: zonaName, numero_cuerda: cuerdaNum,
-                      pool_assigned_at: new Date().toISOString(), pool_assigned_by: session?.user?.id,
-                    }).eq('id', c.id);
-                    if (!error) {
-                      count++;
-                      await supabase.from('activity_logs').insert({
-                        user_id: session?.user?.id, church_id: churchId, action: 'assign',
-                        entity_type: 'contact', entity_id: c.id,
-                        before_data: { numero_cuerda: c.numero_cuerda, cell_id: c.cell_id },
-                        after_data: { numero_cuerda: cuerdaNum, cell_id: cell.id, cell_name: cell.name },
-                      });
-                    }
-                  }
-                  showSuccess(`${count} contacto(s) autoasignados.`);
-                  setSelectedIds(new Set());
-                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                  setConfirmDialog(null);
+      {/* Confirmation Dialog — unified across 5 assignment flows.
+          Display + copy live in AssignConfirmDialog; the mutations
+          themselves stay here so they can read allContacts / cuerdas
+          / zonas / selectedIds / suggestions out of the page state. */}
+      <AssignConfirmDialog
+        state={confirmDialog}
+        onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}
+        visibleSelectedCount={visibleSelectedCount}
+        pending={autoAssignMutation.isPending || assignSingleMutation.isPending}
+        onConfirm={async () => {
+          if (!confirmDialog) return;
+          if (confirmDialog.type === 'auto') {
+            autoAssignMutation.mutate();
+            return;
+          }
+          if (confirmDialog.type === 'auto_selected') {
+            const toAssign = filteredContacts.filter(c => selectedIds.has(c.id) && !c.cell_id);
+            let count = 0;
+            for (const c of toAssign) {
+              const sug = suggestions[c.id];
+              if (!sug?.cell) continue;
+              const cell = sug.cell;
+              let zonaId: string | null = null;
+              let zonaName: string | null = null;
+              let cuerdaNum: string | null = null;
+              if (cell.cuerda_id && cuerdas?.length) {
+                const cuerda = cuerdas.find(cr => cr.id === cell.cuerda_id);
+                if (cuerda) {
+                  cuerdaNum = cuerda.numero;
+                  const zona = zonas?.find(z => z.id === cuerda.zona_id);
+                  if (zona) { zonaId = zona.id; zonaName = zona.nombre; }
                 }
-                else if (confirmDialog?.type === 'cuerda_only' && confirmDialog?.contactId && confirmDialog?.cuerdaNum) {
-                  // Assign to cuerda only (no cell)
-                  const zona = zonas?.find(z => z.id === confirmDialog.cuerdaZonaId);
-                  const { error } = await supabase.from('contacts').update({
-                    numero_cuerda: confirmDialog.cuerdaNum,
-                    zona_id: zona?.id || null,
-                    zona: zona?.nombre || null,
-                    cell_id: null,
-                  }).eq('id', confirmDialog.contactId);
-                  if (error) showError(error.message);
-                  else {
-                    const contact = allContacts?.find(ct => ct.id === confirmDialog.contactId);
-                    // Log to activity_logs for Historial
-                    await supabase.from('activity_logs').insert({
-                      user_id: session?.user?.id,
-                      church_id: churchId,
-                      action: 'assign',
-                      entity_type: 'contact',
-                      entity_id: confirmDialog.contactId,
-                      before_data: { numero_cuerda: contact?.numero_cuerda, cell_id: contact?.cell_id, zona: contact?.zona },
-                      after_data: { numero_cuerda: confirmDialog.cuerdaNum, cell_id: null, zona: zona?.nombre },
-                    });
-                    showSuccess(`Contacto asignado a Cuerda ${confirmDialog.cuerdaNum}.`);
-                    queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                    queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-                  }
-                  setConfirmDialog(null);
-                }
-                else if (confirmDialog?.type === 'pre_assign' && confirmDialog?.contactId && confirmDialog?.cellId) {
-                  // Stage the assignment in pending_assignment_cell_id
-                  // without touching cell_id. Contact moves to the
-                  // 'Asignar Contactos' outbox tab. Member confirms or
-                  // cancels from there.
-                  const { error } = await supabase.from('contacts').update({
-                    pending_assignment_cell_id: confirmDialog.cellId,
-                  }).eq('id', confirmDialog.contactId);
-                  if (error) showError(error.message);
-                  else {
-                    showSuccess('Pre-asignado. Lo encontrás en "Asignar Contactos" para confirmar.');
-                    queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                  }
-                  setConfirmDialog(null);
-                }
-                else if (confirmDialog?.contactId && confirmDialog?.cellId) assignSingleMutation.mutate({ contactId: confirmDialog.contactId, cellId: confirmDialog.cellId });
-              }}
-              disabled={autoAssignMutation.isPending || assignSingleMutation.isPending}
-            >
-              {(autoAssignMutation.isPending || assignSingleMutation.isPending) ? 'Asignando...'
-                : confirmDialog?.type === 'pre_assign' ? 'Pre-asignar'
-                : 'Confirmar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              }
+              const { error } = await supabase.from('contacts').update({
+                cell_id: cell.id, zona_id: zonaId, zona: zonaName, numero_cuerda: cuerdaNum,
+                pool_assigned_at: new Date().toISOString(), pool_assigned_by: session?.user?.id,
+              }).eq('id', c.id);
+              if (!error) {
+                count++;
+                await supabase.from('activity_logs').insert({
+                  user_id: session?.user?.id, church_id: churchId, action: 'assign',
+                  entity_type: 'contact', entity_id: c.id,
+                  before_data: { numero_cuerda: c.numero_cuerda, cell_id: c.cell_id },
+                  after_data: { numero_cuerda: cuerdaNum, cell_id: cell.id, cell_name: cell.name },
+                });
+              }
+            }
+            showSuccess(`${count} contacto(s) autoasignados.`);
+            setSelectedIds(new Set());
+            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            setConfirmDialog(null);
+            return;
+          }
+          if (confirmDialog.type === 'cuerda_only') {
+            const zona = zonas?.find(z => z.id === confirmDialog.cuerdaZonaId);
+            const { error } = await supabase.from('contacts').update({
+              numero_cuerda: confirmDialog.cuerdaNum,
+              zona_id: zona?.id || null,
+              zona: zona?.nombre || null,
+              cell_id: null,
+            }).eq('id', confirmDialog.contactId);
+            if (error) {
+              showError(error.message);
+            } else {
+              const contact = allContacts?.find(ct => ct.id === confirmDialog.contactId);
+              await supabase.from('activity_logs').insert({
+                user_id: session?.user?.id,
+                church_id: churchId,
+                action: 'assign',
+                entity_type: 'contact',
+                entity_id: confirmDialog.contactId,
+                before_data: { numero_cuerda: contact?.numero_cuerda, cell_id: contact?.cell_id, zona: contact?.zona },
+                after_data: { numero_cuerda: confirmDialog.cuerdaNum, cell_id: null, zona: zona?.nombre },
+              });
+              showSuccess(`Contacto asignado a Cuerda ${confirmDialog.cuerdaNum}.`);
+              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+              queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+            }
+            setConfirmDialog(null);
+            return;
+          }
+          if (confirmDialog.type === 'pre_assign') {
+            // Stage the assignment in pending_assignment_cell_id without touching
+            // cell_id. Contact moves to the 'Asignar Contactos' outbox tab.
+            // Member confirms or cancels from there.
+            const { error } = await supabase.from('contacts').update({
+              pending_assignment_cell_id: confirmDialog.cellId,
+            }).eq('id', confirmDialog.contactId);
+            if (error) {
+              showError(error.message);
+            } else {
+              showSuccess('Pre-asignado. Lo encontrás en "Asignar Contactos" para confirmar.');
+              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            }
+            setConfirmDialog(null);
+            return;
+          }
+          if (confirmDialog.type === 'assign') {
+            assignSingleMutation.mutate({ contactId: confirmDialog.contactId, cellId: confirmDialog.cellId });
+          }
+        }}
+      />
 
       {/* CSV Import Dialog — render the wrapper only when open so the lazy
           CsvImporter chunk only fetches on first open, not page mount. */}
