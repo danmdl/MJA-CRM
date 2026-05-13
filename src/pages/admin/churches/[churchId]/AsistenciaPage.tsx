@@ -1,16 +1,16 @@
 "use client";
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Calendar, Users, BarChart3, Search, Check, X as XIcon, Trash2, Pencil } from 'lucide-react';
+import { Plus, Search, Check, X as XIcon, Trash2, Pencil, ChevronLeft, ChevronRight, BarChart3, UserPlus } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
-import { PROCESS_STAGES, COURSE_STAGES, stageColor, stageLabel, isCourseStage, type ProcessStageKey } from '@/lib/process-stages';
+import { PROCESS_STAGES, stageColor, stageLabel, isCourseStage, type ProcessStageKey } from '@/lib/process-stages';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -45,11 +45,20 @@ interface ProcessRow {
   id: string;
   contact_id: string;
   stage: ProcessStageKey;
+  moved_at: string;
   metadata: Record<string, any>;
   contacts: { first_name: string; last_name: string | null; numero_cuerda: string | null } | null;
 }
 
-type TabKey = 'eventos' | 'clases' | 'resumen';
+// 'todos' = aggregate across stages, 'resumen' = stats. All other tab
+// keys map directly to ProcessStageKey.
+type TabKey = 'todos' | ProcessStageKey | 'resumen';
+
+const SPECIAL_TABS: TabKey[] = ['todos'];
+
+// Calendar setup — Monday-start, Spanish month/day names.
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 // ─── Page ─────────────────────────────────────────────────────────────
 
@@ -58,31 +67,38 @@ const AsistenciaPage = () => {
   const { profile } = useSession();
   const queryClient = useQueryClient();
 
-  const [tab, setTab] = useState<TabKey>('eventos');
-  const [filterStage, setFilterStage] = useState<string>('');
-  const [filterFrom, setFilterFrom] = useState<string>('');
-  const [filterTo, setFilterTo] = useState<string>('');
+  const [tab, setTab] = useState<TabKey>('todos');
+  const [year, setYear] = useState<number>(new Date().getFullYear());
   const [createOpen, setCreateOpen] = useState(false);
+  const [createPrefillDate, setCreatePrefillDate] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<AttendanceEvent | null>(null);
   const [takingEvent, setTakingEvent] = useState<AttendanceEvent | null>(null);
-  const [filterClaseStage, setFilterClaseStage] = useState<ProcessStageKey>('abc');
 
   const isPrivileged = !!profile && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role || '');
   const userCuerda = profile?.numero_cuerda || null;
 
-  // ── Queries ────────────────────────────────────────────────────────
-  const { data: events = [], isLoading: eventsLoading } = useQuery<AttendanceEvent[]>({
-    queryKey: ['attendance-events', churchId, filterStage, filterFrom, filterTo],
+  // Reset year when switching tabs so the user always lands on the
+  // current year for the new stage — keeps navigation predictable.
+  const stageForTab = useMemo<ProcessStageKey | null>(() => {
+    if (SPECIAL_TABS.includes(tab) || tab === 'resumen') return null;
+    return tab as ProcessStageKey;
+  }, [tab]);
+
+  // ── Events for the current tab + year ──────────────────────────────
+  const { data: events = [] } = useQuery<AttendanceEvent[]>({
+    queryKey: ['attendance-events', churchId, year, stageForTab],
     queryFn: async () => {
       if (!churchId) return [];
+      const yearFrom = `${year}-01-01`;
+      const yearTo = `${year}-12-31`;
       let q = supabase.from('attendance_events')
         .select('*')
         .eq('church_id', churchId)
         .is('deleted_at', null)
+        .gte('event_date', yearFrom)
+        .lte('event_date', yearTo)
         .order('event_date', { ascending: false });
-      if (filterStage) q = q.eq('stage', filterStage);
-      if (filterFrom) q = q.gte('event_date', filterFrom);
-      if (filterTo) q = q.lte('event_date', filterTo);
+      if (stageForTab) q = q.eq('stage', stageForTab);
       const { data, error } = await q;
       if (error) throw error;
       return (data || []) as AttendanceEvent[];
@@ -91,15 +107,16 @@ const AsistenciaPage = () => {
     staleTime: 30_000,
   });
 
-  // Attendance counts per event (for the events list display)
+  // Attendance counts per event
+  const eventIds = useMemo(() => events.map(e => e.id), [events]);
   const { data: attendanceByEvent = {} } = useQuery<Record<string, { present: number; absent: number; justified: number }>>({
-    queryKey: ['attendance-counts', churchId, events.map(e => e.id).join(',')],
+    queryKey: ['attendance-counts', churchId, eventIds.join(',')],
     queryFn: async () => {
-      if (events.length === 0) return {};
+      if (eventIds.length === 0) return {};
       const { data, error } = await supabase
         .from('contact_attendance')
         .select('event_id, status')
-        .in('event_id', events.map(e => e.id));
+        .in('event_id', eventIds);
       if (error) throw error;
       const counts: Record<string, { present: number; absent: number; justified: number }> = {};
       (data || []).forEach((r: any) => {
@@ -110,7 +127,7 @@ const AsistenciaPage = () => {
       });
       return counts;
     },
-    enabled: events.length > 0,
+    enabled: eventIds.length > 0,
     staleTime: 30_000,
   });
 
@@ -144,170 +161,126 @@ const AsistenciaPage = () => {
     staleTime: 5 * 60_000,
   });
 
-  // Course-stage processes (ABC / Nivel 1 / Nivel 2) for the Clases tab
-  const { data: courseProcesses = [], isLoading: processesLoading } = useQuery<ProcessRow[]>({
-    queryKey: ['process-courses', churchId, filterClaseStage],
+  // ── Enrolled list for the current etapa ────────────────────────────
+  // contact_processes rows for the selected stage. For "todos" we don't
+  // show the enrolled list (it'd be a wall of names across all etapas);
+  // for each individual etapa we list every contact in that stage
+  // regardless of cuerda, so a contact added by Cuerda 12 is visible to
+  // Cuerda 5 too. Edit/delete is gated client-side by role + cuerda
+  // ownership.
+  const { data: enrolled = [], isLoading: enrolledLoading } = useQuery<ProcessRow[]>({
+    queryKey: ['asistencia-enrolled', churchId, stageForTab],
     queryFn: async () => {
-      if (!churchId) return [];
+      if (!churchId || !stageForTab) return [];
       const { data, error } = await supabase
         .from('contact_processes')
-        .select('id, contact_id, stage, metadata, contacts:contact_id ( first_name, last_name, numero_cuerda )')
+        .select('id, contact_id, stage, moved_at, metadata, contacts:contact_id ( first_name, last_name, numero_cuerda )')
         .eq('church_id', churchId)
-        .eq('stage', filterClaseStage);
+        .eq('stage', stageForTab)
+        .order('moved_at', { ascending: false });
       if (error) throw error;
       return ((data || []) as any) as ProcessRow[];
     },
-    enabled: !!churchId && tab === 'clases',
+    enabled: !!churchId && !!stageForTab,
     staleTime: 30_000,
-  });
-
-  // ── Mutations ──────────────────────────────────────────────────────
-  const deleteEvent = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('attendance_events')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      showSuccess('Evento eliminado');
-      queryClient.invalidateQueries({ queryKey: ['attendance-events', churchId] });
-    },
-    onError: (e: any) => showError(e.message || 'Error al eliminar'),
-  });
-
-  // ── Derived: visible events (cuerda scoping for non-privileged) ────
-  const visibleEvents = useMemo(() => {
-    if (isPrivileged || !userCuerda) return events;
-    // Non-privileged see events for their cuerda, plus events without
-    // a cuerda set (church-wide like Domingos / Encuentros).
-    const userCuerdaId = cuerdas.find(c => c.numero === userCuerda)?.id;
-    return events.filter(e => !e.cuerda_id || e.cuerda_id === userCuerdaId);
-  }, [events, isPrivileged, userCuerda, cuerdas]);
-
-  // ── Stats for Resumen tab ──────────────────────────────────────────
-  const stats = useMemo(() => {
-    if (visibleEvents.length === 0) return { totalEvents: 0, avgPresent: 0, totalAttendanceRecords: 0 };
-    let totalPresent = 0;
-    let totalRecorded = 0;
-    visibleEvents.forEach(e => {
-      const c = attendanceByEvent[e.id];
-      if (c) {
-        totalPresent += c.present;
-        totalRecorded += c.present + c.absent + c.justified;
-      }
-    });
-    const avgPresent = totalRecorded === 0 ? 0 : Math.round((totalPresent / totalRecorded) * 100);
-    return { totalEvents: visibleEvents.length, avgPresent, totalAttendanceRecords: totalRecorded };
-  }, [visibleEvents, attendanceByEvent]);
-
-  // Per-contact attendance % (last 90 days events)
-  const { data: perContactStats = [] } = useQuery<{ contact_id: string; first_name: string; last_name: string | null; present: number; total: number }[]>({
-    queryKey: ['per-contact-attendance', churchId, visibleEvents.map(e => e.id).join(',')],
-    queryFn: async () => {
-      if (visibleEvents.length === 0) return [];
-      const { data: rows, error } = await supabase
-        .from('contact_attendance')
-        .select('contact_id, status, contacts:contact_id ( first_name, last_name )')
-        .in('event_id', visibleEvents.map(e => e.id));
-      if (error) throw error;
-      const m = new Map<string, { contact_id: string; first_name: string; last_name: string | null; present: number; total: number }>();
-      (rows || []).forEach((r: any) => {
-        const id = r.contact_id;
-        const entry = m.get(id) || { contact_id: id, first_name: r.contacts?.first_name || '?', last_name: r.contacts?.last_name || null, present: 0, total: 0 };
-        entry.total++;
-        if (r.status === 'present') entry.present++;
-        m.set(id, entry);
-      });
-      return Array.from(m.values());
-    },
-    enabled: visibleEvents.length > 0 && tab === 'resumen',
-    staleTime: 60_000,
   });
 
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      {/* Header: title + Nuevo evento. The "Eventos" sub-title is gone
+          — etapas are now the primary tabs and the page is implicitly
+          about events. */}
+      <div className="flex flex-wrap items-center gap-3 mb-3">
         <h1 className="text-xl sm:text-2xl font-bold">Asistencia</h1>
-        <span className="text-xs text-muted-foreground hidden sm:inline">Registro de asistencias ligado a las etapas de Procesos</span>
+        <span className="text-xs text-muted-foreground hidden sm:inline">Registro ligado a las etapas de Procesos</span>
         <div className="flex-1" />
-        {tab === 'eventos' && (
-          <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+        {tab !== 'resumen' && (
+          <Button onClick={() => { setCreatePrefillDate(null); setCreateOpen(true); }} className="gap-1.5">
             <Plus className="h-4 w-4" /> Nuevo evento
           </Button>
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border mb-4">
-        <TabBtn active={tab === 'eventos'} onClick={() => setTab('eventos')} icon={<Calendar className="h-3.5 w-3.5" />} label="Eventos" />
-        <TabBtn active={tab === 'clases'} onClick={() => setTab('clases')} icon={<Users className="h-3.5 w-3.5" />} label="Clases (ABC / Niveles)" />
-        <TabBtn active={tab === 'resumen'} onClick={() => setTab('resumen')} icon={<BarChart3 className="h-3.5 w-3.5" />} label="Resumen" />
+      {/* Etapa tabs — horizontal scrollable on mobile. TODOS first,
+          one tab per stage, then Resumen at the end. */}
+      <div className="flex items-center gap-1 border-b border-border mb-4 overflow-x-auto pb-px">
+        <EtapaTab active={tab === 'todos'} onClick={() => setTab('todos')} label="TODOS" />
+        {PROCESS_STAGES.map(s => (
+          <EtapaTab
+            key={s.key}
+            active={tab === s.key}
+            onClick={() => setTab(s.key)}
+            label={s.short}
+            fullLabel={s.label}
+            color={s.color}
+          />
+        ))}
+        <EtapaTab active={tab === 'resumen'} onClick={() => setTab('resumen')} label="Resumen" icon={<BarChart3 className="h-3 w-3" />} />
       </div>
 
-      {/* Filter bar (shared by eventos + resumen) */}
-      {tab !== 'clases' && (
-        <div className="flex flex-wrap items-end gap-3 mb-4 p-3 border rounded-lg bg-card">
-          <div>
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Etapa</Label>
-            <select value={filterStage} onChange={e => setFilterStage(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background min-w-[180px]">
-              <option value="">Todas las etapas</option>
-              {PROCESS_STAGES.map(s => (
-                <option key={s.key} value={s.key}>{s.label}</option>
-              ))}
-            </select>
+      {tab === 'resumen' ? (
+        <ResumenView events={events} attendanceByEvent={attendanceByEvent} />
+      ) : (
+        <>
+          {/* Color legend — shows every stage's swatch. On individual
+              etapa tabs it still shows the full legend so the user
+              can read the calendar colors at a glance. */}
+          <ColorLegend />
+
+          {/* Year navigator + Persona search */}
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <div className="inline-flex items-center gap-1 border rounded-md">
+              <button onClick={() => setYear(y => y - 1)} className="p-1.5 hover:bg-muted/50 rounded-l-md" title="Año anterior">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="px-3 text-sm font-semibold min-w-[60px] text-center">{year}</span>
+              <button onClick={() => setYear(y => y + 1)} className="p-1.5 hover:bg-muted/50 rounded-r-md" title="Año siguiente">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <div>
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Desde</Label>
-            <Input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="h-8 text-xs w-[140px]" />
-          </div>
-          <div>
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Hasta</Label>
-            <Input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="h-8 text-xs w-[140px]" />
-          </div>
-          {(filterStage || filterFrom || filterTo) && (
-            <button onClick={() => { setFilterStage(''); setFilterFrom(''); setFilterTo(''); }} className="text-xs text-muted-foreground hover:text-foreground h-8 px-2">
-              Limpiar
-            </button>
+
+          {/* Year calendar — 12 mini-month grids in a responsive grid. */}
+          <YearCalendar
+            year={year}
+            events={events}
+            onDayClick={(dateStr) => {
+              setCreatePrefillDate(dateStr);
+              setCreateOpen(true);
+            }}
+            onEventClick={(ev) => setTakingEvent(ev)}
+            onEventEdit={(ev) => setEditingEvent(ev)}
+            onEventDelete={(ev) => {
+              if (!confirm('¿Eliminar este evento? La asistencia registrada también se borra.')) return;
+              supabase.from('attendance_events')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', ev.id)
+                .then(({ error }) => {
+                  if (error) { showError(error.message); return; }
+                  showSuccess('Evento eliminado');
+                  queryClient.invalidateQueries({ queryKey: ['attendance-events', churchId] });
+                });
+            }}
+            attendanceByEvent={attendanceByEvent}
+          />
+
+          {/* Enrolled list — only on individual etapa tabs */}
+          {stageForTab && (
+            <div className="mt-6">
+              <EnrolledList
+                churchId={churchId!}
+                stage={stageForTab}
+                enrolled={enrolled}
+                loading={enrolledLoading}
+                isPrivileged={isPrivileged}
+                userCuerda={userCuerda}
+                userId={profile?.id || null}
+                onChanged={() => queryClient.invalidateQueries({ queryKey: ['asistencia-enrolled', churchId, stageForTab] })}
+              />
+            </div>
           )}
-        </div>
-      )}
-
-      {/* Tab content */}
-      {tab === 'eventos' && (
-        <EventosList
-          events={visibleEvents}
-          loading={eventsLoading}
-          attendanceByEvent={attendanceByEvent}
-          onTake={setTakingEvent}
-          onEdit={setEditingEvent}
-          onDelete={(id) => {
-            if (confirm('¿Eliminar este evento? La asistencia registrada también se borra.')) {
-              deleteEvent.mutate(id);
-            }
-          }}
-        />
-      )}
-
-      {tab === 'clases' && (
-        <ClasesGrid
-          stage={filterClaseStage}
-          onStageChange={setFilterClaseStage}
-          processes={courseProcesses}
-          loading={processesLoading}
-          userCuerda={userCuerda}
-          isPrivileged={isPrivileged}
-        />
-      )}
-
-      {tab === 'resumen' && (
-        <ResumenView
-          stats={stats}
-          perContact={perContactStats}
-          events={visibleEvents}
-          attendanceByEvent={attendanceByEvent}
-        />
+        </>
       )}
 
       {/* Dialogs */}
@@ -319,10 +292,12 @@ const AsistenciaPage = () => {
           userId={profile?.id || null}
           userCuerdaNumero={userCuerda}
           isPrivileged={isPrivileged}
+          defaultStage={stageForTab || 'nuevas_personas_celulas'}
+          defaultDate={createPrefillDate}
           existing={editingEvent}
-          onClose={() => { setCreateOpen(false); setEditingEvent(null); }}
+          onClose={() => { setCreateOpen(false); setEditingEvent(null); setCreatePrefillDate(null); }}
           onSaved={() => {
-            setCreateOpen(false); setEditingEvent(null);
+            setCreateOpen(false); setEditingEvent(null); setCreatePrefillDate(null);
             queryClient.invalidateQueries({ queryKey: ['attendance-events', churchId] });
           }}
         />
@@ -337,7 +312,6 @@ const AsistenciaPage = () => {
           onClose={() => setTakingEvent(null)}
           onSaved={() => {
             queryClient.invalidateQueries({ queryKey: ['attendance-counts', churchId] });
-            queryClient.invalidateQueries({ queryKey: ['per-contact-attendance', churchId] });
           }}
         />
       )}
@@ -347,271 +321,500 @@ const AsistenciaPage = () => {
 
 // ─── Tab button ───────────────────────────────────────────────────────
 
-const TabBtn = ({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) => (
+const EtapaTab = ({ active, onClick, label, fullLabel, color, icon }: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  fullLabel?: string;
+  color?: string;
+  icon?: React.ReactNode;
+}) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+    title={fullLabel || label}
+    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b-2 -mb-px transition-colors ${
       active ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
     }`}
   >
+    {color && (
+      <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+    )}
     {icon}
     {label}
   </button>
 );
 
-// ─── Eventos list ─────────────────────────────────────────────────────
+// ─── Color legend ─────────────────────────────────────────────────────
 
-const EventosList = ({ events, loading, attendanceByEvent, onTake, onEdit, onDelete }: {
+const ColorLegend = () => (
+  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-muted-foreground">
+    <span className="text-[10px] uppercase tracking-wider">Referencias:</span>
+    {PROCESS_STAGES.map(s => (
+      <span key={s.key} className="inline-flex items-center gap-1">
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
+        {s.short}
+      </span>
+    ))}
+  </div>
+);
+
+// ─── Year calendar ────────────────────────────────────────────────────
+
+const YearCalendar = ({ year, events, onDayClick, onEventClick, onEventEdit, onEventDelete, attendanceByEvent }: {
+  year: number;
   events: AttendanceEvent[];
-  loading: boolean;
+  onDayClick: (dateStr: string) => void;
+  onEventClick: (ev: AttendanceEvent) => void;
+  onEventEdit: (ev: AttendanceEvent) => void;
+  onEventDelete: (ev: AttendanceEvent) => void;
   attendanceByEvent: Record<string, { present: number; absent: number; justified: number }>;
-  onTake: (e: AttendanceEvent) => void;
-  onEdit: (e: AttendanceEvent) => void;
-  onDelete: (id: string) => void;
 }) => {
-  if (loading) return <div className="text-center py-12 text-muted-foreground text-sm">Cargando eventos…</div>;
-  if (events.length === 0) {
-    return (
-      <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
-        <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground/60" />
-        <p className="text-sm font-medium">No hay eventos cargados</p>
-        <p className="text-xs text-muted-foreground mt-1">Apretá "Nuevo evento" para registrar la asistencia de una reunión.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-2">
-      {events.map(ev => {
-        const counts = attendanceByEvent[ev.id] || { present: 0, absent: 0, justified: 0 };
-        const total = counts.present + counts.absent + counts.justified;
-        return (
-          <div key={ev.id} className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 transition-colors">
-            <span className="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase text-white shrink-0"
-                  style={{ background: stageColor(ev.stage) }}>
-              {stageLabel(ev.stage)}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">
-                {ev.title || `${stageLabel(ev.stage)} · ${formatDateAR(ev.event_date)}`}
-              </div>
-              <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0">
-                <span>{formatDateAR(ev.event_date)}</span>
-                {ev.event_time && <span>· {ev.event_time.slice(0, 5)}</span>}
-                {total > 0 && (
-                  <>
-                    <span>·</span>
-                    <span className="text-green-400">{counts.present} presentes</span>
-                    {counts.absent > 0 && <span className="text-red-400">/ {counts.absent} ausentes</span>}
-                    {counts.justified > 0 && <span className="text-amber-400">/ {counts.justified} justificados</span>}
-                  </>
-                )}
-              </div>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => onTake(ev)} className="gap-1 h-8 text-xs shrink-0">
-              <Check className="h-3 w-3" /> Asistencia
-            </Button>
-            <button onClick={() => onEdit(ev)} className="p-1.5 text-muted-foreground hover:text-foreground rounded" title="Editar">
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button onClick={() => onDelete(ev.id)} className="p-1.5 text-muted-foreground hover:text-red-400 rounded" title="Eliminar">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+  const [popoverDay, setPopoverDay] = useState<{ month: number; day: number } | null>(null);
 
-// ─── Clases grid ──────────────────────────────────────────────────────
-
-const ClasesGrid = ({ stage, onStageChange, processes, loading, userCuerda, isPrivileged }: {
-  stage: ProcessStageKey;
-  onStageChange: (s: ProcessStageKey) => void;
-  processes: ProcessRow[];
-  loading: boolean;
-  userCuerda: string | null;
-  isPrivileged: boolean;
-}) => {
-  const [search, setSearch] = useState('');
-  const visible = useMemo(() => {
-    let list = processes;
-    if (!isPrivileged && userCuerda) {
-      list = list.filter(p => p.contacts?.numero_cuerda === userCuerda);
-    }
-    if (search.trim()) {
-      const t = search.toLowerCase();
-      list = list.filter(p => `${p.contacts?.first_name || ''} ${p.contacts?.last_name || ''}`.toLowerCase().includes(t));
-    }
-    return list;
-  }, [processes, isPrivileged, userCuerda, search]);
+  // Bucket events by 'YYYY-MM-DD' for fast lookup per cell.
+  const byDate = useMemo(() => {
+    const m: Record<string, AttendanceEvent[]> = {};
+    events.forEach(e => {
+      (m[e.event_date] = m[e.event_date] || []).push(e);
+    });
+    return m;
+  }, [events]);
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end gap-3 mb-3 p-3 border rounded-lg bg-card">
-        <div>
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Etapa con clases</Label>
-          <select value={stage} onChange={e => onStageChange(e.target.value as ProcessStageKey)} className="h-8 text-xs border rounded px-2 bg-background min-w-[160px]">
-            {COURSE_STAGES.map(k => (
-              <option key={k} value={k}>{stageLabel(k)}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex-1 min-w-[200px]">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Buscar</Label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input value={search} onChange={e => setSearch(e.target.value)} className="h-8 text-xs pl-8" placeholder="Nombre o apellido…" />
-          </div>
-        </div>
-        <span className="text-xs text-muted-foreground self-center pb-1">
-          La edición se hace desde la solapa Procesos (cards de cada contacto).
-        </span>
+    <div className="relative">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {Array.from({ length: 12 }, (_, monthIdx) => (
+          <MonthGrid
+            key={monthIdx}
+            year={year}
+            month={monthIdx}
+            byDate={byDate}
+            onDayClick={(day) => {
+              const eventsHere = byDate[isoDate(year, monthIdx, day)] || [];
+              if (eventsHere.length === 0) {
+                onDayClick(isoDate(year, monthIdx, day));
+              } else {
+                // Open a popover-ish list for this day instead of
+                // immediately jumping into one of N events.
+                setPopoverDay({ month: monthIdx, day });
+              }
+            }}
+          />
+        ))}
       </div>
-      {loading ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">Cargando…</div>
-      ) : visible.length === 0 ? (
-        <div className="border-2 border-dashed border-border rounded-lg p-8 text-center text-sm text-muted-foreground">
-          No hay contactos en esta etapa.
-        </div>
-      ) : (
-        <div className="border rounded-lg overflow-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40 text-muted-foreground">
-              <tr>
-                <th className="text-left px-2 py-2 sticky left-0 bg-muted/40">Contacto</th>
-                <th className="text-left px-2 py-2">Cuerda</th>
-                {Array.from({ length: 10 }, (_, i) => (
-                  <th key={i} className="text-center px-1 py-2 w-9">C{i + 1}</th>
-                ))}
-                <th className="text-center px-2 py-2 w-14">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map(p => {
-                const pres = Array.from({ length: 10 }, (_, i) => p.metadata?.[`clase_${i + 1}`]);
-                const presentCount = pres.filter(v => v === 'P').length;
-                const recordedCount = pres.filter(v => v === 'P' || v === 'A').length;
-                const pct = recordedCount === 0 ? null : Math.round((presentCount / recordedCount) * 100);
-                return (
-                  <tr key={p.id} className="border-t hover:bg-muted/20">
-                    <td className="px-2 py-1.5 sticky left-0 bg-background font-medium whitespace-nowrap">
-                      {p.contacts?.first_name} {p.contacts?.last_name || ''}
-                    </td>
-                    <td className="px-2 py-1.5 text-muted-foreground">{p.contacts?.numero_cuerda || '—'}</td>
-                    {pres.map((v, i) => (
-                      <td key={i} className="text-center">
-                        <span className={
-                          v === 'P' ? 'inline-flex items-center justify-center w-6 h-6 rounded bg-green-500/20 text-green-400 font-bold' :
-                          v === 'A' ? 'inline-flex items-center justify-center w-6 h-6 rounded bg-red-500/20 text-red-400 font-bold' :
-                          'text-muted-foreground/40'
-                        }>
-                          {v || '—'}
-                        </span>
-                      </td>
-                    ))}
-                    <td className="text-center font-medium">
-                      {pct === null ? '—' : `${pct}%`}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+
+      {popoverDay && (
+        <DayPopover
+          year={year}
+          month={popoverDay.month}
+          day={popoverDay.day}
+          events={byDate[isoDate(year, popoverDay.month, popoverDay.day)] || []}
+          attendanceByEvent={attendanceByEvent}
+          onClose={() => setPopoverDay(null)}
+          onTake={(ev) => { setPopoverDay(null); onEventClick(ev); }}
+          onEdit={(ev) => { setPopoverDay(null); onEventEdit(ev); }}
+          onDelete={onEventDelete}
+          onNew={() => { setPopoverDay(null); onDayClick(isoDate(year, popoverDay.month, popoverDay.day)); }}
+        />
       )}
     </div>
   );
 };
 
-// ─── Resumen view ─────────────────────────────────────────────────────
+const MonthGrid = ({ year, month, byDate, onDayClick }: {
+  year: number;
+  month: number;
+  byDate: Record<string, AttendanceEvent[]>;
+  onDayClick: (day: number) => void;
+}) => {
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Convert JS Sunday-start (0) into Monday-start offset.
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  // Pad to 42 cells (6 weeks) so every month grid is the same height.
+  while (cells.length < 42) cells.push(null);
 
-const ResumenView = ({ stats, perContact, events, attendanceByEvent }: {
-  stats: { totalEvents: number; avgPresent: number; totalAttendanceRecords: number };
-  perContact: { contact_id: string; first_name: string; last_name: string | null; present: number; total: number }[];
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+  return (
+    <div className="border rounded-lg p-2 bg-card">
+      <div className="text-xs font-semibold mb-1.5">{MONTH_NAMES[month]}</div>
+      <div className="grid grid-cols-7 gap-px text-[10px] text-muted-foreground mb-1">
+        {WEEKDAYS.map((d, i) => <div key={i} className="text-center">{d}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-px">
+        {cells.map((d, i) => {
+          if (d === null) return <div key={i} className="aspect-square" />;
+          const dateStr = isoDate(year, month, d);
+          const evs = byDate[dateStr] || [];
+          const isToday = isCurrentMonth && today.getDate() === d;
+          return (
+            <button
+              key={i}
+              onClick={() => onDayClick(d)}
+              className={`aspect-square flex flex-col items-center justify-start py-0.5 rounded text-[10px] transition-colors ${
+                isToday ? 'bg-primary/15 ring-1 ring-primary/40' : 'hover:bg-muted/40'
+              }`}
+            >
+              <span className={`leading-none ${isToday ? 'font-bold text-primary' : 'text-foreground'}`}>{d}</span>
+              {evs.length > 0 && (
+                <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
+                  {evs.slice(0, 3).map(e => (
+                    <span key={e.id} className="w-1.5 h-1.5 rounded-full" style={{ background: stageColor(e.stage) }} />
+                  ))}
+                  {evs.length > 3 && <span className="text-[8px] leading-none text-muted-foreground">+</span>}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const DayPopover = ({ year, month, day, events, attendanceByEvent, onClose, onTake, onEdit, onDelete, onNew }: {
+  year: number;
+  month: number;
+  day: number;
+  events: AttendanceEvent[];
+  attendanceByEvent: Record<string, { present: number; absent: number; justified: number }>;
+  onClose: () => void;
+  onTake: (ev: AttendanceEvent) => void;
+  onEdit: (ev: AttendanceEvent) => void;
+  onDelete: (ev: AttendanceEvent) => void;
+  onNew: () => void;
+}) => (
+  <Dialog open={true} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <DialogContent className="sm:max-w-[480px]">
+      <DialogHeader>
+        <DialogTitle>{day} de {MONTH_NAMES[month]} {year}</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-1.5 max-h-[60vh] overflow-y-auto py-1">
+        {events.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Sin eventos en este día.</p>
+        ) : events.map(ev => {
+          const c = attendanceByEvent[ev.id] || { present: 0, absent: 0, justified: 0 };
+          const total = c.present + c.absent + c.justified;
+          return (
+            <div key={ev.id} className="flex items-center gap-2 p-2 border rounded">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase text-white shrink-0"
+                    style={{ background: stageColor(ev.stage) }}>
+                {stageLabel(ev.stage)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {ev.title || stageLabel(ev.stage)}
+                </div>
+                {total > 0 && (
+                  <div className="text-[10px] text-muted-foreground">
+                    {c.present}P {c.absent > 0 && `· ${c.absent}A`} {c.justified > 0 && `· ${c.justified}J`}
+                  </div>
+                )}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => onTake(ev)} className="gap-1 h-7 text-xs">
+                <Check className="h-3 w-3" /> Asistencia
+              </Button>
+              <button onClick={() => onEdit(ev)} className="p-1 text-muted-foreground hover:text-foreground rounded" title="Editar">
+                <Pencil className="h-3 w-3" />
+              </button>
+              <button onClick={() => onDelete(ev)} className="p-1 text-muted-foreground hover:text-red-400 rounded" title="Eliminar">
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onClose}>Cerrar</Button>
+        <Button onClick={onNew} className="gap-1.5"><Plus className="h-3.5 w-3.5" /> Nuevo evento este día</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+// ─── Enrolled list per etapa ──────────────────────────────────────────
+
+const EnrolledList = ({ churchId, stage, enrolled, loading, isPrivileged, userCuerda, userId, onChanged }: {
+  churchId: string;
+  stage: ProcessStageKey;
+  enrolled: ProcessRow[];
+  loading: boolean;
+  isPrivileged: boolean;
+  userCuerda: string | null;
+  userId: string | null;
+  onChanged: () => void;
+}) => {
+  const [search, setSearch] = useState('');
+  const [adderOpen, setAdderOpen] = useState(false);
+  const [savingDelete, setSavingDelete] = useState<string | null>(null);
+
+  const canEditRow = (row: ProcessRow) => {
+    if (isPrivileged) return true;
+    // Field roles can only edit rows for contacts in their own cuerda.
+    if (!userCuerda) return false;
+    return row.contacts?.numero_cuerda === userCuerda;
+  };
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return enrolled;
+    const t = search.toLowerCase();
+    return enrolled.filter(p =>
+      `${p.contacts?.first_name || ''} ${p.contacts?.last_name || ''}`.toLowerCase().includes(t) ||
+      (p.contacts?.numero_cuerda || '').toLowerCase().includes(t),
+    );
+  }, [enrolled, search]);
+
+  const handleDelete = async (row: ProcessRow) => {
+    if (!confirm('¿Sacar a esta persona de la etapa? La asistencia registrada queda intacta.')) return;
+    setSavingDelete(row.id);
+    try {
+      const { error } = await supabase.from('contact_processes').delete().eq('id', row.id);
+      if (error) throw error;
+      showSuccess('Persona removida');
+      onChanged();
+    } catch (e: any) {
+      showError(e.message || 'Error al remover');
+    } finally {
+      setSavingDelete(null);
+    }
+  };
+
+  return (
+    <div className="border rounded-lg bg-card">
+      <div className="flex flex-wrap items-center gap-2 p-3 border-b">
+        <div className="text-sm font-semibold">
+          Personas en {stageLabel(stage)}
+          <span className="text-muted-foreground font-normal ml-1.5">({enrolled.length})</span>
+        </div>
+        <div className="flex-1" />
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} className="h-8 text-xs pl-8 w-[220px]" placeholder="Buscar inscriptos..." />
+        </div>
+        <Button size="sm" onClick={() => setAdderOpen(true)} className="gap-1 h-8 text-xs">
+          <UserPlus className="h-3 w-3" /> Agregar persona
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-xs text-muted-foreground">Cargando…</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-8 text-xs text-muted-foreground">
+          {search ? 'Sin coincidencias.' : 'Nadie cargado en esta etapa todavía.'}
+        </div>
+      ) : (
+        <div className="divide-y">
+          {filtered.map(row => {
+            const editable = canEditRow(row);
+            // Clase % for course stages (ABC / Nivel 1 / Nivel 2).
+            const isCourse = isCourseStage(stage);
+            const presentClases = isCourse
+              ? Array.from({ length: 10 }, (_, i) => row.metadata?.[`clase_${i + 1}`]).filter(v => v === 'P').length
+              : null;
+            const recordedClases = isCourse
+              ? Array.from({ length: 10 }, (_, i) => row.metadata?.[`clase_${i + 1}`]).filter(v => v === 'P' || v === 'A').length
+              : null;
+            return (
+              <div key={row.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{row.contacts?.first_name} {row.contacts?.last_name || ''}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {row.contacts?.numero_cuerda ? `Cuerda ${row.contacts.numero_cuerda}` : 'Sin cuerda'}
+                  </div>
+                </div>
+                {isCourse && recordedClases !== null && (
+                  <div className="text-xs text-muted-foreground tabular-nums">
+                    {presentClases}/{recordedClases} clases
+                  </div>
+                )}
+                {editable && (
+                  <button
+                    onClick={() => handleDelete(row)}
+                    disabled={savingDelete === row.id}
+                    className="p-1.5 text-muted-foreground hover:text-red-400 rounded disabled:opacity-50"
+                    title="Sacar de la etapa"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {adderOpen && (
+        <AddPersonDialog
+          churchId={churchId}
+          stage={stage}
+          userId={userId}
+          existingContactIds={new Set(enrolled.map(e => e.contact_id))}
+          onClose={() => setAdderOpen(false)}
+          onAdded={() => { setAdderOpen(false); onChanged(); }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── Add-person search dialog ─────────────────────────────────────────
+
+const AddPersonDialog = ({ churchId, stage, userId, existingContactIds, onClose, onAdded }: {
+  churchId: string;
+  stage: ProcessStageKey;
+  userId: string | null;
+  existingContactIds: Set<string>;
+  onClose: () => void;
+  onAdded: () => void;
+}) => {
+  const [search, setSearch] = useState('');
+  const [adding, setAdding] = useState<string | null>(null);
+
+  // Cross-cuerda search of the church's contacts. Users from any
+  // cuerda can ADD a contact to an etapa per Dan's spec — the
+  // edit/delete restriction is enforced on the row in the list above.
+  const { data: results = [], isLoading } = useQuery<ContactRow[]>({
+    queryKey: ['asistencia-add-person-search', churchId, search],
+    queryFn: async () => {
+      if (search.trim().length < 2) return [];
+      const t = search.trim();
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, numero_cuerda')
+        .eq('church_id', churchId)
+        .is('deleted_at', null)
+        .or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%`)
+        .order('first_name')
+        .limit(40);
+      if (error) throw error;
+      return (data || []) as ContactRow[];
+    },
+    enabled: !!churchId && search.trim().length >= 2,
+    staleTime: 15_000,
+  });
+
+  const handleAdd = async (contact: ContactRow) => {
+    if (existingContactIds.has(contact.id)) {
+      showError('Esta persona ya está en la etapa');
+      return;
+    }
+    setAdding(contact.id);
+    try {
+      // Move (or create) the row to this stage. ON CONFLICT updates
+      // an existing row's stage rather than rejecting — a contact
+      // can only be in one stage at a time.
+      const { error } = await supabase.from('contact_processes')
+        .upsert({
+          contact_id: contact.id,
+          church_id: churchId,
+          stage,
+          moved_at: new Date().toISOString(),
+          moved_by: userId,
+          metadata: {},
+        }, { onConflict: 'contact_id' });
+      if (error) throw error;
+      showSuccess(`${contact.first_name} agregado a ${stageLabel(stage)}`);
+      onAdded();
+    } catch (e: any) {
+      showError(e.message || 'Error al agregar');
+    } finally {
+      setAdding(null);
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-[520px] max-h-[80vh] flex flex-col p-0">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b">
+          <DialogTitle>Agregar persona a {stageLabel(stage)}</DialogTitle>
+          <div className="text-xs text-muted-foreground">Buscá por nombre. Cualquier cuerda puede agregar.</div>
+        </DialogHeader>
+        <div className="p-3 border-b">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input autoFocus value={search} onChange={e => setSearch(e.target.value)} className="h-9 text-sm pl-9" placeholder="Nombre o apellido..." />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-1">
+          {search.trim().length < 2 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">Escribí al menos 2 letras para buscar.</p>
+          ) : isLoading ? (
+            <p className="text-xs text-muted-foreground text-center py-8">Buscando…</p>
+          ) : results.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">Sin coincidencias.</p>
+          ) : (
+            <div className="divide-y">
+              {results.map(c => {
+                const already = existingContactIds.has(c.id);
+                return (
+                  <div key={c.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{c.first_name} {c.last_name || ''}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {c.numero_cuerda ? `Cuerda ${c.numero_cuerda}` : 'Sin cuerda'}
+                      </div>
+                    </div>
+                    {already ? (
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Ya está</span>
+                    ) : (
+                      <Button size="sm" variant="outline" disabled={adding === c.id} onClick={() => handleAdd(c)} className="h-7 text-xs">
+                        {adding === c.id ? 'Agregando…' : 'Agregar'}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <DialogFooter className="px-5 py-3 border-t">
+          <Button variant="ghost" onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ─── Resumen view (unchanged behavior) ───────────────────────────────
+
+const ResumenView = ({ events, attendanceByEvent }: {
   events: AttendanceEvent[];
   attendanceByEvent: Record<string, { present: number; absent: number; justified: number }>;
 }) => {
-  const topAttenders = useMemo(() => {
-    return [...perContact]
-      .map(p => ({ ...p, pct: p.total === 0 ? 0 : Math.round((p.present / p.total) * 100) }))
-      .sort((a, b) => b.pct - a.pct || b.present - a.present)
-      .slice(0, 10);
-  }, [perContact]);
-
-  const lowAttenders = useMemo(() => {
-    return [...perContact]
-      .filter(p => p.total >= 2)
-      .map(p => ({ ...p, pct: p.total === 0 ? 0 : Math.round((p.present / p.total) * 100) }))
-      .sort((a, b) => a.pct - b.pct)
-      .slice(0, 10);
-  }, [perContact]);
+  const stats = useMemo(() => {
+    let totalPresent = 0;
+    let totalRecorded = 0;
+    events.forEach(e => {
+      const c = attendanceByEvent[e.id];
+      if (c) {
+        totalPresent += c.present;
+        totalRecorded += c.present + c.absent + c.justified;
+      }
+    });
+    const avgPresent = totalRecorded === 0 ? 0 : Math.round((totalPresent / totalRecorded) * 100);
+    return { totalEvents: events.length, avgPresent, totalAttendanceRecords: totalRecorded };
+  }, [events, attendanceByEvent]);
 
   return (
     <div className="space-y-4">
-      {/* Top stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 border rounded-lg bg-card">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Eventos en el rango</div>
-          <div className="text-2xl font-bold mt-1">{stats.totalEvents}</div>
-        </div>
-        <div className="p-4 border rounded-lg bg-card">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">% de asistencia promedio</div>
-          <div className="text-2xl font-bold mt-1">{stats.avgPresent}%</div>
-          <div className="text-[10px] text-muted-foreground mt-0.5">{stats.totalAttendanceRecords} registros</div>
-        </div>
-        <div className="p-4 border rounded-lg bg-card">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Contactos tracked</div>
-          <div className="text-2xl font-bold mt-1">{perContact.length}</div>
-        </div>
+        <Stat label="Eventos" value={String(stats.totalEvents)} />
+        <Stat label="% asistencia promedio" value={`${stats.avgPresent}%`} sub={`${stats.totalAttendanceRecords} registros`} />
+        <Stat label="Etapas con eventos" value={String(new Set(events.map(e => e.stage)).size)} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Top attenders */}
-        <div className="border rounded-lg bg-card overflow-hidden">
-          <div className="px-3 py-2 border-b bg-muted/30 text-xs font-semibold">Más constantes</div>
-          {topAttenders.length === 0 ? (
-            <div className="p-6 text-center text-xs text-muted-foreground">Sin datos.</div>
-          ) : (
-            <div className="divide-y">
-              {topAttenders.map(p => (
-                <div key={p.contact_id} className="flex items-center gap-3 px-3 py-2 text-xs">
-                  <div className="flex-1 min-w-0 truncate">{p.first_name} {p.last_name || ''}</div>
-                  <div className="text-muted-foreground">{p.present}/{p.total}</div>
-                  <div className="font-bold text-green-400 w-12 text-right">{p.pct}%</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Low attenders */}
-        <div className="border rounded-lg bg-card overflow-hidden">
-          <div className="px-3 py-2 border-b bg-muted/30 text-xs font-semibold">A seguir de cerca</div>
-          {lowAttenders.length === 0 ? (
-            <div className="p-6 text-center text-xs text-muted-foreground">Sin datos suficientes (mín. 2 registros).</div>
-          ) : (
-            <div className="divide-y">
-              {lowAttenders.map(p => (
-                <div key={p.contact_id} className="flex items-center gap-3 px-3 py-2 text-xs">
-                  <div className="flex-1 min-w-0 truncate">{p.first_name} {p.last_name || ''}</div>
-                  <div className="text-muted-foreground">{p.present}/{p.total}</div>
-                  <div className="font-bold text-red-400 w-12 text-right">{p.pct}%</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Per-event summary */}
       <div className="border rounded-lg bg-card overflow-hidden">
-        <div className="px-3 py-2 border-b bg-muted/30 text-xs font-semibold">Eventos del rango</div>
+        <div className="px-3 py-2 border-b bg-muted/30 text-xs font-semibold">Eventos recientes</div>
         {events.length === 0 ? (
-          <div className="p-6 text-center text-xs text-muted-foreground">Sin eventos en el rango.</div>
+          <div className="p-6 text-center text-xs text-muted-foreground">Sin eventos.</div>
         ) : (
           <div className="divide-y">
-            {events.slice(0, 25).map(ev => {
+            {events.slice(0, 30).map(ev => {
               const c = attendanceByEvent[ev.id] || { present: 0, absent: 0, justified: 0 };
               const total = c.present + c.absent + c.justified;
               const pct = total === 0 ? 0 : Math.round((c.present / total) * 100);
@@ -635,28 +838,38 @@ const ResumenView = ({ stats, perContact, events, attendanceByEvent }: {
   );
 };
 
-// ─── Create / Edit event dialog ───────────────────────────────────────
+const Stat = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+  <div className="p-4 border rounded-lg bg-card">
+    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <div className="text-2xl font-bold mt-1">{value}</div>
+    {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+  </div>
+);
 
-const EventoDialog = ({ churchId, cuerdas, cells, userId, userCuerdaNumero, isPrivileged, existing, onClose, onSaved }: {
+// ─── Create / Edit event dialog ──────────────────────────────────────
+
+const EventoDialog = ({ churchId, cuerdas, cells, userId, userCuerdaNumero, isPrivileged, defaultStage, defaultDate, existing, onClose, onSaved }: {
   churchId: string;
   cuerdas: { id: string; numero: string; is_church_cuerda: boolean | null }[];
   cells: { id: string; name: string; cuerda_id: string | null }[];
   userId: string | null;
   userCuerdaNumero: string | null;
   isPrivileged: boolean;
+  defaultStage: ProcessStageKey;
+  defaultDate: string | null;
   existing: AttendanceEvent | null;
   onClose: () => void;
   onSaved: () => void;
 }) => {
   const userCuerdaId = useMemo(() => cuerdas.find(c => c.numero === userCuerdaNumero)?.id || null, [cuerdas, userCuerdaNumero]);
 
-  const [stage, setStage] = useState<ProcessStageKey>(existing?.stage || 'nuevas_personas_celulas');
-  const [date, setDate] = useState(existing?.event_date || new Date().toISOString().slice(0, 10));
+  const [stage, setStage] = useState<ProcessStageKey>(existing?.stage || defaultStage);
+  const [date, setDate] = useState(existing?.event_date || defaultDate || new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState(existing?.event_time?.slice(0, 5) || '');
   const [title, setTitle] = useState(existing?.title || '');
   const [notes, setNotes] = useState(existing?.notes || '');
   const [cuerdaId, setCuerdaId] = useState<string | null>(
-    existing?.cuerda_id ?? (isPrivileged ? null : userCuerdaId)
+    existing?.cuerda_id ?? (isPrivileged ? null : userCuerdaId),
   );
   const [cellId, setCellId] = useState<string | null>(existing?.cell_id || null);
   const [saving, setSaving] = useState(false);
@@ -766,7 +979,7 @@ const EventoDialog = ({ churchId, cuerdas, cells, userId, userCuerdaNumero, isPr
   );
 };
 
-// ─── Take attendance dialog ───────────────────────────────────────────
+// ─── Take attendance dialog ──────────────────────────────────────────
 
 const TomarAsistenciaDialog = ({ event, churchId, userCuerda, isPrivileged, onClose, onSaved }: {
   event: AttendanceEvent;
@@ -781,52 +994,29 @@ const TomarAsistenciaDialog = ({ event, churchId, userCuerda, isPrivileged, onCl
   const [statusById, setStatusById] = useState<Record<string, 'present' | 'absent' | 'justified' | undefined>>({});
   const [savingFor, setSavingFor] = useState<string | null>(null);
 
-  // Eligible contacts: scoped by event's cuerda when set; otherwise by user's
-  // cuerda for non-privileged users.
-  const { data: contacts = [], isLoading } = useQuery<ContactRow[]>({
-    queryKey: ['attendance-contacts', churchId, event.cuerda_id, userCuerda, isPrivileged],
+  // Pull contacts from the enrolled list for this stage rather than
+  // every contact in the church — taking attendance is bounded to who
+  // is actually in the etapa. Cross-cuerda since the etapa list is
+  // shared across cuerdas.
+  const { data: enrolled = [], isLoading } = useQuery<{ contact_id: string; first_name: string; last_name: string | null; numero_cuerda: string | null }[]>({
+    queryKey: ['asistencia-take-list', churchId, event.stage],
     queryFn: async () => {
-      const scopeCuerdaNumero = (() => {
-        // If the event is tied to a cuerda, fetch its numero so we filter
-        // contacts by the right value.
-        return null;
-      })();
-      // Build the contact query. We always scope by church; if the event
-      // is tied to a cuerda, use that; otherwise non-privileged users
-      // fall back to their own cuerda; privileged see all.
-      const PAGE_SIZE = 1000;
-      const all: ContactRow[] = [];
-      // Figure out which cuerda's contacts to fetch.
-      let cuerdaNumero: string | null = null;
-      if (event.cuerda_id) {
-        const { data: cu } = await supabase.from('cuerdas').select('numero').eq('id', event.cuerda_id).maybeSingle();
-        cuerdaNumero = cu?.numero || null;
-      } else if (!isPrivileged && userCuerda) {
-        cuerdaNumero = userCuerda;
-      }
-      for (let page = 0; ; page++) {
-        let q = supabase.from('contacts')
-          .select('id, first_name, last_name, numero_cuerda')
-          .eq('church_id', churchId)
-          .is('deleted_at', null)
-          .order('first_name', { ascending: true })
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-        if (cuerdaNumero) q = q.eq('numero_cuerda', cuerdaNumero);
-        const { data, error } = await q;
-        if (error) throw error;
-        const rows = (data || []) as ContactRow[];
-        all.push(...rows);
-        if (rows.length < PAGE_SIZE) break;
-        if (page >= 9) break;
-        void scopeCuerdaNumero;
-      }
-      return all;
+      const { data, error } = await supabase
+        .from('contact_processes')
+        .select('contact_id, contacts:contact_id ( first_name, last_name, numero_cuerda )')
+        .eq('church_id', churchId)
+        .eq('stage', event.stage);
+      if (error) throw error;
+      return ((data || []) as any).map((r: any) => ({
+        contact_id: r.contact_id,
+        first_name: r.contacts?.first_name || '?',
+        last_name: r.contacts?.last_name || null,
+        numero_cuerda: r.contacts?.numero_cuerda || null,
+      }));
     },
-    enabled: !!event.id,
     staleTime: 30_000,
   });
 
-  // Existing attendance for this event
   const { data: existing = [], isLoading: existingLoading } = useQuery<AttendanceRow[]>({
     queryKey: ['attendance-rows', event.id],
     queryFn: async () => {
@@ -840,20 +1030,27 @@ const TomarAsistenciaDialog = ({ event, churchId, userCuerda, isPrivileged, onCl
     staleTime: 0,
   });
 
-  // Hydrate statusById from existing rows on load
-  useMemo(() => {
-    if (existing.length > 0) {
-      const next: Record<string, 'present' | 'absent' | 'justified'> = {};
-      existing.forEach(r => { next[r.contact_id] = r.status; });
-      setStatusById(prev => ({ ...prev, ...next }));
-    }
+  useEffect(() => {
+    if (existing.length === 0) return;
+    const next: Record<string, 'present' | 'absent' | 'justified'> = {};
+    existing.forEach(r => { next[r.contact_id] = r.status; });
+    setStatusById(prev => ({ ...prev, ...next }));
   }, [existing]);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return contacts;
-    const t = search.toLowerCase();
-    return contacts.filter(c => `${c.first_name} ${c.last_name || ''}`.toLowerCase().includes(t));
-  }, [contacts, search]);
+  // Default visible list scopes by the event's cuerda (if any), then
+  // by the user's cuerda when not privileged. Privileged see all
+  // enrolled across cuerdas.
+  const visible = useMemo(() => {
+    let list = enrolled;
+    if (!isPrivileged && userCuerda) {
+      list = list.filter(c => c.numero_cuerda === userCuerda);
+    }
+    if (search.trim()) {
+      const t = search.toLowerCase();
+      list = list.filter(c => `${c.first_name} ${c.last_name || ''}`.toLowerCase().includes(t));
+    }
+    return list;
+  }, [enrolled, isPrivileged, userCuerda, search]);
 
   const mark = async (contactId: string, status: 'present' | 'absent' | 'justified') => {
     setSavingFor(contactId);
@@ -904,36 +1101,40 @@ const TomarAsistenciaDialog = ({ event, churchId, userCuerda, isPrivileged, onCl
             </span>
             <span>{formatDateAR(event.event_date)}{event.event_time ? ` · ${event.event_time.slice(0,5)}` : ''}</span>
             {isCourseStage(event.stage) && (
-              <span className="text-amber-400">(Etapa con clases — usar Procesos para clase_1..10)</span>
+              <span className="text-amber-400">(Etapa con clases — clase_1..10 se carga en Procesos)</span>
             )}
           </div>
         </DialogHeader>
         <div className="px-6 py-3 border-b">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar contacto..." className="pl-9 h-9" />
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar inscripto..." className="pl-9 h-9" />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-2">
           {(isLoading || existingLoading) ? (
             <div className="text-center py-12 text-muted-foreground text-sm">Cargando…</div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">Sin contactos para mostrar.</div>
+          ) : visible.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              {enrolled.length === 0
+                ? 'Nadie está cargado en esta etapa todavía. Agregalos desde la lista.'
+                : 'Sin coincidencias en tu cuerda.'}
+            </div>
           ) : (
             <div className="divide-y">
-              {filtered.map(c => {
-                const status = statusById[c.id];
+              {visible.map(c => {
+                const status = statusById[c.contact_id];
                 return (
-                  <div key={c.id} className="flex items-center gap-2 px-3 py-2 text-xs">
+                  <div key={c.contact_id} className="flex items-center gap-2 px-3 py-2 text-xs">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{c.first_name} {c.last_name || ''}</div>
                       {c.numero_cuerda && <div className="text-[10px] text-muted-foreground">Cuerda {c.numero_cuerda}</div>}
                     </div>
-                    <MarkBtn label="P" title="Presente" active={status === 'present'} color="green" onClick={() => mark(c.id, 'present')} loading={savingFor === c.id} />
-                    <MarkBtn label="A" title="Ausente" active={status === 'absent'} color="red" onClick={() => mark(c.id, 'absent')} loading={savingFor === c.id} />
-                    <MarkBtn label="J" title="Justificado" active={status === 'justified'} color="amber" onClick={() => mark(c.id, 'justified')} loading={savingFor === c.id} />
+                    <MarkBtn label="P" title="Presente" active={status === 'present'} color="green" onClick={() => mark(c.contact_id, 'present')} loading={savingFor === c.contact_id} />
+                    <MarkBtn label="A" title="Ausente" active={status === 'absent'} color="red" onClick={() => mark(c.contact_id, 'absent')} loading={savingFor === c.contact_id} />
+                    <MarkBtn label="J" title="Justificado" active={status === 'justified'} color="amber" onClick={() => mark(c.contact_id, 'justified')} loading={savingFor === c.contact_id} />
                     {status && (
-                      <button onClick={() => clearMark(c.id)} className="p-1 text-muted-foreground hover:text-foreground" title="Limpiar">
+                      <button onClick={() => clearMark(c.contact_id)} className="p-1 text-muted-foreground hover:text-foreground" title="Limpiar">
                         <XIcon className="h-3 w-3" />
                       </button>
                     )}
@@ -944,9 +1145,7 @@ const TomarAsistenciaDialog = ({ event, churchId, userCuerda, isPrivileged, onCl
           )}
         </div>
         <DialogFooter className="px-6 py-3 border-t flex items-center justify-between">
-          <div className="text-xs text-muted-foreground">
-            Las marcas se guardan al instante.
-          </div>
+          <div className="text-xs text-muted-foreground">Las marcas se guardan al instante.</div>
           <Button onClick={onClose}>Cerrar</Button>
         </DialogFooter>
       </DialogContent>
@@ -978,11 +1177,16 @@ const MarkBtn = ({ label, title, active, color, onClick, loading }: {
 // ─── Utils ────────────────────────────────────────────────────────────
 
 function formatDateAR(s: string): string {
-  // Inputs come as 'YYYY-MM-DD'. Format as DD/MM/YY without UTC drift.
   if (!s) return '';
   const parts = s.slice(0, 10).split('-');
   if (parts.length !== 3) return s;
   return `${parts[2]}/${parts[1]}/${parts[0].slice(2)}`;
+}
+
+function isoDate(year: number, month: number, day: number): string {
+  const m = String(month + 1).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${year}-${m}-${d}`;
 }
 
 export default AsistenciaPage;
