@@ -185,27 +185,41 @@ const AsistenciaPage = () => {
     staleTime: 30_000,
   });
 
+  const handleEventDelete = (ev: AttendanceEvent) => {
+    if (!confirm('¿Eliminar este evento? La asistencia registrada también se borra.')) return;
+    supabase.from('attendance_events')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', ev.id)
+      .then(({ error }) => {
+        if (error) { showError(error.message); return; }
+        showSuccess('Evento eliminado');
+        queryClient.invalidateQueries({ queryKey: ['attendance-events', churchId] });
+      });
+  };
+
   // ── Render ─────────────────────────────────────────────────────────
+  // The page uses a column-flex layout with the calendar branch
+  // claiming the remaining vertical space. The whole shell is
+  // h-full so the AdminLayout's <main overflow:auto> doesn't get a
+  // chance to scroll — the calendar's own MonthGrid sizes are tight
+  // enough to fit 12 months in a single viewport at xl+.
   return (
-    <div className="p-4 sm:p-6">
-      {/* Header: title + Nuevo evento. The "Eventos" sub-title is gone
-          — etapas are now the primary tabs and the page is implicitly
-          about events. */}
-      <div className="flex flex-wrap items-center gap-3 mb-3">
-        <h1 className="text-xl sm:text-2xl font-bold">Asistencia</h1>
-        <span className="text-xs text-muted-foreground hidden sm:inline">Registro ligado a las etapas de Procesos</span>
+    <div className="h-full flex flex-col p-3 sm:p-4">
+      {/* Header: title + Nuevo evento. Compact, single row. */}
+      <div className="flex flex-wrap items-center gap-3 mb-2 shrink-0">
+        <h1 className="text-lg sm:text-xl font-bold">Asistencia</h1>
+        <span className="text-xs text-muted-foreground hidden md:inline">Registro ligado a las etapas de Procesos</span>
         <div className="flex-1" />
         {tab !== 'resumen' && (
-          <Button onClick={() => { setCreatePrefillDate(null); setCreateOpen(true); }} className="gap-1.5">
-            <Plus className="h-4 w-4" /> Nuevo evento
+          <Button onClick={() => { setCreatePrefillDate(null); setCreateOpen(true); }} className="gap-1.5 h-8 text-xs">
+            <Plus className="h-3.5 w-3.5" /> Nuevo evento
           </Button>
         )}
       </div>
 
-      {/* Etapa tabs — horizontal scrollable on mobile. TODOS first,
-          one tab per stage, then Resumen at the end. */}
-      <div className="flex items-center gap-1 border-b border-border mb-4 overflow-x-auto pb-px">
-        <EtapaTab active={tab === 'todos'} onClick={() => setTab('todos')} label="TODOS" />
+      {/* Etapa tabs — Calendario first, one tab per stage, then Resumen. */}
+      <div className="flex items-center gap-1 border-b border-border mb-2 overflow-x-auto pb-px shrink-0">
+        <EtapaTab active={tab === 'todos'} onClick={() => setTab('todos')} label="Calendario" />
         {PROCESS_STAGES.map(s => (
           <EtapaTab
             key={s.key}
@@ -220,67 +234,67 @@ const AsistenciaPage = () => {
       </div>
 
       {tab === 'resumen' ? (
-        <ResumenView events={events} attendanceByEvent={attendanceByEvent} />
-      ) : (
-        <>
-          {/* Color legend — shows every stage's swatch. On individual
-              etapa tabs it still shows the full legend so the user
-              can read the calendar colors at a glance. */}
-          <ColorLegend />
-
-          {/* Year navigator + Persona search */}
-          <div className="flex flex-wrap items-center gap-3 mb-3">
+        <div className="flex-1 overflow-y-auto">
+          <ResumenView events={events} attendanceByEvent={attendanceByEvent} />
+        </div>
+      ) : tab === 'todos' ? (
+        // ─── Calendario view ─────────────────────────────────────────
+        // Fills the remaining viewport height. The legend + year nav
+        // sit on a single shrink-0 row; the calendar grid takes the
+        // rest with flex-1 + overflow-hidden so 12 months render
+        // without forcing a page scroll.
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 shrink-0 text-[11px]">
             <div className="inline-flex items-center gap-1 border rounded-md">
-              <button onClick={() => setYear(y => y - 1)} className="p-1.5 hover:bg-muted/50 rounded-l-md" title="Año anterior">
-                <ChevronLeft className="h-4 w-4" />
+              <button onClick={() => setYear(y => y - 1)} className="p-1 hover:bg-muted/50 rounded-l-md" title="Año anterior">
+                <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="px-3 text-sm font-semibold min-w-[60px] text-center">{year}</span>
-              <button onClick={() => setYear(y => y + 1)} className="p-1.5 hover:bg-muted/50 rounded-r-md" title="Año siguiente">
-                <ChevronRight className="h-4 w-4" />
+              <span className="px-3 text-xs font-semibold min-w-[50px] text-center">{year}</span>
+              <button onClick={() => setYear(y => y + 1)} className="p-1 hover:bg-muted/50 rounded-r-md" title="Año siguiente">
+                <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Referencias:</span>
+            {PROCESS_STAGES.map(s => (
+              <span key={s.key} className="inline-flex items-center gap-1 text-muted-foreground">
+                <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                {s.short}
+              </span>
+            ))}
           </div>
-
-          {/* Year calendar — 12 mini-month grids in a responsive grid. */}
           <YearCalendar
             year={year}
             events={events}
-            onDayClick={(dateStr) => {
-              setCreatePrefillDate(dateStr);
-              setCreateOpen(true);
-            }}
+            onDayClick={(dateStr) => { setCreatePrefillDate(dateStr); setCreateOpen(true); }}
             onEventClick={(ev) => setTakingEvent(ev)}
             onEventEdit={(ev) => setEditingEvent(ev)}
-            onEventDelete={(ev) => {
-              if (!confirm('¿Eliminar este evento? La asistencia registrada también se borra.')) return;
-              supabase.from('attendance_events')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('id', ev.id)
-                .then(({ error }) => {
-                  if (error) { showError(error.message); return; }
-                  showSuccess('Evento eliminado');
-                  queryClient.invalidateQueries({ queryKey: ['attendance-events', churchId] });
-                });
-            }}
+            onEventDelete={handleEventDelete}
             attendanceByEvent={attendanceByEvent}
           />
-
-          {/* Enrolled list — only on individual etapa tabs */}
-          {stageForTab && (
-            <div className="mt-6">
-              <EnrolledList
-                churchId={churchId!}
-                stage={stageForTab}
-                enrolled={enrolled}
-                loading={enrolledLoading}
-                isPrivileged={isPrivileged}
-                userCuerda={userCuerda}
-                userId={profile?.id || null}
-                onChanged={() => queryClient.invalidateQueries({ queryKey: ['asistencia-enrolled', churchId, stageForTab] })}
-              />
-            </div>
-          )}
-        </>
+        </div>
+      ) : (
+        // ─── Specific etapa view ─────────────────────────────────────
+        // No almanaque here per Dan's spec — just the enrolled list +
+        // the scheduled-dates list for this etapa. Dates set here
+        // show up as colored dots on the Calendario tab.
+        <div className="flex-1 overflow-y-auto">
+          <EtapaView
+            stage={stageForTab!}
+            events={events}
+            attendanceByEvent={attendanceByEvent}
+            enrolled={enrolled}
+            enrolledLoading={enrolledLoading}
+            isPrivileged={isPrivileged}
+            userCuerda={userCuerda}
+            userId={profile?.id || null}
+            churchId={churchId!}
+            onTakeAttendance={setTakingEvent}
+            onEditEvent={setEditingEvent}
+            onDeleteEvent={handleEventDelete}
+            onScheduleDate={() => { setCreatePrefillDate(null); setCreateOpen(true); }}
+            onEnrolledChanged={() => queryClient.invalidateQueries({ queryKey: ['asistencia-enrolled', churchId, stageForTab] })}
+          />
+        </div>
       )}
 
       {/* Dialogs */}
@@ -344,19 +358,9 @@ const EtapaTab = ({ active, onClick, label, fullLabel, color, icon }: {
   </button>
 );
 
-// ─── Color legend ─────────────────────────────────────────────────────
-
-const ColorLegend = () => (
-  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-muted-foreground">
-    <span className="text-[10px] uppercase tracking-wider">Referencias:</span>
-    {PROCESS_STAGES.map(s => (
-      <span key={s.key} className="inline-flex items-center gap-1">
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
-        {s.short}
-      </span>
-    ))}
-  </div>
-);
+// Legend is now inlined into the Calendario tab row so it shares
+// the year-nav line — saves a whole vertical strip and makes the
+// year fit without scrolling. The standalone component is gone.
 
 // ─── Year calendar ────────────────────────────────────────────────────
 
@@ -380,9 +384,13 @@ const YearCalendar = ({ year, events, onDayClick, onEventClick, onEventEdit, onE
     return m;
   }, [events]);
 
+  // Six columns × two rows of month grids on xl+ so a full year
+  // fits in the viewport without page scroll. Drops to 4×3 on lg,
+  // 3×4 on md, 2×6 on sm, 1×12 on phone (mobile keeps scroll —
+  // making 12 mini-calendars share a phone viewport is hostile).
   return (
-    <div className="relative">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <div className="relative flex-1 min-h-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 h-full">
         {Array.from({ length: 12 }, (_, monthIdx) => (
           <MonthGrid
             key={monthIdx}
@@ -440,15 +448,22 @@ const MonthGrid = ({ year, month, byDate, onDayClick }: {
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
 
+  // Compact layout: tight padding, small fonts, fixed cell height
+  // (no aspect-square — that scaled the cells with width and made
+  // months balloon when the grid had few columns). h-6 cells ×
+  // 6 rows of weeks = 144px of grid; plus header (14px) + weekday
+  // row (12px) + padding (8px) ≈ 180px per month. 2 rows of months
+  // = ~360px, comfortably under a typical viewport's calendar
+  // budget after the page header / etapa tabs / legend.
   return (
-    <div className="border rounded-lg p-2 bg-card">
-      <div className="text-xs font-semibold mb-1.5">{MONTH_NAMES[month]}</div>
-      <div className="grid grid-cols-7 gap-px text-[10px] text-muted-foreground mb-1">
-        {WEEKDAYS.map((d, i) => <div key={i} className="text-center">{d}</div>)}
+    <div className="border rounded-md p-1.5 bg-card flex flex-col min-h-0">
+      <div className="text-[11px] font-semibold mb-1 leading-none">{MONTH_NAMES[month]}</div>
+      <div className="grid grid-cols-7 gap-px text-[9px] text-muted-foreground mb-0.5">
+        {WEEKDAYS.map((d, i) => <div key={i} className="text-center leading-none">{d}</div>)}
       </div>
       <div className="grid grid-cols-7 gap-px">
         {cells.map((d, i) => {
-          if (d === null) return <div key={i} className="aspect-square" />;
+          if (d === null) return <div key={i} className="h-6" />;
           const dateStr = isoDate(year, month, d);
           const evs = byDate[dateStr] || [];
           const isToday = isCurrentMonth && today.getDate() === d;
@@ -456,17 +471,17 @@ const MonthGrid = ({ year, month, byDate, onDayClick }: {
             <button
               key={i}
               onClick={() => onDayClick(d)}
-              className={`aspect-square flex flex-col items-center justify-start py-0.5 rounded text-[10px] transition-colors ${
+              className={`h-6 flex flex-col items-center justify-start py-0.5 rounded text-[9px] leading-none transition-colors ${
                 isToday ? 'bg-primary/15 ring-1 ring-primary/40' : 'hover:bg-muted/40'
               }`}
             >
-              <span className={`leading-none ${isToday ? 'font-bold text-primary' : 'text-foreground'}`}>{d}</span>
+              <span className={`${isToday ? 'font-bold text-primary' : 'text-foreground'}`}>{d}</span>
               {evs.length > 0 && (
                 <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
                   {evs.slice(0, 3).map(e => (
-                    <span key={e.id} className="w-1.5 h-1.5 rounded-full" style={{ background: stageColor(e.stage) }} />
+                    <span key={e.id} className="w-1 h-1 rounded-full" style={{ background: stageColor(e.stage) }} />
                   ))}
-                  {evs.length > 3 && <span className="text-[8px] leading-none text-muted-foreground">+</span>}
+                  {evs.length > 3 && <span className="text-[7px] leading-none text-muted-foreground">+</span>}
                 </div>
               )}
             </button>
@@ -536,6 +551,92 @@ const DayPopover = ({ year, month, day, events, attendanceByEvent, onClose, onTa
     </DialogContent>
   </Dialog>
 );
+
+// ─── Etapa view (no almanaque, just scheduled dates + enrolled) ──────
+
+const EtapaView = ({ stage, events, attendanceByEvent, enrolled, enrolledLoading, isPrivileged, userCuerda, userId, churchId, onTakeAttendance, onEditEvent, onDeleteEvent, onScheduleDate, onEnrolledChanged }: {
+  stage: ProcessStageKey;
+  events: AttendanceEvent[];
+  attendanceByEvent: Record<string, { present: number; absent: number; justified: number }>;
+  enrolled: ProcessRow[];
+  enrolledLoading: boolean;
+  isPrivileged: boolean;
+  userCuerda: string | null;
+  userId: string | null;
+  churchId: string;
+  onTakeAttendance: (ev: AttendanceEvent) => void;
+  onEditEvent: (ev: AttendanceEvent) => void;
+  onDeleteEvent: (ev: AttendanceEvent) => void;
+  onScheduleDate: () => void;
+  onEnrolledChanged: () => void;
+}) => {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {/* Fechas programadas — list of events scheduled for this
+          etapa, oldest to newest. Each row offers take attendance /
+          edit / delete. Dates set here show up as colored dots in
+          the Calendario tab. */}
+      <div className="border rounded-lg bg-card overflow-hidden h-fit">
+        <div className="flex items-center gap-2 px-3 py-2 border-b">
+          <div className="text-sm font-semibold">Fechas programadas</div>
+          <span className="text-xs text-muted-foreground">({events.length})</span>
+          <div className="flex-1" />
+          <Button size="sm" onClick={onScheduleDate} className="gap-1 h-7 text-xs">
+            <Plus className="h-3 w-3" /> Programar fecha
+          </Button>
+        </div>
+        {events.length === 0 ? (
+          <div className="text-center py-8 text-xs text-muted-foreground px-4">
+            No hay fechas programadas para {stageLabel(stage)}. Apretá "Programar fecha" para crear una.
+          </div>
+        ) : (
+          <div className="divide-y max-h-[70vh] overflow-y-auto">
+            {events.map(ev => {
+              const c = attendanceByEvent[ev.id] || { present: 0, absent: 0, justified: 0 };
+              const total = c.present + c.absent + c.justified;
+              return (
+                <div key={ev.id} className="flex items-center gap-2 px-3 py-2 text-xs">
+                  <div className="text-[11px] font-semibold tabular-nums w-14 shrink-0">{formatDateAR(ev.event_date)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium truncate">
+                      {ev.title || stageLabel(ev.stage)}
+                    </div>
+                    {total > 0 && (
+                      <div className="text-[10px] text-muted-foreground">
+                        {c.present}P{c.absent > 0 && ` · ${c.absent}A`}{c.justified > 0 && ` · ${c.justified}J`}
+                      </div>
+                    )}
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => onTakeAttendance(ev)} className="gap-1 h-7 text-xs">
+                    <Check className="h-3 w-3" /> Asistencia
+                  </Button>
+                  <button onClick={() => onEditEvent(ev)} className="p-1 text-muted-foreground hover:text-foreground rounded" title="Editar">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button onClick={() => onDeleteEvent(ev)} className="p-1 text-muted-foreground hover:text-red-400 rounded" title="Eliminar">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Personas inscriptas en la etapa */}
+      <EnrolledList
+        churchId={churchId}
+        stage={stage}
+        enrolled={enrolled}
+        loading={enrolledLoading}
+        isPrivileged={isPrivileged}
+        userCuerda={userCuerda}
+        userId={userId}
+        onChanged={onEnrolledChanged}
+      />
+    </div>
+  );
+};
 
 // ─── Enrolled list per etapa ──────────────────────────────────────────
 

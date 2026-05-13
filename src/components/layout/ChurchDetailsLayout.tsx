@@ -109,13 +109,13 @@ const ChurchDetailsLayout = ({ children }: ChurchDetailsLayoutProps) => {
             <TabsList className="mb-0 w-max">
               {canSeePool() && <TabsTrigger value="pool" className="text-xs sm:text-sm px-2 sm:px-3">🌱 Semillero</TabsTrigger>}
               {canSeeProcesos() && <TabsTrigger value="procesos" className="text-xs sm:text-sm px-2 sm:px-3">⚡ Procesos</TabsTrigger>}
+              {canSeeAsistencia() && <TabsTrigger value="asistencia" className="text-xs sm:text-sm px-2 sm:px-3">✅ Asistencia</TabsTrigger>}
               {canSeeCuerdas() && <TabsTrigger value="cuerdas" className="text-xs sm:text-sm px-2 sm:px-3">Cuerdas</TabsTrigger>}
               {canSeeCelulas() && <TabsTrigger value="celulas" className="text-xs sm:text-sm px-2 sm:px-3">Células</TabsTrigger>}
               {canAddMembers() && <TabsTrigger value="team" className="text-xs sm:text-sm px-2 sm:px-3">Equipo</TabsTrigger>}
               {canSeeCelulas() && <TabsTrigger value="hogares" className="text-xs sm:text-sm px-2 sm:px-3">🕊️ Hogares de Paz</TabsTrigger>}
               {(canSeeMapa() || canSeeCuerdas()) && <TabsTrigger value="territorio" className="text-xs sm:text-sm px-2 sm:px-3">🗺️ Territorio</TabsTrigger>}
               {canSeeRutas() && <TabsTrigger value="rutas" className="text-xs sm:text-sm px-2 sm:px-3">🧭 Rutas</TabsTrigger>}
-              {canSeeAsistencia() && <TabsTrigger value="asistencia" className="text-xs sm:text-sm px-2 sm:px-3">✅ Asistencia</TabsTrigger>}
               {canSeeEventos() && <TabsTrigger value="eventos" className="text-xs sm:text-sm px-2 sm:px-3">📅 Eventos</TabsTrigger>}
               {canSeeHistorial() && <TabsTrigger value="historial" className="text-xs sm:text-sm px-2 sm:px-3">📋 Historial</TabsTrigger>}
               {canSeeValidador() && <TabsTrigger value="validator" className="text-xs sm:text-sm px-2 sm:px-3">🛡️ Validador</TabsTrigger>}
