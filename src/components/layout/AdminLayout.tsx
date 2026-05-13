@@ -89,13 +89,19 @@ const AdminLayout = () => {
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
       <UpdateBanner />
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay — only renders on mobile. The inline
+          `display:'block'` was overriding the `md:hidden` class
+          because inline styles beat class styles, so on desktop the
+          dim overlay was sitting on top of the whole app once the
+          sidebar defaulted open. We now drop the inline display
+          entirely (div is block by default) so md:hidden can do its
+          job at md+ and the overlay only appears on mobile. */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-            zIndex: 40, display: 'block',
+            zIndex: 40,
           }}
           className="md:hidden"
         />
