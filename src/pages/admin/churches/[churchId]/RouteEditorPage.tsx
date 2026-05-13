@@ -511,6 +511,23 @@ const RouteEditorPage = () => {
     const google = (window as any).google;
     if (!google?.maps) return;
 
+    // Detect a stale map instance. The <div ref={mapRef}> lives
+    // inside the `hasRoute ? RouteView : EmptyState` ternary, so any
+    // path that flips routeData to null and back (calculateRoute()
+    // itself does this synchronously at the top, so every recalc
+    // qualifies) unmounts the map div and remounts a fresh DOM node
+    // when the new route lands. mapInstance.current is still bound
+    // to the previous (now orphaned) node, so directionsRenderer
+    // pours the new directions into an off-screen map and the
+    // visible div stays pitch black until the user reloads. Tearing
+    // it down here forces the block below to recreate the map
+    // against the current node.
+    if (mapInstance.current && mapInstance.current.getDiv() !== mapRef.current) {
+      if (directionsRenderer.current) directionsRenderer.current.setMap(null);
+      mapInstance.current = null;
+      directionsRenderer.current = null;
+    }
+
     if (!mapInstance.current) {
       mapInstance.current = new google.maps.Map(mapRef.current, {
         center: { lat: startLat!, lng: startLng! },
