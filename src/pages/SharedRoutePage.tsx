@@ -6,6 +6,13 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, Route as RouteIcon, AlertCircle, MessageCircle, Copy, ChevronDown } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
+import {
+  groupStopsByLocation,
+  buildGroupLabel,
+  buildGroupTitle,
+  markerScaleFor,
+  markerFontSizeFor,
+} from '@/lib/route-stops';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
@@ -204,6 +211,12 @@ const SharedRoutePage = () => {
       // user picked a range, so the canvas doesn't show pins for
       // stops outside the segment they're focused on. The starting
       // point ★ always renders so users keep their bearing.
+      //
+      // Stops at the same coordinates (e.g. two contacts living at the
+      // same address) are collapsed into a single pin labeled "2 y 3",
+      // "2, 3, 4", or a range for 4+, with every name listed in the
+      // tooltip. Without this the upper pin would simply hide the
+      // lower one.
       customMarkers.current.forEach(m => m.setMap(null));
       customMarkers.current = [];
       customMarkers.current.push(new google.maps.Marker({
@@ -213,22 +226,36 @@ const SharedRoutePage = () => {
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor: '#10b981', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2 },
         title: 'Punto de partida',
       }));
-      contacts.forEach((c, idx) => {
-        if (!isStopInRange(idx)) return;
-        const isVisited = !!visited[c.id];
+      const stopsForMarkers = contacts
+        .map((c, idx) => ({ c, idx }))
+        .filter(({ idx, c }) => isStopInRange(idx) && c.lat != null && c.lng != null)
+        .map(({ c, idx }) => ({
+          number: idx + 1,
+          lat: c.lat!,
+          lng: c.lng!,
+          title: `${c.first_name} ${c.last_name || ''}`.trim(),
+          visited: !!visited[c.id],
+        }));
+      const groups = groupStopsByLocation(stopsForMarkers);
+      groups.forEach(g => {
         customMarkers.current.push(new google.maps.Marker({
-          position: { lat: c.lat!, lng: c.lng! },
+          position: { lat: g.lat, lng: g.lng },
           map: mapInstance.current,
-          label: { text: String(idx + 1), color: 'white', fontSize: '13px', fontWeight: 'bold' },
+          label: {
+            text: buildGroupLabel(g.numbers),
+            color: 'white',
+            fontSize: markerFontSizeFor(g),
+            fontWeight: 'bold',
+          },
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: 14,
-            fillColor: isVisited ? '#6b7280' : '#FFC233',
-            fillOpacity: isVisited ? 0.6 : 1,
+            scale: markerScaleFor(g),
+            fillColor: g.allVisited ? '#6b7280' : '#FFC233',
+            fillOpacity: g.allVisited ? 0.6 : 1,
             strokeColor: 'white',
             strokeWeight: 2,
           },
-          title: `${idx + 1}. ${c.first_name} ${c.last_name || ''}`,
+          title: buildGroupTitle(g),
         }));
       });
     };
