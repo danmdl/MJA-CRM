@@ -233,7 +233,20 @@ interface FilterTabDialogProps {
   onSaved: (savedTab: FilterTab) => void;
 }
 
-const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, teamMembers, zonas, onClose, onSaved }: FilterTabDialogProps) => {
+const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, teamMembers, onClose, onSaved }: FilterTabDialogProps) => {
+  const { profile } = useSession();
+  // Only supervisors and global roles (admin / general / pastor) can
+  // pick another cuerda when creating a filter tab. Everyone else gets
+  // their own cuerda baked in — a referente filtering for someone
+  // else's cuerda would just produce an empty Semillero anyway since
+  // the page already scopes by cuerda before the tab filter runs.
+  const canPickCuerda = !!profile && (
+    profile.role === 'admin'
+    || profile.role === 'general'
+    || profile.role === 'pastor'
+    || profile.role === 'supervisor'
+  );
+  const ownCuerdaNumero = profile?.numero_cuerda || '';
   const [name, setName] = useState(tab?.name || '');
   // Local copy of filters. We migrate the legacy single `cuerda` field into
   // the new `cuerdas` array on init so the multi-select picker shows the
@@ -242,6 +255,13 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
     const init: FilterTabFilters = { ...(tab?.filters || {}) };
     if (!init.cuerdas && init.cuerda) init.cuerdas = [init.cuerda];
     delete init.cuerda;
+    // For non-supervisor users, force their own cuerda into the saved
+    // filter regardless of what was there. Without this a referente
+    // would save a tab with `cuerdas: undefined` (= all cuerdas), and
+    // the Semillero's pre-filter scoping makes that confusing.
+    if (!canPickCuerda && ownCuerdaNumero) {
+      init.cuerdas = [ownCuerdaNumero];
+    }
     return init;
   });
   const [saving, setSaving] = useState(false);
@@ -251,7 +271,11 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
     const init: FilterTabFilters = { ...(tab?.filters || {}) };
     if (!init.cuerdas && init.cuerda) init.cuerdas = [init.cuerda];
     delete init.cuerda;
+    if (!canPickCuerda && ownCuerdaNumero) {
+      init.cuerdas = [ownCuerdaNumero];
+    }
     setFilters(init);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   const setF = (key: keyof FilterTabFilters, value: any) => {
@@ -339,34 +363,45 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cuerda</Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm hover:bg-muted/40"
-                  >
-                    <span className={selectedCuerdaCount === 0 ? 'text-muted-foreground' : ''}>{cuerdaButtonLabel}</span>
-                    <ChevronDown className="h-4 w-4 opacity-60" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" collisionPadding={16} className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-56 overflow-y-auto">
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Cuerdas</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={(e) => { e.preventDefault(); setFilters(prev => ({ ...prev, cuerdas: undefined })); }}>
-                    Todas (limpiar)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {cuerdas.map(c => (
-                    <DropdownMenuCheckboxItem
-                      key={c.id}
-                      checked={(filters.cuerdas || []).includes(c.numero)}
-                      onCheckedChange={() => toggleCuerda(c.numero)}
-                      onSelect={(e) => e.preventDefault()}
+              {canPickCuerda ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm hover:bg-muted/40"
                     >
-                      {c.numero}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      <span className={selectedCuerdaCount === 0 ? 'text-muted-foreground' : ''}>{cuerdaButtonLabel}</span>
+                      <ChevronDown className="h-4 w-4 opacity-60" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" collisionPadding={16} className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-56 overflow-y-auto">
+                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider">Cuerdas</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={(e) => { e.preventDefault(); setFilters(prev => ({ ...prev, cuerdas: undefined })); }}>
+                      Todas (limpiar)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {cuerdas.map(c => (
+                      <DropdownMenuCheckboxItem
+                        key={c.id}
+                        checked={(filters.cuerdas || []).includes(c.numero)}
+                        onCheckedChange={() => toggleCuerda(c.numero)}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {c.numero}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                // Fixed cuerda display for non-supervisor roles. Picking
+                // another cuerda would never return rows for them since
+                // the Semillero pre-filter already scopes to their own
+                // cuerda — surfacing it as a read-only chip makes the
+                // contract obvious.
+                <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground">
+                  {ownCuerdaNumero ? `Cuerda ${ownCuerdaNumero}` : 'Tu cuerda'}
+                </div>
+              )}
             </div>
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Responsable</Label>
@@ -417,21 +452,6 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
               <Input type="date" value={filters.fechaContactoTo || ''} onChange={e => setF('fechaContactoTo', e.target.value)} />
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zona</Label>
-              <select value={filters.zonaId || ''} onChange={e => setF('zonaId', e.target.value)} className={selectClass}>
-                <option value="">Todas</option>
-                {zonas.map(z => <option key={z.id} value={z.id}>{z.nombre}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Teléfono</Label>
-              <select value={filters.hasPhone || ''} onChange={e => setF('hasPhone', e.target.value)} className={selectClass}>
-                <option value="">Cualquiera</option>
-                <option value="yes">Con teléfono</option>
-                <option value="no">Sin teléfono</option>
-              </select>
-            </div>
-            <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dirección</Label>
               <select value={filters.hasAddress || ''} onChange={e => setF('hasAddress', e.target.value)} className={selectClass}>
                 <option value="">Cualquiera</option>
@@ -440,19 +460,26 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
               </select>
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Coordenadas</Label>
-              <select value={filters.hasCoords || ''} onChange={e => setF('hasCoords', e.target.value)} className={selectClass}>
-                <option value="">Cualquiera</option>
-                <option value="yes">Con coordenadas</option>
-                <option value="no">Sin coordenadas</option>
-              </select>
-            </div>
-            <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zona</Label>
               <select value={filters.zonaStatus || ''} onChange={e => setF('zonaStatus', e.target.value)} className={selectClass}>
                 <option value="">Cualquiera</option>
                 <option value="in">En zona</option>
                 <option value="out">Fuera de zona</option>
+              </select>
+            </div>
+            {/* Recibidos de MJA — opcional dentro de una solapa custom,
+                aunque la solapa fija "Recibidos de MJA" cubre el flujo
+                principal. Combinable con otros filtros (ej. "recibidos
+                de MJA y sin dirección"). */}
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Recibidos de MJA</Label>
+              <select
+                value={filters.mjaReceived ? 'yes' : ''}
+                onChange={e => setF('mjaReceived', e.target.value === 'yes' ? true : undefined)}
+                className={selectClass}
+              >
+                <option value="">Cualquiera</option>
+                <option value="yes">Solo recibidos de MJA</option>
               </select>
             </div>
           </div>
