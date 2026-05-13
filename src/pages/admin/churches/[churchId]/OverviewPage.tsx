@@ -40,21 +40,8 @@ interface Cell {
   meeting_time: string | null;
 }
 
-interface Contact {
-  id: string;
-  first_name: string;
-  last_name: string | null;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  apartment_number: string | null;
-  barrio: string | null;
-  leader_assigned: string | null;
-  created_at: string;
-  church_id: string;
-  cell_id: string | null;
-  date_of_birth?: string | null;
-}
+// Contact type removed — the page no longer touches individual
+// contact rows. Aggregations come from the get_contacts_per_cell RPC.
 
 const fetchChurchDetails = async (churchId: string): Promise<Church> => {
   const { data, error } = await supabase
@@ -80,14 +67,22 @@ const fetchCells = async (churchId: string): Promise<Cell[]> => {
   return data || [];
 };
 
-const fetchContacts = async (churchId: string): Promise<Contact[]> => {
+// Overview only needs per-cell contact COUNTS for its analytics —
+// number of attendees per cell, totals, top cells by member count.
+// Fetching every contact row was a 500k-row payload at scale and got
+// thrown away after one .forEach(p => attendeeCounts[p.cell_id]++).
+// The get_contacts_per_cell RPC does the aggregation in Postgres
+// (uses idx_contacts_cell_id) and returns one row per cell, so the
+// page now scales O(cells in church) instead of O(contacts in church).
+const fetchContactCountsPerCell = async (churchId: string): Promise<Record<string, number>> => {
   const { data, error } = await supabase
-    .from('contacts')
-    .select('*')
-    .eq('church_id', churchId)
-    .is('deleted_at', null);
-  if (error) throw new Error('No se pudieron cargar los contactos.');
-  return data || [];
+    .rpc('get_contacts_per_cell', { p_church_id: churchId });
+  if (error) throw new Error('No se pudieron cargar los conteos de contactos.');
+  const map: Record<string, number> = {};
+  (data || []).forEach((row: { cell_id: string; contact_count: number }) => {
+    map[row.cell_id] = Number(row.contact_count);
+  });
+  return map;
 };
 
 // Compact list: shows first 5 items, then "Ver más" opens a dialog with full list
@@ -160,10 +155,11 @@ const OverviewPage = () => {
     enabled: !!churchId,
   });
 
-  const { data: contacts, isLoading: isLoadingContacts, isError: isErrorContacts, error: errorContacts } = useQuery<Contact[]>({
-    queryKey: ['overviewContacts', churchId],
-    queryFn: () => fetchContacts(churchId!),
+  const { data: contactCountsPerCell, isLoading: isLoadingContacts, isError: isErrorContacts, error: errorContacts } = useQuery<Record<string, number>>({
+    queryKey: ['overviewContactCounts', churchId],
+    queryFn: () => fetchContactCountsPerCell(churchId!),
     enabled: !!churchId,
+    staleTime: 60_000,
   });
 
   // Fetch cuerdas + zonas for analytics breakdowns
@@ -279,13 +275,12 @@ const OverviewPage = () => {
 
   const analytics = useMemo(() => {
     const c = cells || []; // Use fetched cells
-    const ppl = contacts || []; // Use fetched contacts
-
-    // Build attendee counts per cell
-    const attendeeCounts: Record<string, number> = {};
-    ppl.forEach((p: any) => {
-      if (p.cell_id) attendeeCounts[p.cell_id] = (attendeeCounts[p.cell_id] || 0) + 1;
-    });
+    // attendeeCounts now comes pre-aggregated from the
+    // get_contacts_per_cell RPC instead of being computed by walking
+    // every contact in memory. Cells with zero contacts are absent
+    // from the map; downstream code reads `attendeeCounts[id] || 0`
+    // which handles that.
+    const attendeeCounts: Record<string, number> = contactCountsPerCell || {};
 
     const cellsCount = c.length;
 
@@ -359,7 +354,7 @@ const OverviewPage = () => {
     });
 
     return { cellsCount, cellsCountingReferente, peopleInCellsWithoutReferente, perDay, topReferente, topCells, perZona, perCuerda, personasPorCuerda };
-  }, [cells, contacts, referenteNameMap, cuerdas, zonas]);
+  }, [cells, contactCountsPerCell, referenteNameMap, cuerdas, zonas]);
 
   const [addSecondPastorOpen, setAddSecondPastorOpen] = useState(false);
   const [selectedSecondPastor, setSelectedSecondPastor] = useState<string | 'none'>('none');
