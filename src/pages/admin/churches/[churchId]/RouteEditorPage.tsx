@@ -10,12 +10,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
+import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
+import { loadGoogleMaps } from '@/lib/google-maps';
 import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 // Lazy: profile dialog chunk only loads when a contact card is clicked.
 const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
-
-const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
 interface Contact {
   id: string;
@@ -47,6 +47,7 @@ const RouteEditorPage = () => {
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
   const [onlyWithNumber, setOnlyWithNumber] = useState(true);
+  const [onlyInZone, setOnlyInZone] = useState(false);
 
   // Route + visited + notes state
   const [routeData, setRouteData] = useState<any | null>(null);
@@ -200,14 +201,47 @@ const RouteEditorPage = () => {
       });
   }, [project, profile?.id, queryClient]);
 
-  // Load Google Maps once
+  // Load Google Maps via the shared loader (places + drawing + geometry).
   useEffect(() => {
-    if ((window as any).google?.maps) return;
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places`;
-    script.async = true;
-    document.head.appendChild(script);
+    loadGoogleMaps().catch(err => console.error('[RouteEditor] Google Maps load failed', err));
   }, []);
+
+  // Cuerda territories — same query MapPickerPage uses. Used by the
+  // 'Solo en zona' toggle in the edit dialog.
+  const { data: cuerdasWithTerritory } = useQuery<{ id: string; numero: string; territory_geojson: string | null }[]>({
+    queryKey: ['route-editor-cuerda-territories', churchId],
+    queryFn: async () => {
+      const { data: zonas } = await supabase.from('zonas').select('id').eq('church_id', churchId!);
+      if (!zonas?.length) return [];
+      const { data, error } = await supabase
+        .from('cuerdas_with_geojson')
+        .select('id, numero, territory_geojson')
+        .in('zona_id', zonas.map((z: any) => z.id));
+      if (error) {
+        console.error('[route-editor-cuerda-territories]', error);
+        return [];
+      }
+      return (data as any) || [];
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
+
+  // The 'Solo en zona' toggle scopes to the user's own cuerda's polygon.
+  // No filterCuerda exists in this dialog (the dialog isn't cuerda-scoped),
+  // so we always lean on profile.numero_cuerda. Globals without a cuerda
+  // get the toggle disabled.
+  const activeTerritoryPaths = useMemo(() => {
+    const numero = profile?.numero_cuerda;
+    if (!numero || !cuerdasWithTerritory) return null;
+    const row = cuerdasWithTerritory.find(c => c.numero === numero);
+    if (!row?.territory_geojson) return null;
+    return geoJsonToGooglePaths(row.territory_geojson);
+  }, [cuerdasWithTerritory, profile?.numero_cuerda]);
+
+  useEffect(() => {
+    if (onlyInZone && !activeTerritoryPaths) setOnlyInZone(false);
+  }, [onlyInZone, activeTerritoryPaths]);
 
   // ─── Derived ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -219,6 +253,9 @@ const RouteEditorPage = () => {
       } else if (filterResponsableId && c.responsable_id !== filterResponsableId) return false;
       if (filterDateFrom && (!c.fecha_contacto || c.fecha_contacto < filterDateFrom)) return false;
       if (filterDateTo && (!c.fecha_contacto || c.fecha_contacto > filterDateTo)) return false;
+      if (onlyInZone && activeTerritoryPaths) {
+        if (!isPointInTerritory(c.lat, c.lng, activeTerritoryPaths)) return false;
+      }
       if (term) {
         const name = `${c.first_name} ${c.last_name || ''}`.toLowerCase();
         const addr = (c.address || '').toLowerCase();
@@ -226,7 +263,7 @@ const RouteEditorPage = () => {
       }
       return true;
     });
-  }, [contacts, search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo]);
+  }, [contacts, search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, onlyInZone, activeTerritoryPaths]);
 
   const selectedContacts = useMemo(
     () => (contacts || []).filter(c => selectedIds.has(c.id)),
@@ -829,7 +866,7 @@ const RouteEditorPage = () => {
                 <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
                 <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />
               </div>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground mb-3 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground mb-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={onlyWithNumber}
@@ -837,6 +874,19 @@ const RouteEditorPage = () => {
                   className="rounded border-input"
                 />
                 Solo direcciones con número (recomendado para rutas precisas)
+              </label>
+              <label
+                className={`flex items-center gap-2 text-xs mb-3 cursor-pointer select-none ${activeTerritoryPaths ? 'text-muted-foreground' : 'text-muted-foreground/40 cursor-not-allowed'}`}
+                title={activeTerritoryPaths ? 'Mostrar solo los contactos dentro de la zona dibujada para tu cuerda' : 'Tu cuerda no tiene un territorio dibujado'}
+              >
+                <input
+                  type="checkbox"
+                  checked={onlyInZone}
+                  disabled={!activeTerritoryPaths}
+                  onChange={(e) => setOnlyInZone(e.target.checked)}
+                  className="rounded border-input"
+                />
+                Solo en zona (dentro del territorio dibujado para mi cuerda)
               </label>
 
               <div className="max-h-[320px] overflow-y-auto border rounded">

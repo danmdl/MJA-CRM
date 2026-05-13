@@ -467,8 +467,12 @@ export function applyFilterTab(contacts: any[], filters: FilterTabFilters): any[
     if (filters.zonaId && c.zona_id !== filters.zonaId) return false;
     if (filters.hasPhone === 'yes' && !c.phone) return false;
     if (filters.hasPhone === 'no' && c.phone) return false;
-    if (filters.hasAddress === 'yes' && !c.address) return false;
-    if (filters.hasAddress === 'no' && c.address) return false;
+    // Treat punctuation-only addresses as "no address" — legacy CSVs imported
+    // strings like ". ," before the importer was fixed, so the column is
+    // truthy but contains no real address. Mirrors the sanitizeValue rule.
+    const addressHasContent = !!c.address && /[\p{L}\p{N}]/u.test(c.address);
+    if (filters.hasAddress === 'yes' && !addressHasContent) return false;
+    if (filters.hasAddress === 'no' && addressHasContent) return false;
     if (filters.hasCoords === 'yes' && (c.lat == null || c.lng == null)) return false;
     if (filters.hasCoords === 'no' && c.lat != null && c.lng != null) return false;
     return true;

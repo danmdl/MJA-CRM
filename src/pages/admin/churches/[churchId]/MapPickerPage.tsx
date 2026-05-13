@@ -9,10 +9,10 @@ import { Input } from '@/components/ui/input';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
-import { ChevronLeft, MapPin, Route as RouteIcon, Search, X, List, Map as MapIcon, Navigation } from 'lucide-react';
+import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
+import { loadGoogleMaps } from '@/lib/google-maps';
+import { ChevronLeft, MapPin, Route as RouteIcon, Search, X, List, Map as MapIcon, Navigation, Lasso } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
-
-const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
 interface Contact {
   id: string;
@@ -52,6 +52,15 @@ const MapPickerPage = () => {
   const [filterDateTo, setFilterDateTo] = useState<string>('');
   const [filterSexo, setFilterSexo] = useState<string>('');
   const [onlyWithNumber, setOnlyWithNumber] = useState(true);
+  // 'Solo en zona' toggle: hides contacts whose lat/lng falls outside
+  // the relevant cuerda's drawn territorio. Refers to filterCuerda when
+  // a global picked one, otherwise the user's own cuerda. If there's no
+  // territory drawn, the toggle is disabled and shows a hint.
+  const [onlyInZone, setOnlyInZone] = useState(false);
+  // Lasso state: while drawing, every click pushes a vertex; double-click
+  // closes the polygon and selects every visible contact inside.
+  const [drawingMode, setDrawingMode] = useState(false);
+  const drawingManagerRef = useRef<any>(null);
   // 'Solo seleccionados' toggle: when on, the sidebar list only shows
   // contacts the user has already picked (via the map markers or the
   // list checkboxes). Useful while building a route — instead of
@@ -195,6 +204,54 @@ const MapPickerPage = () => {
     staleTime: 60_000,
   });
 
+  // Cuerdas with their drawn territories for this church. Used by the
+  // 'Solo en zona' filter and the green/red coloring of map pins. We
+  // read the GeoJSON-projecting view so the polygon comes back as a
+  // string we can parse with geoJsonToGooglePaths (the plain `cuerdas`
+  // table can't be SELECTed with the geography column over supabase-js
+  // without a manual ST_AsGeoJSON cast).
+  const { data: cuerdasWithTerritory } = useQuery<{ id: string; numero: string; territory_geojson: string | null }[]>({
+    queryKey: ['mappicker-cuerda-territories', churchId],
+    queryFn: async () => {
+      const { data: zonas } = await supabase.from('zonas').select('id').eq('church_id', churchId!);
+      if (!zonas?.length) return [];
+      const { data, error } = await supabase
+        .from('cuerdas_with_geojson')
+        .select('id, numero, territory_geojson')
+        .in('zona_id', zonas.map((z: any) => z.id));
+      if (error) {
+        console.error('[mappicker-cuerda-territories]', error);
+        return [];
+      }
+      return (data as any) || [];
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
+
+  // Which cuerda's territory does the 'Solo en zona' toggle refer to?
+  // - When the user has picked a cuerda filter, use that — they're
+  //   actively scoping to one cuerda, the polygon they care about is
+  //   the one drawn for that cuerda.
+  // - Otherwise fall back to the user's own cuerda (referente
+  //   default). Globals without a filter get nothing — they should
+  //   pick a cuerda first.
+  const activeCuerdaNumero = filterCuerda || profile?.numero_cuerda || '';
+  const activeTerritoryPaths = useMemo(() => {
+    if (!activeCuerdaNumero || !cuerdasWithTerritory) return null;
+    const row = cuerdasWithTerritory.find(c => c.numero === activeCuerdaNumero);
+    if (!row?.territory_geojson) return null;
+    return geoJsonToGooglePaths(row.territory_geojson);
+  }, [cuerdasWithTerritory, activeCuerdaNumero]);
+
+  // Defensive: if 'Solo en zona' is on but the active cuerda doesn't
+  // have a polygon (e.g. user cleared the filter, swapped cuerdas),
+  // disable the toggle automatically so the user isn't staring at an
+  // empty map wondering why nothing renders.
+  useEffect(() => {
+    if (onlyInZone && !activeTerritoryPaths) setOnlyInZone(false);
+  }, [onlyInZone, activeTerritoryPaths]);
+
   // Team members for Responsable filter — restricted to user's cuerda for non-globals.
   const { data: teamMembers = [] } = useQuery<{ id: string; first_name: string | null; last_name: string | null; numero_cuerda: string | null }[]>({
     queryKey: ['mappicker-team', churchId],
@@ -208,15 +265,13 @@ const MapPickerPage = () => {
     staleTime: 5 * 60_000,
   });
 
-  // Load Google Maps script once
+  // Load Google Maps via the shared loader so we always get places +
+  // drawing + geometry. The legacy inline script tag here only requested
+  // 'places', which broke the lasso (drawing) and in-zone classification
+  // (geometry) when this page loaded before any component using the
+  // shared loader had a chance to.
   useEffect(() => {
-    if ((window as any).google?.maps) return;
-    if (document.querySelector('script[data-gmaps]')) return;
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places`;
-    script.async = true;
-    script.setAttribute('data-gmaps', '1');
-    document.head.appendChild(script);
+    loadGoogleMaps().catch(err => console.error('[MapPicker] Google Maps load failed', err));
   }, []);
 
   // Apply filters. Two memos: one for the MAP (map markers respect every
@@ -258,6 +313,12 @@ const MapPickerPage = () => {
       if (filterDateFrom && (!c.fecha_contacto || c.fecha_contacto < filterDateFrom)) return false;
       if (filterDateTo && (!c.fecha_contacto || c.fecha_contacto > filterDateTo)) return false;
       if (filterSexo && c.sexo !== filterSexo) return false;
+      // In-zone filter: drop pins whose coords fall outside the active
+      // cuerda's drawn polygon. Selection state is preserved — only the
+      // visible set narrows.
+      if (onlyInZone && activeTerritoryPaths) {
+        if (!isPointInTerritory(c.lat, c.lng, activeTerritoryPaths)) return false;
+      }
       if (term) {
         const name = `${c.first_name} ${c.last_name || ''}`.toLowerCase();
         const addr = (c.address || '').toLowerCase();
@@ -265,7 +326,7 @@ const MapPickerPage = () => {
       }
       return true;
     });
-  }, [contacts, search, onlyWithNumber, filterResponsableId, filterCuerda, filterDateFrom, filterDateTo, filterSexo, requireFilterBeforePainting]);
+  }, [contacts, search, onlyWithNumber, filterResponsableId, filterCuerda, filterDateFrom, filterDateTo, filterSexo, requireFilterBeforePainting, onlyInZone, activeTerritoryPaths]);
 
   // Sidebar list = map filtered set, optionally narrowed to selected.
   const filtered = useMemo(() => {
@@ -413,10 +474,19 @@ const MapPickerPage = () => {
       if (c.lat == null || c.lng == null) return;
       const isSelected = selectedIds.has(c.id);
       const existing = markersById.current.get(c.id);
+      // Color rule mirrors TerritoriosPage: green if inside the active
+      // cuerda's polygon, red if outside, gold if no territory drawn yet.
+      // Selected always wins (bright green at a larger scale) so the
+      // route picks stand out from the territory backdrop.
+      let fillColor = '#FFC233'; // no territory → neutral gold
+      if (activeTerritoryPaths) {
+        fillColor = isPointInTerritory(c.lat, c.lng, activeTerritoryPaths) ? '#22c55e' : '#ef4444';
+      }
+      if (isSelected) fillColor = '#10b981';
       const icon = {
         path: google.maps.SymbolPath.CIRCLE,
         scale: isSelected ? 11 : 8,
-        fillColor: isSelected ? '#10b981' : '#FFC233',
+        fillColor,
         fillOpacity: 1,
         strokeColor: 'white',
         strokeWeight: 2,
@@ -447,7 +517,96 @@ const MapPickerPage = () => {
       mapInstance.current.fitBounds(bounds, 60);
       fittedRef.current = true;
     }
-  }, [filteredForMap, selectedIds]);
+  }, [filteredForMap, selectedIds, activeTerritoryPaths]);
+
+  // Paint the active cuerda's polygon as a translucent overlay so the
+  // user sees what defines "en zona". The polygon is recreated whenever
+  // the active cuerda changes (which happens when the user switches the
+  // cuerda filter or when their own cuerda's geometry loads in for the
+  // first time). Stored in a ref so the next pass can clear the previous
+  // one before drawing a new one — otherwise polygons accumulate.
+  const territoryOverlayRef = useRef<any>(null);
+  useEffect(() => {
+    const google = (window as any).google;
+    if (!google?.maps || !mapInstance.current) return;
+    if (territoryOverlayRef.current) {
+      territoryOverlayRef.current.setMap(null);
+      territoryOverlayRef.current = null;
+    }
+    if (!activeTerritoryPaths) return;
+    territoryOverlayRef.current = new google.maps.Polygon({
+      paths: activeTerritoryPaths,
+      strokeColor: '#FFC233',
+      strokeOpacity: 0.9,
+      strokeWeight: 2,
+      fillColor: '#FFC233',
+      fillOpacity: 0.08,
+      clickable: false, // don't intercept marker clicks
+      map: mapInstance.current,
+    });
+  }, [activeTerritoryPaths]);
+
+  // Lasso: a drawing-manager polygon that, on completion, adds every
+  // visible contact whose pin falls inside it to the selection. The
+  // polygon itself is discarded right after — it's a one-shot selection
+  // tool, not a saved overlay. Tied to `drawingMode` so the user can
+  // toggle in/out of the mode from the toolbar.
+  useEffect(() => {
+    const google = (window as any).google;
+    if (!google?.maps?.drawing || !mapInstance.current) return;
+    if (!drawingMode) {
+      if (drawingManagerRef.current) {
+        drawingManagerRef.current.setMap(null);
+        drawingManagerRef.current.setDrawingMode(null);
+        drawingManagerRef.current = null;
+      }
+      return;
+    }
+    const dm = new google.maps.drawing.DrawingManager({
+      drawingMode: google.maps.drawing.OverlayType.POLYGON,
+      drawingControl: false, // we provide our own toolbar button
+      polygonOptions: {
+        strokeColor: '#10b981',
+        strokeOpacity: 1,
+        strokeWeight: 2,
+        fillColor: '#10b981',
+        fillOpacity: 0.15,
+        editable: false,
+        clickable: false,
+      },
+    });
+    dm.setMap(mapInstance.current);
+    drawingManagerRef.current = dm;
+    const listener = google.maps.event.addListener(dm, 'polygoncomplete', (polygon: any) => {
+      // Collect every visible contact whose pin lies inside the polygon.
+      // We use the map-filtered list (not the sidebar list, which may be
+      // narrowed by 'Solo seleccionados'), so the lasso picks from what
+      // the user actually sees.
+      const additions = new Set<string>();
+      filteredForMap.forEach(c => {
+        if (c.lat == null || c.lng == null) return;
+        const pt = new google.maps.LatLng(c.lat, c.lng);
+        if (google.maps.geometry.poly.containsLocation(pt, polygon)) {
+          additions.add(c.id);
+        }
+      });
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        additions.forEach(id => next.add(id));
+        return next;
+      });
+      polygon.setMap(null); // one-shot — don't keep the lasso visible
+      setDrawingMode(false);
+      if (additions.size === 0) {
+        showError('No había contactos visibles dentro del área dibujada.');
+      } else {
+        showSuccess(`+${additions.size} contacto${additions.size === 1 ? '' : 's'} agregado${additions.size === 1 ? '' : 's'} a la ruta.`);
+      }
+    });
+    return () => {
+      google.maps.event.removeListener(listener);
+    };
+  }, [drawingMode, filteredForMap]);
 
   // Cleanup markers on unmount
   useEffect(() => {
@@ -790,6 +949,30 @@ const MapPickerPage = () => {
           />
           Solo con número
         </label>
+        <label
+          className={`flex items-center gap-1.5 text-xs cursor-pointer select-none shrink-0 ${activeTerritoryPaths ? 'text-muted-foreground' : 'text-muted-foreground/40 cursor-not-allowed'}`}
+          title={activeTerritoryPaths ? 'Mostrar solo los contactos dentro de la zona dibujada para esta cuerda' : 'La cuerda activa no tiene un territorio dibujado'}
+        >
+          <input
+            type="checkbox"
+            checked={onlyInZone}
+            disabled={!activeTerritoryPaths}
+            onChange={e => setOnlyInZone(e.target.checked)}
+            className="rounded border-input"
+          />
+          Solo en zona
+        </label>
+        <Button
+          type="button"
+          size="sm"
+          variant={drawingMode ? 'default' : 'outline'}
+          onClick={() => setDrawingMode(v => !v)}
+          className="text-xs h-8 shrink-0 gap-1"
+          title="Dibujá un área en el mapa para seleccionar todos los contactos dentro"
+        >
+          <Lasso className="h-3 w-3" />
+          {drawingMode ? 'Cancelar dibujo' : 'Dibujar área'}
+        </Button>
 
         {/* Punto de partida — inline on the second row. Label + address
             input + the two preset buttons. The 'Listo' tick still surfaces

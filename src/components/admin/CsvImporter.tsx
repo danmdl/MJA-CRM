@@ -322,8 +322,10 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       const sanitizeValue = (key: string, val: string): any => {
         if (val === '' || val === null || val === undefined) return null;
         const trimmed = String(val).trim();
-        // Junk-only values → null for ALL fields
-        if (/^[.\-,…]+$/.test(trimmed) || trimmed === 'N/A' || trimmed === 'n/a' || trimmed === '') return null;
+        // Any value with no letters or digits is junk — covers ".", ", ,",
+        // ". .", mixed whitespace + punctuation, etc. Keep this in sync with
+        // csv-import-engine.ts:sanitizeValue.
+        if (!/[\p{L}\p{N}]/u.test(trimmed) || trimmed === 'N/A' || trimmed === 'n/a') return null;
 
         if (DATE_FIELDS.has(key)) {
           // Strip time part from timestamps like "2026-02-06 00:00:00"

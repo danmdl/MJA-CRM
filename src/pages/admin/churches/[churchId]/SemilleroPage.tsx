@@ -878,7 +878,9 @@ const SemilleroPage = () => {
         }
       }
       total++;
-      if (c.address && c.address.trim()) withAddress++;
+      // Match the importer's sanitizeValue rule: a value with no letters or
+      // digits doesn't count as a real address (legacy ". ," / ", ." junk).
+      if (c.address && /[\p{L}\p{N}]/u.test(c.address)) withAddress++;
     }
     return { total, withAddress, withoutAddress: total - withAddress };
   }, [allContacts, externalIds, pendingDispatchIds, pendingAssignmentIds, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
@@ -2135,7 +2137,7 @@ const SemilleroPage = () => {
 
                         {/* Dirección + Ver en mapa */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.direccion }}>
-                          {c.address ? (() => {
+                          {(c.address && /[\p{L}\p{N}]/u.test(c.address)) ? (() => {
                             // Incomplete address = no street number (just a locality like "San Martín")
                             const hasStreetNumber = /\d/.test(c.address!);
                             const colorClass = hasStreetNumber ? 'text-foreground' : 'text-red-400';
