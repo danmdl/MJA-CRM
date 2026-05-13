@@ -20,7 +20,8 @@ describe('getRoleLevel', () => {
     expect(getRoleLevel('anfitrion')).toBeLessThan(getRoleLevel('conector'));
     expect(getRoleLevel('conector')).toBeLessThan(getRoleLevel('consolidador'));
     expect(getRoleLevel('consolidador')).toBeLessThan(getRoleLevel('encargado_de_celula'));
-    expect(getRoleLevel('encargado_de_celula')).toBeLessThan(getRoleLevel('referente'));
+    expect(getRoleLevel('encargado_de_celula')).toBeLessThan(getRoleLevel('gestor_de_cuerda'));
+    expect(getRoleLevel('gestor_de_cuerda')).toBeLessThan(getRoleLevel('referente'));
     expect(getRoleLevel('referente')).toBeLessThan(getRoleLevel('supervisor'));
     expect(getRoleLevel('supervisor')).toBeLessThan(getRoleLevel('pastor'));
     expect(getRoleLevel('pastor')).toBeLessThan(getRoleLevel('general'));
@@ -35,7 +36,7 @@ describe('getRoleLevel', () => {
 
 describe('ROLE_LABELS (permissions.ts)', () => {
   it('has a label for every role in the hierarchy', () => {
-    const roles = ['anfitrion', 'conector', 'consolidador', 'encargado_de_celula', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
+    const roles = ['anfitrion', 'conector', 'consolidador', 'encargado_de_celula', 'gestor_de_cuerda', 'referente', 'supervisor', 'pastor', 'general', 'admin'];
     for (const r of roles) {
       expect(ROLE_LABELS[r], `missing label for role "${r}"`).toBeTruthy();
     }

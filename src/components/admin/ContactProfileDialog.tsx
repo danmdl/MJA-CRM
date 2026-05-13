@@ -307,7 +307,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         });
         if (resp.ok) {
           const data = await resp.json();
-          const leaderRoles = ['pastor', 'referente', 'encargado_de_celula', 'general', 'supervisor'];
+          const leaderRoles = ['pastor', 'referente', 'gestor_de_cuerda', 'encargado_de_celula', 'general', 'supervisor'];
           // Edge function doesn't return numero_cuerda, fetch it directly
           const { data: profilesData } = await supabase.from('profiles').select('id, role, numero_cuerda').eq('church_id', churchId);
           const cuerdaMap = new Map((profilesData || []).map((p: any) => [p.id, { role: p.role, numero_cuerda: p.numero_cuerda }]));
@@ -693,7 +693,13 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Referente de Cuerda</label>
                 <input readOnly value={(() => {
                   if (!contact.numero_cuerda || !leaders?.length) return '—';
-                  const ref = leaders.find(l => l.numero_cuerda === contact.numero_cuerda && (l.role === 'referente' || l.role === 'supervisor'));
+                  // Pick the referente / gestor_de_cuerda / supervisor that
+                  // owns this cuerda, in that priority order. gestor_de_cuerda
+                  // is the helper tier so a real referente wins.
+                  const ref =
+                    leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'referente') ||
+                    leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'gestor_de_cuerda') ||
+                    leaders.find(l => l.numero_cuerda === contact.numero_cuerda && l.role === 'supervisor');
                   return ref ? `${ref.first_name || ''} ${ref.last_name || ''}`.trim() || '—' : '—';
                 })()} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
               </div>
@@ -766,8 +772,9 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                             setContact({ ...contact, numero_cuerda: newCuerda, zona: zonaMap[newCuerda] || null, cell_id: null } as any);
                           }
                         };
-                        if (profile?.role === 'referente' && profile?.numero_cuerda) {
-                          // Referentes can only reassign to their own cuerda.
+                        if ((profile?.role === 'referente' || profile?.role === 'gestor_de_cuerda') && profile?.numero_cuerda) {
+                          // Referentes (and gestor_de_cuerda helpers)
+                          // can only reassign to their own cuerda.
                           return (
                             <select
                               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"

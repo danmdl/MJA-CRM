@@ -11,7 +11,7 @@ interface ChangelogEntry {
   published_at: string;
 }
 
-const VISIBLE_ROLES = ['admin', 'general', 'pastor', 'supervisor', 'referente'];
+const VISIBLE_ROLES = ['admin', 'general', 'pastor', 'supervisor', 'referente', 'gestor_de_cuerda'];
 
 const UpdateBanner = () => {
   const { session, profile } = useSession();

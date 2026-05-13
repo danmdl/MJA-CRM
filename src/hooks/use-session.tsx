@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
 
 // Definir el tipo de rol de usuario
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'consolidador' | 'supervisor' | 'anfitrion';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'gestor_de_cuerda' | 'encargado_de_celula' | 'conector' | 'consolidador' | 'supervisor' | 'anfitrion';
 
 // Definir la interfaz para el perfil del usuario
 interface UserProfile {

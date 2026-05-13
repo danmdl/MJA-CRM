@@ -33,7 +33,7 @@ const fetchChurches = async (): Promise<Church[]> => {
   return data || [];
 };
 
-type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'encargado_de_celula' | 'conector' | 'consolidador' | 'supervisor' | 'anfitrion';
+type UserRole = 'admin' | 'general' | 'pastor' | 'referente' | 'gestor_de_cuerda' | 'encargado_de_celula' | 'conector' | 'consolidador' | 'supervisor' | 'anfitrion';
 
 const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const [loading, setLoading] = useState(false);
@@ -138,7 +138,7 @@ const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
   const isAdmin = profile?.role === 'admin';
 
   // Roles permitidos para la creación de usuarios
-  const allowedRolesForCreation: UserRole[] = ['admin', 'general', 'pastor', 'supervisor', 'referente', 'encargado_de_celula', 'conector', 'anfitrion'];
+  const allowedRolesForCreation: UserRole[] = ['admin', 'general', 'pastor', 'supervisor', 'referente', 'gestor_de_cuerda', 'encargado_de_celula', 'conector', 'anfitrion'];
 
   // Filtrar roles disponibles para el selector en la UI
   const availableRoles = allowedRolesForCreation.filter(roleOption => {
