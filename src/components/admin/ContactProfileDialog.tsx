@@ -534,6 +534,34 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                 )}
               </div>
 
+              {/* Observaciones + Pedido de oración — moved up from the bottom
+                  of the form so they're visible without scrolling. Per Dan:
+                  "observaciones ni se ven a menos que uno haga un scroll
+                  down". Sitting right under the address makes them the second
+                  thing the user sees when opening a contact, which matches
+                  how the field is actually used during follow-ups (write
+                  what happened on the visit, then close). */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observaciones</label>
+                  <textarea
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y"
+                    value={contact.observaciones || ''}
+                    onChange={(e) => setContact({ ...contact, observaciones: e.target.value || null })}
+                    placeholder="Notas adicionales..."
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pedido de Oración</label>
+                  <textarea
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y"
+                    value={contact.pedido_de_oracion || ''}
+                    onChange={(e) => setContact({ ...contact, pedido_de_oracion: e.target.value || null })}
+                    placeholder="¿Tiene algún pedido de oración?"
+                  />
+                </div>
+              </div>
+
               {/* Row 4: Apartamento / Barrio / Fecha nacimiento */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ContactInfoField label="Apartamento" value={contact.apartment_number || ''} onChange={(v) => setContact({ ...contact, apartment_number: v || null })} icon={Home} />
@@ -668,28 +696,6 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
                   const ref = leaders.find(l => l.numero_cuerda === contact.numero_cuerda && (l.role === 'referente' || l.role === 'supervisor'));
                   return ref ? `${ref.first_name || ''} ${ref.last_name || ''}`.trim() || '—' : '—';
                 })()} className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground cursor-default" />
-              </div>
-
-              {/* Observaciones / Pedido de oración */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observaciones</label>
-                  <textarea
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[50px] resize-y"
-                    value={contact.observaciones || ''}
-                    onChange={(e) => setContact({ ...contact, observaciones: e.target.value || null })}
-                    placeholder="Notas adicionales..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pedido de Oración</label>
-                  <textarea
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[50px] resize-y"
-                    value={contact.pedido_de_oracion || ''}
-                    onChange={(e) => setContact({ ...contact, pedido_de_oracion: e.target.value || null })}
-                    placeholder="¿Tiene algún pedido de oración?"
-                  />
-                </div>
               </div>
 
               {/* Save bar at top of form */}
