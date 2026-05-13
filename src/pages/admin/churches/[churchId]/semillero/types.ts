@@ -30,4 +30,9 @@ export interface Contact {
   // back to null when the receiving cuerda's tab is clicked.
   received_from_mja_at?: string | null;
   received_from_mja_seen_at?: string | null;
+  // Reverse direction — set when a non-MJA user reassigns a contact
+  // INTO an MJA-side cuerda. The MJA-side referente's locked tab uses
+  // these to badge inbound contacts.
+  sent_to_mja_at?: string | null;
+  sent_to_mja_seen_at?: string | null;
 }

@@ -331,7 +331,7 @@ const SemilleroPage = () => {
       const all: Contact[] = [];
       for (let page = 0; ; page++) {
         let q = supabase.from('contacts')
-          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, pending_external_send, pending_assignment_cell_id, responsable_id, created_by, created_at, received_from_mja_at, received_from_mja_seen_at')
+          .select('id, first_name, last_name, phone, address, barrio, zona_id, zona, conector, fecha_contacto, numero_cuerda, edad, cell_id, estado_seguimiento, lat, lng, sexo, estado_civil, is_external, pending_external_send, pending_assignment_cell_id, responsable_id, created_by, created_at, received_from_mja_at, received_from_mja_seen_at, sent_to_mja_at, sent_to_mja_seen_at')
           .eq('church_id', churchId!)
           .is('deleted_at', null)
           .order('fecha_contacto', { ascending: false })
@@ -895,8 +895,13 @@ const SemilleroPage = () => {
   const mjaUnseenCount = useMemo(() => {
     if (!allContacts) return 0;
     return allContacts.reduce((n, c: any) => {
-      if (!c.received_from_mja_at) return n;
-      if (c.received_from_mja_seen_at) return n;
+      // Either direction counts: a contact dropped down from MJA into
+      // a regular cuerda (received_from_mja_*) OR pushed up from a
+      // regular cuerda into MJA (sent_to_mja_*). Only one is ever set
+      // at a time per trigger logic, so the OR doesn't double-count.
+      const downUnseen = c.received_from_mja_at && !c.received_from_mja_seen_at;
+      const upUnseen = c.sent_to_mja_at && !c.sent_to_mja_seen_at;
+      if (!downUnseen && !upUnseen) return n;
       // Visibility: same rule as the main pool. Referentes only count
       // their own cuerda; globals count everyone.
       if (!canSeeContactsFromAllCuerdas) {
@@ -1910,8 +1915,29 @@ const SemilleroPage = () => {
                                 counts.set(raw, (counts.get(raw) || 0) + 1);
                                 groups.set(key, counts);
                               });
+                              // Non-privileged users: restrict the dropdown to
+                              // conectores that match a profile in their own
+                              // cuerda. Free-text names (someone typed a name
+                              // that has no profile, or a profile in another
+                              // cuerda) get hidden so the dropdown only lists
+                              // people the referente actually works with.
+                              // Privileged roles (admin/general/pastor/
+                              // supervisor) keep the full list because they
+                              // audit across cuerdas.
+                              const cuerdaProfileKeys = (() => {
+                                if (canSeeContactsFromAllCuerdas || !userCuerdaNumero) return null;
+                                const set = new Set<string>();
+                                (teamMembers || []).forEach(m => {
+                                  if (m.numero_cuerda !== userCuerdaNumero) return;
+                                  const fullName = `${m.first_name || ''} ${m.last_name || ''}`.trim();
+                                  const key = normalize(fullName);
+                                  if (key) set.add(key);
+                                });
+                                return set;
+                              })();
                               const representatives: string[] = [];
-                              groups.forEach(counts => {
+                              groups.forEach((counts, key) => {
+                                if (cuerdaProfileKeys && !cuerdaProfileKeys.has(key)) return;
                                 let best: string | null = null;
                                 let bestCount = -1;
                                 counts.forEach((count, raw) => {
