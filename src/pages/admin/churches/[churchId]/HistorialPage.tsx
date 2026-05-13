@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useChurchUuid } from '@/hooks/use-church-uuid';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
