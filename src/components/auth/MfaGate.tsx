@@ -8,6 +8,12 @@
 //   3. Session is AAL1 + user has a TOTP factor:
 //        - If this browser is in trusted_devices for the user → skip
 //          the challenge, refresh last_seen, render children.
+//        - Else if the current IP's geolocation (country + region or
+//          city) matches the location of ANY of the user's trusted
+//          devices → soft-trust this browser too: mark it as
+//          trusted using the existing TOTP enrollment and render
+//          children. The user already proved both factors from this
+//          region on another device.
 //        - Otherwise → show ChallengeView; on verify success, mark
 //          the device trusted and render children.
 //   4. Session is AAL1 + user has NO TOTP factor:
@@ -26,6 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import {
   isCurrentDeviceTrusted,
+  isCurrentLocationTrusted,
   markCurrentDeviceTrusted,
   touchCurrentDevice,
 } from '@/lib/trusted-devices';
@@ -268,16 +275,39 @@ export const MfaGate: React.FC<{ children: React.ReactNode }> = ({ children }) =
         const verifiedTotp = factors?.totp?.find((f: any) => f.status === 'verified');
 
         if (verifiedTotp) {
-          // User has TOTP enrolled. Decide based on device trust.
-          const trusted = await isCurrentDeviceTrusted(userId);
+          // User has TOTP enrolled. Skip the challenge if EITHER of:
+          //   - device-trust matches (this exact browser was verified
+          //     before), or
+          //   - location-trust matches (any of the user's trusted
+          //     devices was last seen in the same country + region as
+          //     the current IP — see isCurrentLocationTrusted).
+          // Both checks run in parallel so a hot reload doesn't pay
+          // the latency of two sequential round-trips. Either passing
+          // is enough to skip MFA. If the device is trusted we also
+          // refresh its row (last_seen + location). If only the
+          // location was trusted, we still register THIS browser as a
+          // new trusted device so the next visit doesn't depend on
+          // the geolocator being reachable.
+          const [trustedDevice, trustedLocation] = await Promise.all([
+            isCurrentDeviceTrusted(userId),
+            isCurrentLocationTrusted(userId),
+          ]);
           if (cancelled) return;
-          if (trusted) {
+          if (trustedDevice) {
             touchCurrentDevice(userId);
             setPhase('ok');
-          } else {
-            setFactorId(verifiedTotp.id);
-            setPhase('challenge');
+            return;
           }
+          if (trustedLocation) {
+            // Same region as an already-verified device — soft-trust
+            // this new browser by writing it into trusted_devices,
+            // then continue.
+            markCurrentDeviceTrusted(userId);
+            setPhase('ok');
+            return;
+          }
+          setFactorId(verifiedTotp.id);
+          setPhase('challenge');
           return;
         }
 
