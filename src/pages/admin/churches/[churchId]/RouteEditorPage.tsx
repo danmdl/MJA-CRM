@@ -5,14 +5,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { useChurchUuid } from '@/hooks/use-church-uuid';
-import { normalize } from '@/lib/normalize';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
-import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
+import { geoJsonToGooglePaths } from '@/lib/territory-utils';
+import { todayInART, formatDuration, filterRouteContacts } from './route-editor/helpers';
 import { loadGoogleMaps } from '@/lib/google-maps';
 import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
 import {
@@ -270,32 +270,12 @@ const RouteEditorPage = () => {
   }, [onlyInZone, activeTerritoryPaths]);
 
   // ─── Derived ──────────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    // normalize() so "maría" and "maria" return the same set. The
-    // earlier toLowerCase() left accents intact on both sides, which
-    // meant the haystack had to match the user's exact diacritics.
-    const term = normalize(search);
-    return (contacts || []).filter(c => {
-      if (onlyWithNumber && !/\d/.test(c.address || '')) return false;
-      if (filterResponsableId === '__none__') {
-        if (c.responsable_id) return false;
-      } else if (filterResponsableId && c.responsable_id !== filterResponsableId) return false;
-      if (filterDateFrom && (!c.fecha_contacto || c.fecha_contacto < filterDateFrom)) return false;
-      if (filterDateTo && (!c.fecha_contacto || c.fecha_contacto > filterDateTo)) return false;
-      if (onlyInZone && activeTerritoryPaths) {
-        if (!isPointInTerritory(c.lat, c.lng, activeTerritoryPaths)) return false;
-      }
-      if (term) {
-        // Name-only — see MapPickerPage for rationale. Address
-        // matches polluted the list with contacts that just happened
-        // to live on a street with the same name as the person being
-        // searched.
-        const name = normalize(`${c.first_name} ${c.last_name || ''}`);
-        if (!name.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [contacts, search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, onlyInZone, activeTerritoryPaths]);
+  const filtered = useMemo(
+    () => filterRouteContacts(contacts, {
+      search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, onlyInZone, activeTerritoryPaths,
+    }),
+    [contacts, search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, onlyInZone, activeTerritoryPaths],
+  );
 
   const selectedContacts = useMemo(
     () => (contacts || []).filter(c => selectedIds.has(c.id)),
@@ -616,13 +596,6 @@ const RouteEditorPage = () => {
   // sync_route_contact_notes_to_observaciones mirrors each entry into
   // contacts.observaciones with an idempotent "[Ruta <short> · DATE]"
   // prefix so subsequent edits replace the same line.
-  const todayInART = () => {
-    const fmt = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Argentina/Buenos_Aires',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-    });
-    return fmt.format(new Date());
-  };
   const handleContactNoteChange = (contactId: string, value: string) => {
     const date = contactNotes[contactId]?.date || todayInART();
     const nextAll = { ...contactNotes, [contactId]: { text: value, date } };
@@ -696,13 +669,6 @@ const RouteEditorPage = () => {
     } finally {
       setSharing(false);
     }
-  };
-
-  const formatDuration = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0) return `${h}h ${m}min`;
-    return `${m}min`;
   };
 
   // ─── Edit dialog open/close ───────────────────────────────────────────
