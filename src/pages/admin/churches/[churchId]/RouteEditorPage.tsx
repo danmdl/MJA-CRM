@@ -284,9 +284,12 @@ const RouteEditorPage = () => {
         if (!isPointInTerritory(c.lat, c.lng, activeTerritoryPaths)) return false;
       }
       if (term) {
+        // Name-only — see MapPickerPage for rationale. Address
+        // matches polluted the list with contacts that just happened
+        // to live on a street with the same name as the person being
+        // searched.
         const name = normalize(`${c.first_name} ${c.last_name || ''}`);
-        const addr = normalize(c.address || '');
-        if (!name.includes(term) && !addr.includes(term)) return false;
+        if (!name.includes(term)) return false;
       }
       return true;
     });
