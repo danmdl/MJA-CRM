@@ -178,6 +178,19 @@ const SemilleroPage = () => {
   // Assignment permission comes from canAssignContacts() via usePermissions
   const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
+  // CRITICAL: viewerId is the id of the user BEING VIEWED, not the auth
+  // session user. When an admin is impersonating another user, session.user.id
+  // is still the admin's auth id while profile.id is the impersonated user's.
+  // All visibility / "my contacts" / filter-by-self logic must use viewerId
+  // — using session.user.id during impersonation makes the admin's view query
+  // for THEIR own assigned contacts inside the impersonated cuerda, which
+  // typically returns zero rows and looks like the page is broken (Dan
+  // reported this with a screenshot: inbox chip showed 1102, table empty,
+  // brief flash of rows on refresh because the filter is applied via a
+  // useEffect AFTER the first render). Audit / action logging (pool_assigned_by,
+  // etc.) should still use session.user.id since that records who PERFORMED
+  // the action, which is the admin during impersonation.
+  const viewerId = profile?.id || null;
   // The Semillero is the user's "my cuerda" working view. Visibility here is
   // strictly role-based — admin/general/pastor/supervisor see everything,
   // anyone else (referente, encargado_de_celula, consolidador, conector,
@@ -270,17 +283,20 @@ const SemilleroPage = () => {
       filterDefaultsAppliedRef.current = true;
       return;
     }
-    // Wait for cuerdas data so we can detect MJA membership before
-    // committing a default that's hard to undo (filterDefaultsAppliedRef
-    // is single-shot).
-    if (!cuerdas) return;
-    const churchCuerdaNumero = (cuerdas || []).find(cu => cu.is_church_cuerda)?.numero;
-    const userIsMja = !!(profile.numero_cuerda && churchCuerdaNumero && profile.numero_cuerda === churchCuerdaNumero);
-    if (!canFilterAllContacts() && !userIsMja) {
-      setFilterResponsable(session.user.id);
-    }
+    // Previously this auto-applied filterResponsable = session.user.id
+    // for low-permission roles ("you can only see your own contacts").
+    // Dropped because the pool-query visibility scope ALREADY restricts
+    // a non-global to their cuerda (semillero-pool-query.ts line ~101).
+    // Stacking 'only my responsable_id' on top of that meant a líder
+    // de célula with no personally-assigned contacts saw an empty
+    // table while the INBOX chip showed the full cuerda count (1102)
+    // — Dan reported this with a screenshot.
+    //
+    // The user can still filter to "Mis contactos" via the
+    // Responsable dropdown when they want that scope; we just don't
+    // force it as the default.
     filterDefaultsAppliedRef.current = true;
-  }, [profile, session?.user?.id, canFilterAllContacts, cuerdas]);
+  }, [profile, viewerId, canFilterAllContacts, cuerdas]);
 
   // Team members for Responsable dropdown.
   // staleTime is 5 min because team membership changes very rarely.
@@ -460,7 +476,7 @@ const SemilleroPage = () => {
     const idSet = new Set<string>();
     const byContact = new Map<string, string[]>(); // contact id → all ids in same name-group (incl. itself)
     if (!allContacts?.length) return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
-    const userId = session?.user?.id;
+    const userId = viewerId;
     // Only consider contacts this user is allowed to see. Same gate the
     // row pipeline applies to filteredContacts — keeps the dot count and
     // the Duplicados pill in sync with the user's actual view.
@@ -876,7 +892,7 @@ const SemilleroPage = () => {
       if (!canSeeContactsFromAllCuerdas) {
         if (userCuerdaNumero) {
           if (c.numero_cuerda !== userCuerdaNumero) return n;
-        } else if (c.responsable_id !== session?.user?.id) {
+        } else if (c.responsable_id !== viewerId) {
           return n;
         }
       }
@@ -891,7 +907,7 @@ const SemilleroPage = () => {
   // entire pool, not the user's current view.
   const autoassignableCount = useMemo(() => {
     let n = 0;
-    const userId = session?.user?.id;
+    const userId = viewerId;
     allContacts?.forEach(c => {
       if (c.cell_id) return;
       if (externalIds.has(c.id)) return;
@@ -1569,7 +1585,7 @@ const SemilleroPage = () => {
                             // returning every distinct responsable_id appearing on a
                             // contact they can see. We hydrate names via the existing
                             // profileByIdExtended / teamMemberById maps for display.
-                            const userId = session?.user?.id;
+                            const userId = viewerId;
                             const creators = distinctResponsableIds
                               .map(id => ({ id, profile: profileByIdExtended.get(id), teamMember: teamMemberById.get(id) }))
                               .filter(c => {
