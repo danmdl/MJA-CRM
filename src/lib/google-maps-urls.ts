@@ -74,27 +74,52 @@ export function makeStopRanges(total: number): StopRange[] {
  * stop of chunk N is also the origin of chunk N+1 — so the user gets
  * a continuous route across the links.
  */
-const stopParam = (s: Stop): string => {
-  // Prefer the address text when available so iOS Google Maps shows
-  // the address in each input box. Fall back to `lat,lng` when the
-  // stop has no address loaded (e.g. the starting point, or a contact
-  // whose address column is empty but whose coordinates were
-  // hand-placed).
-  if (s.address && s.address.trim()) return s.address.trim();
+/**
+ * Cheap iOS detection — iPhone / iPad / iPod identify themselves
+ * explicitly, plus the iPad-on-iPadOS edge case where the UA reads
+ * 'Macintosh' but the device has touch (maxTouchPoints > 0).
+ *
+ * Why we care: iOS Google Maps renders `lat,lng` waypoints as the
+ * literal text 'Marcador' in its input boxes; Android resolves them
+ * to addresses. Passing the address text fixes the iOS display BUT
+ * breaks Android's route (Android's Maps app does its own geocoding
+ * when launched with an address and lands on a different point). So
+ * we use lat,lng on Android and address-text on iOS.
+ */
+const isIOS = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true;
+  return false;
+};
+
+const stopParam = (s: Stop, preferAddress: boolean): string => {
+  if (preferAddress && s.address && s.address.trim()) return s.address.trim();
   return `${s.lat},${s.lng}`;
 };
 
-export function buildGoogleMapsChunks(allStops: Stop[]): string[] {
+export interface BuildOptions {
+  /**
+   * Force address-preferred mode. When omitted, the function auto-
+   * detects iOS via the user-agent and uses addresses there only.
+   * Exposed so tests can pin behavior without faking navigator.
+   */
+  preferAddress?: boolean;
+}
+
+export function buildGoogleMapsChunks(allStops: Stop[], opts: BuildOptions = {}): string[] {
   if (allStops.length < 2) return [];
+  const preferAddress = opts.preferAddress ?? isIOS();
   const urls: string[] = [];
   let i = 0;
   while (i < allStops.length - 1) {
     const end = Math.min(i + MAX_STOPS_PER_LINK, allStops.length);
     const chunk = allStops.slice(i, end);
-    const origin = stopParam(chunk[0]);
+    const origin = stopParam(chunk[0], preferAddress);
     const last = chunk[chunk.length - 1];
-    const destination = stopParam(last);
-    const waypoints = chunk.slice(1, -1).map(stopParam).join('|');
+    const destination = stopParam(last, preferAddress);
+    const waypoints = chunk.slice(1, -1).map(s => stopParam(s, preferAddress)).join('|');
     let url = `https://www.google.com/maps/dir/?api=1`
       + `&origin=${encodeURIComponent(origin)}`
       + `&destination=${encodeURIComponent(destination)}`
