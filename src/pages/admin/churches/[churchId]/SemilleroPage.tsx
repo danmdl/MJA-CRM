@@ -1694,7 +1694,7 @@ const SemilleroPage = () => {
                         ) : 'Sugerencia'}
                       </ResizableHeader>
                     )}
-                    {isUnassignedView && canAssignContacts() && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
+                    {isUnassignedView && (canAssignContacts() || !isMjaMember) && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                   </tr>
                 </thead>
                 <tbody>
@@ -2052,12 +2052,18 @@ const SemilleroPage = () => {
                           </td>
                         )}
 
-                        {/* Action buttons. Non-global users (referente, conector,
-                            etc.) only see 'Enviar a MJA'. The church-cuerda flow
-                            is the single way they hand off contacts, and only
-                            admin/general/pastor/supervisor (the church-cuerda
-                            authority) actually assigns to specific cells. */}
-                        {isUnassignedView && canAssignContacts() && (
+                        {/* Action buttons. Non-MJA users (referente, líder de
+                            célula, conector etc.) see 'Enviar a MJA' — this is
+                            the church-cuerda hand-off and shouldn't be gated by
+                            can_assign_contacts (which controls assigning to a
+                            specific cell — a different capability). MJA members
+                            with assign permission see Pre-Asignar / Confirmar
+                            despacho / Cuerda-only flows inside; non-MJA users
+                            without assign permission only see 'Enviar a MJA'.
+                            Dan reported a líder de célula impersonation showed
+                            no MJA button because the WHOLE column was gated by
+                            canAssignContacts. */}
+                        {isUnassignedView && (canAssignContacts() || !isMjaMember) && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
                             {c.cell_id ? (
                               <span className="text-[10px] text-blue-400">✓ Asignado</span>
