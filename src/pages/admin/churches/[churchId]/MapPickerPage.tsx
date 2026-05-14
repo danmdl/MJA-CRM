@@ -13,6 +13,7 @@ import { useChurchCoords } from '@/hooks/use-church-coords';
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils';
 import { loadGoogleMaps } from '@/lib/google-maps';
+import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { ChevronLeft, MapPin, Route as RouteIcon, Search, X, List, Map as MapIcon, Navigation, Lasso } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
@@ -40,6 +41,10 @@ const MapPickerPage = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersById = useRef<Map<string, any>>(new Map());
+  // Single clusterer reused across renders. We rebuild the marker
+  // membership in the same diff loop that updates markersById — no
+  // teardown needed unless the map itself unmounts.
+  const clustererRef = useRef<MarkerClusterer | null>(null);
   // Separate marker for the starting point, kept in its own ref so the
   // contact-marker effect can rebuild without ever touching it. Updated
   // by a dedicated effect that fires when startLat / startLng change.
@@ -507,9 +512,9 @@ const MapPickerPage = () => {
         existing.setIcon(icon);
         existing.setTitle(`${c.first_name} ${c.last_name || ''}${isSelected ? ' (seleccionado)' : ''}`);
       } else {
+        // No `map:` here — the MarkerClusterer below owns attachment.
         const marker = new google.maps.Marker({
           position: { lat: c.lat, lng: c.lng },
-          map: mapInstance.current,
           icon,
           title: `${c.first_name} ${c.last_name || ''}`,
         });
@@ -519,6 +524,15 @@ const MapPickerPage = () => {
         markersById.current.set(c.id, marker);
       }
     });
+
+    // Replace cluster membership with the current visible-marker set.
+    // setMarkers + clearMarkers is the API contract; resetting both
+    // sides keeps cluster counts honest after every diff cycle.
+    if (!clustererRef.current) {
+      clustererRef.current = new MarkerClusterer({ map: mapInstance.current, markers: [] });
+    }
+    clustererRef.current.clearMarkers();
+    clustererRef.current.addMarkers(Array.from(markersById.current.values()));
 
     // Fit bounds the first time we have markers
     if (!fittedRef.current && filteredForMap.length > 0) {
@@ -623,6 +637,10 @@ const MapPickerPage = () => {
   // Cleanup markers on unmount
   useEffect(() => {
     return () => {
+      if (clustererRef.current) {
+        clustererRef.current.clearMarkers();
+        clustererRef.current = null;
+      }
       markersById.current.forEach(m => m.setMap(null));
       markersById.current.clear();
       if (startMarkerRef.current) {

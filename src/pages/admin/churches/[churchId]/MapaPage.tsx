@@ -41,6 +41,7 @@ interface ContactPin {
 }
 
 import { loadGoogleMaps } from '@/lib/google-maps';
+import { MarkerClusterer } from '@googlemaps/markerclusterer';
 
 // Geocode a single address using Google Maps Geocoding API
 // Gran Buenos Aires bounding box for validation
@@ -543,6 +544,12 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
         // the cell markers use, so a quick eye-scan groups people by
         // who's responsible for them visually. Contacts without a cuerda
         // assigned fall back to gold (the default cell fallback color).
+        //
+        // Markers are added to a MarkerClusterer instead of straight to
+        // the map. Above ~500 markers per viewport, plain markers chug;
+        // clustering folds them into numbered circles that expand on
+        // zoom-in so the map stays responsive at 5k-10k contacts.
+        const contactMarkers: any[] = [];
         mappableContacts.forEach(contact => {
           const pos = { lat: contact.lat, lng: contact.lng };
           const colors = contact.numero_cuerda ? cuerdaColorMap.get(contact.numero_cuerda) : null;
@@ -557,9 +564,10 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
             strokeWeight: 1,
           };
 
+          // Note: map intentionally NOT set here. MarkerClusterer
+          // attaches/detaches as the user zooms.
           const marker = new gmaps.Marker({
             position: pos,
-            map,
             icon: markerIcon,
             title: `${contact.first_name} ${contact.last_name || ''}`.trim(),
           });
@@ -578,7 +586,12 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
           });
 
           bounds.extend(pos);
+          contactMarkers.push(marker);
         });
+
+        if (contactMarkers.length) {
+          new MarkerClusterer({ map, markers: contactMarkers });
+        }
       }
 
       if (itemsForMap.length === 0) {

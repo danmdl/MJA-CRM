@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useRef, lazy, Suspense } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useParams } from 'react-router-dom';
 import { useChurchUuid } from '@/hooks/use-church-uuid';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
@@ -154,6 +155,76 @@ const CardMeta: React.FC<{ stage: StageKey; meta: Record<string, any> }> = ({ st
 };
 
 // ─── Person detail dialog with stage tabs ─────────────────────────────────────
+
+// Virtualized list of cards inside a kanban column. Switches between
+// direct render (small columns) and a windowed virtualizer (≥ 50 cards)
+// so a column with 1000 people still scrolls at 60fps. The threshold
+// keeps small columns simple — virtualizer overhead is real on small N
+// and direct .map is fine up to a few dozen DOM nodes.
+const VIRTUALIZE_THRESHOLD = 50;
+
+const VirtualizedCardList: React.FC<{
+  cards: ProcessContact[];
+  renderCard: (pc: ProcessContact) => React.ReactNode;
+}> = ({ cards, renderCard }) => {
+  const parentRef = useRef<HTMLDivElement | null>(null);
+
+  // useVirtualizer is always called (rules-of-hooks), but only consulted
+  // when we cross the threshold. measureElement lets cards grow when
+  // CardMeta renders extra stage-specific lines.
+  const virtualizer = useVirtualizer({
+    count: cards.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 64,
+    overscan: 6,
+    measureElement: (el) => el?.getBoundingClientRect().height ?? 64,
+    getItemKey: (idx) => cards[idx].id,
+  });
+
+  if (cards.length < VIRTUALIZE_THRESHOLD) {
+    return (
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-y-auto p-1.5 space-y-1.5"
+        style={{ maxHeight: 'calc(100vh - 260px)' }}
+      >
+        {cards.map(renderCard)}
+        {cards.length === 0 && (
+          <div className="text-center py-6 text-xs text-muted-foreground/50">Sin personas</div>
+        )}
+      </div>
+    );
+  }
+
+  const items = virtualizer.getVirtualItems();
+  return (
+    <div
+      ref={parentRef}
+      className="flex-1 overflow-y-auto p-1.5"
+      style={{ maxHeight: 'calc(100vh - 260px)' }}
+    >
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+        {items.map(vi => (
+          <div
+            key={vi.key}
+            data-index={vi.index}
+            ref={virtualizer.measureElement}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              transform: `translateY(${vi.start}px)`,
+              paddingBottom: 6, // == old space-y-1.5
+            }}
+          >
+            {renderCard(cards[vi.index])}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const PersonDetailDialog: React.FC<{
   open: boolean;
@@ -620,11 +691,11 @@ const ProcesosPage = () => {
                   </div>
                 </div>
 
-                {/* Cards */}
-                <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-                  {cards.map(pc => (
+                {/* Cards — virtualized when the column has ≥ 50 cards */}
+                <VirtualizedCardList
+                  cards={cards}
+                  renderCard={(pc) => (
                     <div
-                      key={pc.id}
                       draggable
                       onDragStart={e => handleDragStart(e, pc.id, pc.stage)}
                       className="group rounded-md border bg-card px-2 py-2 cursor-grab active:cursor-grabbing hover:border-primary/40 transition-colors"
@@ -660,11 +731,8 @@ const ProcesosPage = () => {
                         {pc.numero_cuerda && <span className="font-mono">C{pc.numero_cuerda}</span>}
                       </div>
                     </div>
-                  ))}
-                  {cards.length === 0 && (
-                    <div className="text-center py-6 text-xs text-muted-foreground/50">Sin personas</div>
                   )}
-                </div>
+                />
               </div>
             );
           })}
