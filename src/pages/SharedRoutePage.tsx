@@ -391,8 +391,10 @@ const SharedRoutePage = () => {
   const gmapsUrls = useMemo(() => {
     if (!route || contacts.length === 0) return [];
     const allStops = [
-      { lat: Number(route.start_lat), lng: Number(route.start_lng) },
-      ...contacts.map(c => ({ lat: c.lat!, lng: c.lng! })),
+      // Starting point — pass the address so iOS Google Maps shows it
+      // in the first input box instead of the literal text 'Marcador'.
+      { lat: Number(route.start_lat), lng: Number(route.start_lng), address: route.start_address || null },
+      ...contacts.map(c => ({ lat: c.lat!, lng: c.lng!, address: c.address })),
     ];
     return buildGoogleMapsChunks(allStops);
   }, [route, contacts]);

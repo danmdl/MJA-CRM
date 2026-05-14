@@ -8,10 +8,46 @@ describe('buildGoogleMapsChunks', () => {
     const stops = Array.from({ length: 10 }, (_, i) => stop(i));
     const urls = buildGoogleMapsChunks(stops);
     expect(urls).toHaveLength(1);
-    expect(urls[0]).toContain('origin=-34,-58');
+    // The comma in `lat,lng` is URL-encoded as %2C since we
+    // encodeURIComponent the value before substituting.
+    expect(decodeURIComponent(urls[0].match(/origin=([^&]+)/)![1])).toBe('-34,-58');
     // 8 waypoints between origin and destination.
     const wpCount = (decodeURIComponent(urls[0].match(/waypoints=([^&]+)/)![1])).split('|').length;
     expect(wpCount).toBe(8);
+  });
+
+  it('uses the address text when stops carry one (fixes iOS Marcador labels)', () => {
+    const stops = [
+      { lat: -34.6, lng: -58.4, address: 'Av. Rivadavia 1234, Buenos Aires' },
+      { lat: -34.61, lng: -58.41, address: 'Calle 90 587, San Andrés' },
+    ];
+    const urls = buildGoogleMapsChunks(stops);
+    expect(urls).toHaveLength(1);
+    const origin = decodeURIComponent(urls[0].match(/origin=([^&]+)/)![1]);
+    const dest = decodeURIComponent(urls[0].match(/destination=([^&]+)/)![1]);
+    expect(origin).toBe('Av. Rivadavia 1234, Buenos Aires');
+    expect(dest).toBe('Calle 90 587, San Andrés');
+  });
+
+  it('falls back to lat,lng when a stop has no address', () => {
+    const stops = [
+      { lat: -34.6, lng: -58.4 }, // starting point — no address
+      { lat: -34.61, lng: -58.41, address: 'Calle 90 587, San Andrés' },
+    ];
+    const urls = buildGoogleMapsChunks(stops);
+    const origin = decodeURIComponent(urls[0].match(/origin=([^&]+)/)![1]);
+    expect(origin).toBe('-34.6,-58.4');
+  });
+
+  it('mixes addresses and lat,lng across waypoints', () => {
+    const stops = [
+      { lat: -34.6, lng: -58.4, address: 'A' },
+      { lat: -34.61, lng: -58.41 }, // no address
+      { lat: -34.62, lng: -58.42, address: 'C' },
+    ];
+    const urls = buildGoogleMapsChunks(stops);
+    const waypoints = decodeURIComponent(urls[0].match(/waypoints=([^&]+)/)![1]);
+    expect(waypoints).toBe('-34.61,-58.41');
   });
 
   it('splits into 2 URLs at 11 stops, overlapping by 1', () => {
