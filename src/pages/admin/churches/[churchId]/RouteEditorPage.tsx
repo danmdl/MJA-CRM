@@ -19,7 +19,7 @@ import {
   markerScaleFor,
   markerFontSizeFor,
 } from '@/lib/route-stops';
-import { Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, ChevronDown, MessageCircle, Plus, Map as MapIcon } from 'lucide-react';
+import { Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, Trash2, ChevronLeft, ChevronDown, MessageCircle, Plus, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 // Lazy: profile dialog chunk only loads when a contact card is clicked.
 const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
@@ -699,6 +699,27 @@ const RouteEditorPage = () => {
     setEditDialogOpen(false);
   };
 
+  // Quick-remove a contact directly from the route's stop list (the
+  // numbered cards next to the map). Equivalent to opening "Editar
+  // contactos" and unchecking the contact, but one click instead of
+  // four. Triggers the auto-recalc useEffect via autoCalcedRef=false
+  // so the route reorders + the map markers redraw without a refresh.
+  const removeStop = (contactId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.delete(contactId);
+      return next;
+    });
+    // Empty selection — clear the route so the user lands on the
+    // "Ruta vacía" state instead of seeing a stale calc.
+    if (selectedIds.size <= 1) {
+      setRouteData(null);
+    }
+    // Drop the once-only latch so the auto-recalc effect re-fires
+    // against the new selectedContacts on the next render.
+    autoCalcedRef.current = false;
+  };
+
   const applyEditAndCalculate = async () => {
     if (selectedIds.size === 0) { showError('Seleccioná al menos un contacto.'); return; }
     if (!startLat || !startLng) { showError('Ingresá un punto de partida.'); return; }
@@ -895,6 +916,13 @@ const RouteEditorPage = () => {
                         title="Editar contacto"
                       >
                         <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => removeStop(c.id)}
+                        className="text-muted-foreground hover:text-red-400 p-1 rounded hover:bg-red-500/10 shrink-0"
+                        title="Quitar de la ruta"
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </button>
                       <button
                         onClick={() => toggleVisited(c.id)}
