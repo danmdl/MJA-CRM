@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Route as RouteIcon, AlertCircle, MessageCircle, Copy, ChevronDown } from 'lucide-react';
+import { ExternalLink, Route as RouteIcon, AlertCircle, MessageCircle, Copy, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
 import {
@@ -23,6 +23,21 @@ interface Contact {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  // Extra fields surfaced in the per-stop "ver más" panel so the
+  // referente in the street can see who they're knocking on before
+  // they ring the bell — age, prayer request, observations, etc.
+  // Public viewer; only shipped to people with the share link.
+  phone: string | null;
+  barrio: string | null;
+  numero_cuerda: string | null;
+  conector: string | null;
+  edad: string | null;
+  sexo: string | null;
+  estado_civil: string | null;
+  fecha_contacto: string | null;
+  estado_seguimiento: string | null;
+  observaciones: string | null;
+  pedido_de_oracion: string | null;
 }
 
 interface ContactNote {
@@ -43,6 +58,73 @@ const todayInART = () => {
   return fmt.format(new Date()); // en-CA gives YYYY-MM-DD natively
 };
 
+/**
+ * Read-only summary of a contact, rendered inline below a stop card
+ * when the user clicks the eye icon. Skips fields with no value so
+ * the panel collapses to the minimum useful surface area (some
+ * contacts only have a phone, others only a prayer request).
+ *
+ * NOTE: this is the PUBLIC viewer. Anyone with the share-link sees
+ * these fields. The route already exposed name + address; surfacing
+ * the rest (age, prayer request, observations) was an explicit
+ * request from Dan so the referente in the street knows who they're
+ * about to talk to. Links auto-expire after 60 days.
+ */
+const StopDetails = ({ contact }: { contact: Contact }) => {
+  // Pulled into a small array so the "no extra data" empty state is
+  // a single check and adding/removing a field is one-line.
+  const rows: { label: string; value: string | null }[] = [
+    { label: 'Teléfono', value: contact.phone },
+    { label: 'Edad', value: contact.edad },
+    { label: 'Sexo', value: contact.sexo },
+    { label: 'Estado civil', value: contact.estado_civil },
+    { label: 'Cuerda', value: contact.numero_cuerda },
+    { label: 'Barrio', value: contact.barrio },
+    { label: 'Conector', value: contact.conector },
+    { label: 'Seguimiento', value: contact.estado_seguimiento },
+    { label: 'Fecha contacto', value: contact.fecha_contacto },
+  ];
+  const visible = rows.filter(r => r.value && String(r.value).trim() !== '');
+  const hasObservaciones = !!(contact.observaciones && contact.observaciones.trim() !== '');
+  const hasPedido = !!(contact.pedido_de_oracion && contact.pedido_de_oracion.trim() !== '');
+  const hasAny = visible.length > 0 || hasObservaciones || hasPedido;
+
+  if (!hasAny) {
+    return (
+      <div className="ml-9 text-[10px] text-muted-foreground italic">
+        Sin datos adicionales cargados para este contacto.
+      </div>
+    );
+  }
+
+  return (
+    <div className="ml-9 rounded border border-border/60 bg-muted/30 p-2 space-y-2">
+      {visible.length > 0 && (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+          {visible.map(r => (
+            <div key={r.label} className="flex gap-1.5 min-w-0">
+              <span className="text-muted-foreground shrink-0">{r.label}:</span>
+              <span className="font-medium truncate">{r.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {hasPedido && (
+        <div className="text-[11px]">
+          <div className="text-muted-foreground mb-0.5">Pedido de oración</div>
+          <div className="font-medium whitespace-pre-wrap">{contact.pedido_de_oracion}</div>
+        </div>
+      )}
+      {hasObservaciones && (
+        <div className="text-[11px]">
+          <div className="text-muted-foreground mb-0.5">Observaciones</div>
+          <div className="font-medium whitespace-pre-wrap">{contact.observaciones}</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SharedRoutePage = () => {
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
@@ -55,6 +137,11 @@ const SharedRoutePage = () => {
   const [contactNotes, setContactNotes] = useState<Record<string, ContactNote>>({});
   const [savingContactId, setSavingContactId] = useState<string | null>(null);
   const notesSaveTimers = useRef<Record<string, any>>({});
+  // Per-stop expand state for the "ver más" eye button. Stored as a
+  // Set of contact ids; opening a stop is a one-tap action and so is
+  // closing it. Multi-open by design — the referente reviewing a route
+  // may want to scan a few prayer requests in a row without collapsing.
+  const [expandedStops, setExpandedStops] = useState<Set<string>>(new Set());
   // Which range of stops to render on the map. Defaults to 'all'. When
   // the route has more than 5 stops, the user can pick a segment
   // (1-5, 5-10, 10-15, …) so earlier paths don't crowd the canvas.
@@ -91,13 +178,13 @@ const SharedRoutePage = () => {
       setContactNotes((data.contact_notes as unknown as Record<string, ContactNote>) || {});
       // Fetch the contacts in order
       const { data: cs } = await supabase.from('contacts')
-        .select('id, first_name, last_name, address, lat, lng')
+        .select('id, first_name, last_name, address, lat, lng, phone, barrio, numero_cuerda, conector, edad, sexo, estado_civil, fecha_contacto, estado_seguimiento, observaciones, pedido_de_oracion')
         .in('id', data.ordered_contact_ids);
       const orderMap = new Map<string, number>(
         (data.ordered_contact_ids as string[]).map((id, i) => [id, i] as [string, number])
       );
       const sorted = (cs || []).sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
-      setContacts(sorted as Contact[]);
+      setContacts(sorted as unknown as Contact[]);
       setLoading(false);
     })();
   }, [token]);
@@ -457,6 +544,7 @@ const SharedRoutePage = () => {
               {contacts.map((c, idx) => {
                 const isVisited = !!visited[c.id];
                 const note = contactNotes[c.id]?.text || '';
+                const isExpanded = expandedStops.has(c.id);
                 return (
                   <div key={c.id} className={`flex flex-col gap-2 text-xs p-2 rounded border ${isVisited ? 'opacity-60 border-muted' : 'border-transparent hover:border-border'}`}>
                     <div className="flex items-center gap-2">
@@ -466,12 +554,24 @@ const SharedRoutePage = () => {
                         <div className="text-muted-foreground truncate">{c.address}</div>
                       </div>
                       <button
+                        onClick={() => setExpandedStops(prev => {
+                          const next = new Set(prev);
+                          if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
+                          return next;
+                        })}
+                        className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted shrink-0"
+                        title={isExpanded ? 'Ocultar datos' : 'Ver más datos'}
+                      >
+                        {isExpanded ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                      <button
                         onClick={() => toggleVisited(c.id)}
                         className={`text-[11px] px-2.5 py-1 rounded border whitespace-nowrap shrink-0 ${isVisited ? 'border-gray-500 text-gray-400' : 'border-green-500/40 text-green-400 hover:bg-green-500/10'}`}
                       >
                         {isVisited ? '✓' : 'Marcar'}
                       </button>
                     </div>
+                    {isExpanded && <StopDetails contact={c} />}
                     <div className="ml-9">
                       <textarea
                         value={note}
