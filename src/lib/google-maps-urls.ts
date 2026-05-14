@@ -75,25 +75,31 @@ export function makeStopRanges(total: number): StopRange[] {
  * a continuous route across the links.
  */
 /**
- * Cheap iOS detection — iPhone / iPad / iPod identify themselves
- * explicitly, plus the iPad-on-iPadOS edge case where the UA reads
- * 'Macintosh' but the device has touch (maxTouchPoints > 0).
+ * History of this function:
  *
- * Why we care: iOS Google Maps renders `lat,lng` waypoints as the
- * literal text 'Marcador' in its input boxes; Android resolves them
- * to addresses. Passing the address text fixes the iOS display BUT
- * breaks Android's route (Android's Maps app does its own geocoding
- * when launched with an address and lands on a different point). So
- * we use lat,lng on Android and address-text on iOS.
+ * 1. PR #60: swapped lat,lng → address text for ALL platforms because
+ *    iOS Google Maps was showing "Marcador" instead of addresses in
+ *    the input boxes. ❌ Broke Android — passing an address makes
+ *    Android's Maps app re-geocode and land on a different point.
+ *
+ * 2. PR #61: detected iOS via UA and used addresses ONLY there.
+ *    Android went back to lat,lng (worked fine).
+ *    ❌ But on iOS the addresses caused a worse problem: the route
+ *    line stopped drawing AND travelmode=driving was ignored (Maps
+ *    defaulted to walking). Dan reported addresses visible in inputs
+ *    but no purple line on the map.
+ *
+ * 3. Now: revert to lat,lng for everyone. iOS keeps the "Marcador"
+ *    label cosmetic issue but the route DRAWS and routing mode is
+ *    respected. Android keeps its working behavior. The label issue
+ *    is annoying but a working route trumps cosmetic input text.
+ *
+ * The `address` field on Stop is kept on the interface so callers
+ * don't have to change, but it's currently ignored by the URL builder.
+ * If a future iOS version of Google Maps fixes its address handling,
+ * we can flip the switch via the preferAddress opt without touching
+ * any callsite.
  */
-const isIOS = (): boolean => {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  if (/iPhone|iPad|iPod/i.test(ua)) return true;
-  if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true;
-  return false;
-};
-
 const stopParam = (s: Stop, preferAddress: boolean): string => {
   if (preferAddress && s.address && s.address.trim()) return s.address.trim();
   return `${s.lat},${s.lng}`;
@@ -101,16 +107,18 @@ const stopParam = (s: Stop, preferAddress: boolean): string => {
 
 export interface BuildOptions {
   /**
-   * Force address-preferred mode. When omitted, the function auto-
-   * detects iOS via the user-agent and uses addresses there only.
-   * Exposed so tests can pin behavior without faking navigator.
+   * Opt in to address-text mode. Off by default — iOS Google Maps
+   * doesn't draw the route line when given addresses, and Android
+   * Maps re-geocodes them to wrong points. Kept as an escape hatch
+   * for callers that want to test the address path or for a future
+   * version that handles them.
    */
   preferAddress?: boolean;
 }
 
 export function buildGoogleMapsChunks(allStops: Stop[], opts: BuildOptions = {}): string[] {
   if (allStops.length < 2) return [];
-  const preferAddress = opts.preferAddress ?? isIOS();
+  const preferAddress = opts.preferAddress ?? false;
   const urls: string[] = [];
   let i = 0;
   while (i < allStops.length - 1) {
