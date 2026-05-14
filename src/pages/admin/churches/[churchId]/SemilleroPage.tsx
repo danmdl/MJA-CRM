@@ -21,7 +21,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, Eye, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
+  Users, Search, Undo2, ChevronDown, Zap, ExternalLink, Upload, PlusCircle, RefreshCw, MapPin, Trash2, Filter, ArrowUp, ArrowDown, ArrowUpDown, Columns3,
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { usePermissions } from '@/lib/permissions';
@@ -1445,7 +1445,15 @@ const SemilleroPage = () => {
             <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
+              {/* No w-full on the table: with tableLayout:fixed + w-full
+                  the column widths get scaled UP to fill the container,
+                  which Dan noticed as "dead space" between Responsable /
+                  Conector / Ruta on wide screens. Letting the table size
+                  to its explicit colWidths leaves the columns tight and
+                  empty room appears on the right of the table instead,
+                  which is the lesser visual evil. The outer
+                  overflow-x-auto still handles narrow screens. */}
+              <table className="border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
                 <thead>
                   <tr className="border-b h-[37px]">
                     <th className="px-2" style={{ width: colWidths.check }}>
@@ -1745,13 +1753,16 @@ const SemilleroPage = () => {
                           </td>
                         )}
 
-                        {/* Nombre (con ojo) */}
+                        {/* Nombre — clicking opens the contact profile.
+                            The eye icon used to live here as a visual cue
+                            but Dan asked to drop it: the name being a
+                            link is already obvious, and the icon was
+                            eating ~16px on every row. */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.nombre }}>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <button className="flex items-center gap-1.5 hover:underline text-left text-sm font-medium min-w-0 w-full" onClick={() => setSelectedContactId(c.id)}>
-                                <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                <span className="truncate">{c.first_name} {c.last_name || ''}</span>
+                              <button className="hover:underline text-left text-sm font-medium min-w-0 w-full truncate block" onClick={() => setSelectedContactId(c.id)}>
+                                {c.first_name} {c.last_name || ''}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent><p className="text-xs">Ver contacto</p></TooltipContent>
@@ -2002,12 +2013,22 @@ const SemilleroPage = () => {
                                   {useTerritory ? (
                                     inZone
                                       ? <span className="text-[9px] font-medium shrink-0 text-green-400">✓ En zona</span>
-                                      : <span className="text-[9px] font-medium shrink-0 text-red-400">⚠ Fuera → Enviar a MJA</span>
+                                      // 'Fuera' is enough — the user already knows
+                                      // out-of-zone implies the 'Enviar a MJA'
+                                      // outbox action (which is the next button
+                                      // they'll click anyway). Dropping the arrow
+                                      // text gives the column back ~70px on every
+                                      // out-of-zone row.
+                                      : <span className="text-[9px] font-medium shrink-0 text-red-400" title="Fuera de tu zona — usá 'Enviar a MJA' para despachar">⚠ Fuera</span>
                                   ) : (
-                                    <>
-                                      {sugZona && <span className={`text-[9px] truncate ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>}
-                                      {dist != null && <span className={`text-[9px] font-medium shrink-0 ${textColor}`}>{dist.toFixed(1)}km</span>}
-                                    </>
+                                    // Fallback shown when the user's cuerda has no
+                                    // territory polygon drawn — we can't compute
+                                    // in/out of zone polygonally. Dan asked to drop
+                                    // the kilometre distance (noisy + ambiguous when
+                                    // a contact has no proper zona assigned, names
+                                    // like the barrio bleed through). Just the zone
+                                    // name is enough signal.
+                                    sugZona && <span className={`text-[9px] truncate ${textColor}`}>{sugZona.nombre}{isExternal ? ' ↗' : ''}</span>
                                   )}
                                 </div>
                               );
