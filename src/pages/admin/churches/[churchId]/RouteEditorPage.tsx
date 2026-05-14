@@ -387,14 +387,23 @@ const RouteEditorPage = () => {
     );
   };
 
-  // Auto-calc on mount when project hydration brought selected + start
+  // Auto-calc on mount when project hydration brought selected + start.
+  //
+  // We deliberately do NOT bail on an existing `routeData` here — only on
+  // `calculating`. The dialog-close handler below resets autoCalcedRef to
+  // false specifically so an in-place address edit triggers a recalc, and
+  // at that point `routeData` from the previous calc is still set. If we
+  // skipped on truthy routeData the recalc would never fire and the user
+  // would have to refresh to pick up the new address (Dan reported this
+  // exact symptom — kept reproducing after the original fix because the
+  // routeData guard was still in place).
   useEffect(() => {
     if (autoCalcedRef.current) return;
     if (!projectHydratedRef.current) return;
     if (!contacts || contacts.length === 0) return;
     if (selectedIds.size === 0) return;
     if (!startLat || !startLng) return;
-    if (routeData || calculating) return;
+    if (calculating) return;
     autoCalcedRef.current = true;
     calculateRoute();
     // eslint-disable-next-line react-hooks/exhaustive-deps
