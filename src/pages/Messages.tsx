@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { showSuccess, showError } from '@/utils/toast';
-import { Send, Mail, MailOpen, Search, Archive, ArchiveRestore } from 'lucide-react';
+import { Send, Mail, MailOpen, Search, Archive, ArchiveRestore, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { usePermissions } from '@/lib/permissions';
@@ -165,7 +165,26 @@ const Messages = () => {
   return (
     <div className="p-6 space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Mensajes</h1>
+        <div className="flex items-center gap-2">
+          {/* Back button — Mensajes lives outside the church-scoped layout
+              so it doesn't get the breadcrumb-style nav the admin pages
+              have. Without this the only way out was the hamburger menu;
+              Dan reported it as a friction point. history.back() falls
+              back to the home page if there's no history (e.g. user
+              landed here from a direct link or fresh tab). */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 -ml-2"
+            onClick={() => {
+              if (window.history.length > 1) window.history.back();
+              else window.location.assign('/');
+            }}
+          >
+            <ChevronLeft className="h-4 w-4" /> Atrás
+          </Button>
+          <h1 className="text-2xl font-bold">Mensajes</h1>
+        </div>
         {canSendMessages() && (
           <Button size="sm" className="gap-1.5" onClick={() => setComposeOpen(true)}>
             <Send className="h-4 w-4" /> Nuevo mensaje

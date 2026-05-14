@@ -189,10 +189,14 @@ const TabButton = ({ isActive, onClick, label, onEdit, onDelete, badge }: {
   badge?: number;
 }) => {
   return (
-    <div className={`group flex items-center rounded-t-md whitespace-nowrap ${isActive ? 'bg-card border-x border-t border-border -mb-px' : 'hover:bg-muted/30'}`}>
+    // Active state used to be a near-invisible bg-card swap on top of a
+    // dark theme — Dan called it out: "no podés ni darte cuenta cuál
+    // está seleccionada". Now the active tab gets a gold underline +
+    // gold text so it pops against the dark background.
+    <div className={`group flex items-center whitespace-nowrap ${isActive ? 'border-b-2 border-primary -mb-px' : 'border-b-2 border-transparent hover:bg-muted/30'}`}>
       <button
         onClick={onClick}
-        className={`px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+        className={`px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
       >
         {label}
         {badge !== undefined && badge > 0 && (
