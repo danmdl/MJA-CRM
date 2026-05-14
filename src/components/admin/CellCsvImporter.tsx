@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, X, MapPin, Loader2 } from 'lucide-react';
-// Papa + XLSX lazy-loaded inside handleFile; see CsvImporter.tsx
+// Papa + the xlsx adapter lazy-loaded inside handleFile; see CsvImporter.tsx
 // for the same pattern + audit rationale (bundle whale).
-type XLSXModule = typeof import('xlsx');
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -103,36 +102,37 @@ const CellCsvImporter = ({ open, onOpenChange, churchId, cuerdas, leaders, onSuc
     };
 
     if (isXlsx) {
-      const XLSX = (await import('xlsx')) as XLSXModule;
+      const { readXlsx } = await import('@/lib/xlsx-adapter');
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: 'array' });
-          const json = XLSX.utils.sheet_to_json<Record<string, any>>(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-          if (!json.length) { showError('El archivo está vacío.'); return; }
-          const headers = Object.keys(json[0]).filter(h => h && h.trim() !== '');
-          const strData = json.map(row => { const o: Record<string, string> = {}; headers.forEach(h => { o[h] = row[h] != null ? String(row[h]) : ''; }); return o; });
+          const strData = await readXlsx(e.target?.result as ArrayBuffer);
+          if (!strData.length) { showError('El archivo está vacío.'); return; }
+          const headers = Object.keys(strData[0]).filter(h => h && h.trim() !== '');
           processData(headers, strData);
         } catch { showError('Error al leer el archivo Excel.'); }
       };
       reader.readAsArrayBuffer(f);
     } else {
+      // Stream-parse — see CsvImporter.tsx for the rationale.
       const Papa = await import('papaparse');
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        let text = e.target?.result as string;
-        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-        Papa.parse(text, {
-          header: true, skipEmptyLines: 'greedy',
-          complete: (results) => {
-            const headers = (results.meta.fields || []).filter(h => h && h.trim() !== '');
-            processData(headers, results.data as Record<string, string>[]);
-          },
-          error: () => showError('Error al leer el archivo.'),
-        });
-      };
-      reader.readAsText(f, 'UTF-8');
+      const accumulated: Record<string, string>[] = [];
+      let captured: string[] | null = null;
+      Papa.parse<Record<string, string>>(f, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        worker: false,
+        chunk: (results) => {
+          if (!captured && results.meta.fields) {
+            captured = results.meta.fields.filter(h => h && h.trim() !== '');
+          }
+          for (const row of results.data) accumulated.push(row);
+        },
+        complete: () => {
+          processData(captured || [], accumulated);
+        },
+        error: () => showError('Error al leer el archivo.'),
+      });
     }
   };
 

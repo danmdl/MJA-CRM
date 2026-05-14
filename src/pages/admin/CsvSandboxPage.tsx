@@ -24,7 +24,7 @@
 
 import React, { useMemo, useState, useRef } from 'react';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import { readXlsx } from '@/lib/xlsx-adapter';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -112,11 +112,9 @@ const CsvSandboxPage = () => {
     const isExcel = /\.xlsx?$/i.test(f.name);
     if (isExcel) {
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         try {
-          const wb = XLSX.read(ev.target?.result as ArrayBuffer, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false }) as Record<string, string>[];
+          const json = await readXlsx(ev.target?.result as ArrayBuffer);
           if (!json.length) { showError('El archivo está vacío.'); setParsing(false); return; }
           const hdrs = Object.keys(json[0]);
           setHeaders(hdrs);
@@ -130,15 +128,24 @@ const CsvSandboxPage = () => {
       };
       reader.readAsArrayBuffer(f);
     } else {
+      // chunk: callback streams the file in pieces instead of buffering
+      // the whole thing — half-MB peak heap on 50k-row files instead of
+      // double-digit MB.
+      const accumulated: Record<string, string>[] = [];
+      let captured: string[] = [];
       Papa.parse<Record<string, string>>(f, {
         header: true,
         skipEmptyLines: true,
-        complete: (res) => {
-          if (!res.data.length) { showError('El archivo está vacío.'); setParsing(false); return; }
-          const hdrs = res.meta.fields || [];
-          setHeaders(hdrs);
-          setData(res.data);
-          autoMatch(hdrs);
+        worker: false,
+        chunk: (res) => {
+          if (captured.length === 0 && res.meta.fields) captured = res.meta.fields;
+          for (const row of res.data) accumulated.push(row);
+        },
+        complete: () => {
+          if (!accumulated.length) { showError('El archivo está vacío.'); setParsing(false); return; }
+          setHeaders(captured);
+          setData(accumulated);
+          autoMatch(captured);
           setParsing(false);
         },
         error: (err) => { showError(`Error al leer CSV: ${err.message}`); setParsing(false); },

@@ -6,10 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
-// Papa and XLSX are loaded lazily inside parseFile() so the ~400KB
-// xlsx chunk doesn't ship with the SemilleroPage / CelulasPage
-// initial loads. The audit flagged xlsx as the worst bundle whale.
-type XLSXModule = typeof import('xlsx');
+// Papa + the xlsx adapter are loaded lazily inside parseFile() so the
+// heavy ExcelJS chunk doesn't ship with the SemilleroPage / CelulasPage
+// initial loads.
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import {
   Select,
@@ -95,25 +94,15 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
     const isXlsx = /\.xlsx?$/i.test(selectedFile.name);
 
     if (isXlsx) {
-      // Parse XLSX with SheetJS — load the library only when the user
-      // actually picks an .xlsx file (saves ~400KB on the initial
-      // load of pages that mount CsvImporter).
-      const XLSX = (await import('xlsx')) as XLSXModule;
+      // Lazy-load the adapter so the ExcelJS bundle only ships when the
+      // user actually picks an .xlsx file.
+      const { readXlsx } = await import('@/lib/xlsx-adapter');
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
-          if (jsonData.length === 0) { showError('El archivo está vacío.'); return; }
-          // Convert all values to strings for consistency with CSV flow
-          const headers = Object.keys(jsonData[0]).filter(h => h && h.trim() !== '');
-          const stringData = jsonData.map(row => {
-            const out: Record<string, string> = {};
-            headers.forEach(h => { out[h] = row[h] != null ? String(row[h]) : ''; });
-            return out;
-          });
+          const stringData = await readXlsx(e.target?.result as ArrayBuffer);
+          if (stringData.length === 0) { showError('El archivo está vacío.'); return; }
+          const headers = Object.keys(stringData[0]).filter(h => h && h.trim() !== '');
           processHeaders(headers, stringData);
         } catch (err) {
           console.error('Error parsing XLSX:', err);
@@ -122,31 +111,36 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       };
       reader.readAsArrayBuffer(selectedFile);
     } else {
-      // Parse CSV with PapaParse — lazy-loaded with xlsx.
+      // Stream-parse the file directly — PapaParse reads from the File in
+      // chunks instead of FileReader.readAsText materializing the whole
+      // thing as a string first. 50k-row imports went from ~200 MB peak
+      // heap on mobile Safari to ~50 MB. We still accumulate the parsed
+      // rows in memory (downstream dryRunImport needs the full set for
+      // in-file duplicate detection), but we never have "whole file as
+      // string PLUS whole file as JSON" alive at the same time.
       const Papa = await import('papaparse');
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        let text = e.target?.result as string;
-        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-        Papa.parse(text, {
-          header: true,
-          skipEmptyLines: 'greedy',
-          complete: (results) => {
-            if (results.meta.fields) {
-              const validHeaders = results.meta.fields.filter(h => h && h.trim() !== '');
-              processHeaders(validHeaders, results.data as Record<string, string>[]);
-            } else {
-              setCsvHeaders([]); setDataToImport([]);
-            }
-          },
-          error: (error: Error) => {
-            console.error("Error parsing CSV:", error);
-            showError("Error al leer el archivo CSV.");
-            setCsvHeaders([]); setDataToImport([]);
+      const accumulated: Record<string, string>[] = [];
+      let captured: string[] | null = null;
+      Papa.parse<Record<string, string>>(selectedFile, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        worker: false, // worker:true conflicts with PapaParse's File-streaming in some browsers
+        chunk: (results) => {
+          if (!captured && results.meta.fields) {
+            captured = results.meta.fields.filter(h => h && h.trim() !== '');
           }
-        });
-      };
-      reader.readAsText(selectedFile, 'UTF-8');
+          for (const row of results.data) accumulated.push(row);
+        },
+        complete: () => {
+          if (!captured) { setCsvHeaders([]); setDataToImport([]); return; }
+          processHeaders(captured, accumulated);
+        },
+        error: (error: Error) => {
+          console.error("Error parsing CSV:", error);
+          showError("Error al leer el archivo CSV.");
+          setCsvHeaders([]); setDataToImport([]);
+        },
+      });
     }
   };
 

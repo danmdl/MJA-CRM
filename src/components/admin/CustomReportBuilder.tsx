@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Download, FileSpreadsheet } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { writeXlsxFromAOA } from '@/lib/xlsx-adapter';
 
 interface ReportField {
   key: string;
@@ -96,12 +96,12 @@ const CustomReportBuilder = ({ churchId, churchName, inline }: Props) => {
         })
       );
 
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-      ws['!cols'] = headers.map((h, i) => ({ wch: Math.min(Math.max(h.length, ...rows.map(r => (r[i] || '').length)) + 2, 40) }));
-      const wb = XLSX.utils.book_new();
       const sheetName = !allCuerdas && selectedCuerdas.size === 1 ? `Cuerda ${Array.from(selectedCuerdas)[0]}` : 'Contactos';
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      XLSX.writeFile(wb, `Reporte_${churchName.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await writeXlsxFromAOA(
+        [headers, ...rows],
+        `Reporte_${churchName.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        sheetName,
+      );
       showSuccess(`${data.length} contactos exportados.`);
     } catch { showError('Error inesperado.'); } finally { setGenerating(false); }
   };
