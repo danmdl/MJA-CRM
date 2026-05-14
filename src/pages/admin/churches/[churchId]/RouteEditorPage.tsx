@@ -6,13 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/use-session';
 import { useChurchUuid } from '@/hooks/use-church-uuid';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import AddressAutocomplete from '@/components/admin/AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { geoJsonToGooglePaths } from '@/lib/territory-utils';
 import { todayInART, formatDuration, filterRouteContacts } from './route-editor/helpers';
+import { RouteEditDialog } from './route-editor/RouteEditDialog';
 import { loadGoogleMaps } from '@/lib/google-maps';
 import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
 import {
@@ -22,7 +19,7 @@ import {
   markerScaleFor,
   markerFontSizeFor,
 } from '@/lib/route-stops';
-import { MapPin, Navigation, X, Search, Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, ChevronDown, MessageCircle, Plus, RefreshCw, Map as MapIcon } from 'lucide-react';
+import { Route as RouteIcon, ExternalLink, Share2, Copy, Pencil, ChevronLeft, ChevronDown, MessageCircle, Plus, Map as MapIcon } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 // Lazy: profile dialog chunk only loads when a contact card is clicked.
 const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
@@ -969,182 +966,46 @@ const RouteEditorPage = () => {
         </div>
       )}
 
-      {/* Edit dialog: pick start point + select contacts */}
-      <Dialog open={editDialogOpen} onOpenChange={(o) => { if (!o) cancelEdit(); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-3 border-b">
-            <DialogTitle>Editar contactos de la ruta</DialogTitle>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            {/* Starting point */}
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                <MapPin className="h-3 w-3 text-primary" /> Punto de partida
-                {startLat && startLng && <span className="text-[10px] text-green-500 font-medium normal-case">✓ Listo</span>}
-              </label>
-              <AddressAutocomplete
-                value={startAddress}
-                onChange={(addr, lat, lng) => {
-                  setStartAddress(addr);
-                  if (lat && lng) { setStartLat(lat); setStartLng(lng); }
-                }}
-                placeholder="Escribí la dirección de partida..."
-                biasLat={churchCoords?.lat ?? null}
-                biasLng={churchCoords?.lng ?? null}
-              />
-              <div className="flex flex-wrap gap-2 mt-2">
-                <Button type="button" size="sm" variant="outline" onClick={useGeolocation} className="text-xs h-8">
-                  <Navigation className="h-3 w-3 mr-1" /> Mi ubicación
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={useChurchAddress} className="text-xs h-8" disabled={!church?.address}>
-                  <MapPin className="h-3 w-3 mr-1" /> Iglesia
-                </Button>
-              </div>
-            </div>
-
-            {/* Contact filters */}
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                Contactos ({selectedIds.size} seleccionados)
-              </label>
-              <div className="relative mb-2">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Buscar por nombre o dirección..."
-                  className="pl-9 h-9"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-                <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background">
-                  <option value="">Todos los responsables</option>
-                  <option value="__none__">Sin responsable</option>
-                  {(() => {
-                    // Visibility rule (mirrors the Semillero responsable
-                    // dropdown): privileged roles (admin/general/pastor/
-                    // supervisor) see EVERY teammate in the iglesia.
-                    // Everyone else sees only themselves — the contacts
-                    // they can act on belong to them, so listing other
-                    // people in their cuerda just adds noise (and
-                    // conectores aren't responsables at all).
-                    // Per Dan: 'logueado con un referente, igualmente
-                    // veo referentes de otras cuerdas. La idea sería
-                    // que solamente uno vea responsables que vayan de
-                    // acuerdo al número de cuerda al cual pertenezco.'
-                    const isPrivileged = profile?.role && ['admin', 'general', 'pastor', 'supervisor'].includes(profile.role);
-                    let list = teamMembers;
-                    if (!isPrivileged) {
-                      // Filter to JUST the current user. Same scope the
-                      // backend uses on the contacts query (line 99:
-                      // q = q.eq('responsable_id', profile.id)) — we'd
-                      // never see anyone else's contacts here anyway,
-                      // so picking another responsable always returns
-                      // empty. Limiting the dropdown matches reality.
-                      list = teamMembers.filter(m => m.id === profile?.id);
-                    }
-                    return list
-                      .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
-                      .map(m => (
-                        <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                      ));
-                  })()}
-                </select>
-                <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
-                <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />
-              </div>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground mb-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={onlyWithNumber}
-                  onChange={(e) => setOnlyWithNumber(e.target.checked)}
-                  className="rounded border-input"
-                />
-                Solo direcciones con número (recomendado para rutas precisas)
-              </label>
-              <label
-                className={`flex items-center gap-2 text-xs mb-3 cursor-pointer select-none ${activeTerritoryPaths ? 'text-muted-foreground' : 'text-muted-foreground/40 cursor-not-allowed'}`}
-                title={activeTerritoryPaths ? 'Mostrar solo los contactos dentro de la zona dibujada para tu cuerda' : 'Tu cuerda no tiene un territorio dibujado'}
-              >
-                <input
-                  type="checkbox"
-                  checked={onlyInZone}
-                  disabled={!activeTerritoryPaths}
-                  onChange={(e) => setOnlyInZone(e.target.checked)}
-                  className="rounded border-input"
-                />
-                Solo en zona (dentro del territorio dibujado para mi cuerda)
-              </label>
-
-              <div className="max-h-[320px] overflow-y-auto border rounded">
-                {contactsLoading ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">Cargando...</div>
-                ) : filtered.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">
-                    {search ? 'Sin resultados' : 'No hay contactos georreferenciados.'}
-                  </div>
-                ) : (
-                  filtered.map(c => {
-                    const isSelected = selectedIds.has(c.id);
-                    return (
-                      <div key={c.id} className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-muted/30 ${isSelected ? 'bg-primary/5' : ''}`}>
-                        <Checkbox checked={isSelected} onCheckedChange={() => toggleContact(c.id)} className="mt-0.5 cursor-pointer" />
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleContact(c.id)}>
-                          <div className="text-sm font-medium truncate">
-                            {c.first_name} {c.last_name || ''}
-                            {c.numero_cuerda && (
-                              <span className="ml-2 text-xs text-muted-foreground">· Cuerda {c.numero_cuerda}</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">{c.address || 'Sin dirección'}</div>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingContactId(c.id); }}
-                          className="text-muted-foreground hover:text-foreground p-1"
-                          title="Editar contacto"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {selectedContacts.length > 0 && (
-                <div className="mt-3 p-3 bg-primary/5 rounded border">
-                  <div className="text-xs font-semibold mb-2 text-muted-foreground">
-                    Seleccionados ({selectedContacts.length}):
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedContacts.map(c => (
-                      <div key={c.id} className="flex items-center gap-1 bg-card border rounded-full pl-3 pr-1 py-0.5 text-xs">
-                        <span>{c.first_name} {c.last_name || ''}</span>
-                        <button
-                          onClick={() => toggleContact(c.id)}
-                          className="ml-1 w-4 h-4 rounded-full bg-muted hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center"
-                          title="Quitar"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter className="px-6 py-4 border-t">
-            <Button variant="outline" onClick={cancelEdit}>Cancelar</Button>
-            <Button onClick={applyEditAndCalculate} disabled={selectedIds.size === 0 || !startLat} className="gap-1.5">
-              <RefreshCw className="h-3.5 w-3.5" />
-              {hasRoute ? 'Recalcular ruta' : 'Calcular ruta'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Edit dialog: pick start point + select contacts.
+          Display + interaction live in RouteEditDialog; state stays
+          here so cancelEdit can restore the snapshot. */}
+      <RouteEditDialog
+        open={editDialogOpen}
+        onCancel={cancelEdit}
+        onApply={applyEditAndCalculate}
+        hasRoute={hasRoute}
+        startAddress={startAddress}
+        setStartAddress={setStartAddress}
+        startLat={startLat}
+        setStartLat={setStartLat}
+        startLng={startLng}
+        setStartLng={setStartLng}
+        churchCoords={churchCoords}
+        church={church ?? null}
+        onUseGeolocation={useGeolocation}
+        onUseChurchAddress={useChurchAddress}
+        search={search}
+        setSearch={setSearch}
+        filterResponsableId={filterResponsableId}
+        setFilterResponsableId={setFilterResponsableId}
+        filterDateFrom={filterDateFrom}
+        setFilterDateFrom={setFilterDateFrom}
+        filterDateTo={filterDateTo}
+        setFilterDateTo={setFilterDateTo}
+        onlyWithNumber={onlyWithNumber}
+        setOnlyWithNumber={setOnlyWithNumber}
+        onlyInZone={onlyInZone}
+        setOnlyInZone={setOnlyInZone}
+        activeTerritoryPaths={activeTerritoryPaths}
+        teamMembers={teamMembers}
+        profile={profile}
+        contactsLoading={contactsLoading}
+        filtered={filtered}
+        selectedIds={selectedIds}
+        selectedContacts={selectedContacts}
+        toggleContact={toggleContact}
+        setEditingContactId={setEditingContactId}
+      />
 
       {/* Edit contact dialog */}
       {editingContactId && churchId && (
