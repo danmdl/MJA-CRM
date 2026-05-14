@@ -39,3 +39,4 @@ dist/bundle-stats.html
 # Misc
 .cache
 *.tmp
+coverage/

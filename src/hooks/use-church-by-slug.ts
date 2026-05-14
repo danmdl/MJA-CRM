@@ -15,7 +15,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { isUuid } from '@/lib/church-slug';
+import { isUuid, computeSlugRedirect } from '@/lib/church-slug';
 
 export interface ResolvedChurch {
   id: string;
@@ -70,7 +70,7 @@ export const useChurchBySlugOrId = (slugOrId: string | undefined): ChurchResolut
   // If they landed on the UUID URL, suggest the slug URL.
   let redirectTo: string | null = null;
   if (lookingForUuid && data.slug) {
-    redirectTo = location.pathname.replace(slugOrId, data.slug) + location.search + location.hash;
+    redirectTo = computeSlugRedirect(location.pathname, location.search, location.hash, slugOrId, data.slug);
   }
 
   return { church: data, redirectTo, isLoading: false, notFound: false };
