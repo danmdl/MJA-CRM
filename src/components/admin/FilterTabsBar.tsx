@@ -29,6 +29,8 @@ export interface FilterTabFilters {
   hasAddress?: 'yes' | 'no' | '';
   hasCoords?: 'yes' | 'no' | '';
   zonaStatus?: 'in' | 'out' | '';
+  /** Whether the contact appears in a non-expired shared route. */
+  routeStatus?: 'in' | 'out' | '';
   // Only contacts the trigger flagged as "received from an MJA-side
   // cuerda" (is_church_cuerda=true). Driven by the locked
   // MJA_RECEIVED_TAB_ID tab, not exposed in the save-tab dialog.
@@ -480,6 +482,22 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
               >
                 <option value="">Cualquiera</option>
                 <option value="yes">Solo recibidos de MJA</option>
+              </select>
+            </div>
+            {/* En ruta — same predicate as the Ruta column filter in
+                the Semillero header. Saves the "qué falta visitar"
+                workflow as a reusable solapa (e.g. "Mujeres cuerda
+                202 que faltan visitar"). */}
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">En ruta</Label>
+              <select
+                value={filters.routeStatus || ''}
+                onChange={e => setF('routeStatus', e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Cualquiera</option>
+                <option value="in">✓ En ruta</option>
+                <option value="out">○ Sin ruta</option>
               </select>
             </div>
           </div>
