@@ -25,6 +25,10 @@ export interface PermissionData {
   can_restore_deleted: boolean;
   can_import_csv: boolean;
   can_assign_contacts: boolean;
+  /** Enviar contactos a MJA Central (church-cuerda hand-off). Separate
+   *  from can_assign_contacts on purpose — a líder de célula can hand
+   *  off without being able to assign to specific cells. */
+  can_send_to_mja: boolean;
   can_see_cuerdas: boolean;
   can_edit_cuerdas: boolean;
   can_send_whatsapp: boolean;
@@ -134,6 +138,7 @@ export const usePermissions = () => {
   const canRestoreDeleted = () => hasPermission('can_restore_deleted');
   const canImportCsv = () => hasPermission('can_import_csv');
   const canAssignContacts = () => hasPermission('can_assign_contacts');
+  const canSendToMja = () => hasPermission('can_send_to_mja');
   const canSeeCuerdas = () => hasPermission('can_see_cuerdas');
   const canEditCuerdas = () => hasPermission('can_edit_cuerdas');
   const canSendWhatsapp = () => hasPermission('can_send_whatsapp');
@@ -185,6 +190,7 @@ export const usePermissions = () => {
     canRestoreDeleted,
     canImportCsv,
     canAssignContacts,
+    canSendToMja,
     canSeeCuerdas,
     canEditCuerdas,
     canSendWhatsapp,
