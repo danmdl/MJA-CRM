@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Columns3, Download, Upload } from 'lucide-react';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { showSuccess, showError } from '@/utils/toast';
 import {
   Select,
@@ -47,19 +47,38 @@ const parseCsv = (file: File): Promise<{ headers: string[]; rows: Row[] }> =>
 
 const parseXlsx = async (file: File): Promise<{ headers: string[]; rows: Row[] }> => {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) return { headers: [], rows: [] };
-  const sheet = workbook.Sheets[firstSheetName];
-  // defval: '' so missing cells become empty strings; raw: false so dates/numbers
-  // come out as the displayed string (matches what the user sees in Excel).
-  const json = XLSX.utils.sheet_to_json<Row>(sheet, { defval: '', raw: false });
-  if (json.length === 0) return { headers: [], rows: [] };
-  // Preserve column order from the sheet header row, not from the first data row's keys.
-  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false });
-  const headerRow = (aoa[0] as unknown[] | undefined) || [];
-  const headers = headerRow.map((h) => String(h ?? '')).filter(Boolean);
-  return { headers, rows: json };
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const sheet = wb.worksheets[0];
+  if (!sheet) return { headers: [], rows: [] };
+
+  // Read the header row in its original column order so the merged
+  // output keeps the user's column layout.
+  const headerVals = sheet.getRow(1).values as (string | undefined)[];
+  const headers: string[] = [];
+  for (let i = 1; i < headerVals.length; i++) {
+    const v = headerVals[i];
+    if (v != null && String(v).trim() !== '') headers.push(String(v));
+  }
+
+  const rows: Row[] = [];
+  sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const values = row.values as unknown[];
+    const out: Row = {};
+    headers.forEach((h, idx) => {
+      const raw = values[idx + 1];
+      if (raw == null) { out[h] = ''; return; }
+      if (typeof raw === 'object' && raw !== null) {
+        const o = raw as { text?: string; result?: unknown };
+        out[h] = o.text ?? (o.result != null ? String(o.result) : '');
+      } else {
+        out[h] = String(raw);
+      }
+    });
+    rows.push(out);
+  });
+  return { headers, rows };
 };
 
 const CsvColumnMergerPage = () => {
@@ -141,7 +160,7 @@ const CsvColumnMergerPage = () => {
     return allRows.slice(0, PREVIEW_ROWS).map((row) => mergeValues(row[colA], row[colB]));
   }, [colA, colB, allRows]);
 
-  const handleProcess = () => {
+  const handleProcess = async () => {
     if (!file) {
       showError('Por favor, seleccioná un archivo.');
       return;
@@ -177,10 +196,13 @@ const CsvColumnMergerPage = () => {
         // Build worksheet with explicit header order so the new column lands
         // at the end and original columns keep their original order.
         const finalHeaders = [...headers, finalColName];
-        const sheet = XLSX.utils.json_to_sheet(merged, { header: finalHeaders });
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1');
-        const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Sheet1');
+        ws.addRow(finalHeaders);
+        for (const row of merged) {
+          ws.addRow(finalHeaders.map(h => row[h] ?? ''));
+        }
+        const buffer = await wb.xlsx.writeBuffer();
         blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       }
 
