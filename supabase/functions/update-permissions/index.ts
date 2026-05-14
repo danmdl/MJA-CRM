@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { captureException } from "../_shared/sentry.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,7 +65,7 @@ serve(async (req) => {
       updated: data,
     });
   } catch (error: any) {
-    console.error('Unexpected error in update-permissions:', error);
+    captureException(error, { fn: 'update-permissions' });
     return json(500, { success: false, error: error?.message || 'Unknown error' });
   }
 });

@@ -27,6 +27,7 @@
 //   3. Point it at this function's URL.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { captureException } from '../_shared/sentry.ts';
 
 const RESEND_API_KEY    = Deno.env.get('RESEND_API_KEY')!;
 const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')!;
@@ -434,7 +435,7 @@ Deno.serve(async (req: Request) => {
     return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   } catch (err) {
-    console.error('[auth-send-email-v1] unhandled error:', err);
+    captureException(err, { fn: 'auth-send-email-v1' });
     return new Response(JSON.stringify({ error: 'internal error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

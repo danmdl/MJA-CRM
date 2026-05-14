@@ -5,6 +5,7 @@
 // This is a focused replacement for the resendInvite/generateInviteLink actions.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { captureException } from "../_shared/sentry.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -170,7 +171,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('[invite-user-v2] unexpected error', error);
+    captureException(error, { fn: 'invite-user-v2' });
     return new Response(JSON.stringify({ error: error.message || 'Unexpected error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
