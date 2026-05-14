@@ -44,3 +44,18 @@ export const churchPath = (slugOrId: string, subpath: string): string => {
   const clean = subpath.startsWith('/') ? subpath.slice(1) : subpath;
   return `/admin/churches/${slugOrId}/${clean}`;
 };
+
+/**
+ * Build the slug-canonical URL for a page the user landed on with a
+ * UUID. Replaces the first UUID occurrence in the pathname and
+ * preserves the query string + hash. Extracted from
+ * useChurchBySlugOrId so the redirect math is testable without a
+ * router / DOM.
+ */
+export const computeSlugRedirect = (
+  pathname: string,
+  search: string,
+  hash: string,
+  uuid: string,
+  slug: string,
+): string => pathname.replace(uuid, slug) + (search || '') + (hash || '');
