@@ -16,12 +16,12 @@ describe('buildGoogleMapsChunks', () => {
     expect(wpCount).toBe(8);
   });
 
-  it('uses the address text when stops carry one (fixes iOS Marcador labels)', () => {
+  it('uses addresses when preferAddress is on (iOS path — fixes Marcador labels)', () => {
     const stops = [
       { lat: -34.6, lng: -58.4, address: 'Av. Rivadavia 1234, Buenos Aires' },
       { lat: -34.61, lng: -58.41, address: 'Calle 90 587, San Andrés' },
     ];
-    const urls = buildGoogleMapsChunks(stops);
+    const urls = buildGoogleMapsChunks(stops, { preferAddress: true });
     expect(urls).toHaveLength(1);
     const origin = decodeURIComponent(urls[0].match(/origin=([^&]+)/)![1]);
     const dest = decodeURIComponent(urls[0].match(/destination=([^&]+)/)![1]);
@@ -29,23 +29,33 @@ describe('buildGoogleMapsChunks', () => {
     expect(dest).toBe('Calle 90 587, San Andrés');
   });
 
-  it('falls back to lat,lng when a stop has no address', () => {
+  it('keeps lat,lng when preferAddress is off (Android path — addresses break route)', () => {
     const stops = [
-      { lat: -34.6, lng: -58.4 }, // starting point — no address
+      { lat: -34.6, lng: -58.4, address: 'Av. Rivadavia 1234' },
       { lat: -34.61, lng: -58.41, address: 'Calle 90 587, San Andrés' },
     ];
-    const urls = buildGoogleMapsChunks(stops);
+    const urls = buildGoogleMapsChunks(stops, { preferAddress: false });
     const origin = decodeURIComponent(urls[0].match(/origin=([^&]+)/)![1]);
     expect(origin).toBe('-34.6,-58.4');
   });
 
-  it('mixes addresses and lat,lng across waypoints', () => {
+  it('falls back to lat,lng when a stop has no address (iOS path)', () => {
+    const stops = [
+      { lat: -34.6, lng: -58.4 }, // starting point — no address
+      { lat: -34.61, lng: -58.41, address: 'Calle 90 587, San Andrés' },
+    ];
+    const urls = buildGoogleMapsChunks(stops, { preferAddress: true });
+    const origin = decodeURIComponent(urls[0].match(/origin=([^&]+)/)![1]);
+    expect(origin).toBe('-34.6,-58.4');
+  });
+
+  it('mixes addresses and lat,lng across waypoints (iOS path)', () => {
     const stops = [
       { lat: -34.6, lng: -58.4, address: 'A' },
       { lat: -34.61, lng: -58.41 }, // no address
       { lat: -34.62, lng: -58.42, address: 'C' },
     ];
-    const urls = buildGoogleMapsChunks(stops);
+    const urls = buildGoogleMapsChunks(stops, { preferAddress: true });
     const waypoints = decodeURIComponent(urls[0].match(/waypoints=([^&]+)/)![1]);
     expect(waypoints).toBe('-34.61,-58.41');
   });
