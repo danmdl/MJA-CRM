@@ -622,9 +622,12 @@ const RouteEditorPage = () => {
   // whole route without gaps.
   const gmapsUrls = useMemo(() => {
     if (!routeData || !startLat || !startLng) return [];
+    // Pass the address per stop so iOS Google Maps shows the address
+    // in each input box instead of 'Marcador'. See google-maps-urls.ts
+    // for the rationale.
     const allStops = [
-      { lat: startLat, lng: startLng },
-      ...routeData.orderedContacts.map((c: Contact) => ({ lat: c.lat!, lng: c.lng! })),
+      { lat: startLat, lng: startLng, address: startAddress || null },
+      ...routeData.orderedContacts.map((c: Contact) => ({ lat: c.lat!, lng: c.lng!, address: c.address })),
     ];
     return buildGoogleMapsChunks(allStops);
   }, [routeData, startLat, startLng]);
