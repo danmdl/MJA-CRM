@@ -84,6 +84,8 @@ const SemilleroPage = () => {
   const [filterDuplicates, setFilterDuplicates] = useState<boolean>(false);
   const [filterOnlyWithCoords, setFilterOnlyWithCoords] = useState<boolean>(false);
   const [filterZonaStatus, setFilterZonaStatus] = useState<'' | 'in' | 'out'>('');
+  // 'En ruta' / 'Sin ruta' filter — pairs with the new Ruta column.
+  const [filterRoute, setFilterRoute] = useState<'' | 'in' | 'out'>('');
   // Pagination — pages of 200 contacts. The table is non-virtualized, so
   // dropping a thousand+ <tr>s into the DOM at once added noticeable click
   // and scroll lag. Pagination keeps the rendered set small while still
@@ -130,7 +132,7 @@ const SemilleroPage = () => {
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    check: 34, cuerda: 60, nombre: 130, dup: 44, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 145, conector: 110,
+    check: 34, cuerda: 60, nombre: 130, dup: 44, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 110, conector: 110, ruta: 56,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -159,9 +161,19 @@ const SemilleroPage = () => {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem('semillero.showDupCol') === '1';
   });
+  // 'En ruta' column: a small badge per contact when they're a stop in
+  // any non-expired shared_route. Lets the referente filter for "qué
+  // contactos ya planeé visitar". Defaults to ON because once you adopt
+  // the routes flow it becomes the answer to "who's already planned".
+  const [showRutaCol, setShowRutaCol] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const v = window.localStorage.getItem('semillero.showRutaCol');
+    return v === null ? true : v === '1';
+  });
   useEffect(() => { try { window.localStorage.setItem('semillero.showConectorCol', showConectorCol ? '1' : '0'); } catch {} }, [showConectorCol]);
   useEffect(() => { try { window.localStorage.setItem('semillero.showCuerdaCol', showCuerdaCol ? '1' : '0'); } catch {} }, [showCuerdaCol]);
   useEffect(() => { try { window.localStorage.setItem('semillero.showDupCol', showDupCol ? '1' : '0'); } catch {} }, [showDupCol]);
+  useEffect(() => { try { window.localStorage.setItem('semillero.showRutaCol', showRutaCol ? '1' : '0'); } catch {} }, [showRutaCol]);
 
   // Assignment permission comes from canAssignContacts() via usePermissions
   const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
@@ -313,6 +325,30 @@ const SemilleroPage = () => {
     },
     enabled: !!churchId,
     staleTime: 5 * 60_000,
+  });
+
+  // Set of contact ids that appear in at least one non-expired shared
+  // route. Powers the 'En ruta' badge column + filter — referente can
+  // see at a glance which contacts are already planned for a visit and
+  // which still need one. Refresh interval matches the Rutas grid (20s)
+  // so toggling a stop in the route editor reflects in the Semillero
+  // without a manual refresh.
+  const { data: routeContactIds } = useQuery<Set<string>>({
+    queryKey: ['route-contact-ids', churchId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('shared_routes')
+        .select('ordered_contact_ids')
+        .eq('church_id', churchId!)
+        .gt('expires_at', new Date().toISOString());
+      const set = new Set<string>();
+      (data || []).forEach((row: any) => {
+        ((row.ordered_contact_ids || []) as string[]).forEach(id => set.add(id));
+      });
+      return set;
+    },
+    enabled: !!churchId,
+    staleTime: 20_000,
   });
 
   // Server-paginated pool query (migration from the old "load everything
@@ -916,8 +952,11 @@ const SemilleroPage = () => {
     if (filterDuplicates) {
       filtered = filtered.filter(c => duplicateNameIds.has(c.id));
     }
+    if (filterRoute && routeContactIds) {
+      filtered = filtered.filter(c => filterRoute === 'in' ? routeContactIds.has(c.id) : !routeContactIds.has(c.id));
+    }
     return filtered;
-  }, [allContacts, activeTabId, activeTabFilters, filterZonaStatus, filterDuplicates, duplicateNameIds, cuerdas, cuerdaTerritoryMap]);
+  }, [allContacts, activeTabId, activeTabFilters, filterZonaStatus, filterDuplicates, duplicateNameIds, cuerdas, cuerdaTerritoryMap, filterRoute, routeContactIds]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -935,7 +974,7 @@ const SemilleroPage = () => {
   // page and force them to navigate back.
   useEffect(() => {
     setCurrentPage(0);
-  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, activePool, activeTabId]);
+  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, filterRoute, activePool, activeTabId]);
 
   // totalPages now comes from the server-reported totalFilteredCount,
   // not the in-memory filteredContacts length (which is just the current
@@ -1277,6 +1316,10 @@ const SemilleroPage = () => {
               <span className="w-4 inline-flex justify-center">{showDupCol ? '✓' : ''}</span>
               <span>Duplicados</span>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); setShowRutaCol(v => !v); }} className="gap-2">
+              <span className="w-4 inline-flex justify-center">{showRutaCol ? '✓' : ''}</span>
+              <span>En ruta</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <Button size="sm" variant="ghost" disabled={refreshing} onClick={async () => {
@@ -1567,6 +1610,23 @@ const SemilleroPage = () => {
                         </DropdownMenu>
                       </ResizableHeader>
                     )}
+                    {showRutaCol && (
+                      <ResizableHeader width={colWidths.ruta} onResize={resizeCol('ruta')}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Ruta</span>
+                              <Filter className={`h-3 w-3 ${filterRoute ? 'text-primary fill-primary/30' : 'opacity-60'}`} />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => setFilterRoute('')} className={filterRoute === '' ? 'bg-accent' : ''}>Todos</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilterRoute('in')} className={filterRoute === 'in' ? 'bg-accent' : ''}>✓ En ruta</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilterRoute('out')} className={filterRoute === 'out' ? 'bg-accent' : ''}>○ Sin ruta</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </ResizableHeader>
+                    )}
                     <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>
                       <button
@@ -1814,6 +1874,23 @@ const SemilleroPage = () => {
                           </td>
                         )}
 
+                        {/* En ruta — small badge if this contact is a stop in any
+                            non-expired shared route. Filterable via the column header
+                            (Todos / En ruta / Sin ruta). Toggleable via Columns3. */}
+                        {showRutaCol && (
+                          <td className="px-2 py-1.5 text-center" style={{ width: colWidths.ruta }}>
+                            {routeContactIds?.has(c.id) && (
+                              <span
+                                className="inline-flex items-center px-1.5 leading-none rounded text-[9px] font-semibold uppercase tracking-wider bg-blue-500/15 text-blue-300 border border-blue-500/30"
+                                style={{ height: 18 }}
+                                title="Este contacto está en al menos una ruta activa"
+                              >
+                                En ruta
+                              </span>
+                            )}
+                          </td>
+                        )}
+
                         {/* Dirección + Ver en mapa */}
                         <td className="px-2 py-1.5" style={{ width: colWidths.direccion }}>
                           {(c.address && /[\p{L}\p{N}]/u.test(c.address)) ? (() => {
@@ -2049,12 +2126,17 @@ const SemilleroPage = () => {
                               // (numero_cuerda → 'MJA Central', is_external=true)
                               // happens when they click 'Confirmar despacho'
                               // inside the outbox.
-                              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400" onClick={async () => {
-                                await supabase.from('contacts').update({ pending_external_send: true }).eq('id', c.id);
-                                showSuccess('Movido a tu outbox "Enviar a MJA". Confirmá el despacho cuando estés seguro.');
-                                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-                              }}>
-                                <ExternalLink className="h-3 w-3 mr-1" /> Enviar a MJA
+                              <Button
+                                variant="outline" size="sm"
+                                className="h-7 text-[11px] px-2 border-orange-500/50 text-orange-400 gap-1"
+                                title="Enviar a MJA — el contacto va a tu outbox 'Enviar a MJA' hasta que confirmes el despacho"
+                                onClick={async () => {
+                                  await supabase.from('contacts').update({ pending_external_send: true }).eq('id', c.id);
+                                  showSuccess('Movido a tu outbox "Enviar a MJA". Confirmá el despacho cuando estés seguro.');
+                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                }}
+                              >
+                                <ExternalLink className="h-3 w-3" /> MJA
                               </Button>
                             ) : (
                               // MJA member on a normal inbox row. Both
