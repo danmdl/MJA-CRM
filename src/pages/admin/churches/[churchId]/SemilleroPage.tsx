@@ -132,7 +132,13 @@ const SemilleroPage = () => {
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    check: 34, cuerda: 60, nombre: 130, dup: 44, responsable: 100, telefono: 110, direccion: 130, fechaContacto: 56, sugerencia: 150, asignar: 110, conector: 110, ruta: 56,
+    // Rebalanced after Dan's screenshot showed the table tight on the
+    // left with empty space on the right. With tableLayout:fixed +
+    // w-full, these widths act as proportions: Dirección bumped up
+    // (gets truncated otherwise), small fixed-content columns (check,
+    // dup, ruta, fecha) stay narrow on purpose so they don't waste
+    // horizontal room when the table scales to the container width.
+    check: 34, cuerda: 60, nombre: 160, dup: 44, responsable: 130, telefono: 120, direccion: 200, fechaContacto: 64, sugerencia: 150, asignar: 110, conector: 130, ruta: 56,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -176,7 +182,7 @@ const SemilleroPage = () => {
   useEffect(() => { try { window.localStorage.setItem('semillero.showRutaCol', showRutaCol ? '1' : '0'); } catch {} }, [showRutaCol]);
 
   // Assignment permission comes from canAssignContacts() via usePermissions
-  const { canAddContacts, canImportCsv, canAssignContacts, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
+  const { canAddContacts, canImportCsv, canAssignContacts, canSendToMja, canSendWhatsapp, canEditDeleteContacts, canAutoAssign, canFilterAllContacts } = usePermissions();
   const userCuerdaNumero = profile?.numero_cuerda || null;
   // CRITICAL: viewerId is the id of the user BEING VIEWED, not the auth
   // session user. When an admin is impersonating another user, session.user.id
@@ -1461,15 +1467,16 @@ const SemilleroPage = () => {
             <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : (
             <div className="overflow-x-auto">
-              {/* No w-full on the table: with tableLayout:fixed + w-full
-                  the column widths get scaled UP to fill the container,
-                  which Dan noticed as "dead space" between Responsable /
-                  Conector / Ruta on wide screens. Letting the table size
-                  to its explicit colWidths leaves the columns tight and
-                  empty room appears on the right of the table instead,
-                  which is the lesser visual evil. The outer
-                  overflow-x-auto still handles narrow screens. */}
-              <table className="border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
+              {/* w-full + tableLayout:fixed: the colWidths act as
+                  proportions, the table fills the container width, and
+                  the columns scale together. We tried not-w-full once
+                  (PR #66) to kill "dead space between columns"; that
+                  left the table tight on the left with empty space on
+                  the right (Dan reported this). The rebalanced widths
+                  above keep the wide columns (nombre, dirección,
+                  responsable) generous so they soak up the extra room
+                  instead of distributing it to the small ones. */}
+              <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
                 <thead>
                   <tr className="border-b h-[37px]">
                     <th className="px-2" style={{ width: colWidths.check }}>
@@ -1694,7 +1701,7 @@ const SemilleroPage = () => {
                         ) : 'Sugerencia'}
                       </ResizableHeader>
                     )}
-                    {isUnassignedView && (canAssignContacts() || !isMjaMember) && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
+                    {isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                   </tr>
                 </thead>
                 <tbody>
@@ -2063,7 +2070,7 @@ const SemilleroPage = () => {
                             Dan reported a líder de célula impersonation showed
                             no MJA button because the WHOLE column was gated by
                             canAssignContacts. */}
-                        {isUnassignedView && (canAssignContacts() || !isMjaMember) && (
+                        {isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
                             {c.cell_id ? (
                               <span className="text-[10px] text-blue-400">✓ Asignado</span>
@@ -2658,7 +2665,9 @@ const SemilleroPage = () => {
               <Zap className="h-4 w-4" /> Autoasignar
             </Button>
           )}
-          {canAssignContacts() && !isMjaMember && activePool === 'unassigned' && (
+          {/* Bulk 'Enviar a MJA' uses canSendToMja, not canAssignContacts —
+              consistent with the per-row button. */}
+          {canSendToMja() && !isMjaMember && activePool === 'unassigned' && (
             <Button
               size="sm"
               variant="outline"
@@ -2679,7 +2688,7 @@ const SemilleroPage = () => {
               <ExternalLink className="h-4 w-4" /> Enviar a MJA
             </Button>
           )}
-          {canAssignContacts() && !isMjaMember && activePool === 'external' && (
+          {canSendToMja() && !isMjaMember && activePool === 'external' && (
             // Inside the referente outbox, bulk = the second-stage
             // dispatch confirmation: actually push everything to MJA
             // Central. numero_cuerda flips, is_external becomes true,

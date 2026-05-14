@@ -1459,6 +1459,7 @@ export type Database = {
           can_see_rutas: boolean
           can_see_validador: boolean
           can_send_messages: boolean | null
+          can_send_to_mja: boolean
           can_send_whatsapp: boolean | null
           can_use_templates: boolean
           change_user_role: boolean
@@ -1496,6 +1497,7 @@ export type Database = {
           can_see_rutas?: boolean
           can_see_validador?: boolean
           can_send_messages?: boolean | null
+          can_send_to_mja?: boolean
           can_send_whatsapp?: boolean | null
           can_use_templates?: boolean
           change_user_role?: boolean
@@ -1533,6 +1535,7 @@ export type Database = {
           can_see_rutas?: boolean
           can_see_validador?: boolean
           can_send_messages?: boolean | null
+          can_send_to_mja?: boolean
           can_send_whatsapp?: boolean | null
           can_use_templates?: boolean
           change_user_role?: boolean
