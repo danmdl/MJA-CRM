@@ -952,8 +952,14 @@ const SemilleroPage = () => {
     if (filterDuplicates) {
       filtered = filtered.filter(c => duplicateNameIds.has(c.id));
     }
-    if (filterRoute && routeContactIds) {
-      filtered = filtered.filter(c => filterRoute === 'in' ? routeContactIds.has(c.id) : !routeContactIds.has(c.id));
+    // routeFilter resolves to whichever of the two sources is set:
+    //   - the header dropdown (filterRoute), or
+    //   - the routeStatus field on a saved Solapa.
+    // applyFilterTab can't do this itself because it doesn't have
+    // access to routeContactIds — that's an extra query owned here.
+    const routeFilter = filterRoute || activeTabFilters?.routeStatus || '';
+    if (routeFilter && routeContactIds) {
+      filtered = filtered.filter(c => routeFilter === 'in' ? routeContactIds.has(c.id) : !routeContactIds.has(c.id));
     }
     return filtered;
   }, [allContacts, activeTabId, activeTabFilters, filterZonaStatus, filterDuplicates, duplicateNameIds, cuerdas, cuerdaTerritoryMap, filterRoute, routeContactIds]);
