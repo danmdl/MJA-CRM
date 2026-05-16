@@ -31,12 +31,17 @@ interface ChurchCardProps {
 const ChurchCard = ({ church, onEdit, onDelete, currentUserRole }: ChurchCardProps) => {
   // Cells: filter out soft-deleted ones. The previous version counted every
   // cell including ones in the trash, which inflated the number on the card.
+  // count:'exact' (not 'planned'!) — planned uses the Postgres planner's
+  // pg_class.reltuples estimate which is stale between ANALYZE runs and was
+  // showing visibly wrong numbers (MJA Central card: 4843 contactos vs real
+  // 6415, ~25% off). Exact is a real COUNT(*) — slower in theory but
+  // negligible for the ~10 cards on this page with 3 head-only counts each.
   const { data: cellsCount } = useQuery({
     queryKey: ['card-cells-count', church.id],
     queryFn: async () => {
       const { count } = await supabase
         .from('cells')
-        .select('id', { count: 'planned', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('church_id', church.id)
         .is('deleted_at', null);
       return count || 0;
@@ -50,7 +55,7 @@ const ChurchCard = ({ church, onEdit, onDelete, currentUserRole }: ChurchCardPro
     queryFn: async () => {
       const { count } = await supabase
         .from('contacts')
-        .select('id', { count: 'planned', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('church_id', church.id)
         .is('deleted_at', null);
       return count || 0;
@@ -67,7 +72,7 @@ const ChurchCard = ({ church, onEdit, onDelete, currentUserRole }: ChurchCardPro
     queryFn: async () => {
       const { count } = await supabase
         .from('profiles')
-        .select('id', { count: 'planned', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('church_id', church.id);
       return count || 0;
     }
