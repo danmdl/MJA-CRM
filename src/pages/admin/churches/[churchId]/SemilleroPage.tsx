@@ -396,6 +396,42 @@ const SemilleroPage = () => {
   // The query key intentionally lists every filter dependency so React
   // Query refetches on any change. activePool isn't included when a
   // search term is present (search crosses pool boundaries server-side).
+
+  // Bounding box of the user's cuerda territory, sent down only when
+  // the Zona filter is active and the user has a polygon. Server uses
+  // it to narrow the candidate set (lat/lng range); the client then
+  // does the exact polygon test on the returned page. Otherwise the
+  // polygon test runs over the current page only and most matches go
+  // missing — Dan reported: 'En zona' filter returned 2 of ~30 actual
+  // in-zone contacts because the first server page didn't include the
+  // others. With the bbox prefilter, pagination operates on the
+  // narrowed set and the in-zone rows are guaranteed to come through.
+  const userCuerdaBbox = useMemo(() => {
+    const uc = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
+    if (!uc) return null;
+    const paths = cuerdaTerritoryMap.get(uc.id);
+    if (!paths || paths.length === 0) return null;
+    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+    for (const ring of paths) {
+      for (const p of ring) {
+        if (p.lat < minLat) minLat = p.lat;
+        if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lng < minLng) minLng = p.lng;
+        if (p.lng > maxLng) maxLng = p.lng;
+      }
+    }
+    if (!Number.isFinite(minLat)) return null;
+    return { minLat, maxLat, minLng, maxLng };
+  }, [cuerdas, userCuerdaNumero, cuerdaTerritoryMap]);
+
+  // The bbox prefilter only makes sense for 'in zone' — for 'out' we'd
+  // be excluding the very contacts we want (everything outside the
+  // rectangle, which is the bulk of an 'out of zone' result set). So
+  // we only pass the bbox when zona filter == 'in'. 'Out' still runs
+  // client-side on the current page; documented degradation.
+  const activeZonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
+  const bboxForQuery = activeZonaFilter === 'in' && userCuerdaBbox ? userCuerdaBbox : null;
+
   const { data: poolPage, isLoading } = useQuery<{ rows: Contact[]; totalCount: number }>({
     queryKey: [
       'pool-page', churchId,
@@ -404,6 +440,8 @@ const SemilleroPage = () => {
       filterCuerda, filterResponsable, filterConector, filterOnlyWithCoords,
       sortBy, sortDir,
       profile?.id, profile?.role, profile?.numero_cuerda,
+      // bbox stringified so the key changes when zona filter flips
+      bboxForQuery ? `${bboxForQuery.minLat},${bboxForQuery.maxLat},${bboxForQuery.minLng},${bboxForQuery.maxLng}` : null,
     ],
     queryFn: () => fetchPoolPage<Contact>({
       churchId: churchId!,
@@ -417,6 +455,7 @@ const SemilleroPage = () => {
       filterResponsable,
       filterConector,
       filterOnlyWithCoords,
+      bbox: bboxForQuery,
       churchCuerdaNumero: churchCuerda?.numero || null,
       sortBy,
       sortDir,

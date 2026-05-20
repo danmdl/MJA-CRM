@@ -56,6 +56,16 @@ export interface PoolFilters {
   filterResponsable: string;            // '' | '__none__' | '__church_cuerda__' | uuid
   filterConector: string;               // '' | '__none__' | name
   filterOnlyWithCoords: boolean;
+  /**
+   * Optional bounding-box prefilter on lat/lng. Used by the Semillero
+   * Zona filter: client builds the bbox of the user's cuerda polygon
+   * and passes it down, server narrows the candidate set, client does
+   * the final polygon-in-polygon test on the returned page. Without
+   * this the polygon test runs on the current page only and a small
+   * cuerda territory inside a 6k-contact church misses most matches.
+   * `null` means no bbox filter (default).
+   */
+  bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number } | null;
   churchCuerdaNumero: string | null;    // for the __church_cuerda__ special case
 
   sortBy: SortBy;
@@ -165,6 +175,20 @@ export async function fetchPoolPage<TRow = any>(f: PoolFilters): Promise<PoolPag
 
   if (f.filterOnlyWithCoords) {
     q = q.not('lat', 'is', null).not('lng', 'is', null);
+  }
+
+  // ── Bbox prefilter for Zona client-filter ──────────────────────
+  // Narrows the candidate set to a rectangle around the user's cuerda
+  // polygon. NULL lats fail .gte() / .lte() implicitly so we also
+  // exclude them (client polygon test would skip them anyway).
+  if (f.bbox) {
+    q = q
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .gte('lat', f.bbox.minLat)
+      .lte('lat', f.bbox.maxLat)
+      .gte('lng', f.bbox.minLng)
+      .lte('lng', f.bbox.maxLng);
   }
 
   // ── Sort ──────────────────────────────────────────────────────
