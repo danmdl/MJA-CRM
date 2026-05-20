@@ -961,15 +961,28 @@ const SemilleroPage = () => {
     }
     const zonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
     if (zonaFilter === 'in' || zonaFilter === 'out') {
-      filtered = filtered.filter(c => {
-        if (c.lat == null || c.lng == null) return false;
-        const contactCuerda = (cuerdas || []).find(cu => cu.numero === c.numero_cuerda);
-        if (!contactCuerda) return false;
-        const paths = cuerdaTerritoryMap.get(contactCuerda.id);
-        if (!paths) return false;
-        const inside = isPointInTerritory(c.lat, c.lng, paths);
-        return zonaFilter === 'in' ? inside : !inside;
-      });
+      // CRITICAL: match the badge logic (~line 1995). The badge tests each
+      // contact against the LOGGED-IN USER's cuerda territory, so the filter
+      // must do the same. Previously it tested against the CONTACT's own
+      // cuerda territory, which gives bogus results for a supervisor who
+      // sees contacts across cuerdas — Nahuel (cuerda 108) would see
+      // contacts from cuerda 204 marked '⚠ Fuera' in the badge (they're
+      // outside 108's polygon) but passed by the 'En zona' filter (they
+      // ARE inside 204's own polygon). Dan reported this with two
+      // screenshots: search 'Ruben Gonzalez' → '✓ En zona' badge; apply
+      // 'En zona' filter → tabla full of '⚠ Fuera' rows from other cuerdas.
+      const userCuerda = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
+      const userPaths = userCuerda ? cuerdaTerritoryMap.get(userCuerda.id) : null;
+      if (userPaths) {
+        filtered = filtered.filter(c => {
+          if (c.lat == null || c.lng == null) return false;
+          const inside = isPointInTerritory(c.lat, c.lng, userPaths);
+          return zonaFilter === 'in' ? inside : !inside;
+        });
+      }
+      // If userPaths is missing the header dropdown shouldn't have rendered
+      // in the first place (userCuerdaHasTerritory gates it). Defensive
+      // no-op leaves filtered as-is rather than emptying the table.
     }
     if (filterDuplicates) {
       filtered = filtered.filter(c => duplicateNameIds.has(c.id));
@@ -984,7 +997,7 @@ const SemilleroPage = () => {
       filtered = filtered.filter(c => routeFilter === 'in' ? routeContactIds.has(c.id) : !routeContactIds.has(c.id));
     }
     return filtered;
-  }, [allContacts, activeTabId, activeTabFilters, filterZonaStatus, filterDuplicates, duplicateNameIds, cuerdas, cuerdaTerritoryMap, filterRoute, routeContactIds]);
+  }, [allContacts, activeTabId, activeTabFilters, filterZonaStatus, filterDuplicates, duplicateNameIds, cuerdas, cuerdaTerritoryMap, userCuerdaNumero, filterRoute, routeContactIds]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
