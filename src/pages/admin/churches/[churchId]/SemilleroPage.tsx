@@ -397,40 +397,25 @@ const SemilleroPage = () => {
   // Query refetches on any change. activePool isn't included when a
   // search term is present (search crosses pool boundaries server-side).
 
-  // Bounding box of the user's cuerda territory, sent down only when
-  // the Zona filter is active and the user has a polygon. Server uses
-  // it to narrow the candidate set (lat/lng range); the client then
-  // does the exact polygon test on the returned page. Otherwise the
-  // polygon test runs over the current page only and most matches go
-  // missing — Dan reported: 'En zona' filter returned 2 of ~30 actual
-  // in-zone contacts because the first server page didn't include the
-  // others. With the bbox prefilter, pagination operates on the
-  // narrowed set and the in-zone rows are guaranteed to come through.
-  const userCuerdaBbox = useMemo(() => {
-    const uc = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
-    if (!uc) return null;
-    const paths = cuerdaTerritoryMap.get(uc.id);
-    if (!paths || paths.length === 0) return null;
-    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-    for (const ring of paths) {
-      for (const p of ring) {
-        if (p.lat < minLat) minLat = p.lat;
-        if (p.lat > maxLat) maxLat = p.lat;
-        if (p.lng < minLng) minLng = p.lng;
-        if (p.lng > maxLng) maxLng = p.lng;
-      }
-    }
-    if (!Number.isFinite(minLat)) return null;
-    return { minLat, maxLat, minLng, maxLng };
-  }, [cuerdas, userCuerdaNumero, cuerdaTerritoryMap]);
-
-  // The bbox prefilter only makes sense for 'in zone' — for 'out' we'd
-  // be excluding the very contacts we want (everything outside the
-  // rectangle, which is the bulk of an 'out of zone' result set). So
-  // we only pass the bbox when zona filter == 'in'. 'Out' still runs
-  // client-side on the current page; documented degradation.
+  // When the Zona filter is active, restrict the server-side query to
+  // the user's own cuerda before the client polygon test runs. The
+  // semantics Dan asked for: 'En zona' means a contact OF MY CUERDA
+  // whose location is inside MY polygon — not 'any contact that happens
+  // to be geographically in my polygon'. So we tighten the result set
+  // to numero_cuerda = userCuerdaNumero across ALL pages, and the
+  // client polygon test then classifies in/out within that.
+  //
+  // Previous attempt used a polygon-bbox server prefilter (PR #73),
+  // which fixed the 'only first page' bug but DIDN'T fix the cuerda
+  // mixing (cuerda 104 contacts living inside 108's polygon got
+  // labeled En zona for a supervisor of 108). The strict numero_cuerda
+  // restriction below is the right semantic.
+  //
+  // Skipped when the user has no cuerda (admin/general without one);
+  // the filter dropdown only renders when userCuerdaHasTerritory is
+  // true anyway.
   const activeZonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
-  const bboxForQuery = activeZonaFilter === 'in' && userCuerdaBbox ? userCuerdaBbox : null;
+  const restrictToCuerda = activeZonaFilter && userCuerdaNumero ? userCuerdaNumero : null;
 
   const { data: poolPage, isLoading } = useQuery<{ rows: Contact[]; totalCount: number }>({
     queryKey: [
@@ -440,8 +425,7 @@ const SemilleroPage = () => {
       filterCuerda, filterResponsable, filterConector, filterOnlyWithCoords,
       sortBy, sortDir,
       profile?.id, profile?.role, profile?.numero_cuerda,
-      // bbox stringified so the key changes when zona filter flips
-      bboxForQuery ? `${bboxForQuery.minLat},${bboxForQuery.maxLat},${bboxForQuery.minLng},${bboxForQuery.maxLng}` : null,
+      restrictToCuerda,
     ],
     queryFn: () => fetchPoolPage<Contact>({
       churchId: churchId!,
@@ -455,7 +439,7 @@ const SemilleroPage = () => {
       filterResponsable,
       filterConector,
       filterOnlyWithCoords,
-      bbox: bboxForQuery,
+      restrictToCuerda,
       churchCuerdaNumero: churchCuerda?.numero || null,
       sortBy,
       sortDir,
@@ -1000,28 +984,28 @@ const SemilleroPage = () => {
     }
     const zonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
     if (zonaFilter === 'in' || zonaFilter === 'out') {
-      // CRITICAL: match the badge logic (~line 1995). The badge tests each
-      // contact against the LOGGED-IN USER's cuerda territory, so the filter
-      // must do the same. Previously it tested against the CONTACT's own
-      // cuerda territory, which gives bogus results for a supervisor who
-      // sees contacts across cuerdas — Nahuel (cuerda 108) would see
-      // contacts from cuerda 204 marked '⚠ Fuera' in the badge (they're
-      // outside 108's polygon) but passed by the 'En zona' filter (they
-      // ARE inside 204's own polygon). Dan reported this with two
-      // screenshots: search 'Ruben Gonzalez' → '✓ En zona' badge; apply
-      // 'En zona' filter → tabla full of '⚠ Fuera' rows from other cuerdas.
+      // Match the badge logic and the server restrictToCuerda:
+      //   1. Only contacts of MY OWN cuerda count. A contact from cuerda
+      //      104 that happens to live inside cuerda 108's polygon is
+      //      NOT 'in zone' for a supervisor of 108 — they're not in his
+      //      cuerda administratively. Dan: 'me estás mezclando las
+      //      cuerdas'.
+      //   2. Of those, test the lat/lng against the user's cuerda
+      //      polygon to classify in/out.
+      // The server already restricts to numero_cuerda = userCuerdaNumero
+      // when zona filter is active (see restrictToCuerda in the
+      // useQuery above), but we keep the client check defensively in
+      // case the bypass ever changes.
       const userCuerda = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
       const userPaths = userCuerda ? cuerdaTerritoryMap.get(userCuerda.id) : null;
       if (userPaths) {
         filtered = filtered.filter(c => {
+          if (c.numero_cuerda !== userCuerdaNumero) return false;
           if (c.lat == null || c.lng == null) return false;
           const inside = isPointInTerritory(c.lat, c.lng, userPaths);
           return zonaFilter === 'in' ? inside : !inside;
         });
       }
-      // If userPaths is missing the header dropdown shouldn't have rendered
-      // in the first place (userCuerdaHasTerritory gates it). Defensive
-      // no-op leaves filtered as-is rather than emptying the table.
     }
     if (filterDuplicates) {
       filtered = filtered.filter(c => duplicateNameIds.has(c.id));
@@ -2038,7 +2022,16 @@ const SemilleroPage = () => {
                         {isUnassignedView && showSugerencia && (
                           <td className="px-2 py-1.5" style={{ width: colWidths.sugerencia }}>
                             {userCuerdaHasTerritory ? (() => {
-                              // Non-MJA user whose cuerda has territory: show zone classification only
+                              // 'En zona' / 'Fuera' clasificación es solo para
+                              // contactos DE TU PROPIA cuerda. Un contacto de
+                              // cuerda 104 que vive geográficamente dentro del
+                              // polígono de cuerda 108 NO debe aparecer 'En zona'
+                              // para un supervisor de 108 — administrativamente
+                              // no es de su cuerda (Dan: 'me estás mezclando las
+                              // cuerdas'). Mostrar guion para distinguirlos.
+                              if (c.numero_cuerda !== userCuerdaNumero) {
+                                return <span className="text-xs text-muted-foreground">—</span>;
+                              }
                               const uc = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
                               const paths = uc ? cuerdaTerritoryMap.get(uc.id) : null;
                               if (!paths || c.lat == null || c.lng == null) {
