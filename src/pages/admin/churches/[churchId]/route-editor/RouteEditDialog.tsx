@@ -46,6 +46,10 @@ interface RouteEditDialogProps {
   setFilterDateFrom: (s: string) => void;
   filterDateTo: string;
   setFilterDateTo: (s: string) => void;
+  filterCreatedFrom: string;
+  setFilterCreatedFrom: (s: string) => void;
+  filterCreatedTo: string;
+  setFilterCreatedTo: (s: string) => void;
   onlyWithNumber: boolean;
   setOnlyWithNumber: (b: boolean) => void;
   onlyInZone: boolean;
@@ -79,6 +83,7 @@ export const RouteEditDialog = ({
   churchCoords, church, onUseGeolocation, onUseChurchAddress,
   search, setSearch, filterResponsableId, setFilterResponsableId,
   filterDateFrom, setFilterDateFrom, filterDateTo, setFilterDateTo,
+  filterCreatedFrom, setFilterCreatedFrom, filterCreatedTo, setFilterCreatedTo,
   onlyWithNumber, setOnlyWithNumber, onlyInZone, setOnlyInZone, activeTerritoryPaths,
   teamMembers, profile,
   contactsLoading, filtered, selectedIds, selectedContacts,
@@ -132,8 +137,8 @@ export const RouteEditDialog = ({
                 className="pl-9 h-9"
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-              <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background">
+            <div className="mb-2">
+              <select value={filterResponsableId} onChange={e => setFilterResponsableId(e.target.value)} className="h-8 w-full text-xs border rounded px-2 bg-background">
                 <option value="">Todos los responsables</option>
                 <option value="__none__">Sin responsable</option>
                 {(() => {
@@ -150,8 +155,23 @@ export const RouteEditDialog = ({
                     ));
                 })()}
               </select>
-              <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
-              <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />
+            </div>
+            {/* Dos rangos de fecha independientes:
+                - Conexión → fecha_contacto (la fecha cargada a mano)
+                - Creación → created_at (cuándo entró el contacto al sistema) */}
+            <div className="mb-2">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Fecha de conexión</label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
+                <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />
+              </div>
+            </div>
+            <div className="mb-2">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Fecha de creación</label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <input type="date" value={filterCreatedFrom} onChange={e => setFilterCreatedFrom(e.target.value)} placeholder="Desde" className="h-8 w-full text-xs border rounded px-2 bg-background" />
+                <input type="date" value={filterCreatedTo} onChange={e => setFilterCreatedTo(e.target.value)} placeholder="Hasta" className="h-8 w-full text-xs border rounded px-2 bg-background" />
+              </div>
             </div>
             <label className="flex items-center gap-2 text-xs text-muted-foreground mb-2 cursor-pointer select-none">
               <input
