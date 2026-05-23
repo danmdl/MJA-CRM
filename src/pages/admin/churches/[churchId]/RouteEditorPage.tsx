@@ -34,6 +34,7 @@ interface Contact {
   numero_cuerda: string | null;
   responsable_id: string | null;
   fecha_contacto: string | null;
+  created_at: string | null;
 }
 
 const RouteEditorPage = () => {
@@ -52,8 +53,12 @@ const RouteEditorPage = () => {
   const [startLat, setStartLat] = useState<number | null>(null);
   const [startLng, setStartLng] = useState<number | null>(null);
   const [filterResponsableId, setFilterResponsableId] = useState<string>('');
+  // Rango sobre fecha_contacto ("fecha de conexión").
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
+  // Rango sobre created_at ("fecha de creación del contacto").
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<string>('');
+  const [filterCreatedTo, setFilterCreatedTo] = useState<string>('');
   const [onlyWithNumber, setOnlyWithNumber] = useState(true);
   const [onlyInZone, setOnlyInZone] = useState(false);
 
@@ -110,7 +115,7 @@ const RouteEditorPage = () => {
       const all: Contact[] = [];
       for (let page = 0; ; page++) {
         let q = supabase.from('contacts')
-          .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, created_by, fecha_contacto')
+          .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, created_by, fecha_contacto, created_at')
           .eq('church_id', churchId!)
           .is('deleted_at', null)
           .not('lat', 'is', null)
@@ -269,9 +274,10 @@ const RouteEditorPage = () => {
   // ─── Derived ──────────────────────────────────────────────────────────
   const filtered = useMemo(
     () => filterRouteContacts(contacts, {
-      search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, onlyInZone, activeTerritoryPaths,
+      search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo,
+      createdFrom: filterCreatedFrom, createdTo: filterCreatedTo, onlyInZone, activeTerritoryPaths,
     }),
-    [contacts, search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, onlyInZone, activeTerritoryPaths],
+    [contacts, search, onlyWithNumber, filterResponsableId, filterDateFrom, filterDateTo, filterCreatedFrom, filterCreatedTo, onlyInZone, activeTerritoryPaths],
   );
 
   const selectedContacts = useMemo(
@@ -1032,6 +1038,10 @@ const RouteEditorPage = () => {
         setFilterDateFrom={setFilterDateFrom}
         filterDateTo={filterDateTo}
         setFilterDateTo={setFilterDateTo}
+        filterCreatedFrom={filterCreatedFrom}
+        setFilterCreatedFrom={setFilterCreatedFrom}
+        filterCreatedTo={filterCreatedTo}
+        setFilterCreatedTo={setFilterCreatedTo}
         onlyWithNumber={onlyWithNumber}
         setOnlyWithNumber={setOnlyWithNumber}
         onlyInZone={onlyInZone}

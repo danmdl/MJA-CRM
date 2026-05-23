@@ -28,14 +28,19 @@ interface RouteContact {
   lng: number | null;
   responsable_id: string | null;
   fecha_contacto: string | null;
+  created_at: string | null;
 }
 
 interface FilterArgs {
   search: string;
   onlyWithNumber: boolean;
   filterResponsableId: string;
+  /** Rango sobre fecha_contacto ("fecha de conexión"). */
   filterDateFrom: string;
   filterDateTo: string;
+  /** Rango sobre created_at ("fecha de creación del contacto"). */
+  createdFrom: string;
+  createdTo: string;
   onlyInZone: boolean;
   activeTerritoryPaths: { lat: number; lng: number }[][] | null | undefined;
 }
@@ -58,6 +63,12 @@ export const filterRouteContacts = <T extends RouteContact>(
     } else if (args.filterResponsableId && c.responsable_id !== args.filterResponsableId) return false;
     if (args.filterDateFrom && (!c.fecha_contacto || c.fecha_contacto < args.filterDateFrom)) return false;
     if (args.filterDateTo && (!c.fecha_contacto || c.fecha_contacto > args.filterDateTo)) return false;
+    // created_at is an ISO timestamp; the date inputs are YYYY-MM-DD.
+    // Compare against the date prefix so the 'to' bound includes the
+    // whole day instead of cutting off at midnight.
+    const created = c.created_at ? c.created_at.slice(0, 10) : '';
+    if (args.createdFrom && (!created || created < args.createdFrom)) return false;
+    if (args.createdTo && (!created || created > args.createdTo)) return false;
     if (args.onlyInZone && args.activeTerritoryPaths) {
       if (!isPointInTerritory(c.lat, c.lng, args.activeTerritoryPaths ?? null)) return false;
     }
