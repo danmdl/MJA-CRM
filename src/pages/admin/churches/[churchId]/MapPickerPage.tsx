@@ -28,6 +28,7 @@ interface Contact {
   responsable_id: string | null;
   fecha_contacto: string | null;
   sexo: string | null;
+  created_at: string | null;
 }
 
 const MapPickerPage = () => {
@@ -56,8 +57,12 @@ const MapPickerPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterResponsableId, setFilterResponsableId] = useState<string>('');
   const [filterCuerda, setFilterCuerda] = useState<string>('');
+  // Rango sobre fecha_contacto (la fecha de la conexión).
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
+  // Rango sobre created_at (cuándo se cargó el contacto al sistema).
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<string>('');
+  const [filterCreatedTo, setFilterCreatedTo] = useState<string>('');
   const [filterSexo, setFilterSexo] = useState<string>('');
   const [onlyWithNumber, setOnlyWithNumber] = useState(true);
   // 'Solo en zona' toggle: hides contacts whose lat/lng falls outside
@@ -136,7 +141,7 @@ const MapPickerPage = () => {
       const all: Contact[] = [];
       for (let page = 0; ; page++) {
         let q = supabase.from('contacts')
-          .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, fecha_contacto, sexo')
+          .select('id, first_name, last_name, address, lat, lng, numero_cuerda, responsable_id, fecha_contacto, sexo, created_at')
           .eq('church_id', churchId!)
           .is('deleted_at', null)
           .not('lat', 'is', null)
@@ -301,6 +306,8 @@ const MapPickerPage = () => {
     filterCuerda ||
     filterDateFrom ||
     filterDateTo ||
+    filterCreatedFrom ||
+    filterCreatedTo ||
     filterSexo
   );
   const requireFilterBeforePainting = isGlobalRole && !hasAnyNarrowingFilter;
@@ -325,6 +332,11 @@ const MapPickerPage = () => {
       if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
       if (filterDateFrom && (!c.fecha_contacto || c.fecha_contacto < filterDateFrom)) return false;
       if (filterDateTo && (!c.fecha_contacto || c.fecha_contacto > filterDateTo)) return false;
+      // created_at is an ISO timestamp; slice to the date prefix so the
+      // 'to' bound includes the whole day instead of cutting off at midnight.
+      const created = c.created_at ? c.created_at.slice(0, 10) : '';
+      if (filterCreatedFrom && (!created || created < filterCreatedFrom)) return false;
+      if (filterCreatedTo && (!created || created > filterCreatedTo)) return false;
       if (filterSexo && c.sexo !== filterSexo) return false;
       // In-zone filter: drop pins whose coords fall outside the active
       // cuerda's drawn polygon. Selection state is preserved — only the
@@ -343,7 +355,7 @@ const MapPickerPage = () => {
       }
       return true;
     });
-  }, [contacts, search, onlyWithNumber, filterResponsableId, filterCuerda, filterDateFrom, filterDateTo, filterSexo, requireFilterBeforePainting, onlyInZone, activeTerritoryPaths]);
+  }, [contacts, search, onlyWithNumber, filterResponsableId, filterCuerda, filterDateFrom, filterDateTo, filterCreatedFrom, filterCreatedTo, filterSexo, requireFilterBeforePainting, onlyInZone, activeTerritoryPaths]);
 
   // Sidebar list = map filtered set, optionally narrowed to selected.
   const filtered = useMemo(() => {
@@ -401,10 +413,12 @@ const MapPickerPage = () => {
     setFilterCuerda('');
     setFilterDateFrom('');
     setFilterDateTo('');
+    setFilterCreatedFrom('');
+    setFilterCreatedTo('');
     setFilterSexo('');
   };
 
-  const hasActiveFilters = !!(search || filterResponsableId || filterCuerda || filterDateFrom || filterDateTo || filterSexo);
+  const hasActiveFilters = !!(search || filterResponsableId || filterCuerda || filterDateFrom || filterDateTo || filterCreatedFrom || filterCreatedTo || filterSexo);
 
   const toggleContact = (id: string) => {
     setSelectedIds(prev => {
@@ -936,8 +950,24 @@ const MapPickerPage = () => {
           <option value="masculino">Masculino</option>
           <option value="femenino">Femenino</option>
         </select>
-        <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} title="Fecha contacto desde" className="h-8 text-xs border rounded px-2 bg-background shrink-0" />
-        <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} title="Fecha contacto hasta" className="h-8 text-xs border rounded px-2 bg-background shrink-0" />
+        {/* Dos rangos independientes:
+            - Fecha de contacto → fecha_contacto (la fecha cargada a mano)
+            - Fecha de carga    → created_at (cuándo entró el contacto al sistema)
+            Antes había un solo par sin label y la gente no sabía qué filtraba. */}
+        <div className="flex flex-col shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">Fecha de contacto</span>
+          <div className="flex items-center gap-1">
+            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} title="Fecha de contacto · desde" className="h-8 text-xs border rounded px-2 bg-background" />
+            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} title="Fecha de contacto · hasta" className="h-8 text-xs border rounded px-2 bg-background" />
+          </div>
+        </div>
+        <div className="flex flex-col shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">Fecha de carga</span>
+          <div className="flex items-center gap-1">
+            <input type="date" value={filterCreatedFrom} onChange={e => setFilterCreatedFrom(e.target.value)} title="Fecha de carga · desde" className="h-8 text-xs border rounded px-2 bg-background" />
+            <input type="date" value={filterCreatedTo} onChange={e => setFilterCreatedTo(e.target.value)} title="Fecha de carga · hasta" className="h-8 text-xs border rounded px-2 bg-background" />
+          </div>
+        </div>
         {hasActiveFilters && (
           <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 h-8 shrink-0">
             <X className="h-3 w-3" /> Limpiar
@@ -966,7 +996,7 @@ const MapPickerPage = () => {
           shares the row with the quick filters so the map starts higher
           on the page. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3 px-1">
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Rápidos:</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0" title="Aplican al rango de Fecha de contacto">Rápidos (contacto):</span>
         <button onClick={() => setLastNDays(7)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted shrink-0">7 días</button>
         <button onClick={() => setLastNDays(15)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted shrink-0">15 días</button>
         <button onClick={() => setLastNDays(30)} className="text-xs px-2 py-0.5 rounded-full border hover:bg-muted shrink-0">30 días</button>
