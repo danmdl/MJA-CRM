@@ -85,6 +85,7 @@ const DateRangeChip = ({ label, hint, from, to, setFrom, setTo }: DateRangeChipP
       </button>
       {open && (
         <div className="absolute z-30 top-full left-0 mt-1 bg-popover text-popover-foreground border rounded-md shadow-lg p-3 flex flex-col gap-2 min-w-[200px]">
+          <div className="text-xs font-semibold border-b pb-1.5 mb-0.5">{label}</div>
           <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Desde</label>
           <input
             type="date"
@@ -1037,7 +1038,7 @@ const MapPickerPage = () => {
             en popover con Desde/Hasta. Cerrado muestra el resumen
             ('1/5 – 15/5' / 'desde 1/5' / 'cualquiera') así no comen ancho. */}
         <DateRangeChip
-          label="Contacto"
+          label="Fecha de contacto"
           hint="Fecha de contacto (cuándo se conectó con la persona)"
           from={filterDateFrom}
           to={filterDateTo}
@@ -1045,7 +1046,7 @@ const MapPickerPage = () => {
           setTo={setFilterDateTo}
         />
         <DateRangeChip
-          label="Carga"
+          label="Fecha de carga"
           hint="Fecha de carga (cuándo entró el contacto al sistema)"
           from={filterCreatedFrom}
           to={filterCreatedTo}
