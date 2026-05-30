@@ -31,6 +31,89 @@ interface Contact {
   created_at: string | null;
 }
 
+/**
+ * Filtro de rango de fechas como pill: muestra el rango actual en
+ * forma compacta y abre un popover con Desde/Hasta al hacer click.
+ * Antes la toolbar tenía 4 inputs `dd/mm/yyyy` siempre abiertos —
+ * dos por filtro — y comía media pantalla a lo ancho.
+ */
+const fmtDate = (s: string) => {
+  if (!s) return '';
+  const [, m, d] = s.split('-');
+  return `${parseInt(d, 10)}/${parseInt(m, 10)}`;
+};
+
+interface DateRangeChipProps {
+  label: string;
+  hint?: string;
+  from: string;
+  to: string;
+  setFrom: (s: string) => void;
+  setTo: (s: string) => void;
+}
+
+const DateRangeChip = ({ label, hint, from, to, setFrom, setTo }: DateRangeChipProps) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+  const active = !!(from || to);
+  const summary = !active
+    ? 'cualquiera'
+    : from && to
+      ? `${fmtDate(from)} – ${fmtDate(to)}`
+      : from
+        ? `desde ${fmtDate(from)}`
+        : `hasta ${fmtDate(to)}`;
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        title={hint}
+        className={`h-8 text-xs rounded-full px-3 inline-flex items-center gap-1.5 transition-colors ${active ? 'border-2 border-primary text-primary font-medium' : 'border text-muted-foreground hover:bg-muted'}`}
+      >
+        <span className="uppercase tracking-wider text-[10px] font-semibold">{label}</span>
+        <span className="opacity-70">·</span>
+        <span>{summary}</span>
+      </button>
+      {open && (
+        <div className="absolute z-30 top-full left-0 mt-1 bg-popover text-popover-foreground border rounded-md shadow-lg p-3 flex flex-col gap-2 min-w-[200px]">
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Desde</label>
+          <input
+            type="date"
+            value={from}
+            onChange={e => setFrom(e.target.value)}
+            className="h-8 text-xs border rounded px-2 bg-background"
+          />
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Hasta</label>
+          <input
+            type="date"
+            value={to}
+            onChange={e => setTo(e.target.value)}
+            className="h-8 text-xs border rounded px-2 bg-background"
+          />
+          {active && (
+            <button
+              type="button"
+              onClick={() => { setFrom(''); setTo(''); }}
+              className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mt-1 self-start"
+            >
+              <X className="h-3 w-3" /> Limpiar fechas
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MapPickerPage = () => {
   const { churchId: churchSlug, projectId } = useParams<{ churchId: string; projectId: string }>();
   const churchId = useChurchUuid();
@@ -950,24 +1033,25 @@ const MapPickerPage = () => {
           <option value="masculino">Masculino</option>
           <option value="femenino">Femenino</option>
         </select>
-        {/* Dos rangos independientes:
-            - Fecha de contacto → fecha_contacto (la fecha cargada a mano)
-            - Fecha de carga    → created_at (cuándo entró el contacto al sistema)
-            Antes había un solo par sin label y la gente no sabía qué filtraba. */}
-        <div className="flex flex-col shrink-0">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">Fecha de contacto</span>
-          <div className="flex items-center gap-1">
-            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} title="Fecha de contacto · desde" className="h-8 text-xs border rounded px-2 bg-background" />
-            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} title="Fecha de contacto · hasta" className="h-8 text-xs border rounded px-2 bg-background" />
-          </div>
-        </div>
-        <div className="flex flex-col shrink-0">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">Fecha de carga</span>
-          <div className="flex items-center gap-1">
-            <input type="date" value={filterCreatedFrom} onChange={e => setFilterCreatedFrom(e.target.value)} title="Fecha de carga · desde" className="h-8 text-xs border rounded px-2 bg-background" />
-            <input type="date" value={filterCreatedTo} onChange={e => setFilterCreatedTo(e.target.value)} title="Fecha de carga · hasta" className="h-8 text-xs border rounded px-2 bg-background" />
-          </div>
-        </div>
+        {/* Dos rangos independientes, cada uno como un pill que se abre
+            en popover con Desde/Hasta. Cerrado muestra el resumen
+            ('1/5 – 15/5' / 'desde 1/5' / 'cualquiera') así no comen ancho. */}
+        <DateRangeChip
+          label="Contacto"
+          hint="Fecha de contacto (cuándo se conectó con la persona)"
+          from={filterDateFrom}
+          to={filterDateTo}
+          setFrom={setFilterDateFrom}
+          setTo={setFilterDateTo}
+        />
+        <DateRangeChip
+          label="Carga"
+          hint="Fecha de carga (cuándo entró el contacto al sistema)"
+          from={filterCreatedFrom}
+          to={filterCreatedTo}
+          setFrom={setFilterCreatedFrom}
+          setTo={setFilterCreatedTo}
+        />
         {hasActiveFilters && (
           <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 h-8 shrink-0">
             <X className="h-3 w-3" /> Limpiar
