@@ -350,6 +350,29 @@ function buildGenericEmail(confirmUrl: string, actionType: string) {
 // ─── main handler ────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  // GET /auth-send-email-v1 — operational healthcheck. Reports whether
+  // required secrets are configured and whether the Resend key is
+  // accepted by Resend's API. Booleans only, never secret values.
+  if (req.method === 'GET') {
+    let resendKeyStatus = 'not_configured';
+    if (RESEND_API_KEY) {
+      try {
+        const r = await fetch('https://api.resend.com/domains', {
+          headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
+        });
+        resendKeyStatus = r.ok ? 'valid' : `rejected_${r.status}`;
+      } catch {
+        resendKeyStatus = 'network_error';
+      }
+    }
+    return new Response(JSON.stringify({
+      resend_api_key: resendKeyStatus,
+      hook_secret_configured: !!HOOK_SECRET_RAW,
+      supabase_url_configured: !!SUPABASE_URL,
+      service_role_configured: !!SUPABASE_SERVICE,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }
