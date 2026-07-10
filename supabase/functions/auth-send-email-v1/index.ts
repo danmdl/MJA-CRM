@@ -18,6 +18,13 @@
 //      200; if the hook secret is missing the function refuses to
 //      start (would otherwise accept anything).
 //
+// Payload contract (do not change without checking GoTrue):
+//   { user: { id, email, user_metadata, ... },
+//     email_data: { token, token_hash, redirect_to, email_action_type,
+//                   site_url, token_new, token_hash_new } }
+//   There is NO top-level `user_id`. The user object arrives inline, so
+//   no admin.getUserById round-trip is needed.
+//
 // Setup:
 //   1. Add RESEND_API_KEY and SEND_EMAIL_HOOK_SECRET to Edge Function
 //      secrets in Supabase Dashboard. The hook secret is the one
@@ -375,30 +382,31 @@ Deno.serve(async (req: Request) => {
 
   try {
     const payload = JSON.parse(rawBody);
-    const { user_id, email_data } = payload;
+    // The Send Email Hook payload is `{ user, email_data }` — the FULL user
+    // object, including email and user_metadata. There is no top-level
+    // `user_id` field. Reading one produced `undefined`, which tripped the
+    // required-fields guard below and made every auth email 400.
+    const { user, email_data } = payload;
     const {
       token_hash,
       redirect_to,
       email_action_type: actionType,
     } = email_data ?? {};
 
-    if (!user_id || !token_hash || !actionType) {
+    if (!user?.id || !user?.email || !token_hash || !actionType) {
+      console.error('[auth-send-email-v1] missing required fields', {
+        hasUserId: !!user?.id,
+        hasUserEmail: !!user?.email,
+        hasTokenHash: !!token_hash,
+        actionType,
+      });
       return new Response(JSON.stringify({ error: 'missing required fields' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(user_id);
-    if (userErr || !user?.email) {
-      console.error('[auth-send-email-v1] could not fetch user', userErr);
-      // Don't fail-open silently — return 404 so Supabase logs it.
-      return new Response(JSON.stringify({ error: 'user not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    const userEmail = user.email;
+    const userEmail: string = user.email;
 
     const safeRedirect = normalizeRedirect(redirect_to);
     const confirmUrl = buildConfirmationUrl(token_hash, actionType, safeRedirect);
