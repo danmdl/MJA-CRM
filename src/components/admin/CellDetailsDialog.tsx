@@ -61,7 +61,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
-      await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+      await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({

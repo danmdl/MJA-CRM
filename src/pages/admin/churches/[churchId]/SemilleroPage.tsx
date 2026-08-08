@@ -2624,7 +2624,7 @@ const SemilleroPage = () => {
             const note = templateName
               ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}".`
               : `WhatsApp enviado a las ${time} (sin plantilla).`;
-            const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+            const resp = await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log-v2', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
               body: JSON.stringify({
@@ -2673,7 +2673,7 @@ const SemilleroPage = () => {
               ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}" (envío masivo).`
               : `WhatsApp enviado a las ${time} (envío masivo, sin plantilla).`;
             await Promise.all(sentContactIds.map(contactId =>
-              fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log', {
+              fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log-v2', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
                 body: JSON.stringify({
