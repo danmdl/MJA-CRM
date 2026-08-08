@@ -45,7 +45,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
     const isAdminOrGeneral = callerProfile.role === "admin" || callerProfile.role === "general"
-    const allowedLeaderRoles = ["pastor", "piloto", "encargado_de_celula"]
+    // Roles allowed to log contacts for their church (everyone except conector and anfitrion,
+    // who are read-only or non-participant roles respectively). Hardcoding avoided in favor of
+    // permissions table, but that's a larger refactor; this is the interim fix to unblock
+    // referente, supervisor, consolidador, and other leader roles.
+    const allowedLeaderRoles = ["pastor", "piloto", "supervisor", "referente", "encargado_de_celula", "consolidador"]
     if (!isAdminOrGeneral) {
       const sameChurch = callerProfile.church_id === churchId
       const isAllowedRole = allowedLeaderRoles.includes(callerProfile.role)
