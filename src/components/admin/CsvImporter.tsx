@@ -26,6 +26,7 @@ import { logEvent } from '@/utils/clientLogger';
 import { ContactField } from '@/lib/contact-fields'; // Import ContactField type
 import { useQueryClient } from '@tanstack/react-query';
 import { autoMapCsvHeaders } from '@/lib/csv-header-mapping';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 interface CsvImporterProps {
   tableName: string;
@@ -512,8 +513,7 @@ const CsvImporter = ({ tableName, requiredFields, optionalFields, churchId, onIm
       setAutoMatchedFields(new Set());
       // Refresh Semillero contacts list immediately so user sees new data without F5
       if (churchId) {
-        queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+        refreshContactQueries(queryClient);
       }
       // Notify parent: close dialog + highlight imported rows
       if (onImportComplete) {

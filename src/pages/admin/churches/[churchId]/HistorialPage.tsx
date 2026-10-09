@@ -125,62 +125,75 @@ const HistorialPage = () => {
   const [cuerdaFilter, setCuerdaFilter] = useState<string>('all');
   const [sexoFilter, setSexoFilter] = useState<string>('all');
 
+  // Action / cuerda / sexo filters run in SQL so the 500-row cap applies
+  // to the filtered set; before, they only searched the latest 500 events
+  // out of 18k. Free-text search stays client-side over those rows.
   const { data: rows, isLoading, refetch } = useQuery<ActivityRow[]>({
-    queryKey: ['historial', churchId],
+    queryKey: ['historial', churchId, actionFilter, cuerdaFilter, sexoFilter],
     queryFn: async () => {
       if (!churchId) return [];
-      const { data, error } = await supabase
-        .from('activity_logs')
-        .select('id, user_id, church_id, action, entity_type, entity_id, before_data, after_data, created_at, profiles!activity_logs_user_id_profiles_fkey(first_name, last_name, email)')
-        .eq('church_id', churchId)
-        .order('created_at', { ascending: false })
-        .limit(500);
-      if (error) {
-        // FK alias may not exist; fall back to no join.
-        const { data: fallback } = await supabase
+      const quoted = (v: string) => `"${v.replace(/"/g, '\\"')}"`;
+      const build = (columns: string) => {
+        let q = supabase
           .from('activity_logs')
-          .select('id, user_id, church_id, action, entity_type, entity_id, before_data, after_data, created_at')
+          .select(columns)
           .eq('church_id', churchId)
-          .order('created_at', { ascending: false })
-          .limit(500);
-        return (fallback as any) || [];
-      }
-      return (data as any) || [];
+          .order('created_at', { ascending: false });
+        // Deletions are logged as bulk_delete_contacts, not 'delete'.
+        if (actionFilter === 'delete') q = q.ilike('action', '%delete%');
+        else if (actionFilter !== 'all') q = q.eq('action', actionFilter);
+        // Creates/updates carry the contact in after_data, deletes in before_data.
+        if (cuerdaFilter !== 'all') {
+          q = q.or(`after_data->>numero_cuerda.eq.${quoted(cuerdaFilter)},before_data->>numero_cuerda.eq.${quoted(cuerdaFilter)}`);
+        }
+        // Logs carry 'Masculino', 'Femenino' and lowercase variants.
+        if (sexoFilter !== 'all') {
+          q = q.or(`after_data->>sexo.ilike.${quoted(sexoFilter)},before_data->>sexo.ilike.${quoted(sexoFilter)}`);
+        }
+        return q.limit(500);
+      };
+      const { data, error } = await build('id, user_id, church_id, action, entity_type, entity_id, before_data, after_data, created_at, profiles!activity_logs_user_id_profiles_fkey(first_name, last_name, email)');
+      if (!error) return (data as any) || [];
+      // FK alias may not exist; fall back to no join.
+      const { data: fallback, error: fallbackError } = await build('id, user_id, church_id, action, entity_type, entity_id, before_data, after_data, created_at');
+      if (fallbackError) throw fallbackError;
+      return (fallback as any) || [];
     },
     enabled: !!churchId,
     staleTime: 30_000,
+    placeholderData: prev => prev,
   });
 
-  const cuerdaOptions = useMemo(() => {
-    const set = new Set<string>();
-    (rows || []).forEach(r => {
-      const c = extractCuerda(r);
-      if (c) set.add(c);
-    });
-    return Array.from(set).sort();
-  }, [rows]);
+  // Options come from the church's cuerdas, not from the loaded rows, so
+  // picking a cuerda doesn't shrink the dropdown to that one entry.
+  const { data: cuerdaOptions = [] } = useQuery<string[]>({
+    queryKey: ['cuerdas-historial', churchId],
+    queryFn: async () => {
+      const { data: zonas } = await supabase.from('zonas').select('id').eq('church_id', churchId!);
+      if (!zonas?.length) return [];
+      const { data } = await supabase.from('cuerdas').select('numero').in('zona_id', zonas.map(z => z.id));
+      const set = new Set<string>();
+      (data || []).forEach((r: { numero: string | null }) => { if (r.numero) set.add(r.numero); });
+      return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+    },
+    enabled: !!churchId,
+    staleTime: 5 * 60_000,
+  });
 
   const filtered = useMemo(() => {
     const q = normalize(search);
+    if (!q) return rows || [];
     return (rows || []).filter(r => {
-      // Deletions are logged as bulk_delete_contacts, not 'delete'.
-      if (actionFilter === 'delete' ? !r.action?.includes('delete') : actionFilter !== 'all' && r.action !== actionFilter) return false;
-      const c = extractCuerda(r);
-      if (cuerdaFilter !== 'all' && c !== cuerdaFilter) return false;
-      const s = extractSexo(r);
-      // Logs carry 'Masculino', 'Femenino' and lowercase variants.
-      if (sexoFilter !== 'all' && (s || '').toLowerCase() !== sexoFilter.toLowerCase()) return false;
-      if (!q) return true;
       const haystack = [
         actorName(r),
         r.action,
         r.entity_type,
-        c,
+        extractCuerda(r),
         JSON.stringify(r.after_data || r.before_data || {}),
       ].filter(Boolean).join(' ');
       return normalize(haystack).includes(q);
     });
-  }, [rows, search, actionFilter, cuerdaFilter, sexoFilter]);
+  }, [rows, search]);
 
   const clearFilters = () => {
     setSearch('');

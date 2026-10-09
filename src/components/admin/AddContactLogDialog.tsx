@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 interface AddContactLogDialogProps {
   open: boolean;
@@ -18,6 +20,7 @@ interface AddContactLogDialogProps {
 }
 
 const AddContactLogDialog: React.FC<AddContactLogDialogProps> = ({ open, onOpenChange, churchId, contactId, onAdded }) => {
+  const queryClient = useQueryClient();
   const [date, setDate] = useState('');
   const [method, setMethod] = useState('');
   const [notes, setNotes] = useState('');
@@ -42,6 +45,7 @@ const AddContactLogDialog: React.FC<AddContactLogDialogProps> = ({ open, onOpenC
         showError(err.error || 'Error al agregar el registro.');
       } else {
         showSuccess('Registro agregado.');
+        refreshContactQueries(queryClient);
         setDate('');
         setMethod('');
         setNotes('');

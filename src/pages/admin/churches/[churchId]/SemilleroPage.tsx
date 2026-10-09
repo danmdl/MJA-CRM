@@ -63,6 +63,7 @@ import { BulkAssignDialog } from './semillero/BulkAssignDialog';
 import { PaginationControls } from './semillero/PaginationControls';
 import { AssignConfirmDialog, type ConfirmDialogState } from './semillero/AssignConfirmDialog';
 import { arToday } from '@/lib/ar-date';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 // ─── Main Component ──────────────────────────────────────────────
 const SemilleroPage = () => {
@@ -703,7 +704,7 @@ const SemilleroPage = () => {
           }
           processed++;
           if (processed >= toGeocode.length) {
-            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            refreshContactQueries(queryClient);
           }
         });
       }, i * 300);
@@ -1122,7 +1123,7 @@ const SemilleroPage = () => {
         prevStates: [{ zona_id: contact?.zona_id || null, zona: contact?.zona || null, numero_cuerda: contact?.numero_cuerda || null, cell_id: contact?.cell_id || null }],
       });
     },
-    onSuccess: () => { showSuccess('Contacto asignado a célula.'); queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] }); setConfirmDialog(null); },
+    onSuccess: () => { showSuccess('Contacto asignado a célula.'); refreshContactQueries(queryClient); setConfirmDialog(null); },
     onError: (err: any) => showError(err.message),
   });
 
@@ -1165,7 +1166,7 @@ const SemilleroPage = () => {
       setUndoData({ contactIds: ids, prevStates });
       return count;
     },
-    onSuccess: (count) => { showSuccess(`${count} contacto(s) asignados.`); queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] }); setConfirmDialog(null); },
+    onSuccess: (count) => { showSuccess(`${count} contacto(s) asignados.`); refreshContactQueries(queryClient); setConfirmDialog(null); },
     onError: (err: any) => showError(err.message || 'Error al autoasignar.'),
   });
 
@@ -1180,7 +1181,7 @@ const SemilleroPage = () => {
         }).eq('id', undoData.contactIds[i]);
       }
     },
-    onSuccess: () => { showSuccess('Deshecho.'); setUndoData(null); queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] }); },
+    onSuccess: () => { showSuccess('Deshecho.'); setUndoData(null); refreshContactQueries(queryClient); },
     onError: (err: any) => showError(err.message),
   });
 
@@ -1368,7 +1369,7 @@ const SemilleroPage = () => {
         <Button size="sm" variant="ghost" disabled={refreshing} onClick={async () => {
           setRefreshing(true);
           await queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
-          await queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          await refreshContactQueries(queryClient);
           await queryClient.invalidateQueries({ queryKey: ['cuerdas-pool', churchId] });
           await queryClient.invalidateQueries({ queryKey: ['zonas', churchId] });
           await queryClient.invalidateQueries({ queryKey: ['barrios', churchId] });
@@ -1396,7 +1397,7 @@ const SemilleroPage = () => {
               activeTabId={activeTabId}
               mjaUnseenCount={mjaUnseenCount}
               onActiveTabChange={(id, filters) => {
-                // Switching to the locked "Recibidos de MJA" tab → mark
+                // Switching to the locked "Pases" tab → mark
                 // every currently-unseen MJA arrival as seen, in the
                 // user's cuerda. RPC runs as SECURITY DEFINER and
                 // returns the number of rows it touched; we refetch
@@ -1410,7 +1411,7 @@ const SemilleroPage = () => {
                       p_cuerda: userCuerdaNumero,
                     });
                     if (!error) {
-                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                      refreshContactQueries(queryClient);
                     }
                   })();
                 }
@@ -2127,14 +2128,14 @@ const SemilleroPage = () => {
                                   if (cc) update.numero_cuerda = cc.numero;
                                   await supabase.from('contacts').update(update).eq('id', c.id);
                                   showSuccess('Despachado a MJA Central.');
-                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                  refreshContactQueries(queryClient);
                                 }}>
                                   <Zap className="h-3 w-3 mr-1" /> Confirmar despacho
                                 </Button>
                                 <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" onClick={async () => {
                                   await supabase.from('contacts').update({ pending_external_send: false }).eq('id', c.id);
                                   showSuccess('Cancelado. El contacto vuelve a tu lista.');
-                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                  refreshContactQueries(queryClient);
                                 }}>
                                   <Undo2 className="h-3 w-3 mr-1" /> Cancelar
                                 </Button>
@@ -2177,7 +2178,7 @@ const SemilleroPage = () => {
                                         after_data: { numero_cuerda: stagedCuerda?.numero, cell_id: stagedCellId, cell_name: stagedCell?.name },
                                       });
                                       showSuccess(`Asignado a ${stagedCell?.name}.`);
-                                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                      refreshContactQueries(queryClient);
                                     }}>
                                       <Zap className="h-3 w-3 mr-1" /> Confirmar asignación
                                     </Button>
@@ -2189,7 +2190,7 @@ const SemilleroPage = () => {
                                       // of the dispatched pool).
                                       await supabase.from('contacts').update({ pending_assignment_cell_id: null }).eq('id', c.id);
                                       showSuccess('Pre-asignación cancelada.');
-                                      queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                      refreshContactQueries(queryClient);
                                     }}>
                                       <Undo2 className="h-3 w-3 mr-1" /> Cancelar
                                     </Button>
@@ -2213,7 +2214,7 @@ const SemilleroPage = () => {
                                 onClick={async () => {
                                   await supabase.from('contacts').update({ pending_external_send: true }).eq('id', c.id);
                                   showSuccess('Movido a tu outbox "Enviar a MJA". Confirmá el despacho cuando estés seguro.');
-                                  queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                                  refreshContactQueries(queryClient);
                                 }}
                               >
                                 <ExternalLink className="h-3 w-3" /> MJA
@@ -2389,7 +2390,7 @@ const SemilleroPage = () => {
             }
             showSuccess(`${count} contacto(s) autoasignados.`);
             setSelectedIds(new Set());
-            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            refreshContactQueries(queryClient);
             setConfirmDialog(null);
             return;
           }
@@ -2415,8 +2416,7 @@ const SemilleroPage = () => {
                 after_data: { numero_cuerda: confirmDialog.cuerdaNum, cell_id: null, zona: zona?.nombre },
               });
               showSuccess(`Contacto asignado a Cuerda ${confirmDialog.cuerdaNum}.`);
-              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
-              queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
+              refreshContactQueries(queryClient);
             }
             setConfirmDialog(null);
             return;
@@ -2432,7 +2432,7 @@ const SemilleroPage = () => {
               showError(error.message);
             } else {
               showSuccess('Pre-asignado. Lo encontrás en "Asignar Contactos" para confirmar.');
-              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+              refreshContactQueries(queryClient);
             }
             setConfirmDialog(null);
             return;
@@ -2478,7 +2478,7 @@ const SemilleroPage = () => {
             onOpenChange={(o) => {
               if (!o) {
                 setSelectedContactId(null);
-                queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
+                refreshContactQueries(queryClient);
               }
             }}
             contactId={selectedContactId}
@@ -2517,7 +2517,7 @@ const SemilleroPage = () => {
           setDeleting(false);
           if (failed > 0) {
             showError(`No se pudieron eliminar ${failed} contacto(s). ${firstError || ''}`);
-            queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+            refreshContactQueries(queryClient);
             return;
           }
           // Audit row for the bulk delete. We log a single row covering
@@ -2534,7 +2534,7 @@ const SemilleroPage = () => {
           showSuccess(`${ids.length} contacto${ids.length === 1 ? '' : 's'} eliminado${ids.length === 1 ? '' : 's'}.`);
           setSelectedIds(new Set());
           setBulkDeleteOpen(false);
-          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          refreshContactQueries(queryClient);
         }}
       />
 
@@ -2545,7 +2545,7 @@ const SemilleroPage = () => {
             open
             onOpenChange={(o) => {
               setAddContactOpen(o);
-              if (!o) queryClient.refetchQueries({ queryKey: ['pool-all-contacts', churchId] });
+              if (!o) refreshContactQueries(queryClient);
             }}
             churchId={churchId!}
           />
@@ -2565,7 +2565,7 @@ const SemilleroPage = () => {
             group={mergeGroup as any}
             userId={session?.user?.id || null}
             onResolved={() => {
-              queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+              refreshContactQueries(queryClient);
               queryClient.invalidateQueries({ queryKey: ['dedupe-dismissals', churchId] });
               setSelectedIds(new Set());
             }}
@@ -2621,8 +2621,6 @@ const SemilleroPage = () => {
             }
             showSuccess('Envío registrado en el historial.');
             queryClient.invalidateQueries({ queryKey: ['contact-logs-inline', contactId] });
-            queryClient.invalidateQueries({ queryKey: ['contact-logs', contactId] });
-            queryClient.invalidateQueries({ queryKey: ['contact_logs', contactId] });
           } catch (e) { console.error('Failed to log WhatsApp send:', e); showError('Error registrando el envío.'); }
         }}
       />
@@ -2706,7 +2704,7 @@ const SemilleroPage = () => {
                 await supabase.from('contacts').update({ pending_external_send: true }).in('id', ids);
                 showSuccess(`${ids.length} movido${ids.length === 1 ? '' : 's'} al outbox "Enviar a MJA".`);
                 setSelectedIds(new Set());
-                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                refreshContactQueries(queryClient);
               }}
             >
               <ExternalLink className="h-4 w-4" /> Enviar a MJA
@@ -2735,7 +2733,7 @@ const SemilleroPage = () => {
                 await supabase.from('contacts').update(update).in('id', ids);
                 showSuccess(`${ids.length} despachado${ids.length === 1 ? '' : 's'} a MJA Central.`);
                 setSelectedIds(new Set());
-                queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+                refreshContactQueries(queryClient);
               }}
             >
               <Zap className="h-4 w-4" /> Confirmar despacho
@@ -2806,7 +2804,7 @@ const SemilleroPage = () => {
           setSelectedIds(new Set());
           setBulkAssignOpen(false);
           setBulkAssignTargetId('');
-          queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+          refreshContactQueries(queryClient);
         }}
       />
     </div>

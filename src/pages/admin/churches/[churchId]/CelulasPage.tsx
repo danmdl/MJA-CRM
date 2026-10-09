@@ -18,6 +18,7 @@ import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import { Textarea } from '@/components/ui/textarea';
 import AddCellDialog from '@/components/admin/AddCellDialog';
 import CellCsvImporter from '@/components/admin/CellCsvImporter';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 interface CellRow {
   id: string;
@@ -203,7 +204,7 @@ const CelulasPage = () => {
     queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
     queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
     queryClient.invalidateQueries({ queryKey: ['cell-contact-counts', churchId] });
-    queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+    refreshContactQueries(queryClient);
   };
 
   const handleSave = async () => {
@@ -246,7 +247,7 @@ const CelulasPage = () => {
       queryClient.invalidateQueries({ queryKey: ['overviewCells'] });
       queryClient.invalidateQueries({ queryKey: ['cells-pool'] });
       queryClient.invalidateQueries({ queryKey: ['cells'] });
-      queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+      refreshContactQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['historial'] });
     } catch { showError('Error inesperado.'); } finally { setSaving(false); }
   };
@@ -604,7 +605,7 @@ const CelulasPage = () => {
             queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
             queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
             queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
-            queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+            refreshContactQueries(queryClient);
           } else {
             setAddCellOpen(o);
           }
@@ -623,7 +624,7 @@ const CelulasPage = () => {
           queryClient.invalidateQueries({ queryKey: ['celulas-page', churchId] });
           queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
           queryClient.invalidateQueries({ queryKey: ['cells-map', churchId] });
-          queryClient.invalidateQueries({ queryKey: ['cuerdas-page'] });
+          refreshContactQueries(queryClient);
         }}
       />
     </div>

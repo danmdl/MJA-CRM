@@ -114,7 +114,7 @@ describe('fetchPoolPage — solapa filters run server-side', () => {
     expect(has(c, 'not', 'lat', 'is', null)).toBe(true);
   });
 
-  it('recibidos de MJA is the only OR in the query', async () => {
+  it('pases (MJA received/sent) is the only OR in the query', async () => {
     await fetchPoolPage({ ...baseFilters, tab: { mjaReceived: true } });
     const ors = lastCalls().filter(x => x[0] === 'or');
     expect(ors).toEqual([['or', 'received_from_mja_at.not.is.null,sent_to_mja_at.not.is.null']]);

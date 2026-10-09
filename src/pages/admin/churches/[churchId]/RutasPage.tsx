@@ -128,7 +128,7 @@ const RutasPage = () => {
   const cuerdaOptions = React.useMemo(() => {
     const set = new Set<string>();
     projects.forEach((p: any) => { if (p.numero_cuerda) set.add(String(p.numero_cuerda)); });
-    return Array.from(set).sort((a, b) => Number(a) - Number(b));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
   }, [projects]);
 
   const visibleProjects = React.useMemo(() => {

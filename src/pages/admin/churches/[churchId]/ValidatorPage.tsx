@@ -12,6 +12,8 @@ import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { useSession } from '@/hooks/use-session';
 import { normalize } from '@/lib/normalize';
 import { fetchAllPages } from '@/lib/pagination';
+import { useQueryClient } from '@tanstack/react-query';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 // Lazy: only fetch the ~1k LOC profile dialog when the user opens it.
 const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
@@ -43,6 +45,7 @@ const CHECKS = [
 ];
 
 const ValidatorPage = () => {
+  const queryClient = useQueryClient();
   const { churchId: churchSlug } = useParams<{ churchId: string }>();
   const churchId = useChurchUuid();
   const navigate = useNavigate();
@@ -354,12 +357,14 @@ const ValidatorPage = () => {
       showSuccess('Coordenadas eliminadas (fuera de zona). Corregí la dirección manualmente.');
     }
     setGeocodePreview(null);
+    refreshContactQueries(queryClient);
     runValidation();
   };
 
   const clearCoords = async (contactId: string) => {
     await supabase.from('contacts').update({ lat: null, lng: null }).eq('id', contactId);
     showSuccess('Coordenadas eliminadas. Editá la dirección manualmente desde el Semillero.');
+    refreshContactQueries(queryClient);
     runValidation();
   };
 
@@ -583,6 +588,7 @@ const ValidatorPage = () => {
     }
 
     setBulkRegeocoding(false);
+    refreshContactQueries(queryClient);
     const parts = [
       `${fixed} corregidos`,
       cleared > 0 ? `${cleared} sin calle (limpiados)` : null,

@@ -128,14 +128,14 @@ const FilterTabsBar = ({ churchId, activeTabId, onActiveTabChange, cuerdas, team
           onClick={() => handleSelectTab(null)}
           label="Todos"
         />
-        {/* "Recibidos de MJA" — always second. Filters to contacts the
-            trigger flagged as coming in from an MJA-side cuerda. Badge
+        {/* "Pases" — always second. Contacts that crossed the MJA
+            boundary in either direction (received or sent). Badge
             count shows unseen arrivals; the Semillero clears them on
             tab click. Locked: no edit/delete buttons rendered. */}
         <TabButton
           isActive={activeTabId === MJA_RECEIVED_TAB_ID}
           onClick={() => handleSelectTab(MJA_RECEIVED_TAB_ID)}
-          label="Recibidos de MJA"
+          label="Pases"
           badge={mjaUnseenCount > 0 ? mjaUnseenCount : undefined}
         />
         {tabs.map(tab => (
@@ -473,19 +473,19 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
                 <option value="out">Fuera de zona</option>
               </select>
             </div>
-            {/* Recibidos de MJA — opcional dentro de una solapa custom,
-                aunque la solapa fija "Recibidos de MJA" cubre el flujo
+            {/* Pases — opcional dentro de una solapa custom, aunque la
+                solapa fija "Pases" cubre el flujo
                 principal. Combinable con otros filtros (ej. "recibidos
                 de MJA y sin dirección"). */}
             <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Recibidos de MJA</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Pases</Label>
               <select
                 value={filters.mjaReceived ? 'yes' : ''}
                 onChange={e => setF('mjaReceived', e.target.value === 'yes' ? true : undefined)}
                 className={selectClass}
               >
                 <option value="">Cualquiera</option>
-                <option value="yes">Solo recibidos de MJA</option>
+                <option value="yes">Solo pases</option>
               </select>
             </div>
             {/* En ruta — same predicate as the Ruta column filter in
