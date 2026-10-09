@@ -450,11 +450,11 @@ const FilterTabDialog = ({ tab, churchId, userId, existingPositions, cuerdas, te
               <Input type="number" value={filters.edadMax || ''} onChange={e => setF('edadMax', e.target.value)} placeholder="Ej: 35" />
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Fecha contacto desde</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Fecha de creación desde</Label>
               <Input type="date" value={filters.fechaContactoFrom || ''} onChange={e => setF('fechaContactoFrom', e.target.value)} />
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Fecha contacto hasta</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Fecha de creación hasta</Label>
               <Input type="date" value={filters.fechaContactoTo || ''} onChange={e => setF('fechaContactoTo', e.target.value)} />
             </div>
             <div>
@@ -551,8 +551,16 @@ export function applyFilterTab(contacts: any[], filters: FilterTabFilters): any[
       const e = parseInt(c.edad || '', 10);
       if (isNaN(e) || e > parseInt(filters.edadMax, 10)) return false;
     }
-    if (filters.fechaContactoFrom && (!c.fecha_contacto || c.fecha_contacto < filters.fechaContactoFrom)) return false;
-    if (filters.fechaContactoTo && (!c.fecha_contacto || c.fecha_contacto > filters.fechaContactoTo)) return false;
+    // Las keys siguen llamándose fechaContactoFrom/To por retrocompat con
+    // solapas guardadas en seedling_filter_tabs.filters, pero el filtro
+    // apunta a created_at (fecha de creación del contacto). Antes
+    // apuntaba a fecha_contacto, que es un campo opcional casi siempre
+    // null y por eso el usuario veía "no filtra". created_at es un ISO
+    // timestamp; se compara contra YYYY-MM-DD cortando el prefijo de
+    // fecha para que el "hasta" incluya el día entero.
+    const createdDate = c.created_at ? String(c.created_at).slice(0, 10) : '';
+    if (filters.fechaContactoFrom && (!createdDate || createdDate < filters.fechaContactoFrom)) return false;
+    if (filters.fechaContactoTo && (!createdDate || createdDate > filters.fechaContactoTo)) return false;
     if (filters.zonaId && c.zona_id !== filters.zonaId) return false;
     if (filters.hasPhone === 'yes' && !c.phone) return false;
     if (filters.hasPhone === 'no' && c.phone) return false;
