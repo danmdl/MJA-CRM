@@ -33,6 +33,7 @@ import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import {
   fetchPoolPage,
+  fetchPoolAll,
   fetchPoolCounts,
   fetchDistinctCuerdas,
   fetchDistinctResponsables,
@@ -41,7 +42,7 @@ import {
 } from '@/lib/semillero-pool-query';
 import ContactMapDialog from '@/components/admin/ContactMapDialog';
 import WhatsAppComposeDialog, { WhatsAppIcon } from '@/components/admin/WhatsAppComposeDialog';
-import FilterTabsBar, { applyFilterTab, FilterTabFilters, MJA_RECEIVED_TAB_ID } from '@/components/admin/FilterTabsBar';
+import FilterTabsBar, { FilterTabFilters, MJA_RECEIVED_TAB_ID } from '@/components/admin/FilterTabsBar';
 // Heavy dialogs are lazy: they're conditionally rendered (open && <Dialog>),
 // so the chunk only downloads when the user actually opens one. Pulled out
 // roughly 70KB of JS from the SemilleroPage initial load.
@@ -61,6 +62,7 @@ import { BulkDeleteDialog } from './semillero/BulkDeleteDialog';
 import { BulkAssignDialog } from './semillero/BulkAssignDialog';
 import { PaginationControls } from './semillero/PaginationControls';
 import { AssignConfirmDialog, type ConfirmDialogState } from './semillero/AssignConfirmDialog';
+import { arToday } from '@/lib/ar-date';
 
 // ─── Main Component ──────────────────────────────────────────────
 const SemilleroPage = () => {
@@ -384,11 +386,7 @@ const SemilleroPage = () => {
   // the page now scales to 500k+ contacts without changing UX.
   //
   // Caveats handled below:
-  //   - duplicate detection now only sees the current page; users get
-  //     a degraded experience when filterDuplicates is on at a giant
-  //     church. A dedicated "find duplicates across base" action will
-  //     come later.
-  //   - zona-polygon filter likewise only applies to the current page.
+  //   - duplicate detection only sees the current page.
   //   - Dropdown options (cuerda/responsable/conector) come from their
   //     own small queries below.
   //   - Pool-tab chip counts come from a separate count query.
@@ -416,6 +414,22 @@ const SemilleroPage = () => {
   // true anyway.
   const activeZonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
   const restrictToCuerda = activeZonaFilter && userCuerdaNumero ? userCuerdaNumero : null;
+  // The polygon test can't run in SQL from here, so with Zona active we
+  // fetch the whole (already server-filtered) set of the user's cuerda —
+  // the biggest cuerda is ~2.3k contacts — classify it, and paginate
+  // locally. Without a polygon for the user's cuerda the filter is a no-op.
+  const zonaPaths = useMemo(() => {
+    if (activeZonaFilter !== 'in' && activeZonaFilter !== 'out') return null;
+    const userCuerda = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
+    return userCuerda ? cuerdaTerritoryMap.get(userCuerda.id) || null : null;
+  }, [activeZonaFilter, cuerdas, userCuerdaNumero, cuerdaTerritoryMap]);
+
+  const tabFilters = activeTabId ? activeTabFilters : null;
+  const routeFilter: '' | 'in' | 'out' = filterRoute || tabFilters?.routeStatus || '';
+  const routeIdList = useMemo(
+    () => (routeContactIds ? Array.from(routeContactIds).sort() : null),
+    [routeContactIds],
+  );
 
   const { data: poolPage, isLoading } = useQuery<{ rows: Contact[]; totalCount: number }>({
     queryKey: [
@@ -426,27 +440,46 @@ const SemilleroPage = () => {
       sortBy, sortDir,
       profile?.id, profile?.role, profile?.numero_cuerda,
       restrictToCuerda,
+      tabFilters ? JSON.stringify(tabFilters) : null,
+      routeFilter, routeFilter ? routeIdList : null,
+      zonaPaths ? activeZonaFilter : null,
     ],
-    queryFn: () => fetchPoolPage<Contact>({
-      churchId: churchId!,
-      userId: profile?.id || null,
-      userRole: profile?.role || null,
-      userCuerda: profile?.numero_cuerda || null,
-      canSeeAllCuerdas: canSeeContactsFromAllCuerdas,
-      pool: activePool as PoolKind,
-      search: searchTerm,
-      filterCuerda,
-      filterResponsable,
-      filterConector,
-      filterOnlyWithCoords,
-      restrictToCuerda,
-      churchCuerdaNumero: churchCuerda?.numero || null,
-      sortBy,
-      sortDir,
-      page: currentPage,
-      pageSize: PAGE_SIZE,
-    }),
-    enabled: !!churchId && !!profile,
+    queryFn: async () => {
+      const f = {
+        churchId: churchId!,
+        userId: profile?.id || null,
+        userRole: profile?.role || null,
+        userCuerda: profile?.numero_cuerda || null,
+        canSeeAllCuerdas: canSeeContactsFromAllCuerdas,
+        pool: activePool as PoolKind,
+        search: searchTerm,
+        filterCuerda,
+        filterResponsable,
+        filterConector,
+        filterOnlyWithCoords,
+        restrictToCuerda,
+        churchCuerdaNumero: churchCuerda?.numero || null,
+        tab: tabFilters,
+        routeFilter,
+        routeContactIds: routeIdList,
+        sortBy,
+        sortDir,
+        page: currentPage,
+        pageSize: PAGE_SIZE,
+      };
+      if (!zonaPaths) return fetchPoolPage<Contact>(f);
+      const all = await fetchPoolAll<Contact>(f);
+      const matching = all.filter(c => {
+        if (c.numero_cuerda !== userCuerdaNumero) return false;
+        if (c.lat == null || c.lng == null) return false;
+        const inside = isPointInTerritory(c.lat, c.lng, zonaPaths);
+        return activeZonaFilter === 'in' ? inside : !inside;
+      });
+      const start = currentPage * PAGE_SIZE;
+      return { rows: matching.slice(start, start + PAGE_SIZE), totalCount: matching.length };
+    },
+    // 'En ruta' needs the live route ids before it can build its filter.
+    enabled: !!churchId && !!profile && (!routeFilter || !!routeIdList),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     placeholderData: prev => prev, // keep previous page visible during fetch
@@ -959,68 +992,14 @@ const SemilleroPage = () => {
   // Contacts only disappear from a referente's Semillero if they get
   // assigned to a DIFFERENT cuerda. Having a cell_id is irrelevant —
   // the referente still needs to see and manage them.
-  // Almost all filtering moved server-side via fetchPoolPage. What's
-  // left in this useMemo are the two filters that don't have efficient
-  // SQL equivalents:
-  //   1. Zona in/out polygon test — needs PostGIS or full coord scan.
-  //      We apply it client-side over just the current page; users
-  //      who flip this filter on a giant church get a degraded result
-  //      (only see in/out matches that happen to live on the current
-  //      page). Fair trade for now.
-  //   2. Duplicate detection — needs a full-group scan. Same caveat:
-  //      runs against the current page only when filterDuplicates is
-  //      on. A dedicated "Find duplicates across base" action will
-  //      come later.
-  //   3. Active tab filters (saved filter presets) — those still get
-  //      applied client-side because their structure is dynamic and
-  //      we haven't migrated them to SQL yet.
-  // Sorting is done server-side too (ORDER BY in fetchPoolPage), so
-  // this useMemo no longer reorders.
+  // Every filter except Duplicados runs in the pool query above (Zona
+  // via fetchPoolAll). Duplicate detection still only sees the current
+  // page — it needs a full-group scan that doesn't exist yet.
   const filteredContacts = useMemo(() => {
     if (!allContacts) return [];
-    let filtered = allContacts;
-    if (activeTabId && Object.keys(activeTabFilters).length > 0) {
-      filtered = applyFilterTab(filtered, activeTabFilters);
-    }
-    const zonaFilter = filterZonaStatus || activeTabFilters?.zonaStatus || '';
-    if (zonaFilter === 'in' || zonaFilter === 'out') {
-      // Match the badge logic and the server restrictToCuerda:
-      //   1. Only contacts of MY OWN cuerda count. A contact from cuerda
-      //      104 that happens to live inside cuerda 108's polygon is
-      //      NOT 'in zone' for a supervisor of 108 — they're not in his
-      //      cuerda administratively. Dan: 'me estás mezclando las
-      //      cuerdas'.
-      //   2. Of those, test the lat/lng against the user's cuerda
-      //      polygon to classify in/out.
-      // The server already restricts to numero_cuerda = userCuerdaNumero
-      // when zona filter is active (see restrictToCuerda in the
-      // useQuery above), but we keep the client check defensively in
-      // case the bypass ever changes.
-      const userCuerda = (cuerdas || []).find(cu => cu.numero === userCuerdaNumero);
-      const userPaths = userCuerda ? cuerdaTerritoryMap.get(userCuerda.id) : null;
-      if (userPaths) {
-        filtered = filtered.filter(c => {
-          if (c.numero_cuerda !== userCuerdaNumero) return false;
-          if (c.lat == null || c.lng == null) return false;
-          const inside = isPointInTerritory(c.lat, c.lng, userPaths);
-          return zonaFilter === 'in' ? inside : !inside;
-        });
-      }
-    }
-    if (filterDuplicates) {
-      filtered = filtered.filter(c => duplicateNameIds.has(c.id));
-    }
-    // routeFilter resolves to whichever of the two sources is set:
-    //   - the header dropdown (filterRoute), or
-    //   - the routeStatus field on a saved Solapa.
-    // applyFilterTab can't do this itself because it doesn't have
-    // access to routeContactIds — that's an extra query owned here.
-    const routeFilter = filterRoute || activeTabFilters?.routeStatus || '';
-    if (routeFilter && routeContactIds) {
-      filtered = filtered.filter(c => routeFilter === 'in' ? routeContactIds.has(c.id) : !routeContactIds.has(c.id));
-    }
-    return filtered;
-  }, [allContacts, activeTabId, activeTabFilters, filterZonaStatus, filterDuplicates, duplicateNameIds, cuerdas, cuerdaTerritoryMap, userCuerdaNumero, filterRoute, routeContactIds]);
+    if (!filterDuplicates) return allContacts;
+    return allContacts.filter(c => duplicateNameIds.has(c.id));
+  }, [allContacts, filterDuplicates, duplicateNameIds]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -1038,7 +1017,7 @@ const SemilleroPage = () => {
   // page and force them to navigate back.
   useEffect(() => {
     setCurrentPage(0);
-  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, filterRoute, activePool, activeTabId]);
+  }, [searchTerm, filterCuerda, filterResponsable, filterConector, filterDuplicates, filterOnlyWithCoords, filterZonaStatus, filterRoute, activePool, activeTabId, activeTabFilters]);
 
   // totalPages now comes from the server-reported totalFilteredCount,
   // not the in-memory filteredContacts length (which is just the current
@@ -2619,7 +2598,7 @@ const SemilleroPage = () => {
           try {
             const session = (await supabase.auth.getSession()).data.session;
             const now = new Date();
-            const today = now.toISOString().split('T')[0];
+            const today = arToday(now);
             const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
             const note = templateName
               ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}".`
@@ -2667,7 +2646,7 @@ const SemilleroPage = () => {
           try {
             const session = (await supabase.auth.getSession()).data.session;
             const now = new Date();
-            const today = now.toISOString().split('T')[0];
+            const today = arToday(now);
             const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
             const note = templateName
               ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}" (envío masivo).`

@@ -23,6 +23,21 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { normalize, normalizeName } from '@/lib/normalize';
+import { addDays, arDayStartIso, isIsoDay } from '@/lib/ar-date';
+import type { FilterTabFilters } from '@/components/admin/FilterTabsBar';
+
+// estado_civil is free text in the DB ('Soltero', 'Soltera', 'soltera',
+// 'Soltero/a', 'Concubinato'...). Each dropdown option maps to a
+// case-insensitive regex (Postgres ~*) that groups the real variants.
+// Unknown options fall back to exact equality.
+export const ESTADO_CIVIL_PATTERNS: Record<string, string> = {
+  'Soltero/a': '^\\s*solter',
+  'Casado/a': '^\\s*casad',
+  'En pareja': 'pareja|concubin|novi',
+  'Divorciado/a': 'divorci|separad',
+  'Viudo/a': '^\\s*viud',
+  'No brindó información': '^\\s*no brind',
+};
 
 // Columns brought back per row. Kept tight on purpose — the old
 // SELECT pulled 28 columns including some that only the dialog
@@ -75,6 +90,12 @@ export interface PoolFilters {
   restrictToCuerda: string | null;
   churchCuerdaNumero: string | null;    // for the __church_cuerda__ special case
 
+  /** Filters of the active saved solapa (null on "Todos"). */
+  tab: FilterTabFilters | null;
+  /** 'in' / 'out' of a live shared route; needs routeContactIds. */
+  routeFilter: '' | 'in' | 'out';
+  routeContactIds: string[] | null;
+
   sortBy: SortBy;
   sortDir: SortDir;
   page: number;
@@ -86,81 +107,52 @@ export interface PoolPage<TRow> {
   totalCount: number;
 }
 
-/**
- * Build and run a Semillero pool query against `contacts` with all
- * filters applied server-side. Returns the page rows + total count
- * for the filtered set so the UI can render "page N of M".
- */
-export async function fetchPoolPage<TRow = any>(f: PoolFilters): Promise<PoolPage<TRow>> {
-  let q = supabase
-    .from('contacts')
-    .select(POOL_ROW_COLUMNS, { count: 'exact' })
-    .eq('church_id', f.churchId)
-    .is('deleted_at', null);
-
+// Applies visibility, pool gate, search, toolbar filters, the active
+// solapa's filters and the route filter. Returns null when the result
+// is provably empty (e.g. 'En ruta' with no live routes) so callers can
+// skip the round-trip.
+function applyPoolFilters(q: any, f: PoolFilters): any | null {
   // ── Visibility scope ──────────────────────────────────────────
-  // Mirrors the visibility rules the old client-side flow applied:
-  //   - 'conector' role: only contacts they created themselves
-  //     (created_by). This overrides cuerda / responsable scoping.
-  //   - Other non-globals with a cuerda: only contacts of their
-  //     cuerda. created_by leaks were possible before — keeping
-  //     this strict prevents that.
-  //   - Other non-globals without a cuerda: only contacts where
-  //     they are responsable_id.
-  //   - Globals (admin/general/pastor/supervisor + canSeeAllCuerdas):
-  //     no scope, full church view.
+  //   - 'conector' role: only contacts they created (created_by).
+  //   - Other non-globals with a cuerda: only their cuerda.
+  //   - Other non-globals without a cuerda: only where responsable_id.
+  //   - Globals (canSeeAllCuerdas): full church view.
   if (f.userRole === 'conector') {
-    if (f.userId) {
-      q = q.eq('created_by', f.userId);
-    } else {
-      return { rows: [], totalCount: 0 };
-    }
+    if (!f.userId) return null;
+    q = q.eq('created_by', f.userId);
   } else if (!f.canSeeAllCuerdas) {
-    if (f.userCuerda) {
-      q = q.eq('numero_cuerda', f.userCuerda);
-    } else if (f.userId) {
-      q = q.eq('responsable_id', f.userId);
-    } else {
-      return { rows: [], totalCount: 0 };
-    }
+    if (f.userCuerda) q = q.eq('numero_cuerda', f.userCuerda);
+    else if (f.userId) q = q.eq('responsable_id', f.userId);
+    else return null;
   }
 
   // ── Pool gate ─────────────────────────────────────────────────
-  // 'all' is used by the global search view (when the user types in
-  // the search box we cross pool boundaries so they can find anyone).
-  // Otherwise narrow to the active pool.
+  // Searching crosses pool boundaries so users can find anyone.
+  // pending_external_send is NOT NULL DEFAULT false, so plain equality
+  // replaces the old null-or-false OR (keeps the query at a single
+  // PostgREST `or` param, used below by the MJA filter).
   const isSearching = f.search.trim().length > 0;
   if (!isSearching) {
     if (f.pool === 'unassigned') {
-      q = q
-        .is('cell_id', null)
-        .or('pending_external_send.is.null,pending_external_send.eq.false')
-        .is('pending_assignment_cell_id', null);
+      q = q.is('cell_id', null).eq('pending_external_send', false).is('pending_assignment_cell_id', null);
     } else if (f.pool === 'external') {
-      q = q
-        .is('cell_id', null)
-        .eq('pending_external_send', true);
+      q = q.is('cell_id', null).eq('pending_external_send', true);
     } else if (f.pool === 'pending_assignment') {
-      q = q
-        .is('cell_id', null)
-        .not('pending_assignment_cell_id', 'is', null);
+      q = q.is('cell_id', null).not('pending_assignment_cell_id', 'is', null);
     }
   }
 
   // ── Search ────────────────────────────────────────────────────
-  // Tokenize on whitespace and AND the tokens via chained ilike
-  // against search_haystack (migration 0034). Each token uses the
-  // trigram index, so the chained match still ends up cheap.
+  // Tokens AND-chained against search_haystack (trigram-indexed).
   if (isSearching) {
     const tokens = normalize(f.search).split(/\s+/).filter(Boolean);
     for (const token of tokens) {
-      // Escape `%` and `_` from user input so they're literal.
       const safe = token.replace(/[%_]/g, ch => `\\${ch}`);
       q = q.ilike('search_haystack', `%${safe}%`);
     }
   }
 
-  // ── Equality / IS NULL filters ────────────────────────────────
+  // ── Toolbar filters ───────────────────────────────────────────
   if (f.filterCuerda) q = q.eq('numero_cuerda', f.filterCuerda);
 
   if (f.filterResponsable === '__none__') {
@@ -175,43 +167,98 @@ export async function fetchPoolPage<TRow = any>(f: PoolFilters): Promise<PoolPag
   if (f.filterConector === '__none__') {
     q = q.is('conector', null);
   } else if (f.filterConector) {
-    // Conector is stored in normalizeName() form by the DB trigger,
-    // so we can do equality against the same normalization client-side.
+    // Stored in normalizeName() form by a DB trigger.
     q = q.eq('conector', normalizeName(f.filterConector));
   }
 
-  if (f.filterOnlyWithCoords) {
-    q = q.not('lat', 'is', null).not('lng', 'is', null);
+  if (f.filterOnlyWithCoords) q = q.not('lat', 'is', null).not('lng', 'is', null);
+
+  // Set internally while the Zona filter is active: 'En zona' is relative
+  // to the logged-in user's own cuerda.
+  if (f.restrictToCuerda) q = q.eq('numero_cuerda', f.restrictToCuerda);
+
+  // ── Saved solapa ──────────────────────────────────────────────
+  const t = f.tab;
+  if (t) {
+    if (t.mjaReceived) q = q.or('received_from_mja_at.not.is.null,sent_to_mja_at.not.is.null');
+
+    // Legacy tabs saved a single `cuerda`; newer ones the `cuerdas` array.
+    const cuerdas = t.cuerdas && t.cuerdas.length > 0 ? t.cuerdas : t.cuerda ? [t.cuerda] : null;
+    if (cuerdas) q = q.in('numero_cuerda', cuerdas);
+
+    if (t.responsable === '__none__') q = q.is('responsable_id', null);
+    else if (t.responsable) q = q.eq('responsable_id', t.responsable);
+
+    if (t.sexo) q = q.eq('sexo', t.sexo);
+
+    if (t.estadoCivil) {
+      const re = ESTADO_CIVIL_PATTERNS[t.estadoCivil];
+      q = re ? q.filter('estado_civil', 'imatch', re) : q.eq('estado_civil', t.estadoCivil);
+    }
+
+    const edadMin = parseInt(t.edadMin || '', 10);
+    const edadMax = parseInt(t.edadMax || '', 10);
+    if (!Number.isNaN(edadMin)) q = q.gte('edad', edadMin);
+    if (!Number.isNaN(edadMax)) q = q.lte('edad', edadMax);
+
+    // Keys keep the legacy fechaContacto* names for saved tabs; the
+    // dialog labels them "Fecha de creación" and they filter created_at
+    // by Argentina calendar day ('hasta' is inclusive).
+    if (isIsoDay(t.fechaContactoFrom)) q = q.gte('created_at', arDayStartIso(t.fechaContactoFrom));
+    if (isIsoDay(t.fechaContactoTo)) q = q.lt('created_at', arDayStartIso(addDays(t.fechaContactoTo, 1)));
+
+    if (t.zonaId) q = q.eq('zona_id', t.zonaId);
+
+    if (t.hasPhone === 'yes') q = q.not('phone', 'is', null);
+    else if (t.hasPhone === 'no') q = q.is('phone', null);
+
+    if (t.hasAddress === 'yes') q = q.not('address', 'is', null);
+    else if (t.hasAddress === 'no') q = q.is('address', null);
+
+    if (t.hasCoords === 'yes') q = q.not('lat', 'is', null).not('lng', 'is', null);
+    else if (t.hasCoords === 'no') q = q.is('lat', null);
   }
 
-  // restrictToCuerda is the internal counterpart to filterCuerda
-  // (which is the user's dropdown choice). Used when the Zona filter
-  // is active so the client polygon test only sees contacts of the
-  // user's own cuerda, across all pages.
-  if (f.restrictToCuerda) {
-    q = q.eq('numero_cuerda', f.restrictToCuerda);
+  // ── En ruta ───────────────────────────────────────────────────
+  if (f.routeFilter) {
+    const ids = f.routeContactIds || [];
+    if (f.routeFilter === 'in') {
+      if (ids.length === 0) return null;
+      q = q.in('id', ids);
+    } else if (ids.length > 0) {
+      q = q.not('id', 'in', `(${ids.join(',')})`);
+    }
   }
 
-  // ── Sort ──────────────────────────────────────────────────────
+  return q;
+}
+
+function applyPoolSort(q: any, f: PoolFilters): any {
   if (f.sortBy === 'nombre') {
     q = q.order('search_name', { ascending: f.sortDir === 'asc' });
-  } else if (f.sortBy === 'fecha') {
-    q = q.order('fecha_contacto', { ascending: f.sortDir === 'asc', nullsFirst: false });
   } else {
-    q = q.order('fecha_contacto', { ascending: false, nullsFirst: false });
+    q = q.order('fecha_contacto', { ascending: f.sortBy === 'fecha' && f.sortDir === 'asc', nullsFirst: false });
   }
-  // Secondary tie-breaker on id keeps .range() pagination stable across
-  // calls — without it, rows with equal fecha_contacto can swap places
-  // between page N and page N+1 (the bug that prompted the original
-  // server-side pagination of the bulk fetch back in PR #14).
-  q = q.order('id', { ascending: true });
+  // Tie-breaker on id keeps .range() pagination stable across calls.
+  return q.order('id', { ascending: true });
+}
 
-  // ── Pagination ────────────────────────────────────────────────
+/**
+ * Build and run a Semillero pool query against `contacts` with all
+ * filters applied server-side. Returns the page rows + total count
+ * for the filtered set so the UI can render "page N of M".
+ */
+export async function fetchPoolPage<TRow = any>(f: PoolFilters): Promise<PoolPage<TRow>> {
+  const base = supabase
+    .from('contacts')
+    .select(POOL_ROW_COLUMNS, { count: 'exact' })
+    .eq('church_id', f.churchId)
+    .is('deleted_at', null);
+  const filtered = applyPoolFilters(base, f);
+  if (!filtered) return { rows: [], totalCount: 0 };
+
   const from = f.page * f.pageSize;
-  const to = (f.page + 1) * f.pageSize - 1;
-  q = q.range(from, to);
-
-  const { data, count, error } = await q;
+  const { data, count, error } = await applyPoolSort(filtered, f).range(from, from + f.pageSize - 1);
   if (error) {
     console.error('[fetchPoolPage]', error, { filters: f });
     throw error;
@@ -220,6 +267,35 @@ export async function fetchPoolPage<TRow = any>(f: PoolFilters): Promise<PoolPag
     rows: (data || []) as unknown as TRow[],
     totalCount: count ?? 0,
   };
+}
+
+/**
+ * Every row matching the filters (ignores page/pageSize), walked in
+ * 1000-row chunks to get past the PostgREST response cap. Used when a
+ * filter can only be evaluated client-side (the Zona polygon test) so
+ * it sees the whole filtered set instead of a single page.
+ */
+export async function fetchPoolAll<TRow = any>(f: PoolFilters, maxRows = 20000): Promise<TRow[]> {
+  const CHUNK = 1000;
+  const all: TRow[] = [];
+  for (let from = 0; from < maxRows; from += CHUNK) {
+    const base = supabase
+      .from('contacts')
+      .select(POOL_ROW_COLUMNS)
+      .eq('church_id', f.churchId)
+      .is('deleted_at', null);
+    const filtered = applyPoolFilters(base, f);
+    if (!filtered) return [];
+    const { data, error } = await applyPoolSort(filtered, f).range(from, from + CHUNK - 1);
+    if (error) {
+      console.error('[fetchPoolAll]', error, { filters: f });
+      throw error;
+    }
+    const rows = (data || []) as unknown as TRow[];
+    all.push(...rows);
+    if (rows.length < CHUNK) break;
+  }
+  return all;
 }
 
 // ─── Count-only queries for the pool tab chips ───────────────────

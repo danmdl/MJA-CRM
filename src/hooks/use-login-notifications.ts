@@ -82,7 +82,7 @@ export function useLoginNotifications() {
       const { count: msgCount } = await (supabase as any)
         .from('message_recipients')
         .select('*, messages!inner(created_at)', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .eq('recipient_id', userId)
         .is('read_at', null)
         .gte('messages.created_at', since) as { count: number | null };
       const unreadMessages = msgCount || 0;

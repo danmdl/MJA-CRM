@@ -19,6 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import PipelineSummaryCard from '@/components/admin/PipelineSummaryCard';
 import MetricsCharts from '@/components/admin/MetricsCharts';
 import CustomReportBuilder from '@/components/admin/CustomReportBuilder';
+import { normalize } from '@/lib/normalize';
 
 interface Church {
   id: string;
@@ -301,8 +302,9 @@ const OverviewPage = () => {
     const perDay: Record<string, number> = {};
     weekDays.forEach(d => { perDay[d] = 0; });
     c.forEach((x: any) => {
-      const day = (x.meeting_day || '').trim();
-      const match = weekDays.find(d => d.toLowerCase() === day.toLowerCase());
+      // Free text: 'Miercoles', 'Sabados', 'sábado' all count.
+      const day = normalize((x.meeting_day || '').trim());
+      const match = day ? weekDays.find(d => day.startsWith(normalize(d))) : undefined;
       if (match) perDay[match] = (perDay[match] || 0) + 1;
     });
 

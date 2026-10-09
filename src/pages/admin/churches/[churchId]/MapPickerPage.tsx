@@ -16,6 +16,7 @@ import { loadGoogleMaps } from '@/lib/google-maps';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { ChevronLeft, MapPin, Route as RouteIcon, Search, X, List, Map as MapIcon, Navigation, Lasso } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
+import { addDays, arToday, toArDate } from '@/lib/ar-date';
 
 interface Contact {
   id: string;
@@ -416,9 +417,7 @@ const MapPickerPage = () => {
       if (filterCuerda && c.numero_cuerda !== filterCuerda) return false;
       if (filterDateFrom && (!c.fecha_contacto || c.fecha_contacto < filterDateFrom)) return false;
       if (filterDateTo && (!c.fecha_contacto || c.fecha_contacto > filterDateTo)) return false;
-      // created_at is an ISO timestamp; slice to the date prefix so the
-      // 'to' bound includes the whole day instead of cutting off at midnight.
-      const created = c.created_at ? c.created_at.slice(0, 10) : '';
+      const created = toArDate(c.created_at);
       if (filterCreatedFrom && (!created || created < filterCreatedFrom)) return false;
       if (filterCreatedTo && (!created || created > filterCreatedTo)) return false;
       if (filterSexo && c.sexo !== filterSexo) return false;
@@ -485,9 +484,7 @@ const MapPickerPage = () => {
 
   // Quick filter presets — set fecha_contacto >= N days ago
   const setLastNDays = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    setFilterDateFrom(d.toISOString().slice(0, 10));
+    setFilterDateFrom(addDays(arToday(), -n));
     setFilterDateTo('');
   };
 
@@ -1031,8 +1028,8 @@ const MapPickerPage = () => {
         )}
         <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-8 text-xs border rounded px-2 bg-background shrink-0">
           <option value="">Sexo: todos</option>
-          <option value="masculino">Masculino</option>
-          <option value="femenino">Femenino</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Femenino">Femenino</option>
         </select>
         {/* Dos rangos independientes, cada uno como un pill que se abre
             en popover con Desde/Hasta. Cerrado muestra el resumen

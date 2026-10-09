@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { Download, FileSpreadsheet } from 'lucide-react';
 import { writeXlsxFromAOA } from '@/lib/xlsx-adapter';
+import { fetchAllPages } from '@/lib/pagination';
+import { arToday, toArDate } from '@/lib/ar-date';
 
 interface ReportField {
   key: string;
@@ -70,19 +72,21 @@ const CustomReportBuilder = ({ churchId, churchName, inline }: Props) => {
       const selectedKeys = fields.filter(f => f.checked).map(f => f.key);
       if (selectedKeys.length === 0) { showError('Seleccioná al menos una columna.'); return; }
 
-      let query = supabase
-        .from('contacts')
-        .select(selectedKeys.join(', '))
-        .eq('church_id', churchId)
-        .order('numero_cuerda', { ascending: true });
-
-      if (!allCuerdas && selectedCuerdas.size > 0) {
-        query = query.in('numero_cuerda', Array.from(selectedCuerdas));
-      }
-      if (estadoFilter !== 'all') query = query.eq('estado_seguimiento', estadoFilter);
-
-      const { data, error } = await query;
-      if (error || !data) { showError('Error al generar el reporte.'); return; }
+      // Exports can exceed the 1000-row response cap; trashed contacts excluded.
+      const data = await fetchAllPages<any>(() => {
+        let query = supabase
+          .from('contacts')
+          .select(selectedKeys.includes('id') ? selectedKeys.join(', ') : ['id', ...selectedKeys].join(', '))
+          .eq('church_id', churchId)
+          .is('deleted_at', null)
+          .order('numero_cuerda', { ascending: true });
+        if (!allCuerdas && selectedCuerdas.size > 0) {
+          query = query.in('numero_cuerda', Array.from(selectedCuerdas));
+        }
+        if (estadoFilter !== 'all') query = query.eq('estado_seguimiento', estadoFilter);
+        return query;
+      });
+      if (data.length === 0) { showError('No hay contactos para esos filtros.'); return; }
 
       const headers = fields.filter(f => f.checked).map(f => f.label);
       const rows = data.map((row: any) =>
@@ -90,7 +94,11 @@ const CustomReportBuilder = ({ churchId, churchName, inline }: Props) => {
           const val = row[f.key];
           if (val === null || val === undefined) return '';
           if (['created_at', 'fecha_contacto', 'date_of_birth'].includes(f.key)) {
-            try { return new Date(val).toLocaleDateString('es-AR'); } catch { return val; }
+            // Date-only columns must not go through new Date(): it reads them
+            // as UTC midnight and prints the previous day in Argentina.
+            const day = f.key === 'created_at' ? toArDate(val) : String(val).slice(0, 10);
+            const [y, m, d] = day.split('-');
+            return y && m && d ? `${d}/${m}/${y}` : String(val);
           }
           return String(val);
         })
@@ -99,7 +107,7 @@ const CustomReportBuilder = ({ churchId, churchName, inline }: Props) => {
       const sheetName = !allCuerdas && selectedCuerdas.size === 1 ? `Cuerda ${Array.from(selectedCuerdas)[0]}` : 'Contactos';
       await writeXlsxFromAOA(
         [headers, ...rows],
-        `Reporte_${churchName.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        `Reporte_${churchName.replace(/\s/g, '_')}_${arToday()}.xlsx`,
         sheetName,
       );
       showSuccess(`${data.length} contactos exportados.`);

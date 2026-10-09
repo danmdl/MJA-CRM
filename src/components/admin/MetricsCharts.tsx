@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/pagination';
 
 interface Contact {
   created_at: string;
@@ -14,11 +15,10 @@ const MetricsCharts = ({ churchId }: { churchId: string }) => {
   const { data: contacts } = useQuery<Contact[]>({
     queryKey: ['metrics-contacts', churchId],
     queryFn: async () => {
-      const { data } = await supabase.from('contacts')
-        .select('created_at, numero_cuerda, estado_seguimiento')
+      return fetchAllPages<Contact>(() => supabase.from('contacts')
+        .select('id, created_at, numero_cuerda, estado_seguimiento')
         .eq('church_id', churchId)
-        .is('deleted_at', null);
-      return (data || []) as Contact[];
+        .is('deleted_at', null));
     },
     staleTime: 60000,
   });

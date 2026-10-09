@@ -163,11 +163,13 @@ const HistorialPage = () => {
   const filtered = useMemo(() => {
     const q = normalize(search);
     return (rows || []).filter(r => {
-      if (actionFilter !== 'all' && r.action !== actionFilter) return false;
+      // Deletions are logged as bulk_delete_contacts, not 'delete'.
+      if (actionFilter === 'delete' ? !r.action?.includes('delete') : actionFilter !== 'all' && r.action !== actionFilter) return false;
       const c = extractCuerda(r);
       if (cuerdaFilter !== 'all' && c !== cuerdaFilter) return false;
       const s = extractSexo(r);
-      if (sexoFilter !== 'all' && s !== sexoFilter) return false;
+      // Logs carry 'Masculino', 'Femenino' and lowercase variants.
+      if (sexoFilter !== 'all' && (s || '').toLowerCase() !== sexoFilter.toLowerCase()) return false;
       if (!q) return true;
       const haystack = [
         actorName(r),
@@ -232,8 +234,8 @@ const HistorialPage = () => {
           <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Sexo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="M">Masculino</SelectItem>
-            <SelectItem value="F">Femenino</SelectItem>
+            <SelectItem value="Masculino">Masculino</SelectItem>
+            <SelectItem value="Femenino">Femenino</SelectItem>
           </SelectContent>
         </Select>
         {hasActiveFilters && (

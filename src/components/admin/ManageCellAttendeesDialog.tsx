@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Input } from '@/components/ui/input';
+import { fetchAllPages } from '@/lib/pagination';
 
 interface Contact {
   id: string;
@@ -33,14 +34,12 @@ const ManageCellAttendeesDialog = ({ open, onOpenChange, churchId, cellId }: Man
   useEffect(() => {
     if (!open) return;
     const load = async () => {
-      const { data, error } = await supabase
+      // Whole church (7k+ contacts) — page past the 1000-row cap.
+      const data = await fetchAllPages<any>(() => supabase
         .from('contacts')
         .select('id, first_name, last_name, email, cell_id')
-        .eq('church_id', churchId);
-      if (error) {
-        showError('Error al cargar contactos.');
-        return;
-      }
+        .eq('church_id', churchId)
+        .is('deleted_at', null));
       setAllContacts(data || []);
       const preselected = new Set((data || []).filter(c => c.cell_id === cellId).map(c => c.id));
       setSelected(preselected);
