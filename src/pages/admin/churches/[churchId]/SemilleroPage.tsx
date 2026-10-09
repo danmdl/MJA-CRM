@@ -62,6 +62,7 @@ import { BulkDeleteDialog } from './semillero/BulkDeleteDialog';
 import { BulkAssignDialog } from './semillero/BulkAssignDialog';
 import { PaginationControls } from './semillero/PaginationControls';
 import { AssignConfirmDialog, type ConfirmDialogState } from './semillero/AssignConfirmDialog';
+import { arToday } from '@/lib/ar-date';
 
 // ─── Main Component ──────────────────────────────────────────────
 const SemilleroPage = () => {
@@ -2597,7 +2598,7 @@ const SemilleroPage = () => {
           try {
             const session = (await supabase.auth.getSession()).data.session;
             const now = new Date();
-            const today = now.toISOString().split('T')[0];
+            const today = arToday(now);
             const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
             const note = templateName
               ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}".`
@@ -2645,7 +2646,7 @@ const SemilleroPage = () => {
           try {
             const session = (await supabase.auth.getSession()).data.session;
             const now = new Date();
-            const today = now.toISOString().split('T')[0];
+            const today = arToday(now);
             const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
             const note = templateName
               ? `WhatsApp enviado a las ${time} usando plantilla "${templateName}" (envío masivo).`

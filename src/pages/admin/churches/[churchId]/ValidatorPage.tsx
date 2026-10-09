@@ -11,6 +11,7 @@ import { geoJsonToGooglePaths, isPointInTerritory } from '@/lib/territory-utils'
 import { buildGeocodeAddress } from '@/lib/geocode-address';
 import { useSession } from '@/hooks/use-session';
 import { normalize } from '@/lib/normalize';
+import { fetchAllPages } from '@/lib/pagination';
 
 // Lazy: only fetch the ~1k LOC profile dialog when the user opens it.
 const ContactProfileDialog = lazy(() => import('@/components/admin/ContactProfileDialog'));
@@ -133,17 +134,17 @@ const ValidatorPage = () => {
     };
 
     // 1. Contacts without coordinates (have address but no lat/lng)
-    const { data: noCoords } = await contactsBase()
+    const noCoords = await fetchAllPages<any>(() => contactsBase()
       .not('address', 'is', null)
-      .or('lat.is.null,lng.is.null');
+      .or('lat.is.null,lng.is.null'));
     (noCoords || []).filter(c => c.address && c.address.trim()).forEach(c => {
       found.push({ id: `no-coords-${c.id}`, type: 'contacts_no_coords', severity: 'error', entity: 'contact', entityId: c.id,
         name: `${c.first_name} ${c.last_name || ''}`.trim(), detail: `Dirección: ${c.address} — sin geolocalización` });
     });
 
     // 2. Contacts with bad coordinates (outside GBA)
-    const { data: allWithCoords } = await contactsBase()
-      .not('lat', 'is', null).not('lng', 'is', null);
+    const allWithCoords = await fetchAllPages<any>(() => contactsBase()
+      .not('lat', 'is', null).not('lng', 'is', null));
     (allWithCoords || []).forEach(c => {
       if (!isWithinGBA(c.lat, c.lng)) {
         found.push({ id: `bad-coords-${c.id}`, type: 'contacts_bad_coords', severity: 'error', entity: 'contact', entityId: c.id,
@@ -152,32 +153,32 @@ const ValidatorPage = () => {
     });
 
     // 3. Contacts without sexo
-    const { data: noSexo } = await contactsBase()
-      .or('sexo.is.null,sexo.eq.');
+    const noSexo = await fetchAllPages<any>(() => contactsBase()
+      .or('sexo.is.null,sexo.eq.'));
     (noSexo || []).forEach(c => {
       found.push({ id: `no-sexo-${c.id}`, type: 'contacts_no_sexo', severity: 'warning', entity: 'contact', entityId: c.id,
         name: `${c.first_name} ${c.last_name || ''}`.trim(), detail: 'Sin sexo — no se puede filtrar por género en la asignación' });
     });
 
     // 4. Contacts without address
-    const { data: noAddr } = await contactsBase()
-      .or('address.is.null,address.eq.');
+    const noAddr = await fetchAllPages<any>(() => contactsBase()
+      .or('address.is.null,address.eq.'));
     (noAddr || []).forEach(c => {
       found.push({ id: `no-addr-${c.id}`, type: 'contacts_no_address', severity: 'warning', entity: 'contact', entityId: c.id,
         name: `${c.first_name} ${c.last_name || ''}`.trim(), detail: 'Sin dirección — no se puede calcular proximidad' });
     });
 
     // 5. Contacts without phone
-    const { data: noPhone } = await contactsBase()
-      .or('phone.is.null,phone.eq.');
+    const noPhone = await fetchAllPages<any>(() => contactsBase()
+      .or('phone.is.null,phone.eq.'));
     (noPhone || []).forEach(c => {
       found.push({ id: `no-phone-${c.id}`, type: 'contacts_no_phone', severity: 'info', entity: 'contact', entityId: c.id,
         name: `${c.first_name} ${c.last_name || ''}`.trim(), detail: 'Sin teléfono de contacto' });
     });
 
     // 6. Duplicate phones
-    const { data: allPhones } = await contactsBase()
-      .not('phone', 'is', null);
+    const allPhones = await fetchAllPages<any>(() => contactsBase()
+      .not('phone', 'is', null));
     const phoneCounts = new Map<string, { count: number; contacts: typeof allPhones }>();
     (allPhones || []).forEach(c => {
       if (!c.phone || c.phone.trim().length < 5) return;
@@ -200,8 +201,8 @@ const ValidatorPage = () => {
     // stripped of accents, whitespace collapsed). Two contacts with the same
     // person's name in the same church are very likely the same person —
     // worth surfacing as a warning so a leader can merge or correct.
-    const { data: allNames } = await contactsBase()
-      .select('id, first_name, last_name');
+    const allNames = await fetchAllPages<any>(() => contactsBase()
+      .select('id, first_name, last_name'));
     const nameGroups = new Map<string, { contacts: typeof allNames }>();
     (allNames || []).forEach(c => {
       const full = normalize(`${c.first_name || ''} ${c.last_name || ''}`).replace(/\s+/g, ' ').trim();
@@ -258,14 +259,14 @@ const ValidatorPage = () => {
         const { data: cuerdaRows } = await supabase.from('cuerdas').select('id, numero').in('id', cuerdaIds);
         const cuerdaNumeros = new Set((cuerdaRows || []).map(c => c.numero));
         // Fetch contacts in those cuerdas
-        const { data: contactsInTerritoryCuerdas } = await supabase
+        const contactsInTerritoryCuerdas = await fetchAllPages<any>(() => supabase
           .from('contacts')
           .select('id, first_name, last_name, lat, lng, numero_cuerda')
           .eq('church_id', churchId!)
           .is('deleted_at', null)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
-          .not('numero_cuerda', 'is', null);
+          .not('numero_cuerda', 'is', null));
         for (const ct of (contactsInTerritoryCuerdas || [])) {
           if (!ct.numero_cuerda || !cuerdaNumeros.has(ct.numero_cuerda)) continue;
           // Find the cuerda entry
@@ -445,20 +446,17 @@ const ValidatorPage = () => {
     bulkAbortRef.current = false;
     setBulkProgress({ done: 0, total: 0, fixed: 0, cleared: 0, stillInCaba: 0, outOfZone: 0, failed: 0 });
 
-    // Pull candidates. Pagination not needed at 896 rows but we cap at
-    // 2000 to be safe in case the criteria match more after future
-    // imports.
-    const { data: candidates, error } = await supabase
+    // .limit() alone is still capped at 1000 rows by the server.
+    const candidates = await fetchAllPages<{ id: string; address: string | null; lat: number | null; lng: number | null }>(() => supabase
       .from('contacts')
       .select('id, address, lat, lng')
       .eq('church_id', churchId)
       .is('deleted_at', null)
       .not('address', 'is', null)
       .not('lat', 'is', null)
-      .not('lng', 'is', null)
-      .limit(2000);
+      .not('lng', 'is', null));
 
-    if (error || !candidates) {
+    if (candidates.length === 0) {
       setBulkRegeocoding(false);
       showError('No se pudo cargar la lista de candidatos.');
       return;

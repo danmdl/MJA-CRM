@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ContactProfileDialog from './ContactProfileDialog';
 import { normalize } from '@/lib/normalize';
 import { normalizeArgentinePhoneForWhatsapp } from '@/lib/phone-validation';
+import { arToday } from '@/lib/ar-date';
 
 interface CellDetailsDialogProps {
   open: boolean;
@@ -59,7 +60,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
+      const today = arToday(now);
       const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
       await fetch('https://jczsgvaednptnypxhcje.supabase.co/functions/v1/add-contact-log-v2', {
         method: 'POST',

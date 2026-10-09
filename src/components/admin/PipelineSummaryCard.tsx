@@ -26,6 +26,8 @@ const PipelineSummaryCard = ({ churchId }: Props) => {
           .select('estado_seguimiento')
           .eq('church_id', churchId)
           .is('deleted_at', null)
+          // Without a stable order, .range() pages can overlap or skip rows.
+          .order('id')
           .range(p * PAGE, (p + 1) * PAGE - 1);
         if (error) break;
         if (!data || data.length === 0) break;

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { PoolFilters } from './semillero-pool-query';
 
 // Recording fake of the supabase-js query builder: every chained call is
 // logged as [method, ...args] and awaiting it resolves to `nextResult`.
@@ -27,13 +28,13 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 const { fetchPoolPage, fetchPoolAll, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
 
-const baseFilters = {
+const baseFilters: PoolFilters = {
   churchId: 'church-1',
   userId: 'user-1',
   userRole: 'admin',
   userCuerda: null,
   canSeeAllCuerdas: true,
-  pool: 'unassigned' as const,
+  pool: 'unassigned',
   search: '',
   filterCuerda: '',
   filterResponsable: '',
@@ -42,10 +43,10 @@ const baseFilters = {
   restrictToCuerda: null,
   churchCuerdaNumero: 'MJA Central',
   tab: null,
-  routeFilter: '' as const,
+  routeFilter: '',
   routeContactIds: null,
   sortBy: null,
-  sortDir: 'asc' as const,
+  sortDir: 'asc',
   page: 0,
   pageSize: 200,
 };

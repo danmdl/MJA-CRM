@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { PROCESS_STAGES, type ProcessStageKey } from '@/lib/process-stages';
 import type { AttendanceEvent } from './types';
+import { arToday } from '@/lib/ar-date';
 
 interface EventoDialogProps {
   churchId: string;
@@ -29,7 +30,7 @@ export const EventoDialog = ({
   const userCuerdaId = useMemo(() => cuerdas.find(c => c.numero === userCuerdaNumero)?.id || null, [cuerdas, userCuerdaNumero]);
 
   const [stage, setStage] = useState<ProcessStageKey>(existing?.stage || defaultStage);
-  const [date, setDate] = useState(existing?.event_date || defaultDate || new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(existing?.event_date || defaultDate || arToday());
   const [time, setTime] = useState(existing?.event_time?.slice(0, 5) || '');
   const [title, setTitle] = useState(existing?.title || '');
   const [notes, setNotes] = useState(existing?.notes || '');

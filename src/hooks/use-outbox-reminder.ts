@@ -3,6 +3,7 @@ import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/integrations/supabase/client';
 import { showInfo } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
+import { arToday } from '@/lib/ar-date';
 
 // Daily reminder: if the user has contacts sitting in their MJA outbox
 // (pending_external_send=true) waiting for confirmation, show a toast
@@ -31,7 +32,7 @@ export function useOutboxReminder() {
     // so we just check the role: admin/general don't get this reminder.)
     if (profile.role === 'admin' || profile.role === 'general') return;
 
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = arToday();
     const lsKey = `${LS_KEY_PREFIX}${userId}`;
     const lastShown = (() => { try { return localStorage.getItem(lsKey); } catch { return null; } })();
     if (lastShown === today) return; // already shown today

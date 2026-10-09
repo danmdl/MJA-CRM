@@ -11,6 +11,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { usePermissions } from '@/lib/permissions';
+import { fetchAllPages } from '@/lib/pagination';
 
 interface DeletedItem {
   id: string;
@@ -39,11 +40,12 @@ const PapeleraPage = () => {
   const { data: items, isLoading } = useQuery<DeletedItem[]>({
     queryKey: ['papelera', churchId],
     queryFn: async () => {
-      const { data: contacts } = await supabase
+      // 4.8k trashed contacts: page past the 1000-row response cap.
+      const contacts = await fetchAllPages<any>(() => supabase
         .from('contacts')
         .select('id, first_name, last_name, numero_cuerda, sexo, deleted_at, deleted_by')
         .eq('church_id', churchId!)
-        .not('deleted_at', 'is', null);
+        .not('deleted_at', 'is', null));
 
       const { data: cells } = await supabase
         .from('cells')
@@ -162,8 +164,8 @@ const PapeleraPage = () => {
           </select>
           <select value={filterSexo} onChange={e => setFilterSexo(e.target.value)} className="h-9 px-2 rounded border bg-background text-sm" disabled={filterType === 'cell'}>
             <option value="all">Ambos sexos</option>
-            <option value="M">Masculino</option>
-            <option value="F">Femenino</option>
+            <option value="Masculino">Masculino</option>
+            <option value="Femenino">Femenino</option>
           </select>
           {(filterType !== 'all' || filterCuerda !== 'all' || filterSexo !== 'all') && (
             <button onClick={() => { setFilterType('all'); setFilterCuerda('all'); setFilterSexo('all'); }} className="text-xs text-muted-foreground hover:text-foreground underline">
@@ -189,7 +191,7 @@ const PapeleraPage = () => {
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-[10px]">{item.type === 'contact' ? 'Contacto' : 'Célula'}</Badge>
                 <span className="text-sm font-medium truncate">{item.name}</span>
-                {item.sexo && <span className="text-[10px] text-muted-foreground">({item.sexo === 'M' ? 'M' : 'F'})</span>}
+                {item.sexo && <span className="text-[10px] text-muted-foreground">({item.sexo.charAt(0).toUpperCase()})</span>}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">

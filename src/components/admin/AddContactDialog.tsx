@@ -13,6 +13,7 @@ import AddressAutocomplete from './AddressAutocomplete';
 import { isWithinGBA as isWithinGBACheck } from '@/lib/geo-validation';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { normalizeName } from '@/lib/normalize';
+import { arToday } from '@/lib/ar-date';
 
 interface Cell {
   id: string;
@@ -59,7 +60,7 @@ const FormField = ({ label, id, value, onChange, type = "text", required = false
 
 const nativeSelectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => arToday();
 
 const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProps) => {
   const [loading, setLoading] = useState(false);
