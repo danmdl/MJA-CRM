@@ -248,7 +248,7 @@ const MapaPage: React.FC<MapaPageProps> = ({ forcedViewMode, hideToggle }) => {
     } else {
       (mapContacts || []).forEach(c => { if (c.numero_cuerda) nums.add(c.numero_cuerda); });
     }
-    return Array.from(nums).sort((a, b) => Number(a) - Number(b));
+    return Array.from(nums).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
   }, [cells, mapContacts, viewMode]);
 
   // Which cuerdas are visible — initialized to:

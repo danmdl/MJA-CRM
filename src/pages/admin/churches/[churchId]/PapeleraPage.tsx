@@ -98,7 +98,7 @@ const PapeleraPage = () => {
   const cuerdaOptions = useMemo(() => {
     const set = new Set<string>();
     (items || []).forEach(i => { if (i.numero_cuerda) set.add(String(i.numero_cuerda)); });
-    return Array.from(set).sort((a, b) => Number(a) - Number(b));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
   }, [items]);
 
   const filtered = useMemo(() => {

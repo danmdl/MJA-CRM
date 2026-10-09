@@ -119,6 +119,7 @@ const CellDetailsDialog = ({ open, onOpenChange, churchId, cellId }: CellDetails
         .select('id, first_name, last_name, phone, address')
         .eq('church_id', churchId)
         .eq('cell_id', cellId)
+        .is('deleted_at', null)
         .order('first_name', { ascending: true });
       setAttendees((contactsData || []) as Contact[]);
       setLoading(false);

@@ -151,7 +151,8 @@ const TerritoriosPage: React.FC = () => {
       const { data } = await supabase
         .from('cells')
         .select('id, name, cuerda_id, lat, lng')
-        .eq('church_id', churchId!);
+        .eq('church_id', churchId!)
+        .is('deleted_at', null);
       return data || [];
     },
     enabled: !!churchId,

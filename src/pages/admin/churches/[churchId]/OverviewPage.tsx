@@ -64,6 +64,7 @@ const fetchCells = async (churchId: string): Promise<Cell[]> => {
     .from('cells')
     .select('*')
     .eq('church_id', churchId)
+    .is('deleted_at', null)
     .order('name', { ascending: true });
   if (error) throw new Error('No se pudieron cargar las células.');
   return data || [];

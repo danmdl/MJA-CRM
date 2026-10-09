@@ -108,7 +108,7 @@ const CuerdasPage = () => {
   const { data: cells } = useQuery<Cell[]>({
     queryKey: ['cells', churchId],
     queryFn: async () => {
-      const { data } = await supabase.from('cells').select('*').eq('church_id', churchId!).order('name');
+      const { data } = await supabase.from('cells').select('*').eq('church_id', churchId!).is('deleted_at', null).order('name');
       return (data || []) as Cell[];
     },
     enabled: !!churchId,
