@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Trash2, Merge, X, AlertTriangle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 // Fields we present in the merge dialog. Order matches what's most useful to
 // see at a glance — identity first, then contact, then context. id /
@@ -88,6 +90,7 @@ const fmt = (v: any) => {
 };
 
 const DuplicateMergeDialog: React.FC<Props> = ({ open, onOpenChange, group, userId, onResolved }) => {
+  const queryClient = useQueryClient();
   // The user picks ONE survivor. By default we pick the oldest contact (the
   // one with the earliest created_at) — they've usually accumulated the most
   // history (logs, processes, transfers) and that's what the user will want
@@ -208,6 +211,7 @@ const DuplicateMergeDialog: React.FC<Props> = ({ open, onOpenChange, group, user
       }
 
       showSuccess(`Merge completado: 1 contacto principal, ${losers.length} eliminado${losers.length === 1 ? '' : 's'}.`);
+      refreshContactQueries(queryClient);
       onResolved();
       onOpenChange(false);
     } catch (e: any) {

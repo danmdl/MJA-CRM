@@ -106,9 +106,7 @@ export function useLoginNotifications() {
         const headline = userIsMjaSide
           ? `Tenés ${mjaCount} ${mjaCount === 1 ? 'nuevo contacto recibido' : 'nuevos contactos recibidos'} de otras cuerdas`
           : `Tenés ${mjaCount} ${mjaCount === 1 ? 'nuevo contacto asignado' : 'nuevos contactos asignados'} por MJA`;
-        const description = userIsMjaSide
-          ? 'Abrí la solapa "Recibidos de MJA" en el Semillero para revisarlos.'
-          : 'Abrí la solapa "Recibidos de MJA" en el Semillero para revisarlos.';
+        const description = 'Abrí la solapa "Pases" en el Semillero para revisarlos.';
         showHighlight(headline, {
           description,
           action: {

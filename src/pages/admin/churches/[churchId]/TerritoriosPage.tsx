@@ -10,6 +10,7 @@ import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
 import { geoJsonToGooglePaths, googlePathsToGeoJson, isPointInTerritory } from '@/lib/territory-utils';
 import { loadGoogleMaps } from '@/lib/google-maps';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 interface CuerdaWithTerritory {
   id: string;
@@ -663,7 +664,7 @@ const TerritoriosPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['cuerdas-territorios', churchId] });
       // Bust the Semillero pool query too — territory changes affect
       // the in/out badges there.
-      await queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+      await refreshContactQueries(queryClient);
       await queryClient.invalidateQueries({ queryKey: ['cuerdas-pool', churchId] });
     } catch (e: any) {
       showError(e?.message || 'Error guardando territorio.');

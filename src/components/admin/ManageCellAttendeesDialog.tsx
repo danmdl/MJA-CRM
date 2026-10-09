@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Input } from '@/components/ui/input';
 import { fetchAllPages } from '@/lib/pagination';
+import { useQueryClient } from '@tanstack/react-query';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 interface Contact {
   id: string;
@@ -26,6 +28,7 @@ interface ManageCellAttendeesDialogProps {
 }
 
 const ManageCellAttendeesDialog = ({ open, onOpenChange, churchId, cellId }: ManageCellAttendeesDialogProps) => {
+  const queryClient = useQueryClient();
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -84,6 +87,7 @@ const ManageCellAttendeesDialog = ({ open, onOpenChange, churchId, cellId }: Man
         if (error) throw error;
       }
       showSuccess('Asistentes actualizados.');
+      refreshContactQueries(queryClient);
       setTimeout(() => onOpenChange(false), 50);
     } catch (e: any) {
       showError(e.message || 'Error al actualizar asistentes.');

@@ -22,6 +22,7 @@ import { PIPELINE_STAGES } from './ContactPipelineBadge';
 import AddressAutocomplete from './AddressAutocomplete';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { normalizeName } from '@/lib/normalize';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 interface Contact {
   id: string;
@@ -387,16 +388,7 @@ const ContactProfileDialog = ({ open, onOpenChange, contactId, churchId }: Conta
         showError(msg || 'Error al actualizar el contacto.');
       } else {
         showSuccess('Contacto actualizado con éxito.');
-        // Two query keys to invalidate, not one. The shared 'contacts'
-        // key is what most lists outside of the Semillero page key
-        // off, but the Semillero (where the user spends most time
-        // editing) uses its own 'pool-all-contacts' key — without
-        // bumping that, the row keeps showing the pre-save data
-        // until a full refresh. Per Dan: 'cuando refresco sigue
-        // estando en la 206' on a contact whose cuerda he had just
-        // changed.
-        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-        queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+        refreshContactQueries(queryClient);
         // Mark current state as saved so hasUnsavedChanges becomes false
         // and safeClose doesn't open the unsaved-changes dialog
         if (contact) setOriginalContact(JSON.stringify(contact));

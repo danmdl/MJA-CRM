@@ -226,7 +226,6 @@ const HogaresDePazPage = () => {
         showSuccess('Hogar de Paz actualizado.');
       }
       queryClient.invalidateQueries({ queryKey: ['hogares-page', churchId] });
-      queryClient.invalidateQueries({ queryKey: ['hogares', churchId] });
       queryClient.invalidateQueries({ queryKey: ['historial'] });
       setEditHogar(null);
       setShowNew(false);
@@ -253,7 +252,6 @@ const HogaresDePazPage = () => {
     else {
       showSuccess('Hogar de Paz eliminado.');
       queryClient.invalidateQueries({ queryKey: ['hogares-page', churchId] });
-      queryClient.invalidateQueries({ queryKey: ['hogares', churchId] });
     }
   };
 

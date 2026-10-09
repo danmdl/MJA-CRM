@@ -14,6 +14,7 @@ import { isWithinGBA as isWithinGBACheck } from '@/lib/geo-validation';
 import { useChurchCoords } from '@/hooks/use-church-coords';
 import { normalizeName } from '@/lib/normalize';
 import { arToday } from '@/lib/ar-date';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 interface Cell {
   id: string;
@@ -242,8 +243,7 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
           });
         }
         showSuccess(`¡Contacto "${firstName}" añadido con éxito!`);
-        queryClient.invalidateQueries({ queryKey: ['contacts', churchId] });
-        queryClient.invalidateQueries({ queryKey: ['pool-all-contacts', churchId] });
+        refreshContactQueries(queryClient);
         queryClient.invalidateQueries({ queryKey: ['cells-pool', churchId] });
         queryClient.invalidateQueries({ queryKey: ['cuerdas-pool', churchId] });
         queryClient.invalidateQueries({ queryKey: ['historial'] });

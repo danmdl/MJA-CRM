@@ -34,6 +34,7 @@ import {
 import AddCellDialog from '@/components/admin/AddCellDialog';
 import CellDetailsDialog from '@/components/admin/CellDetailsDialog';
 import ManageCellAttendeesDialog from '@/components/admin/ManageCellAttendeesDialog';
+import { refreshContactQueries } from '@/lib/contact-queries';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface Cuerda {
@@ -258,6 +259,7 @@ const CuerdasPage = () => {
     else {
       showSuccess(`${zonaCells.length} células de ${zonaNombre} eliminadas.`);
       queryClient.invalidateQueries({ queryKey: ['cells', churchId] });
+      refreshContactQueries(queryClient);
     }
   };
 
