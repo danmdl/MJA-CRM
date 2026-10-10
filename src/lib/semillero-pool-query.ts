@@ -298,6 +298,68 @@ export async function fetchPoolAll<TRow = any>(f: PoolFilters, maxRows = 20000):
   return all;
 }
 
+/**
+ * Rows for an explicit id set (e.g. every duplicate in the user's scope)
+ * with all other pool filters applied. Chunked so each request stays
+ * under URL-length limits and the 1000-row cap.
+ */
+export async function fetchPoolByIds<TRow = any>(f: PoolFilters, ids: string[], chunkSize = 200): Promise<TRow[]> {
+  const all: TRow[] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const base = supabase
+      .from('contacts')
+      .select(POOL_ROW_COLUMNS)
+      .eq('church_id', f.churchId)
+      .is('deleted_at', null)
+      .in('id', ids.slice(i, i + chunkSize));
+    const filtered = applyPoolFilters(base, f);
+    if (!filtered) return [];
+    const { data, error } = await filtered;
+    if (error) {
+      console.error('[fetchPoolByIds]', error, { filters: f });
+      throw error;
+    }
+    all.push(...((data || []) as unknown as TRow[]));
+  }
+  return all;
+}
+
+export interface DuplicateGroupRow { contact_id: string; group_no: number }
+
+type DuplicateScope = { canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null; userRole?: string | null };
+const duplicateArgs = (churchId: string, v: DuplicateScope) => ({
+  p_church_id: churchId,
+  p_user_role: v.userRole ?? null,
+  p_user_cuerda: v.userCuerda,
+  p_user_id: v.userId,
+  p_can_see_all: v.canSeeAllCuerdas,
+});
+
+/** How many contacts are in a duplicate group, without downloading them. */
+export async function fetchDuplicateCount(churchId: string, v: DuplicateScope): Promise<number> {
+  const { count, error } = await supabase.rpc('get_duplicate_name_groups', duplicateArgs(churchId, v), { head: true, count: 'exact' });
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** Duplicate-name groups across the user's whole scope (migration 0041). */
+export async function fetchDuplicateGroups(churchId: string, v: DuplicateScope): Promise<DuplicateGroupRow[]> {
+  // ~2.3k rows today; page past the 1000-row cap.
+  const all: DuplicateGroupRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .rpc('get_duplicate_name_groups', duplicateArgs(churchId, v))
+      .order('group_no')
+      .order('contact_id')
+      .range(from, from + 999);
+    if (error) throw error;
+    const rows = (data || []) as DuplicateGroupRow[];
+    all.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return all;
+}
+
 // ─── Count-only queries for the pool tab chips ───────────────────
 //
 // The Inbox / Outbox / Pending Asignación chips at the top show
@@ -376,57 +438,45 @@ export async function fetchPoolCounts(f: PoolCountFilters): Promise<{
 
 // ─── Dropdown option queries ────────────────────────────────────
 //
-// The three dropdowns (Cuerda, Responsable, Conector) used to be
-// computed from the in-memory contact list. After the refactor we
-// query them separately and small.
+// Distinct Cuerda / Responsable / Conector values for the toolbar
+// dropdowns, computed in SQL (migration 0040). Selecting the column and
+// de-duplicating here was capped at 1000 rows by PostgREST, so most
+// options were missing (e.g. 39 of 188 conectores).
 
-export async function fetchDistinctCuerdas(churchId: string, visibility: {
-  canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null;
-}): Promise<string[]> {
-  let q = supabase
-    .from('contacts')
-    .select('numero_cuerda')
-    .eq('church_id', churchId)
-    .is('deleted_at', null)
-    .not('numero_cuerda', 'is', null);
-  q = applyVisibilityScope(q, visibility);
-  const { data, error } = await q.limit(5000);
-  if (error) throw error;
-  const seen = new Set<string>();
-  (data || []).forEach((r: any) => { if (r.numero_cuerda) seen.add(r.numero_cuerda); });
-  return Array.from(seen).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+interface DropdownVisibility {
+  canSeeAllCuerdas: boolean;
+  userCuerda: string | null;
+  userId: string | null;
+  userRole?: string | null;
 }
 
-export async function fetchDistinctResponsables(churchId: string, visibility: {
-  canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null;
-}): Promise<string[]> {
-  let q = supabase
-    .from('contacts')
-    .select('responsable_id')
-    .eq('church_id', churchId)
-    .is('deleted_at', null)
-    .not('responsable_id', 'is', null);
-  q = applyVisibilityScope(q, visibility);
-  const { data, error } = await q.limit(5000);
+async function fetchFilterOptions(
+  churchId: string,
+  kind: 'cuerda' | 'responsable' | 'conector',
+  v: DropdownVisibility,
+): Promise<string[]> {
+  const { data, error } = await supabase.rpc('get_pool_filter_options', {
+    p_church_id: churchId,
+    p_kind: kind,
+    p_user_role: v.userRole ?? null,
+    p_user_cuerda: v.userCuerda,
+    p_user_id: v.userId,
+    p_can_see_all: v.canSeeAllCuerdas,
+  });
   if (error) throw error;
-  const seen = new Set<string>();
-  (data || []).forEach((r: any) => { if (r.responsable_id) seen.add(r.responsable_id); });
-  return Array.from(seen);
+  return ((data || []) as string[]).filter(Boolean);
 }
 
-export async function fetchDistinctConectores(churchId: string, visibility: {
-  canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null;
-}): Promise<string[]> {
-  let q = supabase
-    .from('contacts')
-    .select('conector')
-    .eq('church_id', churchId)
-    .is('deleted_at', null)
-    .not('conector', 'is', null);
-  q = applyVisibilityScope(q, visibility);
-  const { data, error } = await q.limit(10000);
-  if (error) throw error;
-  const seen = new Set<string>();
-  (data || []).forEach((r: any) => { if (r.conector) seen.add(r.conector); });
-  return Array.from(seen).sort((a, b) => a.localeCompare(b, 'es'));
+export async function fetchDistinctCuerdas(churchId: string, visibility: DropdownVisibility): Promise<string[]> {
+  const values = await fetchFilterOptions(churchId, 'cuerda', visibility);
+  return values.sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+}
+
+export async function fetchDistinctResponsables(churchId: string, visibility: DropdownVisibility): Promise<string[]> {
+  return fetchFilterOptions(churchId, 'responsable', visibility);
+}
+
+export async function fetchDistinctConectores(churchId: string, visibility: DropdownVisibility): Promise<string[]> {
+  const values = await fetchFilterOptions(churchId, 'conector', visibility);
+  return values.sort((a, b) => a.localeCompare(b, 'es'));
 }
