@@ -298,6 +298,68 @@ export async function fetchPoolAll<TRow = any>(f: PoolFilters, maxRows = 20000):
   return all;
 }
 
+/**
+ * Rows for an explicit id set (e.g. every duplicate in the user's scope)
+ * with all other pool filters applied. Chunked so each request stays
+ * under URL-length limits and the 1000-row cap.
+ */
+export async function fetchPoolByIds<TRow = any>(f: PoolFilters, ids: string[], chunkSize = 200): Promise<TRow[]> {
+  const all: TRow[] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const base = supabase
+      .from('contacts')
+      .select(POOL_ROW_COLUMNS)
+      .eq('church_id', f.churchId)
+      .is('deleted_at', null)
+      .in('id', ids.slice(i, i + chunkSize));
+    const filtered = applyPoolFilters(base, f);
+    if (!filtered) return [];
+    const { data, error } = await filtered;
+    if (error) {
+      console.error('[fetchPoolByIds]', error, { filters: f });
+      throw error;
+    }
+    all.push(...((data || []) as unknown as TRow[]));
+  }
+  return all;
+}
+
+export interface DuplicateGroupRow { contact_id: string; group_no: number }
+
+type DuplicateScope = { canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null; userRole?: string | null };
+const duplicateArgs = (churchId: string, v: DuplicateScope) => ({
+  p_church_id: churchId,
+  p_user_role: v.userRole ?? null,
+  p_user_cuerda: v.userCuerda,
+  p_user_id: v.userId,
+  p_can_see_all: v.canSeeAllCuerdas,
+});
+
+/** How many contacts are in a duplicate group, without downloading them. */
+export async function fetchDuplicateCount(churchId: string, v: DuplicateScope): Promise<number> {
+  const { count, error } = await supabase.rpc('get_duplicate_name_groups', duplicateArgs(churchId, v), { head: true, count: 'exact' });
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** Duplicate-name groups across the user's whole scope (migration 0041). */
+export async function fetchDuplicateGroups(churchId: string, v: DuplicateScope): Promise<DuplicateGroupRow[]> {
+  // ~2.3k rows today; page past the 1000-row cap.
+  const all: DuplicateGroupRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .rpc('get_duplicate_name_groups', duplicateArgs(churchId, v))
+      .order('group_no')
+      .order('contact_id')
+      .range(from, from + 999);
+    if (error) throw error;
+    const rows = (data || []) as DuplicateGroupRow[];
+    all.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return all;
+}
+
 // ─── Count-only queries for the pool tab chips ───────────────────
 //
 // The Inbox / Outbox / Pending Asignación chips at the top show

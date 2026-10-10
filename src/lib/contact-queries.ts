@@ -30,6 +30,7 @@ export const CONTACT_QUERY_ROOTS: ReadonlySet<string> = new Set([
   'recent-contacts-dashboard',
   'global-contact-search',
   'duplicates',
+  'duplicate-groups',
   'dashboard-stats',
   'historial',
   'activity-logs',

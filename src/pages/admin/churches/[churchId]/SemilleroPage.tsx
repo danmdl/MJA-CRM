@@ -34,6 +34,9 @@ import { CONTACT_FIELDS } from '@/lib/contact-fields';
 import {
   fetchPoolPage,
   fetchPoolAll,
+  fetchPoolByIds,
+  fetchDuplicateGroups,
+  fetchDuplicateCount,
   fetchPoolCounts,
   fetchDistinctCuerdas,
   fetchDistinctResponsables,
@@ -432,6 +435,46 @@ const SemilleroPage = () => {
     [routeContactIds],
   );
 
+  // Duplicate-name groups across the user's whole scope, not just the
+  // visible page (migration 0041). Drives the Dup badge, the merge
+  // dialog's group and the Duplicados filter.
+  const duplicateScope = {
+    canSeeAllCuerdas: canSeeContactsFromAllCuerdas,
+    userCuerda: profile?.numero_cuerda || null,
+    userId: profile?.id || null,
+    userRole: profile?.role || null,
+  };
+  const duplicateScopeKey = [churchId, profile?.id, profile?.role, profile?.numero_cuerda, canSeeContactsFromAllCuerdas];
+  // The pill only needs the count; the id list (~50 kB) loads once the
+  // Dup column or the Duplicados filter is actually in use.
+  const { data: duplicateCount } = useQuery({
+    queryKey: ['duplicate-groups', 'count', ...duplicateScopeKey],
+    queryFn: () => fetchDuplicateCount(churchId!, duplicateScope),
+    enabled: !!churchId && !!profile,
+    staleTime: 60_000,
+  });
+  const { data: duplicateGroups, dataUpdatedAt: duplicateGroupsUpdatedAt } = useQuery({
+    queryKey: ['duplicate-groups', 'rows', ...duplicateScopeKey],
+    queryFn: () => fetchDuplicateGroups(churchId!, duplicateScope),
+    enabled: !!churchId && !!profile && (showDupCol || filterDuplicates),
+    staleTime: 60_000,
+  });
+  const { duplicateNameIds, duplicateGroupByContactId, duplicateGroupNo } = useMemo(() => {
+    const ids = new Set<string>();
+    const groupNo = new Map<string, number>();
+    const members = new Map<number, string[]>();
+    (duplicateGroups || []).forEach(r => {
+      ids.add(r.contact_id);
+      groupNo.set(r.contact_id, r.group_no);
+      const arr = members.get(r.group_no) || [];
+      arr.push(r.contact_id);
+      members.set(r.group_no, arr);
+    });
+    const byContact = new Map<string, string[]>();
+    groupNo.forEach((g, id) => byContact.set(id, members.get(g) || [id]));
+    return { duplicateNameIds: ids, duplicateGroupByContactId: byContact, duplicateGroupNo: groupNo };
+  }, [duplicateGroups]);
+
   const { data: poolPage, isLoading } = useQuery<{ rows: Contact[]; totalCount: number }>({
     queryKey: [
       'pool-page', churchId,
@@ -444,6 +487,7 @@ const SemilleroPage = () => {
       tabFilters ? JSON.stringify(tabFilters) : null,
       routeFilter, routeFilter ? routeIdList : null,
       zonaPaths ? activeZonaFilter : null,
+      filterDuplicates ? duplicateGroupsUpdatedAt : null,
     ],
     queryFn: async () => {
       const f = {
@@ -468,19 +512,30 @@ const SemilleroPage = () => {
         page: currentPage,
         pageSize: PAGE_SIZE,
       };
-      if (!zonaPaths) return fetchPoolPage<Contact>(f);
-      const all = await fetchPoolAll<Contact>(f);
-      const matching = all.filter(c => {
-        if (c.numero_cuerda !== userCuerdaNumero) return false;
-        if (c.lat == null || c.lng == null) return false;
-        const inside = isPointInTerritory(c.lat, c.lng, zonaPaths);
-        return activeZonaFilter === 'in' ? inside : !inside;
-      });
+      if (!zonaPaths && !filterDuplicates) return fetchPoolPage<Contact>(f);
+      // Filters SQL can't express here (Zona polygon, Duplicados) run over
+      // the whole matching set and paginate locally.
+      let matching = filterDuplicates
+        ? await fetchPoolByIds<Contact>(f, Array.from(duplicateNameIds))
+        : await fetchPoolAll<Contact>(f);
+      if (zonaPaths) {
+        matching = matching.filter(c => {
+          if (c.numero_cuerda !== userCuerdaNumero) return false;
+          if (c.lat == null || c.lng == null) return false;
+          const inside = isPointInTerritory(c.lat, c.lng, zonaPaths);
+          return activeZonaFilter === 'in' ? inside : !inside;
+        });
+      }
+      if (filterDuplicates) {
+        // Keep each group together so the copies sit next to each other.
+        matching.sort((a, b) => (duplicateGroupNo.get(a.id) ?? 0) - (duplicateGroupNo.get(b.id) ?? 0)
+          || (a.created_at || '').localeCompare(b.created_at || ''));
+      }
       const start = currentPage * PAGE_SIZE;
       return { rows: matching.slice(start, start + PAGE_SIZE), totalCount: matching.length };
     },
     // 'En ruta' needs the live route ids before it can build its filter.
-    enabled: !!churchId && !!profile && (!routeFilter || !!routeIdList),
+    enabled: !!churchId && !!profile && (!routeFilter || !!routeIdList) && (!filterDuplicates || !!duplicateGroups),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     placeholderData: prev => prev, // keep previous page visible during fetch
@@ -503,90 +558,6 @@ const SemilleroPage = () => {
     enabled: !!churchId,
     staleTime: 60 * 60_000,
   });
-
-  // Pairs the user has confirmed are NOT duplicates (despite same name).
-  // Loaded once per church; the duplicate detector below subtracts these
-  // from the set of "interesting" pairs before deciding which contacts to
-  // light up with the amber dot.
-  const { data: dedupeDismissals } = useQuery<Array<{ contact_id_a: string; contact_id_b: string }>>({
-    queryKey: ['dedupe-dismissals', churchId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('contact_dedupe_dismissals')
-        .select('contact_id_a, contact_id_b');
-      return (data || []) as any[];
-    },
-    enabled: !!churchId,
-    staleTime: 60_000,
-  });
-
-  // ─── Real duplicates: same first_name+last_name within this church ──────────
-  // Builds a Set of contact ids whose normalized full name appears more than
-  // once in the church's contacts AND there's at least one PAIR of contacts
-  // in their name-group that the user hasn't dismissed as "different people".
-  // Used to render the amber dot pill next to the name in the table and to
-  // power the Duplicados filter toggle.
-  //
-  // Scoped to the contacts the CURRENT USER can see — non-globals only count
-  // duplicates within their own cuerda (or, if they have no cuerda, within
-  // the contacts where they're the responsable). A referente in cuerda 204
-  // shouldn't see "141 duplicados" if half of those are in cuerda 105 and
-  // they couldn't act on them anyway.
-  //
-  // Also computes duplicateGroupByContactId so the merge dialog can pull up
-  // every contact that shares a name with the one the user clicked.
-  const { duplicateNameIds, duplicateGroupByContactId } = useMemo(() => {
-    const idSet = new Set<string>();
-    const byContact = new Map<string, string[]>(); // contact id → all ids in same name-group (incl. itself)
-    if (!allContacts?.length) return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
-    const userId = viewerId;
-    // Only consider contacts this user is allowed to see. Same gate the
-    // row pipeline applies to filteredContacts — keeps the dot count and
-    // the Duplicados pill in sync with the user's actual view.
-    const visible = allContacts.filter(c => {
-      if (canSeeContactsFromAllCuerdas) return true;
-      if (userCuerdaNumero) return c.numero_cuerda === userCuerdaNumero;
-      return c.responsable_id === userId;
-    });
-    if (visible.length === 0) return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
-    // 1) Group all visible contacts by normalized full name.
-    const groups = new Map<string, string[]>();
-    visible.forEach(c => {
-      const full = normalize(`${c.first_name || ''} ${c.last_name || ''}`).replace(/\s+/g, ' ').trim();
-      if (!full) return;
-      const arr = groups.get(full) || [];
-      arr.push(c.id);
-      groups.set(full, arr);
-    });
-    // 2) Build a fast lookup of dismissed pairs. The table stores them with
-    //    the lower UUID first (CHECK constraint), so we lookup the same way.
-    const dismissedKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-    const dismissed = new Set<string>();
-    (dedupeDismissals || []).forEach(d => dismissed.add(dismissedKey(d.contact_id_a, d.contact_id_b)));
-    // 3) For each name-group of size 2+, walk every pair. If at least one
-    //    pair is NOT dismissed, every id in that group counts as a duplicate.
-    //    If EVERY pair is dismissed (the user already resolved all of them
-    //    as different people), the group falls out entirely.
-    groups.forEach(ids => {
-      if (ids.length < 2) return;
-      let anyLive = false;
-      for (let i = 0; i < ids.length && !anyLive; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-          if (!dismissed.has(dismissedKey(ids[i], ids[j]))) {
-            anyLive = true;
-            break;
-          }
-        }
-      }
-      if (anyLive) {
-        ids.forEach(id => {
-          idSet.add(id);
-          byContact.set(id, ids);
-        });
-      }
-    });
-    return { duplicateNameIds: idSet, duplicateGroupByContactId: byContact };
-  }, [allContacts, dedupeDismissals, canSeeContactsFromAllCuerdas, userCuerdaNumero, session?.user?.id]);
 
   // ─── Extra responsable lookup ──────────────────────────────────────────────
   // teamMembers is scoped to this church. When a contact's responsable_id
@@ -993,14 +964,8 @@ const SemilleroPage = () => {
   // Contacts only disappear from a referente's Semillero if they get
   // assigned to a DIFFERENT cuerda. Having a cell_id is irrelevant —
   // the referente still needs to see and manage them.
-  // Every filter except Duplicados runs in the pool query above (Zona
-  // via fetchPoolAll). Duplicate detection still only sees the current
-  // page — it needs a full-group scan that doesn't exist yet.
-  const filteredContacts = useMemo(() => {
-    if (!allContacts) return [];
-    if (!filterDuplicates) return allContacts;
-    return allContacts.filter(c => duplicateNameIds.has(c.id));
-  }, [allContacts, filterDuplicates, duplicateNameIds]);
+  // Every filter runs in the pool query above; this is just the page.
+  const filteredContacts = useMemo(() => allContacts || [], [allContacts]);
 
   // How many of the currently-selected contacts are actually visible in the
   // filtered view. Prevents the "Seleccionados" counter from showing stale
@@ -1039,20 +1004,9 @@ const SemilleroPage = () => {
   const pageStart = totalFilteredCount === 0 ? 0 : safePage * PAGE_SIZE + 1;
   const pageEnd = Math.min((safePage + 1) * PAGE_SIZE, totalFilteredCount);
 
-  // Count of duplicate-flagged contacts WITHIN the current filter context.
-  // Reflects what the user is actually looking at: pick Responsable=Mauro
-  // and the Duplicados pill says how many of Mauro's contacts are dups,
-  // not the global church number. When filterDuplicates is on, this equals
-  // filteredContacts.length (the table is already restricted to dups), so
-  // the pill keeps a consistent "what you see" semantic both states.
-  const dupsInFilteredView = useMemo(() => {
-    if (!duplicateNameIds.size) return 0;
-    let n = 0;
-    for (const c of filteredContacts) {
-      if (duplicateNameIds.has(c.id)) n++;
-    }
-    return n;
-  }, [filteredContacts, duplicateNameIds]);
+  // Duplicados pill: every duplicate in the user's scope, or — with the
+  // filter on — the duplicates that also match the other filters.
+  const dupsInFilteredView = filterDuplicates ? totalFilteredCount : (duplicateCount ?? duplicateNameIds.size);
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
@@ -1277,11 +1231,9 @@ const SemilleroPage = () => {
           </button>
         )}
         {/* Duplicates toggle — narrows the table to rows whose normalized
-            full name appears more than once. The count reflects dups
-            WITHIN the current filter context, not the church-wide total —
-            so picking Responsable=Mauro updates the pill to Mauro's dup
-            count, not all of MJA Central. Hidden entirely when there are
-            no dups in the current view, so the toolbar stays clean. */}
+            full name is shared with another contact anywhere in the
+            user's scope. Off: total duplicates in scope. On: duplicates
+            that also match the other filters, grouped together. */}
         {dupsInFilteredView > 0 || filterDuplicates ? (
           <button
             type="button"
@@ -1823,11 +1775,19 @@ const SemilleroPage = () => {
                                     type="button"
                                     className="inline-flex items-center justify-center px-1.5 leading-none rounded text-[9px] font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 hover:text-amber-200 cursor-pointer transition-colors"
                                     style={{ height: 18 }}
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
+                                      // Copies can live on other pages, and the dialog compares
+                                      // every field, so load the full rows of the whole group.
                                       const groupIds = duplicateGroupByContactId.get(c.id) || [c.id];
-                                      const groupContacts = (allContacts || []).filter(x => groupIds.includes(x.id));
-                                      if (groupContacts.length >= 2) setMergeGroup(groupContacts);
+                                      const { data, error } = await supabase
+                                        .from('contacts')
+                                        .select('*')
+                                        .in('id', groupIds)
+                                        .is('deleted_at', null);
+                                      if (error) { showError('No se pudo cargar el grupo de duplicados.'); return; }
+                                      if ((data || []).length >= 2) setMergeGroup(data as unknown as Contact[]);
+                                      else refreshContactQueries(queryClient);
                                     }}
                                     aria-label="Resolver duplicado"
                                   >
@@ -2566,7 +2526,6 @@ const SemilleroPage = () => {
             userId={session?.user?.id || null}
             onResolved={() => {
               refreshContactQueries(queryClient);
-              queryClient.invalidateQueries({ queryKey: ['dedupe-dismissals', churchId] });
               setSelectedIds(new Set());
             }}
           />

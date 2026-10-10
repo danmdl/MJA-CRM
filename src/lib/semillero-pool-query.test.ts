@@ -24,18 +24,24 @@ function makeBuilder() {
 
 const rpcCalls: Array<[string, Record<string, unknown>]> = [];
 let rpcResult: { data: unknown; error: unknown } = { data: [], error: null };
+let rpcQueue: Array<{ data: unknown; error: unknown }> = [];
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: (table: string) => makeBuilder().from(table),
     rpc: (name: string, args: Record<string, unknown>) => {
       rpcCalls.push([name, args]);
-      return Promise.resolve(rpcResult);
+      const chain: any = {
+        order: () => chain,
+        range: () => chain,
+        then: (resolve: any) => resolve(rpcQueue.length ? rpcQueue.shift() : rpcResult),
+      };
+      return chain;
     },
   },
 }));
 
-const { fetchPoolPage, fetchPoolAll, fetchDistinctConectores, fetchDistinctCuerdas, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
+const { fetchPoolPage, fetchPoolAll, fetchPoolByIds, fetchDuplicateGroups, fetchDistinctConectores, fetchDistinctCuerdas, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
 
 const baseFilters: PoolFilters = {
   churchId: 'church-1',
@@ -64,7 +70,7 @@ const lastCalls = () => builds[builds.length - 1];
 const has = (calls: Call[], ...expected: any[]) =>
   calls.some(c => JSON.stringify(c) === JSON.stringify(expected));
 
-beforeEach(() => { builds.length = 0; results = []; rpcCalls.length = 0; rpcResult = { data: [], error: null }; });
+beforeEach(() => { builds.length = 0; results = []; rpcCalls.length = 0; rpcResult = { data: [], error: null }; rpcQueue = []; });
 
 describe('fetchPoolPage — solapa filters run server-side', () => {
   it('without a solapa only applies the pool gate', async () => {
@@ -194,5 +200,29 @@ describe('dropdown options', () => {
   it('surfaces RPC errors', async () => {
     rpcResult = { data: null, error: new Error('boom') };
     await expect(fetchDistinctCuerdas('church-1', { canSeeAllCuerdas: true, userCuerda: null, userId: 'u1' })).rejects.toThrow('boom');
+  });
+});
+
+describe('duplicates', () => {
+  it('fetchPoolByIds chunks ids and keeps the other filters', async () => {
+    const ids = Array.from({ length: 450 }, (_, i) => `id${i}`);
+    results = [{ data: [{ id: 'a' }], error: null }, { data: [{ id: 'b' }], error: null }, { data: [], error: null }];
+    const rows = await fetchPoolByIds({ ...baseFilters, tab: { sexo: 'Femenino' } }, ids);
+    expect(rows).toEqual([{ id: 'a' }, { id: 'b' }]);
+    expect(builds).toHaveLength(3);
+    expect(builds.map(b => (b.find(x => x[0] === 'in' && x[1] === 'id') as any)[2].length)).toEqual([200, 200, 50]);
+    for (const b of builds) {
+      expect(has(b, 'eq', 'sexo', 'Femenino')).toBe(true);
+      expect(b.some(x => x[0] === 'range')).toBe(false);
+    }
+  });
+
+  it('fetchDuplicateGroups pages past 1000 rows', async () => {
+    const page = (n: number, off: number) => Array.from({ length: n }, (_, i) => ({ contact_id: `c${off + i}`, group_no: Math.floor((off + i) / 2) + 1 }));
+    rpcQueue = [{ data: page(1000, 0), error: null }, { data: page(256, 1000), error: null }];
+    const rows = await fetchDuplicateGroups('church-1', { canSeeAllCuerdas: true, userCuerda: null, userId: 'u1', userRole: 'admin' });
+    expect(rows).toHaveLength(1256);
+    expect(rpcCalls.map(c => c[0])).toEqual(['get_duplicate_name_groups', 'get_duplicate_name_groups']);
+    expect(rpcCalls[0][1]).toMatchObject({ p_church_id: 'church-1', p_can_see_all: true, p_user_role: 'admin' });
   });
 });

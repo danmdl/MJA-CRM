@@ -2374,6 +2374,19 @@ export type Database = {
           contact_count: number
         }[]
       }
+      get_duplicate_name_groups: {
+        Args: {
+          p_can_see_all: boolean
+          p_church_id: string
+          p_user_cuerda: string | null
+          p_user_id: string | null
+          p_user_role: string | null
+        }
+        Returns: {
+          contact_id: string
+          group_no: number
+        }[]
+      }
       get_pool_filter_options: {
         Args: {
           p_can_see_all: boolean
