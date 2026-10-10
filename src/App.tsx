@@ -38,24 +38,18 @@ const ResetPage = () => {
     </div>
   );
 };
-import SetupAccount from "./pages/SetupAccount";
-import SharedRoutePage from "./pages/SharedRoutePage";
 import WelcomeMessageAlert from "./components/WelcomeMessageAlert";
 import { SessionProvider } from "./components/SessionProvider";
 import { ConfirmProvider } from "./hooks/use-confirm";
 import { useSession } from "./hooks/use-session";
 import { usePermissions } from "./lib/permissions";
 import { useChurchSlugByUuid } from "./hooks/use-church-slug";
-import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminRoute from "./components/auth/AdminRoute";
 import { MfaGate } from "./components/auth/MfaGate";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import ChurchDetailsLayout from "./components/layout/ChurchDetailsLayout";
-import OnboardingForm from "./components/auth/OnboardingForm";
 import { ThemeProvider } from "next-themes";
-import UserLayout from "./components/layout/UserLayout";
-import Profile from "./pages/Profile";
 
 // Sends users to their appropriate landing page based on role.
 // - Admin/general (canSeeAllAnalytics) → /admin/dashboard
@@ -257,6 +251,14 @@ const PageLoader = () => (
     <div className="h-64 w-full bg-muted/30 rounded-lg mt-4" />
   </div>
 );
+// Rarely-visited or role-specific screens stay out of the initial bundle
+// (they pulled zod, react-hook-form and react-resizable-panels into it).
+const SetupAccount = lazyRetry(() => import("./pages/SetupAccount"));
+const SharedRoutePage = lazyRetry(() => import("./pages/SharedRoutePage"));
+const AdminDashboard = lazyRetry(() => import("./pages/admin/Dashboard"));
+const OnboardingForm = lazyRetry(() => import("./components/auth/OnboardingForm"));
+const UserLayout = lazyRetry(() => import("./components/layout/UserLayout"));
+const Profile = lazyRetry(() => import("./pages/Profile"));
 const AdminProfile = lazyRetry(() => import("./pages/admin/Profile"));
 const ChurchesPage = lazyRetry(() => import("./pages/admin/ChurchesPage"));
 const ChurchOverviewPage = lazyRetry(() => import("./pages/admin/churches/[churchId]/OverviewPage"));
@@ -510,9 +512,11 @@ const PasswordSetupGate = ({ children }: { children: React.ReactNode }) => {
             <h1 className="text-2xl font-bold">MJA CRM</h1>
             <p className="text-muted-foreground text-sm mt-1">Bienvenido/a — completá tu cuenta para continuar.</p>
           </div>
-          <OnboardingForm onSuccess={() => {
-            window.location.href = '/';
-          }} />
+          <Suspense fallback={<PageLoader />}>
+            <OnboardingForm onSuccess={() => {
+              window.location.href = '/';
+            }} />
+          </Suspense>
         </div>
       </div>
     );

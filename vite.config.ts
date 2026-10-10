@@ -77,6 +77,10 @@ export default defineConfig(() => ({
           ) {
             return 'vendor-react';
           }
+          // Rollup's shared CommonJS interop helper otherwise lands in the
+          // first CJS vendor chunk (papaparse), which made every page
+          // modulepreload the CSV parser.
+          if (id.includes('commonjsHelpers')) return 'vendor-react';
           if (id.includes('node_modules/xlsx')) return 'vendor-xlsx';
           if (id.includes('node_modules/papaparse')) return 'vendor-papaparse';
           if (id.includes('node_modules/recharts')) return 'vendor-charts';

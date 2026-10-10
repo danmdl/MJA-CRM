@@ -2374,6 +2374,17 @@ export type Database = {
           contact_count: number
         }[]
       }
+      get_pool_filter_options: {
+        Args: {
+          p_can_see_all: boolean
+          p_church_id: string
+          p_kind: string
+          p_user_cuerda: string | null
+          p_user_id: string | null
+          p_user_role: string | null
+        }
+        Returns: string[]
+      }
       gettransactionid: { Args: never; Returns: unknown }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       longtransactionsenabled: { Args: never; Returns: boolean }

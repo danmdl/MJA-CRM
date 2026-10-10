@@ -22,11 +22,20 @@ function makeBuilder() {
   return proxy;
 }
 
+const rpcCalls: Array<[string, Record<string, unknown>]> = [];
+let rpcResult: { data: unknown; error: unknown } = { data: [], error: null };
+
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (table: string) => makeBuilder().from(table) },
+  supabase: {
+    from: (table: string) => makeBuilder().from(table),
+    rpc: (name: string, args: Record<string, unknown>) => {
+      rpcCalls.push([name, args]);
+      return Promise.resolve(rpcResult);
+    },
+  },
 }));
 
-const { fetchPoolPage, fetchPoolAll, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
+const { fetchPoolPage, fetchPoolAll, fetchDistinctConectores, fetchDistinctCuerdas, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
 
 const baseFilters: PoolFilters = {
   churchId: 'church-1',
@@ -55,7 +64,7 @@ const lastCalls = () => builds[builds.length - 1];
 const has = (calls: Call[], ...expected: any[]) =>
   calls.some(c => JSON.stringify(c) === JSON.stringify(expected));
 
-beforeEach(() => { builds.length = 0; results = []; });
+beforeEach(() => { builds.length = 0; results = []; rpcCalls.length = 0; rpcResult = { data: [], error: null }; });
 
 describe('fetchPoolPage — solapa filters run server-side', () => {
   it('without a solapa only applies the pool gate', async () => {
@@ -160,5 +169,30 @@ describe('fetchPoolAll', () => {
     expect(builds.map(b => b.find(x => x[0] === 'range'))).toEqual([
       ['range', 0, 999], ['range', 1000, 1999], ['range', 2000, 2999],
     ]);
+  });
+});
+
+describe('dropdown options', () => {
+  it('asks the server for distinct values instead of paging rows', async () => {
+    rpcResult = { data: ['Mauro', 'ana', null], error: null };
+    const vis = { canSeeAllCuerdas: false, userCuerda: '104', userId: 'u1', userRole: 'referente' };
+    const res = await fetchDistinctConectores('church-1', vis);
+    expect(res).toEqual(['ana', 'Mauro']);
+    expect(rpcCalls).toEqual([['get_pool_filter_options', {
+      p_church_id: 'church-1', p_kind: 'conector', p_user_role: 'referente',
+      p_user_cuerda: '104', p_user_id: 'u1', p_can_see_all: false,
+    }]]);
+    expect(builds).toHaveLength(0);
+  });
+
+  it('sorts cuerdas numerically with named cuerdas last', async () => {
+    rpcResult = { data: ['204', 'MJA Central', '104', '1001'], error: null };
+    const res = await fetchDistinctCuerdas('church-1', { canSeeAllCuerdas: true, userCuerda: null, userId: 'u1' });
+    expect(res).toEqual(['104', '204', '1001', 'MJA Central']);
+  });
+
+  it('surfaces RPC errors', async () => {
+    rpcResult = { data: null, error: new Error('boom') };
+    await expect(fetchDistinctCuerdas('church-1', { canSeeAllCuerdas: true, userCuerda: null, userId: 'u1' })).rejects.toThrow('boom');
   });
 });

@@ -376,57 +376,45 @@ export async function fetchPoolCounts(f: PoolCountFilters): Promise<{
 
 // ─── Dropdown option queries ────────────────────────────────────
 //
-// The three dropdowns (Cuerda, Responsable, Conector) used to be
-// computed from the in-memory contact list. After the refactor we
-// query them separately and small.
+// Distinct Cuerda / Responsable / Conector values for the toolbar
+// dropdowns, computed in SQL (migration 0040). Selecting the column and
+// de-duplicating here was capped at 1000 rows by PostgREST, so most
+// options were missing (e.g. 39 of 188 conectores).
 
-export async function fetchDistinctCuerdas(churchId: string, visibility: {
-  canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null;
-}): Promise<string[]> {
-  let q = supabase
-    .from('contacts')
-    .select('numero_cuerda')
-    .eq('church_id', churchId)
-    .is('deleted_at', null)
-    .not('numero_cuerda', 'is', null);
-  q = applyVisibilityScope(q, visibility);
-  const { data, error } = await q.limit(5000);
-  if (error) throw error;
-  const seen = new Set<string>();
-  (data || []).forEach((r: any) => { if (r.numero_cuerda) seen.add(r.numero_cuerda); });
-  return Array.from(seen).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+interface DropdownVisibility {
+  canSeeAllCuerdas: boolean;
+  userCuerda: string | null;
+  userId: string | null;
+  userRole?: string | null;
 }
 
-export async function fetchDistinctResponsables(churchId: string, visibility: {
-  canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null;
-}): Promise<string[]> {
-  let q = supabase
-    .from('contacts')
-    .select('responsable_id')
-    .eq('church_id', churchId)
-    .is('deleted_at', null)
-    .not('responsable_id', 'is', null);
-  q = applyVisibilityScope(q, visibility);
-  const { data, error } = await q.limit(5000);
+async function fetchFilterOptions(
+  churchId: string,
+  kind: 'cuerda' | 'responsable' | 'conector',
+  v: DropdownVisibility,
+): Promise<string[]> {
+  const { data, error } = await supabase.rpc('get_pool_filter_options', {
+    p_church_id: churchId,
+    p_kind: kind,
+    p_user_role: v.userRole ?? null,
+    p_user_cuerda: v.userCuerda,
+    p_user_id: v.userId,
+    p_can_see_all: v.canSeeAllCuerdas,
+  });
   if (error) throw error;
-  const seen = new Set<string>();
-  (data || []).forEach((r: any) => { if (r.responsable_id) seen.add(r.responsable_id); });
-  return Array.from(seen);
+  return ((data || []) as string[]).filter(Boolean);
 }
 
-export async function fetchDistinctConectores(churchId: string, visibility: {
-  canSeeAllCuerdas: boolean; userCuerda: string | null; userId: string | null;
-}): Promise<string[]> {
-  let q = supabase
-    .from('contacts')
-    .select('conector')
-    .eq('church_id', churchId)
-    .is('deleted_at', null)
-    .not('conector', 'is', null);
-  q = applyVisibilityScope(q, visibility);
-  const { data, error } = await q.limit(10000);
-  if (error) throw error;
-  const seen = new Set<string>();
-  (data || []).forEach((r: any) => { if (r.conector) seen.add(r.conector); });
-  return Array.from(seen).sort((a, b) => a.localeCompare(b, 'es'));
+export async function fetchDistinctCuerdas(churchId: string, visibility: DropdownVisibility): Promise<string[]> {
+  const values = await fetchFilterOptions(churchId, 'cuerda', visibility);
+  return values.sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+}
+
+export async function fetchDistinctResponsables(churchId: string, visibility: DropdownVisibility): Promise<string[]> {
+  return fetchFilterOptions(churchId, 'responsable', visibility);
+}
+
+export async function fetchDistinctConectores(churchId: string, visibility: DropdownVisibility): Promise<string[]> {
+  const values = await fetchFilterOptions(churchId, 'conector', visibility);
+  return values.sort((a, b) => a.localeCompare(b, 'es'));
 }
