@@ -10,7 +10,8 @@ import { useChurchCoords } from '@/hooks/use-church-coords';
 import { geoJsonToGooglePaths } from '@/lib/territory-utils';
 import { todayInART, formatDuration, filterRouteContacts } from './route-editor/helpers';
 import { RouteEditDialog } from './route-editor/RouteEditDialog';
-import { loadGoogleMaps } from '@/lib/google-maps';
+import { loadGoogleMaps, GOOGLE_MAPS_KEY } from '@/lib/google-maps';
+import { computeRoute } from '@/lib/routes-api';
 import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
 import {
   groupStopsByLocation,
@@ -86,10 +87,10 @@ const RouteEditorPage = () => {
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
-  const directionsRenderer = useRef<any>(null);
+  const routeLine = useRef<any>(null);
   const customMarkers = useRef<any[]>([]);
   // Manual polyline used when the user picks a partial range (e.g. 5–10).
-  // We hide the DirectionsRenderer and draw a straight line connecting
+  // We hide the road-routed line and draw a straight one connecting
   // just the in-range stops so the earlier road-routed legs disappear.
   const customPolyline = useRef<any>(null);
   const projectHydratedRef = useRef(false);
@@ -359,38 +360,25 @@ const RouteEditorPage = () => {
     });
     await waitForGoogle();
 
-    const google = (window as any).google;
-    const directionsService = new google.maps.DirectionsService();
-
-    const waypoints = selectedContacts.map(c => ({
-      location: new google.maps.LatLng(c.lat!, c.lng!),
-      stopover: true,
-    }));
-    const lastWaypoint = waypoints.pop()!;
-
-    directionsService.route(
-      {
-        origin: new google.maps.LatLng(startLat, startLng),
-        destination: lastWaypoint.location,
-        waypoints,
-        optimizeWaypoints: true,
-        travelMode: google.maps.TravelMode.DRIVING,
-        region: 'AR',
-      },
-      (result: any, status: string) => {
-        setCalculating(false);
-        if (status !== 'OK' || !result) {
-          showError(`No se pudo calcular la ruta: ${status}`);
-          return;
-        }
-        const order = result.routes[0].waypoint_order as number[];
-        const orderedContacts = [...order.map(i => selectedContacts[i]), selectedContacts[selectedContacts.length - 1]];
-        const legs = result.routes[0].legs;
-        const totalMeters = legs.reduce((sum: number, l: any) => sum + l.distance.value, 0);
-        const totalSeconds = legs.reduce((sum: number, l: any) => sum + l.duration.value, 0);
-        setRouteData({ result, orderedContacts, totalMeters, totalSeconds, legs });
-      }
-    );
+    if (!GOOGLE_MAPS_KEY) { setCalculating(false); showError('Falta la clave de Google Maps.'); return; }
+    const stops = selectedContacts.map(c => ({ lat: c.lat!, lng: c.lng! }));
+    try {
+      // Routes API: optimize the order of every stop except the last,
+      // which stays the destination.
+      const route = await computeRoute({
+        apiKey: GOOGLE_MAPS_KEY,
+        origin: { lat: startLat, lng: startLng },
+        destination: stops[stops.length - 1],
+        intermediates: stops.slice(0, -1),
+        optimizeOrder: true,
+      });
+      const orderedContacts = [...route.order.map(i => selectedContacts[i]), selectedContacts[selectedContacts.length - 1]];
+      setRouteData({ route, orderedContacts, totalMeters: route.totalMeters, totalSeconds: route.totalSeconds, legs: route.legs });
+    } catch (e: any) {
+      showError(`No se pudo calcular la ruta: ${e?.message || e}`);
+    } finally {
+      setCalculating(false);
+    }
   };
 
   // Auto-calc on mount when project hydration brought selected + start.
@@ -478,7 +466,18 @@ const RouteEditorPage = () => {
     });
   };
 
-  // Toggle between the road-routed directions polyline (range = 'all')
+  // Frame the start point, every stop and the road path.
+  const fitToRoute = () => {
+    const google = (window as any).google;
+    if (!routeData || !mapInstance.current || !google?.maps) return;
+    const bounds = new google.maps.LatLngBounds();
+    if (startLat != null && startLng != null) bounds.extend({ lat: startLat, lng: startLng });
+    routeData.orderedContacts.forEach((c: Contact) => { if (c.lat != null && c.lng != null) bounds.extend({ lat: c.lat, lng: c.lng }); });
+    (routeData.route?.path || []).forEach((p: { lat: number; lng: number }) => bounds.extend(p));
+    if (!bounds.isEmpty()) mapInstance.current.fitBounds(bounds);
+  };
+
+  // Toggle between the road-routed polyline (range = 'all')
   // and a straight-line polyline through the in-range stops (partial
   // range). Called from the routeData effect and the stopsRange effect.
   const refreshPolyline = () => {
@@ -489,14 +488,14 @@ const RouteEditorPage = () => {
       customPolyline.current = null;
     }
     if (stopsRange === 'all') {
-      // Restore the directions polyline.
-      if (directionsRenderer.current) directionsRenderer.current.setMap(mapInstance.current);
+      // Restore the road-routed polyline.
+      if (routeLine.current) routeLine.current.setMap(mapInstance.current);
       return;
     }
     // Hide directions polyline for partial range and draw a straight
     // line through the in-range stops. Not road-routed, but enough
     // visual anchor for "this segment" without the earlier legs.
-    if (directionsRenderer.current) directionsRenderer.current.setMap(null);
+    if (routeLine.current) routeLine.current.setMap(null);
     const path: { lat: number; lng: number }[] = [];
     routeData.orderedContacts.forEach((c: Contact, idx: number) => {
       if (isStopInRange(idx) && c.lat != null && c.lng != null) {
@@ -527,15 +526,15 @@ const RouteEditorPage = () => {
     // itself does this synchronously at the top, so every recalc
     // qualifies) unmounts the map div and remounts a fresh DOM node
     // when the new route lands. mapInstance.current is still bound
-    // to the previous (now orphaned) node, so directionsRenderer
-    // pours the new directions into an off-screen map and the
+    // to the previous (now orphaned) node, so the route line
+    // is drawn into an off-screen map and the
     // visible div stays pitch black until the user reloads. Tearing
     // it down here forces the block below to recreate the map
     // against the current node.
     if (mapInstance.current && mapInstance.current.getDiv() !== mapRef.current) {
-      if (directionsRenderer.current) directionsRenderer.current.setMap(null);
+      if (routeLine.current) routeLine.current.setMap(null);
       mapInstance.current = null;
-      directionsRenderer.current = null;
+      routeLine.current = null;
     }
 
     if (!mapInstance.current) {
@@ -546,13 +545,15 @@ const RouteEditorPage = () => {
         streetViewControl: false,
         fullscreenControl: true,
       });
-      directionsRenderer.current = new google.maps.DirectionsRenderer({
-        suppressMarkers: true,
-        polylineOptions: { strokeColor: '#FFC233', strokeWeight: 5 },
+      routeLine.current = new google.maps.Polyline({
+        strokeColor: '#FFC233',
+        strokeOpacity: 0.9,
+        strokeWeight: 5,
+        map: mapInstance.current,
       });
-      directionsRenderer.current.setMap(mapInstance.current);
     }
-    directionsRenderer.current.setDirections(routeData.result);
+    routeLine.current.setPath(routeData.route.path);
+    fitToRoute();
     refreshMarkers();
     refreshPolyline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -747,11 +748,8 @@ const RouteEditorPage = () => {
       const google = (window as any).google;
       if (!google?.maps || !mapInstance.current) return;
       google.maps.event.trigger(mapInstance.current, 'resize');
-      // Re-fit to the directions bounds. setDirections already sets the
-      // viewport via DirectionsRenderer, but explicitly fitBounds picks
-      // up any new points the user just added/removed in the edit pass.
-      const bounds = directionsRenderer.current?.getDirections?.()?.routes?.[0]?.bounds;
-      if (bounds) mapInstance.current.fitBounds(bounds);
+      // Re-fit so any stops added/removed in the edit pass are in view.
+      fitToRoute();
     });
   };
 
