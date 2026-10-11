@@ -147,3 +147,101 @@ export function classifyAgainstTerritory(
   if (typeof lat !== 'number' || typeof lng !== 'number') return 'no-coords';
   return isPointInTerritory(lat, lng, territoryPaths) ? 'in' : 'out';
 }
+
+/**
+ * Best point to place a polygon's label: the "pole of inaccessibility",
+ * the interior point farthest from every edge (Mapbox polylabel).
+ * Unlike the average of the vertices, it always lands inside the shape
+ * and isn't dragged toward edges that happen to have many vertices.
+ * rings[0] is the outer ring; the rest are holes. Works in a local
+ * equirectangular projection, accurate at city scale.
+ */
+export function polygonLabelPoint(
+  rings: { lat: number; lng: number }[][],
+  precisionMeters = 15,
+): { lat: number; lng: number } | null {
+  const outer = rings[0];
+  if (!outer || outer.length < 3) return null;
+  const lat0 = outer.reduce((s, p) => s + p.lat, 0) / outer.length;
+  const kx = Math.cos((lat0 * Math.PI) / 180);
+  const toXY = (p: { lat: number; lng: number }): [number, number] => [p.lng * kx, p.lat];
+  const polys = rings.map(r => r.map(toXY));
+  const precision = precisionMeters / 111_320;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of polys[0]) {
+    if (x < minX) minX = x; if (y < minY) minY = y;
+    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const cellSize = Math.min(width, height);
+  const back = ([x, y]: [number, number]) => ({ lat: y, lng: x / kx });
+  if (cellSize === 0) return back(polys[0][0]);
+
+  // Signed distance from (x, y) to the polygon outline: > 0 inside.
+  const signedDist = (x: number, y: number): number => {
+    let inside = false;
+    let minSq = Infinity;
+    for (const ring of polys) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [ax, ay] = ring[i];
+        const [bx, by] = ring[j];
+        if ((ay > y) !== (by > y) && x < ((bx - ax) * (y - ay)) / (by - ay) + ax) inside = !inside;
+        let px = bx, py = by;
+        let dx = ax - bx, dy = ay - by;
+        if (dx !== 0 || dy !== 0) {
+          const t = ((x - bx) * dx + (y - by) * dy) / (dx * dx + dy * dy);
+          if (t > 1) { px = ax; py = ay; } else if (t > 0) { px += dx * t; py += dy * t; }
+        }
+        dx = x - px; dy = y - py;
+        const d = dx * dx + dy * dy;
+        if (d < minSq) minSq = d;
+      }
+    }
+    return (inside ? 1 : -1) * Math.sqrt(minSq);
+  };
+
+  type Cell = { x: number; y: number; h: number; d: number; max: number };
+  const cell = (x: number, y: number, h: number): Cell => {
+    const d = signedDist(x, y);
+    return { x, y, h, d, max: d + h * Math.SQRT2 };
+  };
+
+  // Seed with the area centroid and the bbox center, keep the better one.
+  let area = 0, cx = 0, cy = 0;
+  const ring0 = polys[0];
+  for (let i = 0, j = ring0.length - 1; i < ring0.length; j = i++) {
+    const [ax, ay] = ring0[i];
+    const [bx, by] = ring0[j];
+    const f = ax * by - bx * ay;
+    cx += (ax + bx) * f; cy += (ay + by) * f; area += f * 3;
+  }
+  const centroid = area === 0 ? cell(ring0[0][0], ring0[0][1], 0) : cell(cx / area, cy / area, 0);
+  let best = centroid;
+  const bboxCell = cell(minX + width / 2, minY + height / 2, 0);
+  if (bboxCell.d > best.d) best = bboxCell;
+
+  const queue: Cell[] = [];
+  const h = cellSize / 2;
+  for (let x = minX; x < maxX; x += cellSize) {
+    for (let y = minY; y < maxY; y += cellSize) queue.push(cell(x + h, y + h, h));
+  }
+  // Small polygons and few cells: a linear scan for the best candidate
+  // is plenty fast and keeps this dependency-free.
+  let guard = 0;
+  while (queue.length && guard++ < 20000) {
+    let bi = 0;
+    for (let i = 1; i < queue.length; i++) if (queue[i].max > queue[bi].max) bi = i;
+    const c = queue.splice(bi, 1)[0];
+    if (c.d > best.d) best = c;
+    if (c.max - best.d <= precision) continue;
+    const ch = c.h / 2;
+    queue.push(cell(c.x - ch, c.y - ch, ch), cell(c.x + ch, c.y - ch, ch), cell(c.x - ch, c.y + ch, ch), cell(c.x + ch, c.y + ch, ch));
+  }
+  // Long thin zones have many near-equal poles along their spine; the
+  // centre of mass reads as "the middle" there, so prefer it whenever it
+  // is inside and comfortably away from the edges.
+  if (centroid.d >= best.d * 0.5) return back([centroid.x, centroid.y]);
+  return back([best.x, best.y]);
+}

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Save, Trash2, Pencil, Eye, AlertCircle } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { showError, showSuccess } from '@/utils/toast';
-import { geoJsonToGooglePaths, googlePathsToGeoJson, isPointInTerritory } from '@/lib/territory-utils';
+import { geoJsonToGooglePaths, googlePathsToGeoJson, isPointInTerritory, polygonLabelPoint } from '@/lib/territory-utils';
 import { loadGoogleMaps } from '@/lib/google-maps';
 import { refreshContactQueries } from '@/lib/contact-queries';
 
@@ -40,6 +40,19 @@ const CUERDA_PALETTE = [
   '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899',
   '#f43f5e', '#22c55e', '#0ea5e9', '#6366f1', '#a855f7',
 ];
+
+// Cuerda number as a rounded pill (SVG) in the zone's colour, so it reads
+// over the basemap's street and neighbourhood names.
+function cuerdaLabelIcon(numero: string, color: string, selected: boolean) {
+  const fontSize = selected ? 15 : 13;
+  const height = selected ? 28 : 24;
+  const width = Math.max(height + 8, Math.round(numero.length * fontSize * 0.62) + 20);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`
+    + `<rect x="1.5" y="1.5" width="${width - 3}" height="${height - 3}" rx="${(height - 3) / 2}" fill="${color}" stroke="#ffffff" stroke-width="${selected ? 2.5 : 2}"/>`
+    + `<text x="50%" y="50%" dy="0.35em" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="700" fill="#ffffff" stroke="rgba(0,0,0,0.35)" stroke-width="2" paint-order="stroke">${numero.replace(/[<&>"]/g, '')}</text>`
+    + `</svg>`;
+  return { url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`, width, height };
+}
 
 function colorForCuerda(numero: string): string {
   // Stable hash so the same cuerda always gets the same color.
@@ -341,6 +354,7 @@ const TerritoriosPage: React.FC = () => {
     labelMarkersRef.current.forEach(m => m.setMap(null));
     labelMarkersRef.current = [];
 
+    const placedLabels: { lat: number; lng: number }[] = [];
     // Editing polygon — only for the selected cuerda IF the user can
     // edit it AND it has a territory.
     for (const cuerda of cuerdas) {
@@ -373,34 +387,27 @@ const TerritoriosPage: React.FC = () => {
         readonlyPolygonsRef.current.set(cuerda.numero, polygon);
       }
 
-      // Centroid label so the user can read which cuerda each polygon
-      // represents at a glance. Average of the outer ring points — not
-      // a true centroid, but close enough at sub-city scale and cheap.
-      const outer = paths[0] || [];
-      if (outer.length >= 3) {
-        let lat = 0, lng = 0;
-        for (const p of outer) { lat += p.lat; lng += p.lng; }
-        const center = { lat: lat / outer.length, lng: lng / outer.length };
-        const labelMarker = new g.maps.Marker({
-          position: center,
+      // Label at the zone's visual centre (inside the polygon, away from
+      // its edges), drawn as a pill in the cuerda's colour. Zones drawn
+      // on top of each other (e.g. two cuerdas sharing one territory)
+      // would put their labels on the same spot, so those stack.
+      const at = polygonLabelPoint(paths);
+      if (at) {
+        const stackIndex = placedLabels.filter(q => Math.abs(q.lat - at.lat) < 0.002 && Math.abs(q.lng - at.lng) < 0.002).length;
+        placedLabels.push(at);
+        const pill = cuerdaLabelIcon(cuerda.numero, color, isSelected);
+        labelMarkersRef.current.push(new g.maps.Marker({
+          position: at,
           map: mapInstanceRef.current,
           clickable: false,
           zIndex: isSelected ? 11 : 2,
           icon: {
-            // 1×1 transparent SVG so only the label text renders.
-            url: 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%221%22 height%3D%221%22%2F%3E',
-            scaledSize: new g.maps.Size(1, 1),
-            anchor: new g.maps.Point(0, 0),
+            url: pill.url,
+            scaledSize: new g.maps.Size(pill.width, pill.height),
+            // Anchor at the pill's centre; stacked labels shift down.
+            anchor: new g.maps.Point(pill.width / 2, pill.height / 2 - stackIndex * (pill.height + 4)),
           },
-          label: {
-            text: cuerda.numero,
-            color: '#ffffff',
-            fontSize: isSelected ? '18px' : '15px',
-            fontWeight: 'bold',
-            className: 'mja-cuerda-label',
-          },
-        });
-        labelMarkersRef.current.push(labelMarker);
+        }));
       }
     }
 
