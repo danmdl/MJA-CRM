@@ -475,7 +475,7 @@ const SemilleroPage = () => {
     return { duplicateNameIds: ids, duplicateGroupByContactId: byContact, duplicateGroupNo: groupNo };
   }, [duplicateGroups]);
 
-  const { data: poolPage, isLoading } = useQuery<{ rows: Contact[]; totalCount: number }>({
+  const { data: poolPage, isLoading, isFetching: poolFetching } = useQuery<{ rows: Contact[]; totalCount: number }>({
     queryKey: [
       'pool-page', churchId,
       currentPage, PAGE_SIZE,
@@ -541,6 +541,10 @@ const SemilleroPage = () => {
     placeholderData: prev => prev, // keep previous page visible during fetch
   });
   const allContacts = poolPage?.rows;
+  const hasNarrowingFilter = !!(
+    activeTabId || searchTerm.trim() || filterCuerda || filterResponsable || filterConector
+    || filterOnlyWithCoords || filterZonaStatus || filterRoute || filterDuplicates
+  );
   const totalFilteredCount = poolPage?.totalCount ?? 0;
 
   // Church coords for geocoding bias. Without this, addresses like
@@ -1256,10 +1260,17 @@ const SemilleroPage = () => {
           <MapPin className="h-3 w-3 text-cyan-400" />
           <span className="text-[10px] uppercase tracking-wider text-cyan-400">{filterOnlyWithCoords ? 'Ver todos' : 'Solo mapeables'}</span>
         </button>
-        {searchTerm && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border border-blue-500/30 bg-blue-500/5">
-            <span className="text-[10px] uppercase tracking-wider text-blue-400">En filtro</span>
-            <span className="text-sm font-bold tabular-nums text-blue-400">{filteredContacts.length}</span>
+        {/* Total matching the active solapa / search / filters (server
+            count, not just the rows on this page). */}
+        {hasNarrowingFilter && (
+          <div
+            className="inline-flex items-center gap-2 px-3 h-10 rounded-md border-2 border-blue-500/50 bg-blue-500/10"
+            title="Cantidad total de contactos que cumplen la solapa y los filtros activos (todas las páginas)."
+          >
+            <span className="text-[11px] uppercase tracking-wider text-blue-300 leading-tight">Contactos en<br />este filtro</span>
+            <span className={`text-xl font-bold tabular-nums text-blue-300 transition-opacity ${poolFetching ? 'opacity-50' : ''}`}>
+              {isLoading ? '…' : totalFilteredCount.toLocaleString('es-AR')}
+            </span>
           </div>
         )}
 
