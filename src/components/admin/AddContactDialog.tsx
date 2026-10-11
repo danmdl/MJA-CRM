@@ -15,6 +15,8 @@ import { useChurchCoords } from '@/hooks/use-church-coords';
 import { normalizeName } from '@/lib/normalize';
 import { arToday } from '@/lib/ar-date';
 import { refreshContactQueries } from '@/lib/contact-queries';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ChevronDown } from 'lucide-react';
 
 interface Cell {
   id: string;
@@ -63,6 +65,8 @@ const nativeSelectClass = "flex h-10 w-full rounded-md border border-input bg-ba
 
 const today = () => arToday();
 
+const MORE_INFO_KEY = 'addContact.moreInfoOpen';
+
 const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -77,6 +81,19 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
   const [rangoEtario, setRangoEtario] = useState<string>('');
   const [fechaContacto, setFechaContacto] = useState<string>(today());
   const [sexo, setSexo] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+  // "Más información" on phones: collapsed by default; whatever the user
+  // last chose sticks for the next contacts on this device.
+  const [moreInfoOpen, setMoreInfoOpenState] = useState<boolean>(() => {
+    try { return window.localStorage.getItem(MORE_INFO_KEY) === '1'; } catch { return false; }
+  });
+  const setMoreInfoOpen = (update: (open: boolean) => boolean) => {
+    setMoreInfoOpenState(prev => {
+      const next = update(prev);
+      try { window.localStorage.setItem(MORE_INFO_KEY, next ? '1' : '0'); } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
   const [estadoCivil, setEstadoCivil] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [pedidoDeOracion, setPedidoDeOracion] = useState('');
@@ -276,6 +293,260 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
     }
   `;
 
+  // Each field is defined once and laid out twice: the desktop grid keeps
+  // the original order; phones get the short form (most used fields first,
+  // the rest under a collapsible "Más información").
+  const fields = {
+    nombre: (
+      <div className="space-y-2">
+        <label htmlFor="firstName" className="text-sm font-medium">
+          Nombre <span className="text-red-500">*</span>
+        </label>
+        <Input
+          id="firstName"
+          ref={firstNameRef}
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          disabled={loading}
+          required
+          placeholder="Ej: María"
+        />
+      </div>
+    ),
+    apellido: (
+      <FormField
+        label="Apellido"
+        id="lastName"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+        disabled={loading}
+        placeholder="Ej: González"
+      />
+    ),
+    telefono: (
+      <div className="space-y-2">
+        <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} hideExample />
+      </div>
+    ),
+    dob: (
+      <div className="space-y-2">
+        <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
+        <input
+          id="dob"
+          type="date"
+          value={dateOfBirth}
+          onChange={(e) => {
+            setDateOfBirth(e.target.value);
+            if (e.target.value) {
+              const dob = new Date(e.target.value);
+              const now = new Date();
+              let age = now.getFullYear() - dob.getFullYear();
+              const m = now.getMonth() - dob.getMonth();
+              if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+              if (age >= 0) {
+                setEdad(String(age));
+                if (age <= 12) setRangoEtario('Niño (0-12)');
+                else if (age <= 17) setRangoEtario('Adolescente (13-17)');
+                else if (age <= 25) setRangoEtario('Joven (18-25)');
+                else if (age <= 35) setRangoEtario('Adulto joven (26-35)');
+                else if (age <= 59) setRangoEtario('Adulto (36-59)');
+                else setRangoEtario('Crecer (60+)');
+              }
+            }
+          }}
+          disabled={loading}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </div>
+    ),
+    edad: (
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Edad</label>
+        <input
+          type="number"
+          inputMode="numeric"
+          min="0"
+          max="120"
+          value={edad}
+          onChange={(e) => {
+            if (dateOfBirth) return;
+            const v = e.target.value;
+            setEdad(v);
+            const n = parseInt(v);
+            if (!isNaN(n)) {
+              if (n <= 12) setRangoEtario('Niño (0-12)');
+              else if (n <= 17) setRangoEtario('Adolescente (13-17)');
+              else if (n <= 25) setRangoEtario('Joven (18-25)');
+              else if (n <= 35) setRangoEtario('Adulto joven (26-35)');
+              else if (n <= 59) setRangoEtario('Adulto (36-59)');
+              else setRangoEtario('Crecer (60+)');
+            } else {
+              setRangoEtario('');
+            }
+          }}
+          readOnly={!!dateOfBirth}
+          disabled={loading}
+          placeholder="Ej: 32"
+          className={`flex h-10 w-full rounded-md border border-input px-3 py-2 text-sm ${dateOfBirth ? 'bg-muted text-muted-foreground cursor-default' : 'bg-background'}`}
+        />
+      </div>
+    ),
+    rango: (
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Rango Etario</label>
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={rangoEtario}
+          onChange={(e) => setRangoEtario(e.target.value)}
+          disabled={loading}
+        >
+          <option value="">Sin especificar</option>
+          <option value="Niño (0-12)">Niño (0-12)</option>
+          <option value="Adolescente (13-17)">Adolescente (13-17)</option>
+          <option value="Joven (18-25)">Joven (18-25)</option>
+          <option value="Adulto joven (26-35)">Adulto joven (26-35)</option>
+          <option value="Adulto (36-59)">Adulto (36-59)</option>
+          <option value="Crecer (60+)">Crecer (60+)</option>
+        </select>
+      </div>
+    ),
+    fechaContacto: (
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Fecha de Contacto</label>
+        <input
+          type="date"
+          value={fechaContacto}
+          onChange={(e) => setFechaContacto(e.target.value)}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+      </div>
+    ),
+    sexo: (
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Sexo <span className="text-red-500">*</span></label>
+        <select
+          className={`${nativeSelectClass} ${!sexo ? 'border-red-500/60' : ''}`}
+          value={sexo || ''}
+          onChange={(e) => setSexo(e.target.value || null)}
+          disabled={loading}
+          required
+        >
+          <option value="" disabled>Seleccionar...</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Femenino">Femenino</option>
+        </select>
+      </div>
+    ),
+    direccion: (
+      <div className="contact-form-col-wide space-y-2">
+        <label className="text-sm font-medium">Dirección</label>
+        <AddressAutocomplete
+          value={address}
+          onChange={(addr, lat, lng) => { setAddress(addr || ''); if (lat != null && lng != null && isWithinGBACheck(lat, lng)) { setContactLat(lat); setContactLng(lng); } else if (lat != null) { setContactLat(null); setContactLng(null); } }}
+          placeholder="Ej: Av Corrientes 4000, CABA"
+          disabled={loading}
+          biasLat={churchCoords?.lat ?? null}
+          biasLng={churchCoords?.lng ?? null}
+        />
+      </div>
+    ),
+    apartamento: (
+      <FormField
+        label="Número de Apartamento"
+        id="apartmentNumber"
+        value={apartmentNumber}
+        onChange={(e) => setApartmentNumber(e.target.value)}
+        disabled={loading}
+        placeholder="Ej: 3B"
+      />
+    ),
+    estadoCivil: (
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Estado Civil</label>
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={estadoCivil}
+          onChange={(e) => setEstadoCivil(e.target.value)}
+          disabled={loading}
+        >
+          <option value="">Sin especificar</option>
+          <option value="Soltero/a">Soltero/a</option>
+          <option value="Casado/a">Casado/a</option>
+          <option value="En pareja">En pareja</option>
+          <option value="Viudo/a">Viudo/a</option>
+          <option value="Separado/a">Separado/a</option>
+          <option value="N/A">N/A</option>
+        </select>
+      </div>
+    ),
+    conector: (
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Conector</label>
+        <Input
+          id="conector"
+          value={conector}
+          disabled={loading}
+          readOnly
+          className="bg-muted text-muted-foreground cursor-default"
+        />
+      </div>
+    ),
+    observaciones: (
+      <div className="contact-form-col-full space-y-2">
+        <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
+        <Textarea
+          id="observaciones"
+          value={observaciones}
+          onChange={(e) => setObservaciones(e.target.value)}
+          disabled={loading}
+          placeholder="Notas adicionales sobre el contacto..."
+          rows={2}
+        />
+      </div>
+    ),
+    pedido: (
+      <div className="contact-form-col-full space-y-2">
+        <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
+        <Textarea
+          id="pedidoOracion"
+          value={pedidoDeOracion}
+          onChange={(e) => setPedidoDeOracion(e.target.value)}
+          disabled={loading}
+          placeholder="¿Tiene algún pedido de oración?"
+          rows={2}
+        />
+      </div>
+    ),
+  };
+
+  // Phones: Sexo as two big M / F buttons instead of a dropdown.
+  const sexoMobileField = (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Sexo <span className="text-red-500">*</span></label>
+      <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Sexo">
+        {([['Masculino', 'M'], ['Femenino', 'F']] as const).map(([value, short]) => {
+          const selected = sexo === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={value}
+              onClick={() => setSexo(value)}
+              disabled={loading}
+              className={`h-12 rounded-md border text-lg font-bold transition-colors ${selected ? 'border-primary bg-primary text-primary-foreground' : sexo ? 'border-input bg-background text-muted-foreground' : 'border-red-500/60 bg-background'}`}
+            >
+              {short}
+            </button>
+          );
+        })}
+      </div>
+      {!sexo && <p className="text-xs text-red-400">Elegí M o F para poder guardar.</p>}
+    </div>
+  );
+
+
   // Close on Escape key
   useEffect(() => {
     if (!open) return;
@@ -301,231 +572,54 @@ const AddContactDialog = ({ open, onOpenChange, churchId }: AddContactDialogProp
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ overflowY: 'auto', flex: 1, padding: '16px 24px' }}>
+          {isMobile ? (
+            <div className="space-y-3" style={{ marginBottom: '8px' }}>
+              {fields.nombre}
+              {fields.apellido}
+              {fields.telefono}
+              {fields.direccion}
+              {fields.apartamento}
+              {sexoMobileField}
+              {fields.pedido}
+              <button
+                type="button"
+                onClick={() => setMoreInfoOpen(o => !o)}
+                aria-expanded={moreInfoOpen}
+                className="flex w-full items-center justify-between rounded-md border border-input px-3 py-3 text-sm font-medium"
+              >
+                <span>Más información</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${moreInfoOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {moreInfoOpen && (
+                <div className="space-y-3">
+                  {fields.dob}
+                  {fields.edad}
+                  {fields.rango}
+                  {fields.fechaContacto}
+                  {fields.estadoCivil}
+                  {fields.conector}
+                  {fields.observaciones}
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="contact-form-grid" style={{ display: "grid", gap: "12px 12px", marginBottom: "8px" }}>
-
-            {/* Nombre */}
-            <div className="space-y-2">
-              <label htmlFor="firstName" className="text-sm font-medium">
-                Nombre <span className="text-red-500">*</span>
-              </label>
-              <Input
-                id="firstName"
-                ref={firstNameRef}
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                disabled={loading}
-                required
-                placeholder="Ej: María"
-              />
-            </div>
-
-            {/* Apellido */}
-            <FormField
-              label="Apellido"
-              id="lastName"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: González"
-            />
-
-            {/* Teléfono */}
-            <div className="space-y-2">
-              <CountryPhoneInput label="Teléfono" value={phone} onChange={(v) => setPhone(v)} hideExample />
-            </div>
-
-            {/* Fecha de nacimiento */}
-            <div className="space-y-2">
-              <label htmlFor="dob" className="text-sm font-medium">Fecha de nacimiento</label>
-              <input
-                id="dob"
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => {
-                  setDateOfBirth(e.target.value);
-                  if (e.target.value) {
-                    const dob = new Date(e.target.value);
-                    const now = new Date();
-                    let age = now.getFullYear() - dob.getFullYear();
-                    const m = now.getMonth() - dob.getMonth();
-                    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
-                    if (age >= 0) {
-                      setEdad(String(age));
-                      if (age <= 12) setRangoEtario('Niño (0-12)');
-                      else if (age <= 17) setRangoEtario('Adolescente (13-17)');
-                      else if (age <= 25) setRangoEtario('Joven (18-25)');
-                      else if (age <= 35) setRangoEtario('Adulto joven (26-35)');
-                      else if (age <= 59) setRangoEtario('Adulto (36-59)');
-                      else setRangoEtario('Crecer (60+)');
-                    }
-                  }
-                }}
-                disabled={loading}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-
-            {/* Edad + Rango Etario */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Edad</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                min="0"
-                max="120"
-                value={edad}
-                onChange={(e) => {
-                  if (dateOfBirth) return;
-                  const v = e.target.value;
-                  setEdad(v);
-                  const n = parseInt(v);
-                  if (!isNaN(n)) {
-                    if (n <= 12) setRangoEtario('Niño (0-12)');
-                    else if (n <= 17) setRangoEtario('Adolescente (13-17)');
-                    else if (n <= 25) setRangoEtario('Joven (18-25)');
-                    else if (n <= 35) setRangoEtario('Adulto joven (26-35)');
-                    else if (n <= 59) setRangoEtario('Adulto (36-59)');
-                    else setRangoEtario('Crecer (60+)');
-                  } else {
-                    setRangoEtario('');
-                  }
-                }}
-                readOnly={!!dateOfBirth}
-                disabled={loading}
-                placeholder="Ej: 32"
-                className={`flex h-10 w-full rounded-md border border-input px-3 py-2 text-sm ${dateOfBirth ? 'bg-muted text-muted-foreground cursor-default' : 'bg-background'}`}
-              />
-            </div>
-
-            {/* Rango Etario */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Rango Etario</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={rangoEtario}
-                onChange={(e) => setRangoEtario(e.target.value)}
-                disabled={loading}
-              >
-                <option value="">Sin especificar</option>
-                <option value="Niño (0-12)">Niño (0-12)</option>
-                <option value="Adolescente (13-17)">Adolescente (13-17)</option>
-                <option value="Joven (18-25)">Joven (18-25)</option>
-                <option value="Adulto joven (26-35)">Adulto joven (26-35)</option>
-                <option value="Adulto (36-59)">Adulto (36-59)</option>
-                <option value="Crecer (60+)">Crecer (60+)</option>
-              </select>
-            </div>
-
-            {/* Fecha de Contacto - defaults to today, editable */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Fecha de Contacto</label>
-              <input
-                type="date"
-                value={fechaContacto}
-                onChange={(e) => setFechaContacto(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-            </div>
-
-            {/* Sexo - REQUIRED */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Sexo <span className="text-red-500">*</span></label>
-              <select
-                className={`${nativeSelectClass} ${!sexo ? 'border-red-500/60' : ''}`}
-                value={sexo || ''}
-                onChange={(e) => setSexo(e.target.value || null)}
-                disabled={loading}
-                required
-              >
-                <option value="" disabled>Seleccionar...</option>
-                <option value="Masculino">Masculino</option>
-                <option value="Femenino">Femenino</option>
-              </select>
-            </div>
-
-            {/* Dirección - spans 2 cols */}
-            <div className="contact-form-col-wide space-y-2">
-              <label className="text-sm font-medium">Dirección</label>
-              <AddressAutocomplete
-                value={address}
-                onChange={(addr, lat, lng) => { setAddress(addr || ''); if (lat != null && lng != null && isWithinGBACheck(lat, lng)) { setContactLat(lat); setContactLng(lng); } else if (lat != null) { setContactLat(null); setContactLng(null); } }}
-                placeholder="Ej: Av Corrientes 4000, CABA"
-                disabled={loading}
-                biasLat={churchCoords?.lat ?? null}
-                biasLng={churchCoords?.lng ?? null}
-              />
-            </div>
-
-            {/* Número de Apartamento */}
-            <FormField
-              label="Número de Apartamento"
-              id="apartmentNumber"
-              value={apartmentNumber}
-              onChange={(e) => setApartmentNumber(e.target.value)}
-              disabled={loading}
-              placeholder="Ej: 3B"
-            />
-
-{/* Estado Civil */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Estado Civil</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={estadoCivil}
-                onChange={(e) => setEstadoCivil(e.target.value)}
-                disabled={loading}
-              >
-                <option value="">Sin especificar</option>
-                <option value="Soltero/a">Soltero/a</option>
-                <option value="Casado/a">Casado/a</option>
-                <option value="En pareja">En pareja</option>
-                <option value="Viudo/a">Viudo/a</option>
-                <option value="Separado/a">Separado/a</option>
-                <option value="N/A">N/A</option>
-              </select>
-            </div>
-
-{/* Conector - read-only for Conector role */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Conector</label>
-              <Input
-                id="conector"
-                value={conector}
-                disabled={loading}
-                readOnly
-                className="bg-muted text-muted-foreground cursor-default"
-              />
-            </div>
-
-
-
-            {/* Observaciones - spans full row */}
-            <div className="contact-form-col-full space-y-2">
-              <label htmlFor="observaciones" className="text-sm font-medium">Observaciones</label>
-              <Textarea
-                id="observaciones"
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                disabled={loading}
-                placeholder="Notas adicionales sobre el contacto..."
-                rows={2}
-              />
-            </div>
-
-            {/* Pedido de Oración - spans full row */}
-            <div className="contact-form-col-full space-y-2">
-              <label htmlFor="pedidoOracion" className="text-sm font-medium">Pedido de Oración</label>
-              <Textarea
-                id="pedidoOracion"
-                value={pedidoDeOracion}
-                onChange={(e) => setPedidoDeOracion(e.target.value)}
-                disabled={loading}
-                placeholder="¿Tiene algún pedido de oración?"
-                rows={2}
-              />
-            </div>
-
+            {fields.nombre}
+            {fields.apellido}
+            {fields.telefono}
+            {fields.dob}
+            {fields.edad}
+            {fields.rango}
+            {fields.fechaContacto}
+            {fields.sexo}
+            {fields.direccion}
+            {fields.apartamento}
+            {fields.estadoCivil}
+            {fields.conector}
+            {fields.observaciones}
+            {fields.pedido}
           </div>
+          )}
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-6 py-4 border-t shrink-0">
