@@ -138,13 +138,11 @@ const SemilleroPage = () => {
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    // Rebalanced after Dan's screenshot showed the table tight on the
-    // left with empty space on the right. With tableLayout:fixed +
-    // w-full, these widths act as proportions: Dirección bumped up
-    // (gets truncated otherwise), small fixed-content columns (check,
-    // dup, ruta, fecha) stay narrow on purpose so they don't waste
-    // horizontal room when the table scales to the container width.
-    check: 34, cuerda: 60, nombre: 160, dup: 44, responsable: 130, telefono: 120, direccion: 200, fechaContacto: 64, sugerencia: 150, asignar: 110, conector: 130, ruta: 56,
+    // Content-sized widths. Every column keeps exactly its width and
+    // Dirección (no fixed width) absorbs whatever room is left, so wide
+    // monitors show longer addresses instead of black gaps between
+    // columns. `direccion` here is only its minimum.
+    check: 34, cuerda: 60, nombre: 190, dup: 44, responsable: 130, telefono: 150, direccion: 220, fechaContacto: 76, sugerencia: 150, asignar: 110, conector: 130, ruta: 56,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -1014,6 +1012,16 @@ const SemilleroPage = () => {
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
+  // Sum of the visible fixed columns plus Dirección's minimum: below this
+  // the table scrolls horizontally instead of squeezing Dirección to 0.
+  const tableMinWidth = colWidths.check + colWidths.nombre + colWidths.telefono + colWidths.responsable
+    + colWidths.direccion + colWidths.fechaContacto
+    + (showCuerdaCol ? colWidths.cuerda : 0)
+    + (showDupCol ? colWidths.dup : 0)
+    + (showConectorCol ? colWidths.conector : 0)
+    + (showRutaCol ? colWidths.ruta : 0)
+    + (isUnassignedView && showSugerencia ? colWidths.sugerencia : 0)
+    + (isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) ? colWidths.asignar : 0);
 
   // ─── Auto-assign preview ───────────────────────────────────────
   const autoAssignPreview = useMemo(() => {
@@ -1446,16 +1454,11 @@ const SemilleroPage = () => {
             <div className="p-6 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : (
             <div className="overflow-x-auto">
-              {/* w-full + tableLayout:fixed: the colWidths act as
-                  proportions, the table fills the container width, and
-                  the columns scale together. We tried not-w-full once
-                  (PR #66) to kill "dead space between columns"; that
-                  left the table tight on the left with empty space on
-                  the right (Dan reported this). The rebalanced widths
-                  above keep the wide columns (nombre, dirección,
-                  responsable) generous so they soak up the extra room
-                  instead of distributing it to the small ones. */}
-              <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 860 }}>
+              {/* w-full + tableLayout:fixed with Dirección as the only
+                  auto-width column: it takes the leftover room on wide
+                  screens; below tableMinWidth the container scrolls
+                  instead of squeezing the other columns. */}
+              <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
                 <thead>
                   <tr className="border-b h-[37px]">
                     <th className="px-2" style={{ width: colWidths.check }}>
@@ -1643,7 +1646,7 @@ const SemilleroPage = () => {
                         </DropdownMenu>
                       </ResizableHeader>
                     )}
-                    <ResizableHeader width={colWidths.direccion} onResize={resizeCol('direccion')}>Dirección</ResizableHeader>
+                    <ResizableHeader>Dirección</ResizableHeader>
                     <ResizableHeader width={colWidths.fechaContacto} onResize={resizeCol('fechaContacto')}>
                       <button
                         type="button"
@@ -1919,7 +1922,7 @@ const SemilleroPage = () => {
                         )}
 
                         {/* Dirección + Ver en mapa */}
-                        <td className="px-2 py-1.5" style={{ width: colWidths.direccion }}>
+                        <td className="px-2 py-1.5">
                           {(c.address && /[\p{L}\p{N}]/u.test(c.address)) ? (() => {
                             // Incomplete address = no street number (just a locality like "San Martín")
                             const hasStreetNumber = /\d/.test(c.address!);
@@ -1927,7 +1930,7 @@ const SemilleroPage = () => {
                             return (
                               <div className="flex items-center gap-1">
                                 <span
-                                  className={`text-xs truncate max-w-[150px] ${colorClass}`}
+                                  className={`text-xs truncate min-w-0 ${colorClass}`}
                                   title={hasStreetNumber ? c.address! : `⚠ Dirección incompleta (sin número): ${c.address}`}
                                 >
                                   {c.address}
