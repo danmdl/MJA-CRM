@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, Route as RouteIcon, AlertCircle, MessageCircle, Copy, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { buildGoogleMapsChunks, makeStopRanges, type StopRange } from '@/lib/google-maps-urls';
+import { loadGoogleMaps, GOOGLE_MAPS_KEY } from '@/lib/google-maps';
+import { computeRoute, type LatLng } from '@/lib/routes-api';
 import {
   groupStopsByLocation,
   buildGroupLabel,
@@ -14,7 +16,6 @@ import {
   markerFontSizeFor,
 } from '@/lib/route-stops';
 
-const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
 interface Contact {
   id: string;
@@ -160,7 +161,11 @@ const SharedRoutePage = () => {
   // line connecting the visible stops, which is enough to anchor the
   // visual without showing earlier path legs.
   const customPolyline = useRef<any>(null);
-  const directionsRendererRef = useRef<any>(null);
+  const routeLineRef = useRef<any>(null);
+  const fittedRef = useRef(false);
+  // Road path for the full route, computed once per stop list so toggling
+  // ranges doesn't re-bill a Routes API request.
+  const routePathRef = useRef<{ key: string; path: LatLng[] } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -191,12 +196,8 @@ const SharedRoutePage = () => {
 
   // Load Google Maps
   useEffect(() => {
-    if ((window as any).google?.maps) return;
     if (!route) return;
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places`;
-    script.async = true;
-    document.head.appendChild(script);
+    loadGoogleMaps().catch(() => {});
   }, [route]);
 
   // Available range buttons (e.g. [{1,5},{5,10},…]) and a predicate
@@ -223,59 +224,49 @@ const SharedRoutePage = () => {
         });
       }
 
-      // Lazily create the DirectionsRenderer once. We toggle its map
-      // attachment based on whether the user wants the full route or
-      // a single range — for ranges we replace it with a custom
-      // straight-line polyline so earlier legs disappear.
-      if (!directionsRendererRef.current) {
-        directionsRendererRef.current = new google.maps.DirectionsRenderer({
-          suppressMarkers: true,
-          polylineOptions: { strokeColor: '#FFC233', strokeWeight: 5 },
-        });
+      // Lazily create the road-routed line once. We toggle its map
+      // attachment based on whether the user wants the full route or a
+      // single range — for ranges we replace it with a straight-line
+      // polyline so earlier legs disappear.
+      if (!routeLineRef.current) {
+        routeLineRef.current = new google.maps.Polyline({ strokeColor: '#FFC233', strokeOpacity: 0.9, strokeWeight: 5 });
       }
 
       // Clear the previous custom polyline (if any) before we decide
-      // whether to draw a new one or restore the directions polyline.
+      // whether to draw a new one or restore the road-routed line.
       if (customPolyline.current) {
         customPolyline.current.setMap(null);
         customPolyline.current = null;
       }
 
       if (stopsRange === 'all') {
-        // Full road-routed polyline via DirectionsService. The API
-        // caps waypoints around 23 — past that, skip the line render
-        // (pins still show, and the chunked GMaps links handle the
-        // actual driving directions).
-        directionsRendererRef.current.setMap(mapInstance.current);
+        // Full road-routed line via the Routes API, in the saved order.
+        // Past ~23 stops skip the line (pins still show, and the chunked
+        // GMaps links handle the actual driving directions).
+        routeLineRef.current.setMap(mapInstance.current);
         const PLOT_LINE_LIMIT = 23;
-        const stopsForLine = contacts.length > PLOT_LINE_LIMIT
-          ? contacts.slice(0, PLOT_LINE_LIMIT)
-          : contacts;
-        if (stopsForLine.length >= 1) {
-          const ds = new google.maps.DirectionsService();
-          const waypoints = stopsForLine.slice(0, -1).map(c => ({
-            location: new google.maps.LatLng(c.lat!, c.lng!),
-            stopover: true,
-          }));
-          const dest = stopsForLine[stopsForLine.length - 1];
-          ds.route({
-            origin: new google.maps.LatLng(Number(route.start_lat), Number(route.start_lng)),
-            destination: new google.maps.LatLng(dest.lat!, dest.lng!),
-            waypoints,
-            optimizeWaypoints: false,
-            travelMode: google.maps.TravelMode.DRIVING,
-            region: 'AR',
-          }, (result: any, status: string) => {
-            if (status === 'OK') directionsRendererRef.current.setDirections(result);
-          });
+        const stopsForLine = (contacts.length > PLOT_LINE_LIMIT ? contacts.slice(0, PLOT_LINE_LIMIT) : contacts)
+          .filter(c => c.lat != null && c.lng != null);
+        const key = stopsForLine.map(c => `${c.id}:${c.lat},${c.lng}`).join('|');
+        if (routePathRef.current?.key === key) {
+          routeLineRef.current.setPath(routePathRef.current.path);
+        } else if (stopsForLine.length >= 1 && GOOGLE_MAPS_KEY) {
+          const points = stopsForLine.map(c => ({ lat: c.lat!, lng: c.lng! }));
+          computeRoute({
+            apiKey: GOOGLE_MAPS_KEY,
+            origin: { lat: Number(route.start_lat), lng: Number(route.start_lng) },
+            destination: points[points.length - 1],
+            intermediates: points.slice(0, -1),
+          }).then(r => {
+            routePathRef.current = { key, path: r.path };
+            routeLineRef.current?.setPath(r.path);
+          }).catch(err => console.warn('[SharedRoute] route line', err));
         }
       } else {
-        // Partial range: hide the directions polyline (otherwise it
-        // would still draw the full road route underneath) and
-        // replace it with a straight-line polyline through just the
-        // in-range stops. Less precise but visually unambiguous —
-        // earlier paths are gone.
-        directionsRendererRef.current.setMap(null);
+        // Partial range: hide the road-routed line (otherwise it would
+        // still draw the full route underneath) and replace it with a
+        // straight-line polyline through just the in-range stops.
+        routeLineRef.current.setMap(null);
         const path: { lat: number; lng: number }[] = [];
         contacts.forEach((c, idx) => {
           if (isStopInRange(idx) && c.lat != null && c.lng != null) {
@@ -345,6 +336,16 @@ const SharedRoutePage = () => {
           title: buildGroupTitle(g),
         }));
       });
+
+      // Frame the start and every stop once, on first render; later
+      // re-renders (visited toggles, range picks) keep the user's view.
+      if (!fittedRef.current) {
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend({ lat: Number(route.start_lat), lng: Number(route.start_lng) });
+        contacts.forEach(c => { if (c.lat != null && c.lng != null) bounds.extend({ lat: c.lat, lng: c.lng }); });
+        mapInstance.current.fitBounds(bounds);
+        fittedRef.current = true;
+      }
     };
     tryRender();
     // eslint-disable-next-line react-hooks/exhaustive-deps

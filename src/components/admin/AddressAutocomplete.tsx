@@ -26,6 +26,7 @@ interface AddressAutocompleteProps {
 }
 
 import { loadGoogleMaps } from '@/lib/google-maps';
+import { fetchAddressSuggestions } from '@/lib/places-api';
 
 // Lifted out alongside the loadGoogleMaps refactor — used below to short-circuit
 // the autocomplete effect and render a plain input fallback when the key isn't
@@ -49,7 +50,10 @@ const AddressAutocomplete = ({
   const [ready, setReady] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const autocompleteServiceRef = useRef<any>(null);
+  // One token per typing session (reset after a pick) groups the
+  // autocomplete requests for billing.
+  const sessionTokenRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const geocoderRef = useRef<any>(null);
   const mountedRef = useRef(true); // track if component is still mounted
 
@@ -58,8 +62,9 @@ const AddressAutocomplete = ({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      // Cancel any pending debounce on unmount
+      // Cancel any pending debounce / request on unmount
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
     };
   }, []);
 
@@ -71,7 +76,6 @@ const AddressAutocomplete = ({
     if (!GOOGLE_API_KEY) return;
     loadGoogleMaps().then(() => {
       if (!mountedRef.current) return;
-      autocompleteServiceRef.current = new (window as any).google.maps.places.AutocompleteService();
       geocoderRef.current = new (window as any).google.maps.Geocoder();
       setReady(true);
     });
@@ -79,43 +83,38 @@ const AddressAutocomplete = ({
 
   const search = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.length < 3 || !autocompleteServiceRef.current) {
+    if (q.length < 3 || !GOOGLE_API_KEY) {
       if (mountedRef.current) { setSuggestions([]); setOpen(false); }
       return;
     }
-    debounceRef.current = setTimeout(() => {
+    debounceRef.current = setTimeout(async () => {
       if (!mountedRef.current) return;
+      // Only the latest keystroke's answer matters.
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      if (!sessionTokenRef.current) sessionTokenRef.current = crypto.randomUUID();
       setLoading(true);
-      // Build the prediction request. componentRestrictions limits to
-      // Argentina; locationBias (if church coords are provided) tells
-      // Google to favor results within `biasRadius` meters of the church.
-      // It's a soft bias — addresses outside still come up if there's
-      // no better match nearby.
-      const request: any = {
-        input: q,
-        componentRestrictions: { country: 'ar' },
-        types: ['address'],
-      };
-      if (biasLat != null && biasLng != null && (window as any).google?.maps) {
-        const google = (window as any).google;
-        request.locationBias = new google.maps.Circle({
-          center: { lat: biasLat, lng: biasLng },
-          radius: biasRadius,
+      try {
+        // Limited to Argentina, softly biased toward the church so nearby
+        // addresses beat more prominent matches elsewhere.
+        const results = await fetchAddressSuggestions({
+          apiKey: GOOGLE_API_KEY,
+          input: q,
+          bias: biasLat != null && biasLng != null ? { lat: biasLat, lng: biasLng, radiusMeters: biasRadius } : null,
+          sessionToken: sessionTokenRef.current,
+          signal: controller.signal,
         });
+        if (!mountedRef.current || controller.signal.aborted) return;
+        setSuggestions(results);
+        setOpen(results.length > 0);
+      } catch (e: any) {
+        if (e?.name === 'AbortError' || !mountedRef.current) return;
+        console.warn('[AddressAutocomplete]', e);
+        setSuggestions([]); setOpen(false);
+      } finally {
+        if (mountedRef.current && !controller.signal.aborted) setLoading(false);
       }
-      autocompleteServiceRef.current.getPlacePredictions(
-        request,
-        (predictions: any[], status: string) => {
-          if (!mountedRef.current) return; // don't setState if unmounted
-          setLoading(false);
-          if (status === 'OK' && predictions) {
-            setSuggestions(predictions.map(p => ({ description: p.description, place_id: p.place_id })));
-            setOpen(true);
-          } else {
-            setSuggestions([]); setOpen(false);
-          }
-        }
-      );
     }, 300);
   }, [biasLat, biasLng, biasRadius]);
 
@@ -129,6 +128,7 @@ const AddressAutocomplete = ({
     setQuery(suggestion.description);
     onChange(suggestion.description);
     setSuggestions([]); setOpen(false);
+    sessionTokenRef.current = null;
     if (geocoderRef.current) {
       geocoderRef.current.geocode(
         { placeId: suggestion.place_id },

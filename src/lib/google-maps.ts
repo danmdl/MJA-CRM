@@ -11,6 +11,7 @@
 import { showError } from '@/utils/toast';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+export const GOOGLE_MAPS_KEY: string | undefined = GOOGLE_KEY;
 
 // Cache the loading promise so multiple components calling this
 // simultaneously don't each kick off their own script tag.
@@ -82,7 +83,7 @@ export function loadGoogleMaps(): Promise<any> {
 
     const script = document.createElement('script');
     script.id = 'google-maps-script';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=places,drawing,geometry`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&libraries=drawing,geometry`;
     script.async = true;
     script.onload = () => {
       // gm_authFailure usually fires AFTER onload — so wait a tick
