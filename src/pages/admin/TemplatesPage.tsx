@@ -287,31 +287,19 @@ const TemplatesPage = () => {
     setNewBody(prev => prev + `{${variable}}`);
   };
 
-  if (!canUseTemplates()) {
-    return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No tenés permisos para acceder a las plantillas.</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Contactá a un administrador si creés que esto es un error.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Plantillas de WhatsApp</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Administrá tus plantillas de mensajes para WhatsApp
+            {canUseTemplates()
+              ? 'Administrá tus plantillas de mensajes para WhatsApp'
+              : 'Plantillas del sistema, listas para usar'}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {canUseTemplates() && (
           <Button 
             variant={showTrash ? "default" : "outline"} 
             size="sm"
@@ -320,7 +308,8 @@ const TemplatesPage = () => {
           >
             <Trash2 className="h-4 w-4" /> {showTrash ? 'Ver activas' : 'Papelera'}
           </Button>
-          {!showTrash && (
+          )}
+          {!showTrash && canUseTemplates() && (
             <Button onClick={() => setCreating(true)} className="gap-2">
               <Plus className="h-4 w-4" /> Nueva Plantilla
             </Button>
@@ -460,10 +449,14 @@ const TemplatesPage = () => {
         {templates.length === 0 && !creating && (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No tenés plantillas guardadas.</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Hacé clic en "Nueva Plantilla" para crear una.
+              <p className="text-muted-foreground">
+                {canUseTemplates() ? 'No tenés plantillas guardadas.' : 'Todavía no hay plantillas del sistema.'}
               </p>
+              {canUseTemplates() && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Hacé clic en "Nueva Plantilla" para crear una.
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

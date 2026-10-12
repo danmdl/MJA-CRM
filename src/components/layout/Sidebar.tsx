@@ -16,7 +16,7 @@ interface NavItemConfig {
 const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpenSearch?: () => void } = {}) => {
   const { profile } = useSession();
   const navigate = useNavigate();
-  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canUseTemplates, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas, canSeeProcesos, canSeeValidador, canSeeMapa, permissionsReady } = usePermissions();
+  const { canSeeAllAnalytics, canAccessPermissions, canSeeAllChurches, canSeePool, canSeeOwnChurchAnalytics, canSeeCelulas, canSeeHistorial, canSeeCuerdas, canImportCsv, canSeeAsistencia, canSeeEventos, canSeeRutas, canSeeProcesos, canSeeValidador, canSeeMapa, permissionsReady } = usePermissions();
 
   // Detect if we're inside a specific church
   const churchMatch = useMatch('/admin/churches/:churchId/*');
@@ -95,7 +95,8 @@ const Sidebar = ({ onNavigate, onOpenSearch }: { onNavigate?: () => void; onOpen
       title: 'Cuenta',
       items: [
         { to: '/admin/messages', emoji: '💬', label: 'Mensajes' },
-        ...(canUseTemplates() ? [{ to: '/admin/templates', emoji: '📝', label: 'Templates' }] : []),
+        // Everyone sees the system templates; personal ones need the permission.
+        { to: '/admin/templates', emoji: '📝', label: 'Templates' },
         ...(canImportCsv() ? [{ to: '/admin/csv-merger', emoji: '🔗', label: 'Unir columnas' }] : []),
         ...(canAccessPermissions() ? [{ to: '/admin/csv-sandbox', emoji: '🧪', label: 'Sandbox CSV' }] : []),
         ...(profile?.role !== 'conector' ? [{ to: '/admin/notifications', emoji: '🔔', label: 'Notificaciones' }] : []),
