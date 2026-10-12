@@ -551,7 +551,16 @@ const ProcesosPage = () => {
       queryClient.invalidateQueries({ queryKey: ['process-available-contacts', churchId] });
       showSuccess('Contacto agregado al proceso');
     },
-    onError: (err: any) => showError(err.message || 'Error al agregar contacto'),
+    onError: (err: any) => {
+      // contact_processes has one row per contact (unique contact_id).
+      if (err?.code === '23505') {
+        showError('Este contacto ya está en un proceso.');
+        queryClient.invalidateQueries({ queryKey: ['processes', churchId] });
+        queryClient.invalidateQueries({ queryKey: ['process-available-contacts', churchId] });
+        return;
+      }
+      showError(err.message || 'Error al agregar contacto');
+    },
   });
 
   const removeMutation = useMutation({
