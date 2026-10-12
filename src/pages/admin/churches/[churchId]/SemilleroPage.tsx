@@ -36,7 +36,7 @@ import {
   fetchPoolAll,
   fetchPoolByIds,
   fetchDuplicateGroups,
-  fetchDuplicateCount,
+  fetchDuplicateSummary,
   fetchInboxUniqueCount,
   fetchPoolCounts,
   fetchDistinctCuerdas,
@@ -447,9 +447,9 @@ const SemilleroPage = () => {
   const duplicateScopeKey = [churchId, profile?.id, profile?.role, profile?.numero_cuerda, canSeeContactsFromAllCuerdas];
   // The pill only needs the count; the id list (~50 kB) loads once the
   // Dup column or the Duplicados filter is actually in use.
-  const { data: duplicateCount } = useQuery({
-    queryKey: ['duplicate-groups', 'count', ...duplicateScopeKey],
-    queryFn: () => fetchDuplicateCount(churchId!, duplicateScope),
+  const { data: duplicateSummary } = useQuery({
+    queryKey: ['duplicate-groups', 'summary', ...duplicateScopeKey],
+    queryFn: () => fetchDuplicateSummary(churchId!, duplicateScope),
     enabled: !!churchId && !!profile,
     staleTime: 60_000,
   });
@@ -1023,7 +1023,11 @@ const SemilleroPage = () => {
 
   // Duplicados pill: every duplicate in the user's scope, or — with the
   // filter on — the duplicates that also match the other filters.
-  const dupsInFilteredView = filterDuplicates ? totalFilteredCount : (duplicateCount ?? duplicateNameIds.size);
+  // Off: extra copies (María loaded 3 times = 2), which lines up with the
+  // INBOX chip counting people. On: the rows the filter shows (every copy
+  // of each duplicated person, originals included).
+  const duplicateExtraCopies = duplicateSummary ? duplicateSummary.records - duplicateSummary.people : 0;
+  const dupsInFilteredView = filterDuplicates ? totalFilteredCount : duplicateExtraCopies;
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
@@ -1271,7 +1275,11 @@ const SemilleroPage = () => {
             type="button"
             onClick={() => setFilterDuplicates(v => !v)}
             className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${filterDuplicates ? 'border-amber-500 bg-amber-500/10' : 'border-amber-500/30 hover:border-amber-500/60'}`}
-            title={filterDuplicates ? 'Mostrar todos los contactos del filtro' : 'Mostrar solo posibles duplicados (mismo nombre y apellido) dentro del filtro actual'}
+            title={filterDuplicates
+              ? `Mostrando ${totalFilteredCount.toLocaleString('es-AR')} registros duplicados (todas las copias, incluido el original). Click para ver todos.`
+              : duplicateSummary
+                ? `${duplicateExtraCopies.toLocaleString('es-AR')} copias de más: ${duplicateSummary.people.toLocaleString('es-AR')} personas están cargadas más de una vez (${duplicateSummary.records.toLocaleString('es-AR')} registros en total). Click para verlas agrupadas.`
+                : 'Mostrar solo posibles duplicados (mismo nombre y apellido)'}
           >
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
             <span className="text-[10px] uppercase tracking-wider text-amber-400">{filterDuplicates ? 'Mostrando dups' : 'Duplicados'}</span>
