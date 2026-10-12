@@ -138,11 +138,12 @@ const SemilleroPage = () => {
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const [colWidths, setColWidths] = useState({
-    // Content-sized widths. Every column keeps exactly its width and
-    // Dirección (no fixed width) absorbs whatever room is left, so wide
-    // monitors show longer addresses instead of black gaps between
-    // columns. `direccion` here is only its minimum.
-    check: 34, cuerda: 60, nombre: 190, dup: 44, responsable: 130, telefono: 150, direccion: 220, fechaContacto: 76, sugerencia: 150, asignar: 110, conector: 130, ruta: 56,
+    // Content-sized widths. Every column keeps exactly its width except
+    // Dirección and Sugerencia (no fixed width), which split whatever room
+    // is left: both have text that gets truncated, so wide monitors show
+    // more of it instead of black gaps between short columns. For those
+    // two, the value here is only their minimum.
+    check: 34, cuerda: 60, nombre: 190, dup: 44, responsable: 130, telefono: 150, direccion: 220, fechaContacto: 76, sugerencia: 190, asignar: 130, conector: 130, ruta: 56,
   });
   const resizeCol = (col: keyof typeof colWidths) => (delta: number) => {
     setColWidths(prev => ({ ...prev, [col]: Math.max(60, prev[col] + delta) }));
@@ -1012,8 +1013,11 @@ const SemilleroPage = () => {
 
   // Pool is always unassigned or external view now (no zona cards)
   const isUnassignedView = true;
-  // Sum of the visible fixed columns plus Dirección's minimum: below this
-  // the table scrolls horizontally instead of squeezing Dirección to 0.
+  // Inbox rows show one "Pre-Asignar" button; the outbox / pending pools
+  // show two ("Confirmar …" + undo), so the column needs more room there.
+  const asignarWidth = activePool === 'unassigned' ? colWidths.asignar : Math.max(colWidths.asignar, 250);
+  // Sum of the visible fixed columns plus the flexible columns' minimums:
+  // below this the table scrolls instead of squeezing them to 0.
   const tableMinWidth = colWidths.check + colWidths.nombre + colWidths.telefono + colWidths.responsable
     + colWidths.direccion + colWidths.fechaContacto
     + (showCuerdaCol ? colWidths.cuerda : 0)
@@ -1021,7 +1025,7 @@ const SemilleroPage = () => {
     + (showConectorCol ? colWidths.conector : 0)
     + (showRutaCol ? colWidths.ruta : 0)
     + (isUnassignedView && showSugerencia ? colWidths.sugerencia : 0)
-    + (isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) ? colWidths.asignar : 0);
+    + (isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) ? asignarWidth : 0);
 
   // ─── Auto-assign preview ───────────────────────────────────────
   const autoAssignPreview = useMemo(() => {
@@ -1665,7 +1669,7 @@ const SemilleroPage = () => {
                       </button>
                     </ResizableHeader>
                     {isUnassignedView && showSugerencia && (
-                      <ResizableHeader width={colWidths.sugerencia} onResize={resizeCol('sugerencia')}>
+                      <ResizableHeader>
                         {userCuerdaHasTerritory ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1683,7 +1687,7 @@ const SemilleroPage = () => {
                         ) : 'Sugerencia'}
                       </ResizableHeader>
                     )}
-                    {isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) && <ResizableHeader width={colWidths.asignar} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
+                    {isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) && <ResizableHeader width={asignarWidth} onResize={resizeCol('asignar')}>Asignar</ResizableHeader>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1974,7 +1978,7 @@ const SemilleroPage = () => {
 
                         {/* Sugerencia / Célula asignada / Zona classification */}
                         {isUnassignedView && showSugerencia && (
-                          <td className="px-2 py-1.5" style={{ width: colWidths.sugerencia }}>
+                          <td className="px-2 py-1.5">
                             {userCuerdaHasTerritory ? (() => {
                               // 'En zona' / 'Fuera' clasificación es solo para
                               // contactos DE TU PROPIA cuerda. Un contacto de
@@ -2070,7 +2074,7 @@ const SemilleroPage = () => {
                             no MJA button because the WHOLE column was gated by
                             canAssignContacts. */}
                         {isUnassignedView && (canAssignContacts() || (!isMjaMember && canSendToMja())) && (
-                          <td className="px-2 py-1.5" style={{ width: colWidths.asignar }}>
+                          <td className="px-2 py-1.5" style={{ width: asignarWidth }}>
                             {c.cell_id ? (
                               <span className="text-[10px] text-blue-400">✓ Asignado</span>
                             ) : !isMjaMember && (c as any).pending_external_send && activePool === 'external' ? (
