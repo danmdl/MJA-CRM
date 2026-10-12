@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Pencil, Trash2, ChevronRight, HelpCircle } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, ChevronRight, HelpCircle, LifeBuoy } from 'lucide-react';
+import SupportDialog from '@/components/SupportDialog';
 import { showSuccess, showError } from '@/utils/toast';
 import { normalize } from '@/lib/normalize';
 
@@ -32,6 +33,7 @@ const AyudaPage = () => {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [editing, setEditing] = useState<Article | null>(null);
   const [creating, setCreating] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const { data: articles = [], isLoading } = useQuery<Article[]>({
     queryKey: ['help-articles'],
@@ -78,7 +80,7 @@ const AyudaPage = () => {
 
   return (
     <div className="p-3 md:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-2 mb-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <HelpCircle className="h-6 w-6 text-primary" />
@@ -87,11 +89,26 @@ const AyudaPage = () => {
           <p className="text-sm text-muted-foreground mt-1">Tutoriales, preguntas frecuentes y guías sobre la app.</p>
         </div>
         {isEditor && (
-          <Button size="sm" onClick={() => setCreating(true)} className="gap-1.5">
+          <Button size="sm" variant="outline" onClick={() => setCreating(true)} className="gap-1.5 shrink-0">
             <Plus className="h-4 w-4" /> Nuevo artículo
           </Button>
         )}
       </div>
+
+      {/* Contact support — goes straight to the admin's Mensajes inbox */}
+      <div className="flex items-center justify-between gap-3 p-3 mb-4 rounded-lg border border-primary/30 bg-primary/5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <LifeBuoy className="h-5 w-5 text-primary shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">¿No encontrás lo que buscás?</p>
+            <p className="text-xs text-muted-foreground">Mandale un mensaje a soporte y te respondemos por Mensajes.</p>
+          </div>
+        </div>
+        <Button size="sm" onClick={() => setSupportOpen(true)} className="gap-1.5 shrink-0">
+          <LifeBuoy className="h-4 w-4" /> Contactar a soporte
+        </Button>
+      </div>
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
 
       {/* Search bar */}
       <div className="relative mb-4">
