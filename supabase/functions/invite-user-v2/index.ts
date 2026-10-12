@@ -55,7 +55,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const { email, role, churchId, first_name, last_name, phone, numero_cuerda } = body;
-    const siteUrl = Deno.env.get('SITE_URL') ?? 'https://mja-one.vercel.app';
+    // Fallback must be the live site: mja-one.vercel.app is not this project.
+    const siteUrl = Deno.env.get('SITE_URL') ?? 'https://www.mjatu.casa';
 
     if (!email) {
       return new Response(JSON.stringify({ error: 'Email is required' }), {
