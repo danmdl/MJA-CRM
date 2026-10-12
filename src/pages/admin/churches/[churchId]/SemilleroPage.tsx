@@ -37,6 +37,7 @@ import {
   fetchPoolByIds,
   fetchDuplicateGroups,
   fetchDuplicateCount,
+  fetchInboxUniqueCount,
   fetchPoolCounts,
   fetchDistinctCuerdas,
   fetchDistinctResponsables,
@@ -804,6 +805,19 @@ const SemilleroPage = () => {
     refetchOnWindowFocus: true,
   });
   const inboxChipCount = poolCounts?.inbox ?? 0;
+  // The chip shows people, not records: duplicate-name groups count once.
+  const { data: inboxUniqueCount } = useQuery({
+    queryKey: ['pool-counts', 'inbox-unique', churchId, profile?.id, profile?.role, profile?.numero_cuerda, canSeeContactsFromAllCuerdas],
+    queryFn: () => fetchInboxUniqueCount(churchId!, {
+      canSeeAllCuerdas: canSeeContactsFromAllCuerdas,
+      userCuerda: profile?.numero_cuerda || null,
+      userId: profile?.id || null,
+      userRole: profile?.role || null,
+    }),
+    enabled: !!churchId && !!profile,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
   const outboxChipCount = isMjaMember ? 0 : (poolCounts?.outbox ?? 0);
   const pendingChipCount = poolCounts?.pending ?? 0;
 
@@ -1204,10 +1218,12 @@ const SemilleroPage = () => {
           type="button"
           onClick={() => { setActivePool('unassigned'); setSearchTerm(''); }}
           className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md border transition-colors ${activePool === 'unassigned' ? 'border-primary bg-primary/10' : 'border-border hover:border-foreground/30'}`}
-          title="Total de contactos en tu inbox (sin contar los que están en outbox o pre-asignados)."
+          title={inboxUniqueCount != null && inboxUniqueCount < inboxTotalCount
+            ? `${inboxUniqueCount.toLocaleString('es-AR')} personas en tu inbox (${inboxTotalCount.toLocaleString('es-AR')} registros: ${(inboxTotalCount - inboxUniqueCount).toLocaleString('es-AR')} son duplicados). No cuenta outbox ni pre-asignados.`
+            : 'Personas en tu inbox (sin contar los que están en outbox o pre-asignados).'}
         >
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Inbox</span>
-          <span className={`text-sm font-bold tabular-nums ${inboxTotalCount > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : inboxTotalCount}</span>
+          <span className={`text-sm font-bold tabular-nums ${inboxTotalCount > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{isLoading ? '…' : (inboxUniqueCount ?? inboxTotalCount)}</span>
         </button>
         {/* Outbox chip — only for non-MJA users (referentes etc.). MJA
             members don't have an outbox: contacts dispatched to MJA
