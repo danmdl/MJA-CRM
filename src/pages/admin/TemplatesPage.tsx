@@ -34,6 +34,11 @@ const TemplatesPage = () => {
   const userId = session?.user?.id;
   const userName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuario' : 'Usuario';
   const isAdmin = profile?.role === 'admin';
+  // Pastor and up can publish system templates (everyone sees them). Only the
+  // author, an admin or a general can edit or delete one; the DB enforces it.
+  const canCreateSystem = ['admin', 'general', 'pastor', 'supervisor'].includes(profile?.role ?? '');
+  const canManage = (t: WhatsAppTemplate) =>
+    !t.is_system || t.user_id === userId || isAdmin || profile?.role === 'general';
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -42,6 +47,7 @@ const TemplatesPage = () => {
   const [newName, setNewName] = useState('');
   const [newBody, setNewBody] = useState('');
   const [newIsDefault, setNewIsDefault] = useState(false);
+  const [newIsSystem, setNewIsSystem] = useState(false);
   const [newImageUrl, setNewImageUrl] = useState<string | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -112,7 +118,10 @@ const TemplatesPage = () => {
   const handleCreate = async () => {
     if (!newName.trim() || !newBody.trim() || !userId) return;
     
-    if (newIsDefault) {
+    const isSystem = canCreateSystem && newIsSystem;
+    // A default is personal; a system template is shared, so it never is one.
+    const isDefault = newIsDefault && !isSystem;
+    if (isDefault) {
       await supabase.from('whatsapp_templates').update({ is_default: false }).eq('user_id', userId);
     }
     
@@ -120,7 +129,8 @@ const TemplatesPage = () => {
       user_id: userId,
       name: newName.trim(),
       body: newBody.trim(),
-      is_default: newIsDefault,
+      is_default: isDefault,
+      is_system: isSystem,
       image_url: newImageUrl,
     });
     
@@ -129,10 +139,11 @@ const TemplatesPage = () => {
       return;
     }
     
-    showSuccess(newIsDefault ? 'Plantilla creada como default.' : 'Plantilla creada.');
+    showSuccess(isSystem ? 'Plantilla del sistema creada: ya la ven todos.' : isDefault ? 'Plantilla creada como default.' : 'Plantilla creada.');
     setNewName('');
     setNewBody('');
     setNewIsDefault(false);
+    setNewIsSystem(false);
     setNewImageUrl(null);
     setCreating(false);
     loadTemplates();
@@ -405,15 +416,33 @@ const TemplatesPage = () => {
               )}
             </div>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={newIsDefault}
-                onChange={(e) => setNewIsDefault(e.target.checked)}
-                className="rounded border-input"
-              />
-              Marcar como plantilla por defecto
-            </label>
+            {canCreateSystem && (
+              <label className="flex items-start gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newIsSystem}
+                  onChange={(e) => setNewIsSystem(e.target.checked)}
+                  className="rounded border-input mt-0.5"
+                />
+                <span>
+                  Plantilla del sistema (visible para todos)
+                  <span className="block text-[11px] text-muted-foreground">
+                    Todos la pueden usar, pero solo vos, un admin o un general la pueden editar o borrar.
+                  </span>
+                </span>
+              </label>
+            )}
+            {!newIsSystem && (
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newIsDefault}
+                  onChange={(e) => setNewIsDefault(e.target.checked)}
+                  className="rounded border-input"
+                />
+                Marcar como plantilla por defecto
+              </label>
+            )}
             <div className="flex gap-2">
               <Button onClick={handleCreate} disabled={!newName.trim() || !newBody.trim() || uploadingImage} className="gap-2">
                 <Save className="h-4 w-4" /> Guardar
@@ -522,7 +551,7 @@ const TemplatesPage = () => {
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        Por {template.is_system ? 'Admin' : userName} · {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        Por {template.user_id === userId ? userName : 'Sistema'} · {new Date(template.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                       </p>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
@@ -553,7 +582,7 @@ const TemplatesPage = () => {
                               <Star className="h-3 w-3" />
                             </Button>
                           )}
-                          {(!template.is_system || isAdmin) && (
+                          {canManage(template) && (
                             <>
                               <Button
                                 variant="ghost"
@@ -575,7 +604,7 @@ const TemplatesPage = () => {
                             </>
                           )}
                         </>
-                      ) : (
+                      ) : canManage(template) && (
                         <>
                           <Button
                             variant="ghost"
