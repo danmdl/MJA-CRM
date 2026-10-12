@@ -335,11 +335,16 @@ const duplicateArgs = (churchId: string, v: DuplicateScope) => ({
   p_can_see_all: v.canSeeAllCuerdas,
 });
 
-/** How many contacts are in a duplicate group, without downloading them. */
-export async function fetchDuplicateCount(churchId: string, v: DuplicateScope): Promise<number> {
-  const { count, error } = await supabase.rpc('get_duplicate_name_groups', duplicateArgs(churchId, v), { head: true, count: 'exact' });
+/**
+ * Duplicate totals without downloading the groups (migration 0044):
+ * `records` = every contact in a duplicate-name group (originals
+ * included), `people` = how many groups. Extra copies = records - people.
+ */
+export async function fetchDuplicateSummary(churchId: string, v: DuplicateScope): Promise<{ records: number; people: number }> {
+  const { data, error } = await supabase.rpc('get_duplicate_summary', duplicateArgs(churchId, v));
   if (error) throw error;
-  return count ?? 0;
+  const row = (data as { records: number; people: number }[] | null)?.[0];
+  return { records: row?.records ?? 0, people: row?.people ?? 0 };
 }
 
 /** Inbox people (each duplicate-name group counted once), migration 0043. */

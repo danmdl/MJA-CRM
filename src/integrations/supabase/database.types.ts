@@ -2387,6 +2387,19 @@ export type Database = {
           group_no: number
         }[]
       }
+      get_duplicate_summary: {
+        Args: {
+          p_can_see_all: boolean
+          p_church_id: string
+          p_user_cuerda: string | null
+          p_user_id: string | null
+          p_user_role: string | null
+        }
+        Returns: {
+          people: number
+          records: number
+        }[]
+      }
       get_inbox_unique_count: {
         Args: {
           p_can_see_all: boolean

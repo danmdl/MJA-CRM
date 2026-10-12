@@ -41,7 +41,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-const { fetchPoolPage, fetchPoolAll, fetchPoolByIds, fetchDuplicateGroups, fetchInboxUniqueCount, fetchDistinctConectores, fetchDistinctCuerdas, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
+const { fetchPoolPage, fetchPoolAll, fetchPoolByIds, fetchDuplicateGroups, fetchInboxUniqueCount, fetchDuplicateSummary, fetchDistinctConectores, fetchDistinctCuerdas, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
 
 const baseFilters: PoolFilters = {
   churchId: 'church-1',
@@ -235,5 +235,19 @@ describe('fetchInboxUniqueCount', () => {
     expect(rpcCalls).toEqual([['get_inbox_unique_count', {
       p_church_id: 'church-1', p_user_role: 'referente', p_user_cuerda: '104', p_user_id: 'u1', p_can_see_all: false,
     }]]);
+  });
+});
+
+describe('fetchDuplicateSummary', () => {
+  it('returns records and people so the chip can show extra copies', async () => {
+    rpcResult = { data: [{ records: 2257, people: 924 }], error: null };
+    const r = await fetchDuplicateSummary('church-1', { canSeeAllCuerdas: true, userCuerda: null, userId: 'u1', userRole: 'admin' });
+    expect(r).toEqual({ records: 2257, people: 924 });
+    expect(r.records - r.people).toBe(1333);
+    expect(rpcCalls[0][0]).toBe('get_duplicate_summary');
+  });
+  it('treats an empty answer as zero', async () => {
+    rpcResult = { data: [], error: null };
+    expect(await fetchDuplicateSummary('church-1', { canSeeAllCuerdas: true, userCuerda: null, userId: 'u1' })).toEqual({ records: 0, people: 0 });
   });
 });
