@@ -122,7 +122,9 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, con
 
   // Load templates
   const loadTemplates = async (autoLoadDefault = false) => {
-    if (!userId || !canUseTemplates()) return;
+    // Without the template permission RLS returns only system templates,
+    // which everyone can use.
+    if (!userId) return;
     const { data } = await supabase.from('whatsapp_templates')
       .select('id, name, body, is_default, is_system, image_url')
       .or(`user_id.eq.${userId},is_system.eq.true`)
@@ -269,7 +271,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, con
         </DialogHeader>
 
         {/* TOP BAR: Template picker + variable chips */}
-        {canUseTemplates() && (
+        {(canUseTemplates() || templates.length > 0) && (
           <div className="px-5 py-3 border-b bg-muted/10 shrink-0 space-y-2">
             <div className="flex items-center gap-3">
               <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">Plantilla</label>
@@ -333,7 +335,7 @@ const WhatsAppComposeDialog = ({ open, onOpenChange, contactId, contactName, con
               ref={textareaRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder={canUseTemplates() ? 'Escribí tu mensaje o elegí una plantilla arriba' : 'Escribí tu mensaje'}
+              placeholder={canUseTemplates() || templates.length > 0 ? 'Escribí tu mensaje o elegí una plantilla arriba' : 'Escribí tu mensaje'}
               className="flex-1 text-sm resize-none min-h-[140px] md:min-h-[220px] font-mono"
             />
           </div>

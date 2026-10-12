@@ -29,6 +29,7 @@ interface Template {
   name: string;
   body: string;
   is_default: boolean;
+  is_system: boolean;
 }
 
 const BulkWhatsAppDialog = ({ open, onOpenChange, contacts, churchId, onSent }: BulkWhatsAppDialogProps) => {
@@ -44,14 +45,16 @@ const BulkWhatsAppDialog = ({ open, onOpenChange, contacts, churchId, onSent }: 
     (async () => {
       const userId = (await supabase.auth.getSession()).data.session?.user?.id;
       const { data } = await supabase.from('whatsapp_templates')
-        .select('id, name, body, is_default')
+        .select('id, name, body, is_default, is_system')
         .or(`user_id.eq.${userId},is_system.eq.true${churchId ? `,church_id.eq.${churchId}` : ''}`)
+        .is('deleted_at', null)
         .order('is_default', { ascending: false })
         .order('name');
       const list = (data || []) as Template[];
       setTemplates(list);
       // Auto-select default template
-      const def = list.find(t => t.is_default);
+      // The user's own default; a system template is never one.
+      const def = list.find(t => t.is_default && !t.is_system);
       if (def) {
         setSelectedTemplateName(def.name);
         setMessage(def.body);
