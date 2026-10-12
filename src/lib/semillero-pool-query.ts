@@ -342,6 +342,13 @@ export async function fetchDuplicateCount(churchId: string, v: DuplicateScope): 
   return count ?? 0;
 }
 
+/** Inbox people (each duplicate-name group counted once), migration 0043. */
+export async function fetchInboxUniqueCount(churchId: string, v: DuplicateScope): Promise<number> {
+  const { data, error } = await supabase.rpc('get_inbox_unique_count', duplicateArgs(churchId, v));
+  if (error) throw error;
+  return (data as number | null) ?? 0;
+}
+
 /** Duplicate-name groups across the user's whole scope (migration 0041). */
 export async function fetchDuplicateGroups(churchId: string, v: DuplicateScope): Promise<DuplicateGroupRow[]> {
   // ~2.3k rows today; page past the 1000-row cap.

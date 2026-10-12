@@ -41,7 +41,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-const { fetchPoolPage, fetchPoolAll, fetchPoolByIds, fetchDuplicateGroups, fetchDistinctConectores, fetchDistinctCuerdas, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
+const { fetchPoolPage, fetchPoolAll, fetchPoolByIds, fetchDuplicateGroups, fetchInboxUniqueCount, fetchDistinctConectores, fetchDistinctCuerdas, ESTADO_CIVIL_PATTERNS } = await import('./semillero-pool-query');
 
 const baseFilters: PoolFilters = {
   churchId: 'church-1',
@@ -224,5 +224,16 @@ describe('duplicates', () => {
     expect(rows).toHaveLength(1256);
     expect(rpcCalls.map(c => c[0])).toEqual(['get_duplicate_name_groups', 'get_duplicate_name_groups']);
     expect(rpcCalls[0][1]).toMatchObject({ p_church_id: 'church-1', p_can_see_all: true, p_user_role: 'admin' });
+  });
+});
+
+describe('fetchInboxUniqueCount', () => {
+  it('asks the server for people, not records', async () => {
+    rpcResult = { data: 6406, error: null };
+    const n = await fetchInboxUniqueCount('church-1', { canSeeAllCuerdas: false, userCuerda: '104', userId: 'u1', userRole: 'referente' });
+    expect(n).toBe(6406);
+    expect(rpcCalls).toEqual([['get_inbox_unique_count', {
+      p_church_id: 'church-1', p_user_role: 'referente', p_user_cuerda: '104', p_user_id: 'u1', p_can_see_all: false,
+    }]]);
   });
 });
